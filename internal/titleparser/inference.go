@@ -8,7 +8,7 @@ import (
 // 优先级: 源站分类 > 标题季集 > PTGen genre > 默认电影
 func InferCategory(c TitleComponents, sourceCategory string, ptgenGenre string, ptgenEpisodes string) string {
 	// ① 源站分类优先（最可信）
-	if cat := normalizeSourceCategory(sourceCategory); cat != "" {
+	if cat := NormalizeSourceCategory(sourceCategory); cat != "" {
 		return cat
 	}
 
@@ -46,8 +46,12 @@ func InferCategory(c TitleComponents, sourceCategory string, ptgenGenre string, 
 	return "category.movie"
 }
 
-// normalizeSourceCategory 将源站分类归一化为标准键
-func normalizeSourceCategory(raw string) string {
+// NormalizeSourceCategory 将源站分类归一化为标准键（§59.317 全键族重写）。
+// 覆盖 dict category.* 全部 canonical 键 + 站方中文词；特定键先于泛化键
+// （lossless_music 先于 music——防前缀误吞）。旧映射表遗留值兼容：
+// "category.cartoon" 仍归 animation（存量行 P1 刷正前的显示一致性）。
+// 导出：api 层 normalizeCategorySimple 委托此单点（消灭平行实现 §59.26 教训）。
+func NormalizeSourceCategory(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
@@ -55,6 +59,28 @@ func normalizeSourceCategory(raw string) string {
 	lower := strings.ToLower(raw)
 
 	switch {
+	// §59.317 新键族（特定→泛化排序）
+	case containsAny(lower, "lossless", "无损"):
+		return "category.lossless_music"
+	case containsAny(lower, "audiobook", "有声书", "有聲書"):
+		return "category.audiobook"
+	case containsAny(lower, "ebook", "电子书", "電子書"):
+		return "category.ebook"
+	case containsAny(lower, "concert", "演唱"):
+		return "category.concert"
+	case containsAny(lower, "education", "教育", "study"):
+		return "category.education"
+	case containsAny(lower, "game", "游戏", "遊戲"):
+		return "category.game"
+	case containsAny(lower, "software", "软件", "軟體"):
+		return "category.software"
+	case containsAny(lower, "short_drama", "短剧", "短劇", "playlet"):
+		return "category.short_drama"
+	case containsAny(lower, "comic", "漫画", "漫畫"):
+		return "category.comic"
+	case containsAny(lower, "adult", "成人"):
+		return "category.adult"
+	// 媒体主类（原有键族保持）
 	case containsAny(lower, "电影", "movie"):
 		return "category.movie"
 	case containsAny(lower, "电视剧", "剧集", "tv series", "tv-series", "series"):
@@ -65,7 +91,7 @@ func normalizeSourceCategory(raw string) string {
 		return "category.animation"
 	case containsAny(lower, "纪录", "documentary", "document"):
 		return "category.documentary"
-	case containsAny(lower, "音乐", "music", "concert", "演唱会"):
+	case containsAny(lower, "音乐", "music", "演唱会"):
 		return "category.music"
 	case containsAny(lower, "体育", "sport"):
 		return "category.sports"

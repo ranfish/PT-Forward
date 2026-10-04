@@ -1480,30 +1480,11 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 	})
 }
 
+// normalizeCategorySimple §59.317: 委托 titleparser.NormalizeSourceCategory 单点
+// （原平行实现——键族覆盖漂移的重复造轮子，§59.26 教训；行为变化：未知输入
+// 由原样返回改为返回 ""——RSS seen 原始 ID 形态不再泄漏到展示层）。
 func normalizeCategorySimple(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	lower := strings.ToLower(raw)
-	switch {
-	case strings.Contains(lower, "movie") || strings.Contains(raw, "电影"):
-		return "category.movie"
-	case strings.Contains(lower, "tv") || strings.Contains(lower, "series") || strings.Contains(raw, "电视剧") || strings.Contains(raw, "剧集"):
-		return "category.tv_series"
-	case strings.Contains(lower, "anim") || strings.Contains(raw, "动漫") || strings.Contains(raw, "动画"):
-		return "category.animation"
-	case strings.Contains(lower, "doc") || strings.Contains(raw, "纪录"):
-		return "category.documentaries"
-	case strings.Contains(lower, "variety") || strings.Contains(lower, "show") || strings.Contains(raw, "综艺"):
-		return "category.tv_shows"
-	case strings.Contains(lower, "music") || strings.Contains(raw, "音乐"):
-		return "category.music"
-	case strings.Contains(lower, "sport") || strings.Contains(raw, "体育"):
-		return "category.sports"
-	default:
-		return ""
-	}
+	return titleparser.NormalizeSourceCategory(raw)
 }
 
 func inferTypeFromName(name string) string {
