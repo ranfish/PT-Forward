@@ -556,7 +556,15 @@ func TestMTeamAdapter_DownloadViaAPI(t *testing.T) {
 }
 
 func TestMTeamAdapter_DetailViaAPI(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// §59.317 P3: resolveCategory 动态首拉——返回空树（回退静态表，不影响断言）
+		if r.URL.Path == "/api/torrent/categoryList" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"code":"0","data":{"list":[],"adult":[]}}`))
+			return
+		}
 		if r.URL.Path != "/api/torrent/detail" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
