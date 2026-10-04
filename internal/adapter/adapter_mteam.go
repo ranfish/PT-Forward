@@ -184,7 +184,7 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 				Title:     item.Name,
 				Size:      int64(item.Size),
 				Seeders:   int(item.Status.Seeders),
-				Leechers: int(item.Status.Leechers),
+				Leechers:  int(item.Status.Leechers),
 			}
 			if mode == "adult" {
 				r.Adult = true
@@ -403,9 +403,9 @@ func normalizeMTeamCategoryID(raw string) string {
 // （2024-03 级改版）才需人工更新，且彼时 miss 告警必响。
 
 const (
-	mteamCategoryTTL         = 24 * time.Hour
+	mteamCategoryTTL          = 24 * time.Hour
 	mteamCategoryRetryBackoff = 10 * time.Minute // 拉取失败退避（防风暴）
-	mteamCategoryPullTimeout = 5 * time.Second
+	mteamCategoryPullTimeout  = 5 * time.Second
 )
 
 // 主类 ID → canonical（7 主类，权威树稳定层——叶子默认继承）
@@ -526,8 +526,8 @@ func (a *MTeamAdapter) fetchCategoryList(ctx context.Context, config *model.Site
 		Code json.Number `json:"code"`
 		Data struct {
 			List []struct {
-				ID      string  `json:"id"`
-				Parent  *string `json:"parent"`
+				ID     string  `json:"id"`
+				Parent *string `json:"parent"`
 			} `json:"list"`
 			Adult []string `json:"adult"`
 		} `json:"data"`
@@ -943,12 +943,12 @@ func parseMTeamFeedParams(feedURL string) (categories, teams []int, pageSize int
 
 func defaultMTeamDiscounts() map[string]bool {
 	return map[string]bool{
-		"FREE":        true,
-		"_2X_FREE":    true,
-		"FREE_2XUP":   true,
-		"TWOFREE":     true,
-		"_2X":         true,
-		"2XUP":        true,
+		"FREE":           true,
+		"_2X_FREE":       true,
+		"FREE_2XUP":      true,
+		"TWOFREE":        true,
+		"_2X":            true,
+		"2XUP":           true,
 		"_2X_PERCENT_50": true,
 	}
 }
