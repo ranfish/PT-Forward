@@ -68,11 +68,17 @@ func main() {
 	// download_handler: 子查询实参（torrent_snapshots AS s2）片段缝合进外层——真实 SQL 合法
 	// reseed_handler: 变量持有 builder（query := Model(ReseedMatch) 后续 query.Where）+ 子查询
 	//   Model(TorrentMetadata) 被 analyzeStmt 直捕——source_info_hash 属外层 reseed_matches
+	// publish_torrents_handler §59.316: 行值 IN (子查询)——合成占位符 (1) 破坏行值元数
+	//   （SQLite EXPLAIN 期报 "IN(...) element has 1 term - expected 3"）；真实 SQL 运行时
+	//   合法（29/243 双环境数据级验证）
 	knownFP := func(c chain) bool {
 		if c.file == "internal/api/download_handler.go" && c.table == "torrent_snapshots AS s" {
 			return true
 		}
 		if c.file == "internal/api/reseed_handler.go" && strings.Contains(strings.Join(whereFrags(c), " "), "source_info_hash IN") {
+			return true
+		}
+		if c.file == "internal/api/publish_torrents_handler.go" && strings.Contains(strings.Join(whereFrags(c), " "), "(client_uid, save_path, name) IN") {
 			return true
 		}
 		return false
