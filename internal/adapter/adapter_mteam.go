@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -380,9 +381,10 @@ var mteamCategoryMap = map[string]string{
 	"451": "category.education", // 2025-05 新增：教育影片
 }
 
-// normalizeMTeamCategoryID §59.317: 馒头 API 原始分类 ID → 标准 canonical 单点。
+// normalizeMTeamCategoryID §59.317 P0: 馒头 API 原始分类 ID → 标准 canonical（静态表）。
 // 成人区命中 → category.adult；map 命中 → canonical；未收录 → ""（调用方回退）。
-// detail 与 RSS（FetchItemsByAPI）两链统一走此口径。
+// detail 与 RSS（FetchItemsByAPI）两链统一走此口径；动态缓存（§59.317 P3）
+// 未命中时回退本表。
 func normalizeMTeamCategoryID(raw string) string {
 	if raw == "" {
 		return ""
@@ -391,6 +393,180 @@ func normalizeMTeamCategoryID(raw string) string {
 		return "category.adult"
 	}
 	return mteamCategoryMap[raw]
+}
+
+// ===== §59.317 P3: categoryList 动态映射（防腐——站方持续加分类 451/453 实证）=====
+//
+// 架构：动态缓存（TTL 24h，singleflight 式锁合并并发首拉）→ 静态表兜底（本文件
+// P0 权威快照）→ 双 miss Warn 告警。映射生成走"主类继承 + 叶子例外"两张稳定
+// 小表——新叶子挂已知主类下自动继承正确 canonical（防腐机理），仅主类重排
+// （2024-03 级改版）才需人工更新，且彼时 miss 告警必响。
+
+const (
+	mteamCategoryTTL         = 24 * time.Hour
+	mteamCategoryRetryBackoff = 10 * time.Minute // 拉取失败退避（防风暴）
+	mteamCategoryPullTimeout = 5 * time.Second
+)
+
+// 主类 ID → canonical（7 主类，权威树稳定层——叶子默认继承）
+var mteamParentCanonical = map[string]string{
+	"100": "category.movie",
+	"105": "category.tv_series",
+	"444": "category.documentary",
+	"449": "category.animation",
+	"110": "category.music",
+	"447": "category.game",
+	"450": "category.other",
+}
+
+// 叶子例外（与主类 canonical 不同的叶子——主类 other 下各专类 + Music 特化）
+var mteamLeafOverride = map[string]string{
+	"406": "category.concert",
+	"434": "category.lossless_music",
+	"442": "category.audiobook",
+	"427": "category.ebook",
+	"422": "category.software",
+	"407": "category.sports",
+	"451": "category.education",
+}
+
+type mteamCategoryCache struct {
+	mu        sync.RWMutex
+	idMap     map[string]string // ID → canonical（含主类自身）
+	adult     map[string]bool   // 动态成人集（与静态集并集使用）
+	fetchedAt time.Time
+	lastErr   time.Time
+}
+
+// 进程级单例（馒头站点配置进程内唯一；缓存不含凭证）
+var mteamCatCache = &mteamCategoryCache{}
+
+func (c *mteamCategoryCache) reset() {
+	c.mu.Lock()
+	c.idMap = nil
+	c.adult = nil
+	c.fetchedAt = time.Time{}
+	c.lastErr = time.Time{}
+	c.mu.Unlock()
+}
+
+// resolveCategory 动态→静态两级解析（detail/RSS 两链入口）。
+func (a *MTeamAdapter) resolveCategory(ctx context.Context, config *model.SiteConfig, raw string) string {
+	if raw == "" {
+		return ""
+	}
+	a.refreshCategoryCache(ctx, config)
+	mteamCatCache.mu.RLock()
+	isAdult, adultOK := mteamCatCache.adult[raw]
+	canonical, ok := mteamCatCache.idMap[raw]
+	mteamCatCache.mu.RUnlock()
+	if adultOK && isAdult {
+		return "category.adult"
+	}
+	if ok {
+		return canonical
+	}
+	// 静态兜底（动态未加载/未收录）
+	return normalizeMTeamCategoryID(raw)
+}
+
+// refreshCategoryCache TTL 内零开销（RLock 快路径）；过期/未加载时锁内单飞拉取，
+// 失败退避后不重试风暴。
+func (a *MTeamAdapter) refreshCategoryCache(ctx context.Context, config *model.SiteConfig) {
+	c := mteamCatCache
+	c.mu.RLock()
+	fresh := time.Since(c.fetchedAt) < mteamCategoryTTL
+	backoff := time.Since(c.lastErr) < mteamCategoryRetryBackoff
+	c.mu.RUnlock()
+	if fresh || backoff {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if time.Since(c.fetchedAt) < mteamCategoryTTL || time.Since(c.lastErr) < mteamCategoryRetryBackoff {
+		return // 双检（并发首拉合并）
+	}
+	if err := a.fetchCategoryList(ctx, config); err != nil {
+		c.lastErr = time.Now()
+		if a.logger != nil {
+			a.logger.Warn("mteam categoryList fetch failed, fallback static", zap.Error(err))
+		}
+		return
+	}
+	c.fetchedAt = time.Now()
+	if a.logger != nil {
+		a.logger.Info("mteam category cache refreshed",
+			zap.Int("ids", len(c.idMap)), zap.Int("adult", len(c.adult)))
+	}
+}
+
+// fetchCategoryList 拉取并生成映射（锁内调用）。
+// 生成规则：叶子 = 例外表 ?? 主类继承；主类自身直接映射；归一失败的跳过
+// （保持 miss 告警闭环——新语义分类需人工定案后入例外表）。
+func (a *MTeamAdapter) fetchCategoryList(ctx context.Context, config *model.SiteConfig) error {
+	pullCtx, cancel := context.WithTimeout(ctx, mteamCategoryPullTimeout)
+	defer cancel()
+	u := resolveBaseURL(config) + "/api/torrent/categoryList"
+	req, err := http.NewRequestWithContext(pullCtx, http.MethodPost, u, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	a.setAPIHeaders(req, config.APIKey)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { drainBody(resp) }()
+	body, err := readBody(resp)
+	if err != nil {
+		return err
+	}
+	var result struct {
+		Code json.Number `json:"code"`
+		Data struct {
+			List []struct {
+				ID      string  `json:"id"`
+				Parent  *string `json:"parent"`
+			} `json:"list"`
+			Adult []string `json:"adult"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return parseError("解析 categoryList 失败", err)
+	}
+	if result.Code.String() != "0" {
+		return parseError(fmt.Sprintf("categoryList API 失败: code=%s", result.Code.String()), nil)
+	}
+	adult := make(map[string]bool, len(result.Data.Adult))
+	for _, id := range result.Data.Adult {
+		adult[id] = true
+	}
+	idMap := make(map[string]string, len(result.Data.List))
+	for _, item := range result.Data.List {
+		if adult[item.ID] {
+			continue // 成人叶子走 adult 集
+		}
+		if item.Parent == nil {
+			// 主类自身
+			if canonical, ok := mteamParentCanonical[item.ID]; ok {
+				idMap[item.ID] = canonical
+			}
+			continue
+		}
+		if canonical, ok := mteamLeafOverride[item.ID]; ok {
+			idMap[item.ID] = canonical
+			continue
+		}
+		if canonical, ok := mteamParentCanonical[*item.Parent]; ok {
+			idMap[item.ID] = canonical // 主类继承（新叶子防腐路径）
+		}
+		// 主类也未知（站方加新主类/重排）→ 跳过，miss 告警闭环
+	}
+	c := mteamCatCache
+	c.idMap = idMap
+	c.adult = adult
+	return nil
 }
 
 func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -489,9 +665,9 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 			detail.Screenshots = detail.Screenshots[1:]
 		}
 	}
-	// §59.317: 分类归一走 normalizeMTeamCategoryID 单点（成人集+权威树 map）。
+	// §59.317 P0+P3: 分类归一——动态缓存（categoryList）→ 静态表两级解析。
 	// 成人区命中：flags 标记 adult（§56.40 合规增强）+ category.adult。
-	if nc := normalizeMTeamCategoryID(detail.Category); nc != "" {
+	if nc := a.resolveCategory(ctx, config, detail.Category); nc != "" {
 		detail.Category = nc
 		if nc == "category.adult" {
 			detail.Flags = []string{"adult"}
@@ -706,7 +882,7 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 			// §59.317: RSS 链同口径归一——原透传原始 ID（如 "421"）落
 			// rss_torrent_seen.source_category，消费端（normalizeCategorySimple/
 			// compliance lookupSourceCategory）均无法归一（回归审查遗漏 A）。
-			Category: normalizeMTeamCategoryID(item.Category),
+			Category: a.resolveCategory(ctx, config, item.Category),
 			Metadata: map[string]any{},
 		}
 		events = append(events, ev)

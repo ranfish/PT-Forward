@@ -114,6 +114,8 @@ func TestFetchItemsByAPI_NoAPIKey(t *testing.T) {
 }
 
 func TestFetchItemsByAPI_OK(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
 	apiResp := map[string]interface{}{
 		"code": "0",
 		"data": map[string]interface{}{
@@ -280,6 +282,8 @@ func TestNormalizeMTeamCategoryIDAdult(t *testing.T) {
 // TestFetchItemsByAPI_CategoryMapped §59.317: RSS 链分类归一——原始 ID 不再透传
 // 落 rss_torrent_seen.source_category（回归审查遗漏 A）。
 func TestFetchItemsByAPI_CategoryMapped(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
 	apiResp := map[string]interface{}{
 		"code": "0",
 		"data": map[string]interface{}{
@@ -301,6 +305,14 @@ func TestFetchItemsByAPI_CategoryMapped(t *testing.T) {
 	}
 	body, _ := json.Marshal(apiResp)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// §59.317 P3: resolveCategory 动态首拉——显式服务权威树（确定性 mock）
+		if r.URL.Path == "/api/torrent/categoryList" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"code":"0","data":{"list":[` +
+				`{"id":"100","parent":null},{"id":"421","parent":"100"},{"id":"449","parent":null},{"id":"405","parent":"449"}` +
+				`],"adult":["429"]}}`))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(body)
 	}))
@@ -319,5 +331,73 @@ func TestFetchItemsByAPI_CategoryMapped(t *testing.T) {
 		if ev.Category != want[ev.Title] {
 			t.Errorf("%s: category = %q, want %q", ev.Title, ev.Category, want[ev.Title])
 		}
+	}
+}
+
+// TestMTeamCategoryDynamicInherit §59.317 P3: 动态映射——主类继承防腐。
+// 伪造新叶子（999 挂 449 動漫下）自动继承 animation；成人分组动态消费；
+// 动态未收录 ID 回退静态表。
+func TestMTeamCategoryDynamicInherit(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/torrent/categoryList" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"code":"0","data":{"list":[` +
+			`{"id":"449","parent":null},` +
+			`{"id":"999","parent":"449"},` +
+			`{"id":"421","parent":"100"},` +
+			`{"id":"100","parent":null},` +
+			`{"id":"777","parent":"888"}` + // 未知主类——跳过（miss 闭环）
+			`],"adult":["429"]}}`))
+	}))
+	defer srv.Close()
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	cfg := &model.SiteConfig{Domain: srv.URL, APIKey: "k"}
+
+	ctx := context.Background()
+	if got := a.resolveCategory(ctx, cfg, "999"); got != "category.animation" {
+		t.Errorf("新叶子应继承主类 449→animation, got %q", got)
+	}
+	if got := a.resolveCategory(ctx, cfg, "421"); got != "category.movie" {
+		t.Errorf("421 应电影/BluRay→movie, got %q", got)
+	}
+	if got := a.resolveCategory(ctx, cfg, "429"); got != "category.adult" {
+		t.Errorf("动态成人分组应生效, got %q", got)
+	}
+	if got := a.resolveCategory(ctx, cfg, "434"); got != "category.lossless_music" {
+		t.Errorf("叶子例外表应生效（434→lossless_music）, got %q", got)
+	}
+	if got := a.resolveCategory(ctx, cfg, "777"); got != "" {
+		t.Errorf("未知主类叶子应跳过（miss 闭环）, got %q", got)
+	}
+	if got := a.resolveCategory(ctx, cfg, "406"); got != "category.concert" {
+		t.Errorf("动态例外 406→concert, got %q", got)
+	}
+}
+
+// TestMTeamCategoryDynamicFallback §59.317 P3: 拉取失败回退静态表 + 退避防风暴
+// （第二次调用不再打服务器）。
+func TestMTeamCategoryDynamicFallback(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	cfg := &model.SiteConfig{Domain: srv.URL, APIKey: "k"}
+
+	ctx := context.Background()
+	if got := a.resolveCategory(ctx, cfg, "421"); got != "category.movie" {
+		t.Errorf("失败应回退静态表 421→movie, got %q", got)
+	}
+	_ = a.resolveCategory(ctx, cfg, "405") // 退避期内不再拉
+	if hits != 1 {
+		t.Errorf("退避防风暴失效: hits=%d, want 1", hits)
 	}
 }
