@@ -5641,7 +5641,7 @@ func (e *Engine) QuerySingleCoverage(ctx context.Context, infoHash string, clien
 		return hits
 	}
 	var sites []model.Site
-	e.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+	e.db.WithContext(ctx).Where("enabled = ? AND is_reseed_target = ?", true, true).Find(&sites)
 
 	type phResult struct {
 		siteName string
@@ -5772,7 +5772,7 @@ func (e *Engine) QueryBatchCoverage(ctx context.Context, infoHashes []string, cl
 		return result
 	}
 	var sites []model.Site
-	e.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+	e.db.WithContext(ctx).Where("enabled = ? AND is_reseed_target = ?", true, true).Find(&sites)
 
 	// 去重 pieces_hash 列表
 	allPieces := make([]string, 0, len(hashToPieces))

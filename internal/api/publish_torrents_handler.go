@@ -349,7 +349,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	trackerMatcher := site.NewTrackerMatcher(h.db)
 
 	var totalSites int64
-	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites).Error; err != nil {
+	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -704,7 +704,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	cached, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)
 
 	var totalSites int64
-	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites).Error; err != nil {
+	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 

@@ -393,7 +393,9 @@
     "specialNotes": "备注",
     "blocked": "不可用",
     "blockedSiteWarning": "该站点当前不可添加",
-    "createModeDomainLocked": "由系统白名单自动填充"
+    "createModeDomainLocked": "由系统白名单自动填充",
+    "reseedTarget": "辅种探测",
+    "publishUnsupported": "未适配发布"
   },
   "downloader": {
     "title": "下载器管理",

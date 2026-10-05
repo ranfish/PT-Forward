@@ -334,20 +334,22 @@ func TestSettings_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+// §59.318 N1 收权重构：站点全集开发者随版本管理（seed+migration），用户端
+// create/delete 端点已收回（405）——测试改为验证收权 + 直插库走读/改路径。
 func TestSites_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
-	// 使用 supported_sites.json 里的真实 domain（步骤 3 强白名单校验）
-	createBody := map[string]interface{}{
-		"domain": "longpt.org",
+	// ①收权验证：POST /sites 已收回（405）
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "longpt.org"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
-	w := env.doRequest("POST", "/api/v1/sites", createBody)
-	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
-		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
+
+	seeded := &model.Site{Name: "Seeded", Domain: "longpt.org", BaseURL: "https://longpt.org",
+		Framework: "nexusphp", AuthType: "cookie", Enabled: true}
+	if err := env.db.Create(seeded).Error; err != nil {
+		t.Fatal(err)
 	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	siteID := data["id"].(float64)
 
 	w = env.doRequest("GET", "/api/v1/sites", nil)
 	if w.Code != http.StatusOK {
@@ -360,23 +362,24 @@ func TestSites_CRUD(t *testing.T) {
 		t.Fatalf("expected 1 site, got %d", len(items))
 	}
 
-	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d", int(siteID)), nil)
+	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d", seeded.ID), nil)
 	if w.Code != http.StatusOK {
-		t.Fatalf("get: expected 200, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("get: expected 200, got %d body=%s", w.Code, w.Body.String())
 	}
 
 	updateBody := map[string]interface{}{
 		"name":      "UpdatedSite",
 		"framework": "unit3d",
 	}
-	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", int(siteID)), updateBody)
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", seeded.ID), updateBody)
 	if w.Code != http.StatusOK {
-		t.Fatalf("update: expected 200, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("update: expected 200, got %d body=%s", w.Code, w.Body.String())
 	}
 
-	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/sites/%d", int(siteID)), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete: expected 200, got %d: %s", w.Code, w.Body.String())
+	// ②收权验证：DELETE /sites/{id} 已收回（405）
+	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/sites/%d", seeded.ID), nil)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
 
@@ -3988,44 +3991,29 @@ func TestPTGen_ListCache_WithKeyword(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 端点已收回——原校验族测试合并为收权验证。
 func TestSite_Create_Validation(t *testing.T) {
 	env := setupTestEnv(t)
-
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "", "domain": "val.com", "baseUrl": "https://val.com",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("empty name: expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "ValSite", "domain": "", "baseUrl": "https://val.com",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("empty domain: expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "ValSite2", "domain": "val2.com", "baseUrl": "",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("empty baseUrl: expected 400, got %d: %s", w.Code, w.Body.String())
+	for _, body := range []map[string]interface{}{
+		{"name": "", "domain": "val.com"},
+		{"domain": ""},
+		{"domain": "longpt.org"},
+	} {
+		w := env.doRequest("POST", "/api/v1/sites", body)
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("create 应已收回(405), got %d: %s", w.Code, w.Body.String())
+		}
 	}
 }
-
+// §59.318 N1: 收权后重复域校验随 create 端点消亡——占位验证 405。
 func TestSite_Create_DuplicateDomain(t *testing.T) {
 	env := setupTestEnv(t)
-	// 直接 db 写入白名单内的 domain 制造重复（步骤 3 强白名单校验）
 	createTestSite(t, env, "龙PT", "longpt.org")
-
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain": "longpt.org",
-	})
-	if w.Code != http.StatusConflict {
-		t.Fatalf("dup domain: expected 409, got %d: %s", w.Code, w.Body.String())
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "longpt.org"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSite_Update_FrameworkIgnored(t *testing.T) {
 	env := setupTestEnv(t)
 	siteID := createTestSite(t, env, "FWSite", "fw.com")
@@ -4095,35 +4083,22 @@ func TestSite_FreezeStatus_DeleteUnfreeze2(t *testing.T) {
 	}
 }
 
+// §59.318 N1: framework 强覆盖校验随 create 收回——占位验证 405。
 func TestSite_Create_InvalidFramework(t *testing.T) {
 	env := setupTestEnv(t)
-
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name":      "BadFWCreate",
-		"domain":    "badfwcreate.com",
-		"baseUrl":   "https://badfwcreate.com",
-		"framework": "nonexistent",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("bad framework: expected 400, got %d: %s", w.Code, w.Body.String())
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "fw2.com", "framework": "bogus"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
+// §59.318 N1: authType 校验随 create 收回——占位验证 405。
 func TestSite_Create_InvalidAuthType(t *testing.T) {
 	env := setupTestEnv(t)
-
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name":      "BadAuthSite",
-		"domain":    "badauth.com",
-		"baseUrl":   "https://badauth.com",
-		"framework": "nexusphp",
-		"authType":  "invalid",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("bad authType: expected 400, got %d: %s", w.Code, w.Body.String())
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "at2.com", "authType": "bogus"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSite_Update_InvalidAuthType(t *testing.T) {
 	env := setupTestEnv(t)
 	siteID := createTestSite(t, env, "BadAuthUp", "badauthup.com")
@@ -4136,25 +4111,23 @@ func TestSite_Update_InvalidAuthType(t *testing.T) {
 	}
 }
 
+// §59.318 N1: delete 端点已收回——原删除验证合并为收权验证。
 func TestSite_Delete(t *testing.T) {
 	env := setupTestEnv(t)
 	siteID := createTestSite(t, env, "DelSite", "delsite.com")
-
 	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/sites/%d", siteID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete: expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
-
+// §59.318 N1: delete 收回后 404 语义消亡——验证恒 405。
 func TestSite_Delete_NotFound(t *testing.T) {
 	env := setupTestEnv(t)
-
 	w := env.doRequest("DELETE", "/api/v1/sites/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("delete not found: expected 404, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSite_Get_NotFound(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -4164,18 +4137,15 @@ func TestSite_Get_NotFound(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——重名校验随端点消亡，验证恒 405。
 func TestSite_Create_DuplicateName(t *testing.T) {
 	env := setupTestEnv(t)
-	// 先 db 写入制造 name 重复（用白名单内 domain）
 	createTestSite(t, env, "龙PT", "longpt.org")
-
-	// POST 用另一个白名单 domain 但显式传相同 name → 应返回 409（name 重复）
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain": "kufei.org",
-		"name":   "龙PT",
+		"domain": "kufei.org", "name": "龙PT",
 	})
-	if w.Code != http.StatusConflict {
-		t.Fatalf("dup name: expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
 
@@ -4523,7 +4493,8 @@ func TestSite_UpdateFull(t *testing.T) {
 		"authType":               "apikey",
 		"enabled":                true,
 		"isSource":               true,
-		"isTarget":               true,
+		"isTarget":               false, // §59.318: 非适配站开启会被门槛拒绝
+		"isReseedTarget":         true,
 		"participateAutoPublish": true,
 		"cookieCloudSync":        true,
 		"cookieCloudDomain":      "fullupddone.com",
@@ -6121,14 +6092,15 @@ func TestSiteV2_CreateWithCookie(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——验证恒 405。
 func TestSiteV2_CreateMissingRequired(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"name": "OnlyName"})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
+// §59.318 N1: create 收回（坏 body 也 405——路由层拦截先于解析）。
 func TestSiteV2_CreateInvalidBody(t *testing.T) {
 	env := setupTestEnv(t)
 	req := httptest.NewRequest("POST", "/api/v1/sites", bytes.NewReader([]byte("not json")))
@@ -6136,30 +6108,18 @@ func TestSiteV2_CreateInvalidBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+env.token)
 	w := httptest.NewRecorder()
 	env.mux.ServeHTTP(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
+// §59.318 N1: create 收回——seed 强覆盖语义随端点消亡，验证恒 405。
 func TestSiteV2_CreateDefaultsFramework(t *testing.T) {
 	env := setupTestEnv(t)
-	// 步骤 3：framework/authType 由 seed 强制覆盖；选 hdroute.org (generic) 验证
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain": "hdroute.org",
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["framework"] != "generic" {
-		t.Errorf("expected framework=generic, got %v", data["framework"])
-	}
-	if data["authType"] != "cookie" {
-		t.Errorf("expected authType=cookie, got %v", data["authType"])
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "hdroute.org"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSiteV2_ListEmpty(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/sites", nil)
@@ -6281,32 +6241,32 @@ func TestSiteV2_UpdateInvalidBody(t *testing.T) {
 	}
 }
 
+// §59.318 N1: delete 收回——站点保留（不可删）。
 func TestSiteV2_DeleteSuccess(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "DelV2", "delv2.example.com")
 	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/sites/%d", id), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d", id), nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 after delete, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("站点应保留可读, got %d", w.Code)
 	}
 }
-
+// §59.318 N1: delete 收回——恒 405。
 func TestSiteV2_DeleteNotFound(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("DELETE", "/api/v1/sites/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSiteV2_DeleteInvalidID(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("DELETE", "/api/v1/sites/abc", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
 
@@ -6635,15 +6595,16 @@ func TestBuildSiteHTTPClient(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——凭证响应字段改走直插库验证。
 func TestSiteV2_ToResponseHasCredentials(t *testing.T) {
 	env := setupTestEnv(t)
-	// 用白名单内 domain（步骤 3）；framework/authType 由 seed 强制覆盖（gazelle→cookie）
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain":  "dicmusic.com",
-		"passkey": "pk",
-		"apiKey":  "ak", "authKey": "authk", "authHash": "authh",
-		"rssKey": "rssk", "bearerToken": "bt", "enabled": true,
-	})
+	s := &model.Site{Domain: "dicmusic.com", Name: "DIC", BaseURL: "https://dicmusic.com",
+		Framework: "gazelle", AuthType: "cookie", Enabled: true,
+		Passkey: "pk", APIKey: "ak", BearerToken: "bt", AuthKey: "authk", AuthHash: "authh", RSSKey: "rssk"}
+	if err := env.db.Create(s).Error; err != nil {
+		t.Fatal(err)
+	}
+	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d", s.ID), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -6658,12 +6619,11 @@ func TestSiteV2_ToResponseHasCredentials(t *testing.T) {
 		t.Error("expected hasCookie=false")
 	}
 }
-
 func TestSiteV2_UpdateMultipleFields(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "MultiUpV2", "multiupv2.example.com")
 	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", id), map[string]interface{}{
-		"isSource": true, "isTarget": true, "participateAutoPublish": false,
+		"isSource": true, "isTarget": false, "isReseedTarget": true, "participateAutoPublish": false, // §59.318: 非适配站 isTarget 门槛
 		"cookieCloudSync": true, "cookieCloudDomain": "sync.example.com",
 		"alternativeDomains": "alt.example.com", "hashStrategy": "fake_from_id",
 		"sizeStrategy": "desc_regex", "idStrategy": "link_regex", "idPattern": `/torrent/(\d+)`,
@@ -6682,38 +6642,17 @@ func TestSiteV2_UpdateMultipleFields(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——framework 族验证随端点消亡（framework 真相源
+// =sites.json 种子，由 SeedSites 测试覆盖），验证恒 405。
 func TestSiteV2_CreateAllFrameworks(t *testing.T) {
 	env := setupTestEnv(t)
-	// 步骤 3 强白名单校验：每个 framework 选 supported_sites.json 内的一个真实 domain
-	frameworkDomains := []struct {
-		fw     string
-		domain string
-	}{
-		{"nexusphp", "13city.org"},
-		{"unit3d", "monikadesign.uk"},
-		{"gazelle", "dicmusic.com"},
-		{"mteam", "api.m-team.cc"},
-		{"tnode", "zhuque.in"},
-		{"rousi", "rousi.pro"},
-		{"yemapt", "www.yemapt.org"},
-		{"generic", "hdroute.org"},
-	}
-	for i, tc := range frameworkDomains {
-		w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-			"domain": tc.domain,
-		})
-		if w.Code != http.StatusOK {
-			t.Fatalf("framework %s (#%d, domain %s): expected 200, got %d: %s", tc.fw, i, tc.domain, w.Code, w.Body.String())
-		}
-		// 验证 framework 被 seed 强制覆盖（即使没传 framework 字段）
-		resp := parseResponse(t, w)
-		data, _ := resp.Data.(map[string]interface{})
-		if data["framework"] != tc.fw {
-			t.Errorf("framework %s: expected seed framework %s, got %v", tc.fw, tc.fw, data["framework"])
+	for _, dom := range []string{"13city.org", "monikadesign.uk", "dicmusic.com", "api.m-team.cc", "zhuque.in"} {
+		w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": dom})
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("%s: create 应已收回(405), got %d", dom, w.Code)
 		}
 	}
 }
-
 func TestSiteV2_UpdateCredentialsAllFields(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "AllCredV2", "allcredv2.example.com")
@@ -6800,36 +6739,16 @@ func TestSiteV2_UpdateDuplicateDomain(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——可选字段落库语义随端点消亡，验证恒 405。
 func TestSiteV2_CreateWithAllOptionalFields(t *testing.T) {
 	env := setupTestEnv(t)
-	// 用白名单内 domain（步骤 3）；framework/authType/downloadUrlTemplate/cookieCloudDomain 由 seed 强制覆盖，其他可选字段透传
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain": "longpt.org",
-		"cookie": "sid=full", "passkey": "pk",
-		"hashStrategy": "guid", "sizeStrategy": "enclosure", "idStrategy": "query_param",
-		"hashXmlTagName": "infoHash", "sizeXmlTagName": "contentLength", "hashUrlParamName": "hash",
-		"sizeDescRegex": `(\d+)\s*GB`, "sizeTitleRegex": `(\d+)\s*MB`, "sizeBaseUnit": 1024,
-		"downloadMode":        "template",
-		"downloadPagePattern": "/details.php", "requiresSideLoading": true,
-		"isSource": true, "isTarget": true, "participateAutoPublish": true,
-		"cookieCloudSync": true,
-		"enabled":         true, "alternativeDomains": "alt.longpt.org",
-		"overrideRssUrl": "https://rss.longpt.org", "overrideSavePath": "/data/full",
-		"proxyUrl": "socks5://proxy:1080", "skipSslVerify": true,
+		"domain": "hd4fans.org", "name": "HD4F", "proxyUrl": "http://p:1", "skipSslVerify": true,
 	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["requiresSideLoading"] != true {
-		t.Error("expected requiresSideLoading=true")
-	}
-	if data["alternativeDomains"] != "alt.longpt.org" {
-		t.Errorf("expected alt, got %v", data["alternativeDomains"])
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestSiteV2_CredentialsInvalidJSON(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "CredBadV2", "credbadv2.example.com")
@@ -6867,27 +6786,22 @@ func TestSiteV2_UpdateInvalidAuthType(t *testing.T) {
 	}
 }
 
+// §59.318 N1: create 收回——验证恒 405。
 func TestSiteV2_CreateInvalidFramework(t *testing.T) {
 	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "BadFWV2", "domain": "badfwv2.example.com", "baseUrl": "https://badfwv2.example.com", "framework": "nope",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "fw.com", "framework": "bogus"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
+// §59.318 N1: create 收回——验证恒 405。
 func TestSiteV2_CreateInvalidAuthType(t *testing.T) {
 	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "BadATV2", "domain": "badatv2.example.com", "baseUrl": "https://badatv2.example.com",
-		"framework": "generic", "authType": "nope",
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{"domain": "at.com", "authType": "bogus"})
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
-
 func TestResponse_Success2(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Success(rec, map[string]string{"hello": "world"})

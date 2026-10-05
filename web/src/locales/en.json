@@ -391,7 +391,9 @@
     "specialNotes": "Notes",
     "blocked": "Blocked",
     "blockedSiteWarning": "This site cannot be added currently",
-    "createModeDomainLocked": "Auto-filled by system whitelist"
+    "createModeDomainLocked": "Auto-filled by system whitelist",
+    "reseedTarget": "Reseed Probe",
+    "publishUnsupported": "Publish not adapted"
   },
   "downloader": {
     "title": "Downloader Management",

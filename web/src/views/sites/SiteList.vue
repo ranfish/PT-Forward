@@ -86,7 +86,17 @@
           </a-tooltip>
         </template>
         <template v-if="column.key === 'isTarget'">
-          <a-switch :checked="record.isTarget" size="small" @change="(v: boolean) => toggleField(record, 'isTarget', v)" />
+          <a-tooltip :title="record.publishSupported ? '' : t('site.publishUnsupported')">
+            <a-switch
+              :checked="record.isTarget"
+              size="small"
+              :disabled="!record.publishSupported"
+              @change="(v: boolean) => toggleField(record, 'isTarget', v)"
+            />
+          </a-tooltip>
+        </template>
+        <template v-if="column.key === 'isReseedTarget'">
+          <a-switch :checked="record.isReseedTarget" size="small" @change="(v: boolean) => toggleField(record, 'isReseedTarget', v)" />
         </template>
         <template v-if="column.key === 'assumeFree'">
           <a-switch :checked="record.assumeFree" size="small" @change="(v: boolean) => toggleField(record, 'assumeFree', v)" />
@@ -135,9 +145,6 @@
             <a-button type="link" size="small" :loading="syncingSingleId === record.id" @click="syncSingleStats(record.id)">{{ t('site.syncStats') }}</a-button>
             <a-button type="link" size="small" @click="testConnection(record.id)">{{ t('common.test') }}</a-button>
             <a-button type="link" size="small" :loading="dlTestingId === record.id" @click="downloadTest(record.id)">下载测试</a-button>
-            <a-popconfirm :title="t('common.deleteConfirm')" @confirm="deleteSite(record.id)">
-              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
-            </a-popconfirm>
           </a-space>
         </template>
       </template>
@@ -145,64 +152,13 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="isCreateMode ? t('site.addSite') : t('site.editSite')"
+      :title="t('site.editSite')"
       :confirm-loading="submitting"
       width="640px"
       @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
-        <template v-if="isCreateMode">
-          <a-form-item :label="t('site.selectSupportedSite')" name="domain" :rules="[{ required: true, message: t('site.supportedSiteRequired') }]">
-            <a-select
-              v-model:value="form.domain"
-              show-search
-              :placeholder="t('site.selectSupportedSitePlaceholder')"
-              :filter-option="filterSupportedSite"
-              :loading="loadingSupportedSites"
-              :status="selectedSupportedSite?.verification_status === 'blocked' ? 'warning' : ''"
-              option-label-prop="label"
-              @change="onSupportedSiteChange"
-            >
-              <a-select-option
-                v-for="s in supportedSites"
-                :key="s.domain"
-                :value="s.domain"
-                :label="`${s.name_cn} (${s.domain})`"
-                :disabled="s.verification_status === 'blocked'"
-              >
-                <span>{{ s.name_cn }}</span>
-                <span style="color: #999; margin-left: 8px; font-size: 12px;">{{ s.domain }}</span>
-                <a-tag v-if="s.verification_status === 'blocked'" color="error" style="margin-left: 8px;">{{ t('site.blocked') }}</a-tag>
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-
-          <template v-if="selectedSupportedSite">
-            <a-alert
-              v-if="selectedSupportedSite.verification_status === 'blocked'"
-              type="error"
-              style="margin-bottom: 12px;"
-              :message="t('site.blockedSiteWarning')"
-              :description="selectedSupportedSite.special_notes"
-              show-icon
-            />
-            <a-descriptions v-else size="small" :column="2" bordered style="margin-bottom: 12px;">
-              <a-descriptions-item :label="t('site.siteName')">{{ selectedSupportedSite.name_cn }}</a-descriptions-item>
-              <a-descriptions-item :label="t('site.framework')">{{ selectedSupportedSite.framework }}</a-descriptions-item>
-              <a-descriptions-item :label="t('site.authType')">{{ selectedSupportedSite.auth_type }}</a-descriptions-item>
-              <a-descriptions-item :label="t('site.cookieCloudDomain')">{{ selectedSupportedSite.cookiecloud_domain }}</a-descriptions-item>
-              <a-descriptions-item v-if="selectedSupportedSite.special_notes" :label="t('site.specialNotes')" :span="2">
-                {{ selectedSupportedSite.special_notes }}
-              </a-descriptions-item>
-            </a-descriptions>
-          </template>
-
-          <a-form-item :label="t('site.authType')" name="authType">
-            <a-input :value="form.authType" disabled />
-          </a-form-item>
-        </template>
-
-        <template v-if="!isCreateMode && editingSite">
+        <template v-if="editingSite">
           <a-form-item :label="t('site.framework')">
             <a-input :value="editingSite.framework" disabled />
           </a-form-item>
@@ -229,12 +185,15 @@
           <a-tooltip :title="!editingSite || groupedSites.has(editingSite.name) ? '' : '该站点无官组映射，不能作为源站'">
             <a-switch
               v-model:checked="form.isSource"
-              :disabled="isCreateMode ? false : (editingSite ? !groupedSites.has(editingSite.name) : false)"
+              :disabled="editingSite ? !groupedSites.has(editingSite.name) : false"
             />
           </a-tooltip>
         </a-form-item>
         <a-form-item :label="t('site.asTarget')" name="isTarget">
-          <a-switch v-model:checked="form.isTarget" />
+          <a-switch v-model:checked="form.isTarget" :disabled="editingSite ? !editingSite.publishSupported : true" />
+        </a-form-item>
+        <a-form-item :label="t('site.reseedTarget')" name="isReseedTarget">
+          <a-switch v-model:checked="form.isReseedTarget" />
         </a-form-item>
         <a-form-item :label="t('site.participateAutoPublishLabel')" name="participateAutoPublish">
           <a-switch v-model:checked="form.participateAutoPublish" />
@@ -320,7 +279,6 @@ const dlTestingId = ref<number | null>(null)
 const exporting = ref(false)
 const importing = ref(false)
 const editingSite = ref<SiteListItem | null>(null)
-const isCreateMode = ref(false)
 const selectedRowKeys = ref<number[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -328,29 +286,13 @@ const pageSize = ref(20)
 // 白名单站点列表（go:embed seed 数据，懒加载 + 缓存）
 const supportedSites = ref<SupportedSite[]>([])
 const loadingSupportedSites = ref(false)
-const selectedSupportedSite = computed<SupportedSite | null>(() => {
-  if (!isCreateMode.value || !form.domain) return null
-  return supportedSites.value.find(s => s.domain === form.domain) || null
-})
 
 // a-select 过滤函数：按 domain 或 name_cn 模糊匹配
-function filterSupportedSite(input: string, option: { value: string }) {
-  if (!input) return true
-  const needle = input.toLowerCase()
-  const item = supportedSites.value.find(s => s.domain === option.value)
-  if (!item) return false
-  return item.domain.toLowerCase().includes(needle) || item.name_cn.toLowerCase().includes(needle)
-}
+
 
 // 选中支持站点后，从 seed 同步 authType 到 form（仅前端展示，后端会强制覆盖）
 const showCookieOverride = ref(false)
-function onSupportedSiteChange(domain: string) {
-  const s = supportedSites.value.find(x => x.domain === domain)
-  if (s) {
-    form.authType = s.auth_type || 'cookie'
-    showCookieOverride.value = s.show_cookie === true && s.auth_type !== 'cookie'
-  }
-}
+
 
 async function fetchSupportedSites() {
   loadingSupportedSites.value = true
@@ -408,6 +350,7 @@ const form = reactive({
   apiKey: '',
   isSource: false,
   isTarget: false,
+  isReseedTarget: false,
   participateAutoPublish: true,
   assumeFree: false,
   enabled: true,
@@ -432,6 +375,7 @@ const columns = [
   { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 120, align: 'center' as const },
   { title: t('site.asSource'), key: 'isSource', width: 80, align: 'center' as const },
   { title: t('site.asTarget'), key: 'isTarget', width: 80, align: 'center' as const },
+  { title: t('site.reseedTarget'), key: 'isReseedTarget', width: 90, align: 'center' as const },
   { title: t('site.assumeFreeLabel'), key: 'assumeFree', width: 100, align: 'center' as const },
   { title: '代理', key: 'useGlobalProxy', width: 60, align: 'center' as const },
   { title: t('site.credentialStatus'), key: 'hasCookie', width: 130 },
@@ -502,8 +446,8 @@ async function toggleField(record: SiteListItem, field: string, value: boolean) 
 }
 
 function openModal(record: SiteListItem) {
-  isCreateMode.value = false
   editingSite.value = record
+  if (supportedSites.value.length === 0) fetchSupportedSites() // §59.318: show_cookie override 元信息懒加载
   // §野马OpenAPI: 编辑时也检查 show_cookie override
   const ss = supportedSites.value.find(s => s.domain === record.domain)
   showCookieOverride.value = ss?.show_cookie === true && (record.authType || 'cookie') !== 'cookie'
@@ -518,6 +462,7 @@ function openModal(record: SiteListItem) {
     apiKey: '',
     isSource: record.isSource || false,
     isTarget: record.isTarget || false,
+    isReseedTarget: record.isReseedTarget || false,
     participateAutoPublish: record.participateAutoPublish !== undefined ? record.participateAutoPublish : true,
     assumeFree: record.assumeFree || false,
     enabled: record.enabled !== undefined ? record.enabled : true,
@@ -529,49 +474,12 @@ function openModal(record: SiteListItem) {
   modalVisible.value = true
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function openCreateModal() {
-  isCreateMode.value = true
-  editingSite.value = null
-  showCookieOverride.value = false
-  Object.assign(form, {
-    name: '',
-    domain: '',
-    baseUrl: '',
-    framework: '',
-    authType: 'cookie',
-    cookie: '',
-    passkey: '',
-    apiKey: '',
-    isSource: false,
-    isTarget: false,
-    participateAutoPublish: true,
-    assumeFree: false,
-    enabled: true,
-    cookieCloudSync: false,
-  proxyUrl: '',
-  useGlobalProxy: false,
-    skipSslVerify: false,
-  })
-  fetchSupportedSites() // 懒加载白名单
-  modalVisible.value = true
-}
+
 
 async function handleSubmit() {
   submitting.value = true
   try {
-    if (isCreateMode.value) {
-      // create 模式：只传 domain + 用户填的字段；name/baseUrl/framework 由后端 seed 自动填充
-      const payload: Record<string, unknown> = { domain: form.domain }
-      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'assumeFree', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify', 'useGlobalProxy']
-      for (const key of optionalFields) {
-        const value = (form as Record<string, unknown>)[key]
-        if (value !== '' && value !== undefined) {
-          payload[key] = value
-        }
-      }
-      await sitesApi.create(payload)
-    } else if (editingSite.value) {
+    if (editingSite.value) {
       const payload: Record<string, unknown> = {}
       const skipFields = ['name', 'domain', 'baseUrl', 'framework']
       for (const [key, value] of Object.entries(form)) {
@@ -590,15 +498,7 @@ async function handleSubmit() {
   }
 }
 
-async function deleteSite(id: number) {
-  try {
-    await sitesApi.delete(id)
-    message.success(t('common.deleted'))
-    await fetchAll()
-  } catch (e: unknown) {
-    message.error(e instanceof Error ? e.message : String(e))
-  }
-}
+
 
 async function testConnection(id: number) {
   try {

@@ -8,14 +8,8 @@ export const sitesApi = {
   get(id: number) {
     return client.get<ApiResponse<Site>>(`/sites/${id}`)
   },
-  create(data: UpdatePartial<Site>) {
-    return client.post<ApiResponse<Site>>('/sites', data)
-  },
   update(id: number, data: UpdatePartial<Site>) {
     return client.put<ApiResponse<Site>>(`/sites/${id}`, data)
-  },
-  delete(id: number) {
-    return client.delete<ApiResponse<void>>(`/sites/${id}`)
   },
   testConnection(id: number) {
     return client.post<ApiResponse<{ success: boolean; message?: string }>>(`/sites/${id}/test`)

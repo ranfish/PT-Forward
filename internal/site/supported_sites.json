@@ -497,7 +497,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.luckpt.de",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "pt.muxuege.org": {
     "domain": "pt.muxuege.org",
@@ -964,7 +965,8 @@
     "cookiecloud_domain": "xdypt.vip",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "supports_pieces_hash_api": true,
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "xingtan.one": {
     "domain": "xingtan.one",

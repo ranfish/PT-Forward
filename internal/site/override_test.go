@@ -475,7 +475,9 @@ func TestSeedSites_FirstSeedPopulates(t *testing.T) {
 	assert.Equal(t, "nexusphp", site.Framework)
 	assert.False(t, site.Enabled)
 	assert.True(t, site.IsSource)
-	assert.True(t, site.IsTarget)
+	// §59.318 D5: 种子语义拆分——辅种探测继承 true（显式补写），发布目标 false
+	assert.True(t, site.IsReseedTarget)
+	assert.False(t, site.IsTarget)
 }
 
 func TestSeedSites_SkipsExisting(t *testing.T) {

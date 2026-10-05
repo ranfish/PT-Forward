@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/publish"
 )
 
@@ -110,6 +111,12 @@ func (h *FormConfigHandler) handleApply(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 		return
 	}
+	// §59.318 D7: 发布适配门槛——未适配站不允许启用发布配置（保存草稿不拦，
+	// 拦 enabled=true——适配放开时已配好的草稿一键启用）
+	if req.Config.Enabled && !sitepkg.IsPublishSupported(site.Domain) {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "站点未适配发布，无法启用发布配置"})
+		return
+	}
 	prev := site.PublishFormConfig
 	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).
 		Where("id = ?", site.ID).
@@ -117,6 +124,11 @@ func (h *FormConfigHandler) handleApply(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
+	// §59.318 D3: is_target 冗余列同步（form_config.enabled 的两个写点之一——
+	// 另一写点 site_handler handleUpdate 的 isTarget 翻译）
+	_ = h.db.WithContext(context.Background()).Model(&model.Site{}).
+		Where("id = ?", site.ID).
+		Update("is_target", req.Config.Enabled).Error //nolint:errcheck // 冗余列同步失败不阻断配置保存——两写点语义由 D3 单真相兜底
 	// L4 配置审计：变更写 operation_audit_logs（回滚=重上传 HTML 重 diff，不做版本管理）
 	audit, _ := json.Marshal(map[string]any{
 		"site": site.Name, "note": req.Note,
