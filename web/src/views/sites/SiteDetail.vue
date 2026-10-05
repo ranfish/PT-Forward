@@ -287,8 +287,11 @@
         </a-form>
       </a-card>
 
-      <!-- §59.157: 发布表单配置（仅目标站可见——发布配置语义=往该站发布；源站+目标站双角色站同样命中） -->
-      <a-card v-if="site.isTarget" title="发布配置">
+      <!-- §59.157+§59.318 回归审核修复: 发布表单配置卡改挂 publishSupported——原
+           v-if="site.isTarget" 在新语义下死锁（无配置站 is_target=false → 卡片
+           隐藏 → 无法首次配置 → 永远无法启用）。适配站恒可见（配置/暂停/启用
+           三态均可编辑）；未适配站正确隐藏。 -->
+      <a-card v-if="site.publishSupported || site.isTarget" title="发布配置">
         <FormConfigPanel :site-name="site.name" />
       </a-card>
     </a-spin>
