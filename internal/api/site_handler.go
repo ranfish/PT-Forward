@@ -568,10 +568,11 @@ var siteImportFields = []string{
 }
 
 type siteImportResult struct {
-	Total   int      `json:"total"`
-	Updated int      `json:"updated"`
-	Skipped []string `json:"skipped"`
-	Errors  []string `json:"errors"`
+	Total    int      `json:"total"`
+	Updated  int      `json:"updated"`
+	Skipped  []string `json:"skipped"`
+	Warnings []string `json:"warnings"`
+	Errors   []string `json:"errors"`
 }
 
 func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
@@ -639,7 +640,7 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
-	result := siteImportResult{Skipped: []string{}, Errors: []string{}}
+	result := siteImportResult{Skipped: []string{}, Warnings: []string{}, Errors: []string{}}
 	for i := range req.Sites {
 		in := &req.Sites[i]
 		result.Total++
@@ -653,10 +654,10 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// §59.318 D7: 导入降级——未适配发布站携带 is_target=true 时降为 false
-		// 并记警告（不硬拒——单站问题不阻断整批导入）
+		// 记警告（§59.318 附四：预期内降级归 warnings，不硬拒也不算失败）
 		if in.IsTarget && !site.IsPublishSupported(existing.Domain) {
 			in.IsTarget = false
-			result.Errors = append(result.Errors, fmt.Sprintf("%s: 未适配发布，is_target 已降级为 false", in.Domain))
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: 未适配发布，is_target 已降级为 false", in.Domain))
 		}
 		if err := h.db.WithContext(r.Context()).Model(&existing).Select(siteImportFields).Updates(in).Error; err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", in.Domain, err))

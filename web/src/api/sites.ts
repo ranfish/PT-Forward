@@ -69,6 +69,6 @@ export const sitesApi = {
     return client.get<ApiResponse<{ version: number; exported_at: string; warning: string; sites: unknown[] }>>('/sites/export')
   },
   importConfig(data: { sites: unknown[] }) {
-    return client.post<ApiResponse<{ total: number; updated: number; skipped: string[]; errors: string[] }>>('/sites/import', data)
+    return client.post<ApiResponse<{ total: number; updated: number; skipped: string[]; warnings: string[]; errors: string[] }>>('/sites/import', data)
   },
 }
