@@ -69,3 +69,54 @@ func TestSiteIsTargetGate(t *testing.T) {
 		t.Error("is_reseed_target 应已置 true")
 	}
 }
+
+// §59.318 附四: 导入降级归 warnings——未适配发布站携带 is_target=true 降为 false
+// 并出警告（非 errors）；适配站 is_target=true 原样通过。
+func TestSiteImportDegradeWarning(t *testing.T) {
+	env := setupTestEnv(t)
+	mk := func(name, domain, cfg string) *model.Site {
+		s := &model.Site{Name: name, Domain: domain, BaseURL: "https://" + domain,
+			Framework: "nexusphp", AuthType: "cookie", Enabled: true, PublishFormConfig: cfg}
+		if err := env.db.Create(s).Error; err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	mk("未适配站", "longpt.org", "")                                     // 白名单内但未适配
+	mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配
+
+	w := env.doRequest("POST", "/api/v1/sites/import", map[string]interface{}{
+		"sites": []map[string]interface{}{
+			{"domain": "longpt.org", "is_target": true},
+			{"domain": "xdypt.vip", "is_target": true},
+		},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("导入应 200, got %d: %s", w.Code, w.Body.String())
+	}
+	rd, _ := parseResponse(t, w).Data.(map[string]interface{})
+	if rd["updated"] != float64(2) {
+		t.Errorf("应更新 2 站, got %v", rd["updated"])
+	}
+	warns, _ := rd["warnings"].([]interface{})
+	if len(warns) != 1 {
+		t.Errorf("应恰 1 条降级警告, got %v", warns)
+	}
+	errs, _ := rd["errors"].([]interface{})
+	if len(errs) != 0 {
+		t.Errorf("降级不应计入 errors, got %v", errs)
+	}
+	var unsupported2, configured2 model.Site
+	if err := env.db.Where("domain = ?", "longpt.org").First(&unsupported2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if unsupported2.IsTarget {
+		t.Error("未适配站导入后 is_target 应降级为 false")
+	}
+	if err := env.db.Where("domain = ?", "xdypt.vip").First(&configured2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !configured2.IsTarget {
+		t.Error("适配站导入后 is_target 应保持 true")
+	}
+}

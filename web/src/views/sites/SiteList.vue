@@ -632,8 +632,12 @@ async function doImport(file: File) {
     const r = data.data
     const parts = [`更新 ${r.updated} 个`]
     if (r.skipped.length > 0) parts.push(`跳过 ${r.skipped.length} 个（${r.skipped.join(', ')}）`)
+    if (r.warnings.length > 0) parts.push(`降级 ${r.warnings.length} 个`)
     if (r.errors.length > 0) parts.push(`失败 ${r.errors.length} 个`)
-    message.success(`导入完成：${parts.join('，')}`)
+    const summary = `导入完成：${parts.join('，')}`
+    if (r.errors.length > 0) message.error(summary)
+    else if (r.warnings.length > 0) message.warning(summary)
+    else message.success(summary)
     await fetchAll()
   } catch (e: unknown) {
     message.error('导入失败：' + (e instanceof Error ? e.message : String(e)))
