@@ -1,7 +1,6 @@
 package model
 
 import (
-	"strings"
 	"time"
 )
 
@@ -57,7 +56,9 @@ type Site struct {
 
 	IsSource               bool `json:"is_source" gorm:"default:false"`
 	IsTarget               bool `json:"is_target" gorm:"default:false"`
-	TargetTypes            string `json:"target_types,omitempty" gorm:"size:200"`
+	// §59.318 语义拆分：is_target=发布目标（受 publish_supported 门槛，
+	// 与 form_config.enabled 同步）；is_reseed_target=辅种探测范围开关。
+	IsReseedTarget bool   `json:"is_reseed_target" gorm:"default:false"`
 	ParticipateAutoPublish bool `json:"participate_auto_publish" gorm:"default:true"`
 
 	// AssumeFree: 当 DetectDiscount 不可用时（如站点 cookie 被 WAF/异地登录拦截，
@@ -120,13 +121,6 @@ type Site struct {
 }
 
 func (Site) TableName() string { return "sites" }
-
-func (s *Site) HasTargetType(tt string) bool {
-	if s.TargetTypes == "" {
-		return s.IsTarget
-	}
-	return strings.Contains(s.TargetTypes, `"`+tt+`"`)
-}
 
 // §33.1.59 — SiteConfigOverride: 站点配置字段级用户覆盖（Sprint 89 决策 #232）
 type SiteConfigOverride struct {

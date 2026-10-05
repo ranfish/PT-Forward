@@ -279,6 +279,8 @@ export interface Site {
   lastSyncAt?: string | null
   isSource: boolean
   isTarget: boolean
+  isReseedTarget: boolean
+  publishSupported: boolean
   participateAutoPublish: boolean
   assumeFree: boolean
   overrideRssUrl?: string
@@ -297,7 +299,6 @@ export interface Site {
   bonusPoints: number
   statsSyncedAt?: string | null
   hrStrategy: string
-  targetTypes?: string
   reseedLimitCount: number
   reseedLimitInterval: number
   iyuuLimitCount: number

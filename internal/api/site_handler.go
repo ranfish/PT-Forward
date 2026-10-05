@@ -55,63 +55,6 @@ func NewSiteHandler(repo *site.Repository, logger *zap.Logger, db *gorm.DB) *Sit
 	return &SiteHandler{repo: repo, db: db, logger: logger}
 }
 
-type createSiteRequest struct {
-	Name      string `json:"name"`
-	Domain    string `json:"domain"`
-	BaseURL   string `json:"baseUrl"`
-	Framework string `json:"framework"`
-	AuthType  string `json:"authType,omitempty"`
-
-	Passkey     string `json:"passkey,omitempty"`
-	Cookie      string `json:"cookie,omitempty"`
-	APIKey      string `json:"apiKey,omitempty"`
-	BearerToken string `json:"bearerToken,omitempty"`
-	AuthKey     string `json:"authKey,omitempty"`
-	AuthHash    string `json:"authHash,omitempty"`
-	UserID      int    `json:"userId,omitempty"`
-	RSSKey      string `json:"rssKey,omitempty"`
-
-	HashStrategy     string `json:"hashStrategy,omitempty"`
-	SizeStrategy     string `json:"sizeStrategy,omitempty"`
-	IDStrategy       string `json:"idStrategy,omitempty"`
-	IDPattern        string `json:"idPattern,omitempty"`
-	HashXMLTagName   string `json:"hashXmlTagName,omitempty"`
-	SizeXMLTagName   string `json:"sizeXmlTagName,omitempty"`
-	HashURLParamName string `json:"hashUrlParamName,omitempty"`
-	SizeDescRegex    string `json:"sizeDescRegex,omitempty"`
-	SizeTitleRegex   string `json:"sizeTitleRegex,omitempty"`
-	SizeBaseUnit     int    `json:"sizeBaseUnit,omitempty"`
-
-	DownloadMode        string `json:"downloadMode,omitempty"`
-	DownloadURLTemplate string `json:"downloadUrlTemplate,omitempty"`
-	DetailsURLTemplate  string `json:"detailsUrlTemplate,omitempty"`
-	DownloadPagePattern string `json:"downloadPagePattern,omitempty"`
-
-	RequiresSideLoading bool `json:"requiresSideLoading"`
-
-	IsSource               bool `json:"isSource"`
-	IsTarget               bool `json:"isTarget"`
-	ParticipateAutoPublish bool `json:"participateAutoPublish"`
-	AssumeFree             bool `json:"assumeFree"`
-
-	CookieCloudSync   bool   `json:"cookieCloudSync"`
-	CookieCloudDomain string `json:"cookieCloudDomain,omitempty"`
-	Enabled           bool   `json:"enabled"`
-
-	AlternativeDomains string `json:"alternativeDomains,omitempty"`
-
-	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
-	OverrideSavePath string `json:"overrideSavePath,omitempty"`
-
-	ProxyURL       string `json:"proxyUrl,omitempty"`
-	UseGlobalProxy bool   `json:"useGlobalProxy"`
-	SkipSSLVerify  bool   `json:"skipSslVerify"`
-	MaxConcurrent  int    `json:"maxConcurrent,omitempty"`
-	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
-	DownloadHourlyLimit int `json:"downloadHourlyLimit,omitempty"`
-
-	HRStrategy string `json:"hrStrategy,omitempty"`
-}
 
 func applySiteMaxConcurrent(domain string, maxConcurrent int) {
 	if maxConcurrent > 0 {
@@ -193,7 +136,7 @@ type updateSiteRequest struct {
 	DownloadHourlyLimit *int `json:"downloadHourlyLimit,omitempty"`
 
 	HRStrategy          *string `json:"hrStrategy,omitempty"`
-	TargetTypes         *string `json:"targetTypes,omitempty"`
+	IsReseedTarget      *bool   `json:"isReseedTarget,omitempty"`
 	ReseedLimitCount    *int    `json:"reseedLimitCount,omitempty"`
 	ReseedLimitInterval *int    `json:"reseedLimitInterval,omitempty"`
 	IYUULimitCount      *int    `json:"iyuuLimitCount,omitempty"`
@@ -224,6 +167,8 @@ type siteResponse struct {
 
 	IsSource               bool `json:"isSource"`
 	IsTarget               bool `json:"isTarget"`
+	IsReseedTarget         bool `json:"isReseedTarget"`
+	PublishSupported       bool `json:"publishSupported"`
 	ParticipateAutoPublish bool `json:"participateAutoPublish"`
 	AssumeFree             bool `json:"assumeFree"`
 
@@ -346,6 +291,8 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 
 		IsSource:               s.IsSource,
 		IsTarget:               s.IsTarget,
+		IsReseedTarget:         s.IsReseedTarget,
+		PublishSupported:       site.IsPublishSupported(s.Domain),
 		ParticipateAutoPublish: s.ParticipateAutoPublish,
 		AssumeFree:             s.AssumeFree,
 
@@ -382,7 +329,6 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		DownloadHourlyLimit: s.DownloadHourlyLimit,
 
 		HRStrategy:          s.HRStrategy,
-		TargetTypes:         s.TargetTypes,
 		ReseedLimitCount:    s.ReseedLimitCount,
 		ReseedLimitInterval: s.ReseedLimitInterval,
 		IYUULimitCount:      s.IYUULimitCount,
@@ -439,13 +385,12 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 	path := r.URL.Path
 	trimmed := strings.TrimRight(path, "/")
 
+	// §59.318 N1 收权：站点全集由开发者随版本管理（sites.json 种子+migration），
+	// 用户无创建/删除权——POST（创建）与 DELETE（删除）端点收回，仅留
+	// GET/PUT（启用/不启用/配置）。新站=版本更新后种子落"未启用"列表。
 	if trimmed == "/api/v1/sites" {
 		if r.Method == http.MethodGet {
 			h.handleList(w, r)
-			return
-		}
-		if r.Method == http.MethodPost {
-			h.handleCreate(w, r)
 			return
 		}
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
@@ -454,12 +399,9 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 
 	remaining := strings.TrimPrefix(trimmed, "/api/v1/sites/")
 	if remaining == "" || remaining == "/" {
-		switch r.Method {
-		case http.MethodGet:
+		if r.Method == http.MethodGet {
 			h.handleList(w, r)
-		case http.MethodPost:
-			h.handleCreate(w, r)
-		default:
+		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -520,8 +462,6 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 			h.handleGet(w, r)
 		case http.MethodPut:
 			h.handleUpdate(w, r)
-		case http.MethodDelete:
-			h.handleDelete(w, r)
 		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
@@ -587,7 +527,7 @@ type siteExportImport struct {
 
 	IsSource               bool   `json:"is_source"`
 	IsTarget               bool   `json:"is_target"`
-	TargetTypes            string `json:"target_types"`
+	IsReseedTarget         bool   `json:"is_reseed_target"`
 	ParticipateAutoPublish bool   `json:"participate_auto_publish"`
 
 	HRStrategy       string `json:"hr_strategy"`
@@ -619,7 +559,7 @@ var siteImportFields = []string{
 	"passkey", "api_key", "bearer_token", "auth_key", "auth_hash", "user_id", "rss_key",
 	"base_url", "auth_type", "enabled",
 	"cookie_cloud_sync", "cookie_cloud_domain",
-	"is_source", "is_target", "target_types", "participate_auto_publish",
+	"is_source", "is_target", "is_reseed_target", "participate_auto_publish",
 	"hr_strategy", "override_rss_url", "override_save_path",
 	"assume_free",
 	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent", "publish_interval_seconds", "download_hourly_limit",
@@ -659,7 +599,7 @@ func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
 			CookieCloudDomain:      s.CookieCloudDomain,
 			IsSource:               s.IsSource,
 			IsTarget:               s.IsTarget,
-			TargetTypes:            s.TargetTypes,
+			IsReseedTarget:         s.IsReseedTarget,
 			ParticipateAutoPublish: s.ParticipateAutoPublish,
 			HRStrategy:             s.HRStrategy,
 			OverrideRSSURL:         s.OverrideRSSURL,
@@ -711,6 +651,12 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 		if err := h.db.WithContext(r.Context()).Where("domain = ?", in.Domain).First(&existing).Error; err != nil {
 			result.Skipped = append(result.Skipped, in.Domain)
 			continue
+		}
+		// §59.318 D7: 导入降级——未适配发布站携带 is_target=true 时降为 false
+		// 并记警告（不硬拒——单站问题不阻断整批导入）
+		if in.IsTarget && !site.IsPublishSupported(existing.Domain) {
+			in.IsTarget = false
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: 未适配发布，is_target 已降级为 false", in.Domain))
 		}
 		if err := h.db.WithContext(r.Context()).Model(&existing).Select(siteImportFields).Updates(in).Error; err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", in.Domain, err))
@@ -778,181 +724,6 @@ func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		Page:  page,
 		Size:  size,
 	})
-}
-
-func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req createSiteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
-		return
-	}
-
-	if req.Domain == "" {
-		Error(w, http.StatusBadRequest, 40001, "domain 为必填项")
-		return
-	}
-
-	// === 强白名单校验：domain 必须在 supported_sites.json 中 ===
-	// 用户从前端下拉选择站点，前端只传 domain，后端从 seed 自动填充其他系统字段
-	seed, ok := site.GetSupportedSite(req.Domain)
-	if !ok {
-		ErrorWithDetail(w, http.StatusBadRequest, 40002, "站点不在系统支持列表中",
-			"请从前端下拉列表选择已支持的站点（共 "+strconv.Itoa(len(site.ListSupportedSites()))+" 个）")
-		return
-	}
-	if seed.VerificationStatus == "blocked" {
-		ErrorWithDetail(w, http.StatusBadRequest, 40003, "站点暂不可添加",
-			seed.SpecialNotes)
-		return
-	}
-
-	// 强制覆盖系统字段（seed 为唯一真相源，防止前端绕过）
-	req.Framework = seed.Framework
-	req.AuthType = seed.AuthType
-	if seed.CookiecloudDomain != "" {
-		req.CookieCloudDomain = seed.CookiecloudDomain
-	}
-	if seed.DownloadURLTemplate != "" {
-		req.DownloadURLTemplate = seed.DownloadURLTemplate
-	}
-
-	// 自动填充 name（如未提供）
-	if req.Name == "" {
-		req.Name = seed.NameCN
-	}
-	if req.Name == "" {
-		Error(w, http.StatusBadRequest, 40001, "name 为必填项")
-		return
-	}
-
-	// 自动填充 baseURL（如未提供）
-	if req.BaseURL == "" {
-		req.BaseURL = "https://" + req.Domain
-	}
-
-	if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
-		return
-	}
-	if req.ProxyURL != "" {
-		if err := middleware.ValidateProxyURL(req.ProxyURL); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "proxyUrl 不合法: "+err.Error())
-			return
-		}
-	}
-	if req.OverrideRSSURL != "" {
-		if err := middleware.ValidatePublicURL(req.OverrideRSSURL); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "overrideRssUrl 不合法: "+err.Error())
-			return
-		}
-	}
-
-	var supportsPiecesHashAPI bool
-	if seedData, ok := site.GetSiteSeedData(req.Domain); ok && seedData.SupportsPiecesHashAPI != nil {
-		supportsPiecesHashAPI = *seedData.SupportsPiecesHashAPI
-	}
-
-	// framework/authType 已由 seed 强制覆盖，跳过用户输入校验
-
-	exists, err := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "检查站点域名失败")
-		return
-	}
-	if exists {
-		Error(w, http.StatusConflict, 40900, "站点域名已存在")
-		return
-	}
-	exists, err = h.repo.ExistsByName(r.Context(), req.Name, 0)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "检查站点名称失败")
-		return
-	}
-	if exists {
-		Error(w, http.StatusConflict, 40900, "站点名称已存在")
-		return
-	}
-
-	s := model.Site{
-		Name:      req.Name,
-		Domain:    req.Domain,
-		BaseURL:   req.BaseURL,
-		Framework: req.Framework,
-		AuthType:  req.AuthType,
-		Enabled:   req.Enabled,
-
-		Passkey:     req.Passkey,
-		Cookie:      req.Cookie,
-		APIKey:      req.APIKey,
-		BearerToken: req.BearerToken,
-		AuthKey:     req.AuthKey,
-		AuthHash:    req.AuthHash,
-		UserID:      req.UserID,
-		RSSKey:      req.RSSKey,
-
-		HashStrategy:     defaultStr(req.HashStrategy, "guid"),
-		SizeStrategy:     defaultStr(req.SizeStrategy, "enclosure"),
-		IDStrategy:       defaultStr(req.IDStrategy, "query_param"),
-		IDPattern:        req.IDPattern,
-		HashXMLTagName:   req.HashXMLTagName,
-		SizeXMLTagName:   req.SizeXMLTagName,
-		HashURLParamName: req.HashURLParamName,
-		SizeDescRegex:    req.SizeDescRegex,
-		SizeTitleRegex:   req.SizeTitleRegex,
-		SizeBaseUnit:     req.SizeBaseUnit,
-
-		DownloadMode:        defaultStr(req.DownloadMode, "template"),
-		DownloadURLTemplate: req.DownloadURLTemplate,
-		DetailsURLTemplate:  req.DetailsURLTemplate,
-		DownloadPagePattern: req.DownloadPagePattern,
-		RequiresSideLoading: req.RequiresSideLoading,
-
-		IsSource:               req.IsSource,
-		IsTarget:               req.IsTarget,
-		ParticipateAutoPublish: req.ParticipateAutoPublish,
-		AssumeFree:             req.AssumeFree,
-
-		CookieCloudSync:   req.CookieCloudSync,
-		CookieCloudDomain: req.CookieCloudDomain,
-
-		AlternativeDomains: req.AlternativeDomains,
-
-		OverrideRSSURL:   req.OverrideRSSURL,
-		OverrideSavePath: req.OverrideSavePath,
-
-		ProxyURL:      req.ProxyURL,
-		SkipSSLVerify: req.SkipSSLVerify,
-		MaxConcurrent: req.MaxConcurrent,
-
-		HRStrategy: req.HRStrategy,
-
-		SupportsPiecesHashAPI: supportsPiecesHashAPI,
-	}
-
-	// §59.183: 创建未指定(0)落默认 95——0=不限是详情页显式语义；
-	// 不能依赖 DB 列默认（migration 38 旧版库存量列默认 0）。
-	if s.DownloadHourlyLimit == 0 {
-		s.DownloadHourlyLimit = 95
-	}
-
-	if err := h.repo.Create(r.Context(), &s); err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "创建站点失败")
-		return
-	}
-
-	// 有官组映射才允许 is_source=true
-	if s.IsSource && h.sourceDetector != nil && !h.sourceDetector.HasGroupMappings(r.Context(), &s) {
-		h.db.Model(&model.Site{}).Where("id = ?", s.ID).Update("is_source", false)
-		s.IsSource = false
-		h.logger.Info("site is_source disabled: no group mappings", zap.String("name", s.Name))
-	}
-
-	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
-
-	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
-	auditLog(r, "site", "create", "site", fmt.Sprintf("%d", s.ID), s.Name, "success")
-
-	Success(w, h.toResponse(&s))
 }
 
 func (h *SiteHandler) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -1039,7 +810,41 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		s.IsSource = *req.IsSource
 	}
 	if req.IsTarget != nil {
-		s.IsTarget = *req.IsTarget
+		// §59.318 D3+D7: is_target=发布目标开关——单真相位 form_config.enabled。
+		// 开启三重门槛：①publish_supported（开发者适配权威位）②配置已存在
+		// （空配置+enabled=true 为非法态）③写 form_config.enabled 并同步 is_target
+		// 冗余列（写点之一；另一写点 form_config handleApply）。
+		if *req.IsTarget {
+			if !site.IsPublishSupported(s.Domain) {
+				Error(w, http.StatusForbidden, 40021, "站点未适配发布，无法启用为目标站")
+				return
+			}
+			if !hasFormConfig(s.PublishFormConfig) {
+				Error(w, http.StatusBadRequest, 40022, "请先完成发布配置再启用目标站")
+				return
+			}
+			updated, err := setFormConfigEnabled(s, true)
+			if err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "更新发布配置失败: "+err.Error())
+				return
+			}
+			s.PublishFormConfig = updated
+			s.IsTarget = true
+		} else {
+			if s.PublishFormConfig != "" {
+				updated, err := setFormConfigEnabled(s, false)
+				if err != nil {
+					Error(w, http.StatusInternalServerError, 50000, "更新发布配置失败: "+err.Error())
+					return
+				}
+				s.PublishFormConfig = updated
+			}
+			s.IsTarget = false
+		}
+	}
+	if req.IsReseedTarget != nil {
+		// §59.318 D1: 辅种探测范围开关——用户自由切换（能力层由 enabled+凭证隐含）
+		s.IsReseedTarget = *req.IsReseedTarget
 	}
 	if req.ParticipateAutoPublish != nil {
 		s.ParticipateAutoPublish = *req.ParticipateAutoPublish
@@ -1146,9 +951,6 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.HRStrategy != nil {
 		s.HRStrategy = *req.HRStrategy
 	}
-	if req.TargetTypes != nil {
-		s.TargetTypes = *req.TargetTypes
-	}
 	if req.ReseedLimitCount != nil {
 		s.ReseedLimitCount = *req.ReseedLimitCount
 	}
@@ -1181,29 +983,6 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "site", "update", "site", fmt.Sprintf("%d", id), s.Name, "success")
 
 	Success(w, h.toResponse(s))
-}
-
-func (h *SiteHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := h.extractID(r.URL.Path, "/api/v1/sites/")
-	if err != nil {
-		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
-		return
-	}
-
-	s, err := h.repo.GetByID(r.Context(), id)
-	if err != nil {
-		Error(w, http.StatusNotFound, 12001, "站点不存在")
-		return
-	}
-
-	if err := h.repo.Delete(r.Context(), id); err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "删除站点失败")
-		return
-	}
-
-	h.logger.Info("site deleted", zap.String("name", s.Name))
-	auditLog(r, "site", "delete", "site", fmt.Sprintf("%d", id), s.Name, "success")
-	Success(w, nil)
 }
 
 func (h *SiteHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -1371,7 +1150,7 @@ func (h *SiteHandler) handleBatchUpdate(w http.ResponseWriter, r *http.Request) 
 
 	updates := make(map[string]interface{})
 	boolFields := map[string]bool{
-		"enabled": true, "is_source": true, "is_target": true,
+		"enabled": true, "is_source": true,
 		"participate_auto_publish": true, "cookie_cloud_sync": true,
 		"assume_free": true,
 	}
@@ -2871,4 +2650,35 @@ func (h *SiteHandler) resolveUnit3DTorrentIDs(ctx context.Context, config *model
 	}
 
 	return []string{"1"}, nil
+}
+
+// hasFormConfig §59.318 D3: 发布配置存在性——非空+合法 JSON+含 form_fields
+// （暂停态 enabled=false 的既有配置算"已配置"——开关语义=恢复发布）。
+func hasFormConfig(cfg string) bool {
+	if cfg == "" {
+		return false
+	}
+	var m map[string]interface{}
+	if json.Unmarshal([]byte(cfg), &m) != nil {
+		return false
+	}
+	_, ok := m["form_fields"]
+	return ok
+}
+
+// setFormConfigEnabled §59.318 D3: form_config.enabled 位写入——map 反序列化-
+// 改-序列化保真（禁 struct 往返丢字段）。enabled 缺省视为 false 补齐。
+func setFormConfigEnabled(s *model.Site, enabled bool) (string, error) {
+	var m map[string]interface{}
+	if s.PublishFormConfig == "" {
+		m = map[string]interface{}{}
+	} else if err := json.Unmarshal([]byte(s.PublishFormConfig), &m); err != nil {
+		return "", fmt.Errorf("form_config JSON 解析失败: %w", err)
+	}
+	m["enabled"] = enabled
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

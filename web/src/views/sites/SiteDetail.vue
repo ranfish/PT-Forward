@@ -48,7 +48,7 @@
         <a-descriptions-item v-if="showAuthKey && site.hasAuthKey" :label="t('sites.authKey')">{{ t('common.configured') }}</a-descriptions-item>
         <a-descriptions-item v-if="showRssKey && site.hasRssKey" :label="rssKeyLabel">{{ t('common.configured') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.enabledLabel')"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? t('common.yes') : t('common.no')" /></a-descriptions-item>
-        <a-descriptions-item :label="t('site.role')">{{ formatRoles(site.isSource, site.isTarget, site.targetTypes) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.role')">{{ formatRoles(site.isSource, site.isTarget) }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.participateAutoPublishLabel')">{{ site.participateAutoPublish ? t('common.yes') : t('common.no') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.assumeFreeLabel')">
           <a-badge v-if="site.assumeFree" status="warning" :text="t('common.yes')" />
@@ -123,12 +123,8 @@
           </a-row>
           <a-row :gutter="24">
             <a-col :span="12">
-              <a-form-item :label="t('site.targetTypes')">
-                <a-select v-model:value="settingsForm.targetTypes" mode="multiple" :placeholder="t('site.targetTypesPlaceholder')" style="width: 100%">
-                  <a-select-option value="publish">{{ t('site.targetTypePublish') }}</a-select-option>
-                  <a-select-option value="seed_feature">{{ t('site.targetTypeSeedFeature') }}</a-select-option>
-                  <a-select-option value="iyuu" :disabled="!iyuuSupported">{{ t('site.targetTypeIyuu') }}</a-select-option>
-                </a-select>
+              <a-form-item :label="t('site.reseedTarget')">
+                <a-switch v-model:checked="settingsForm.isReseedTarget" />
               </a-form-item>
             </a-col>
           </a-row>
@@ -185,8 +181,8 @@
             </a-select>
           </a-form-item>
 
-          <div v-if="settingsForm.targetTypes.includes('seed_feature')" class="section-title">{{ t('site.seedFeatureRateLimit') }}</div>
-          <a-row v-if="settingsForm.targetTypes.includes('seed_feature')" :gutter="24">
+          <div v-if="settingsForm.isReseedTarget" class="section-title">{{ t('site.seedFeatureRateLimit') }}</div>
+          <a-row v-if="settingsForm.isReseedTarget" :gutter="24">
             <a-col :span="8">
               <a-form-item :label="t('site.reseedLimitCount')">
                 <a-input-number v-model:value="settingsForm.reseedLimitCount" :min="0" :max="10000" style="width: 100%" />
@@ -201,8 +197,8 @@
             </a-col>
           </a-row>
 
-          <div v-if="settingsForm.targetTypes.includes('iyuu')" class="section-title">{{ t('site.iyuuRateLimit') }}</div>
-          <a-row v-if="settingsForm.targetTypes.includes('iyuu')" :gutter="24">
+          <div v-if="settingsForm.isReseedTarget" class="section-title">{{ t('site.iyuuRateLimit') }}</div>
+          <a-row v-if="settingsForm.isReseedTarget" :gutter="24">
             <a-col :span="8">
               <a-form-item :label="t('site.iyuuLimitCount')">
                 <a-input-number v-model:value="settingsForm.iyuuLimitCount" :min="0" :max="10000" style="width: 100%" />
@@ -306,7 +302,6 @@ import { message } from 'ant-design-vue'
 import FormConfigPanel from '@/views/publish/FormConfigPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
-import { iyuuApi } from '@/api/iyuu'
 import { ensureSupportedSitesCache, getSiteFieldOverride } from '@/api/supported-sites'
 import type { Site, SiteCredentials } from '@/api/types'
 
@@ -331,6 +326,14 @@ const loading = ref(false)
 const site = ref<Partial<Site>>({})
 const credForm = reactive({ cookie: '', passkey: '', apiKey: '', bearerToken: '', authKey: '', authHash: '', userId: undefined as number | undefined, rssKey: '' })
 
+// §59.318: 角色显示（语义拆分后两参——辅种探测开关独立列展示）
+function formatRoles(isSource?: boolean, isTarget?: boolean): string {
+  const roles: string[] = []
+  if (isSource) roles.push(t('site.roleSource'))
+  if (isTarget) roles.push(t('site.roleTarget'))
+  return roles.length > 0 ? roles.join(' / ') : '-'
+}
+
 const settingsForm = reactive({
   name: '',
   baseUrl: '',
@@ -346,7 +349,7 @@ const settingsForm = reactive({
   maxConcurrent: 2,
   downloadHourlyLimit: 95,
   hrStrategy: '',
-  targetTypes: [] as string[],
+  isReseedTarget: false,
   reseedLimitCount: 0,
   reseedLimitInterval: 0,
   iyuuLimitCount: 0,
@@ -361,12 +364,6 @@ const authTypeLabels: Record<string, string> = {
 
 const fw = computed(() => site.value.framework as string)
 const supportedSitesLoaded = ref(false)
-const iyuuAvailable = ref(false)
-const iyuuDomains = ref<string[]>([])
-const iyuuSupported = computed(() => {
-  if (!iyuuAvailable.value || !site.value.domain) return false
-  return iyuuDomains.value.includes(site.value.domain)
-})
 const override = computed(() => {
   if (!supportedSitesLoaded.value) return undefined
   return getSiteFieldOverride(site.value.domain as string)
@@ -494,7 +491,7 @@ async function fetchSite() {
       maxConcurrent: site.value.maxConcurrent || 2,
       downloadHourlyLimit: site.value.downloadHourlyLimit !== undefined ? site.value.downloadHourlyLimit : 95,
       hrStrategy: site.value.hrStrategy || '',
-      targetTypes: parseTargetTypes(site.value.targetTypes, site.value.isTarget),
+      isReseedTarget: site.value.isReseedTarget || false,
       reseedLimitCount: site.value.reseedLimitCount || 0,
       reseedLimitInterval: site.value.reseedLimitInterval || 0,
       iyuuLimitCount: site.value.iyuuLimitCount || 0,
@@ -551,7 +548,7 @@ async function updateSettings() {
       name: settingsForm.name,
       baseUrl: settingsForm.baseUrl,
       alternativeDomains: altDomainsToJson(settingsForm.alternativeDomains),
-      targetTypes: targetTypesToJson(settingsForm.targetTypes.filter(t => t !== 'iyuu' || iyuuSupported.value)),
+      isReseedTarget: settingsForm.isReseedTarget,
       reseedLimitCount: settingsForm.reseedLimitCount,
       reseedLimitInterval: settingsForm.reseedLimitInterval,
       iyuuLimitCount: settingsForm.iyuuLimitCount,
@@ -606,43 +603,9 @@ function altDomainsToJson(val: string): string {
   return JSON.stringify(items)
 }
 
-function parseTargetTypes(val: string | undefined, isTarget: boolean | undefined): string[] {
-  if (val) {
-    try {
-      const arr = JSON.parse(val)
-      if (Array.isArray(arr)) return arr
-    } catch { /* ignore */ }
-  }
-  if (isTarget) return ['publish', 'seed_feature']
-  return []
-}
 
-function targetTypesToJson(types: string[]): string {
-  if (types.length === 0) return ''
-  return JSON.stringify(types)
-}
 
-const targetTypeLabels: Record<string, string> = {
-  publish: t('site.targetTypePublish'),
-  seed_feature: t('site.targetTypeSeedFeature'),
-  iyuu: t('site.targetTypeIyuu'),
-}
 
-function formatRoles(isSource?: boolean, isTarget?: boolean, targetTypes?: string): string {
-  const roles: string[] = []
-  if (isSource) roles.push(t('site.sourceSiteRole'))
-  if (targetTypes) {
-    try {
-      const arr: string[] = JSON.parse(targetTypes)
-      for (const tt of arr) {
-        if (targetTypeLabels[tt]) roles.push(targetTypeLabels[tt])
-      }
-    } catch { /* ignore */ }
-  } else if (isTarget) {
-    roles.push(t('site.targetSiteRole'))
-  }
-  return roles.filter(Boolean).join(', ') || '-'
-}
 
 onMounted(() => {
   fetchSite()
@@ -651,13 +614,6 @@ onMounted(() => {
   ensureSupportedSitesCache()
     .then(() => { supportedSitesLoaded.value = true })
     .catch(() => {})
-  iyuuApi.status().then((resp) => {
-    const d = resp.data?.data
-    if (d) {
-      iyuuAvailable.value = d.available
-      iyuuDomains.value = d.domains || []
-    }
-  }).catch(() => {})
 })
 </script>
 

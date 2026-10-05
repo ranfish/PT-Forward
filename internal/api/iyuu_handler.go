@@ -429,7 +429,7 @@ func (h *IYUUHandler) handleSupportedTargets(w http.ResponseWriter, _ *http.Requ
 	}
 
 	var sites []model.Site
-	if err := h.db.Where("enabled = ? AND is_target = ?", true, true).Find(&sites).Error; err != nil {
+	if err := h.db.Where("enabled = ? AND is_reseed_target = ?", true, true).Find(&sites).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询站点列表失败")
 		return
 	}

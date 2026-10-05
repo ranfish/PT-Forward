@@ -40,6 +40,8 @@ type SiteSeedData struct {
 	DownloadMode          string         `json:"download_mode"`
 	IsSource              bool           `json:"is_source"`
 	IsTarget              bool           `json:"is_target"`
+	// §59.318: 辅种探测范围开关（种子继承历史 is_target 语义——行为零变化）
+	IsReseedTarget bool `json:"is_reseed_target"`
 	CookieCloudDomain     string         `json:"cookiecloud_domain"`
 	AlternativeDomains    string         `json:"alternative_domains"`
 	SupportsPiecesHashAPI *bool          `json:"supports_pieces_hash_api,omitempty"`
@@ -145,6 +147,7 @@ func SeedSites(db *gorm.DB) error {
 			Enabled:            false,
 			IsSource:           s.IsSource,
 			IsTarget:           s.IsTarget,
+			IsReseedTarget:     s.IsReseedTarget,
 			CookieCloudDomain:  s.CookieCloudDomain,
 			AlternativeDomains: s.AlternativeDomains,
 			TrackerDomains:     trackerDomainsJSON,
@@ -172,6 +175,14 @@ func SeedSites(db *gorm.DB) error {
 		// Force update to set enabled=false for seeded sites.
 		if err := db.Model(site).Update("enabled", false).Error; err != nil {
 			return siteError(ErrSiteSeed, fmt.Sprintf("disable seeded site %s", s.Domain), err)
+		}
+		// §59.318: 语义拆分双 bool 显式补写（GORM 零值陷阱——false 被 Create
+		// 跳过落列默认；种子站发布目标恒 false，探测开关落种子声明值）
+		if err := db.Model(site).Update("is_target", false).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("seed is_target %s", s.Domain), err)
+		}
+		if err := db.Model(site).Update("is_reseed_target", s.IsReseedTarget).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("seed is_reseed_target %s", s.Domain), err)
 		}
 
 		// 填充官组映射（内置，不可删除）

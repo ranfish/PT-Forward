@@ -34,6 +34,9 @@ type SupportedSite struct {
 	Paths               map[string]string `json:"paths,omitempty"`
 	VerificationStatus  string            `json:"verification_status"`
 	SpecialNotes        string            `json:"special_notes,omitempty"`
+	// §59.318: 发布适配支持（开发者权威位——逐站适配完成随版本置 true；
+	// 用户侧 is_target(发布开关) 的门槛。当前：修道院/幸运）。
+	PublishSupported bool `json:"publish_supported,omitempty"`
 }
 
 var (
@@ -73,6 +76,13 @@ func GetSupportedSite(domain string) (*SupportedSite, bool) {
 	}
 	s, ok := supportedSitesMap[domain]
 	return s, ok
+}
+
+// IsPublishSupported §59.318: 站点是否已适配发布（supported_sites.json 权威位）。
+// 不在白名单的站（理论不存在——强白名单体系）恒 false。
+func IsPublishSupported(domain string) bool {
+	s, ok := GetSupportedSite(domain)
+	return ok && s.PublishSupported
 }
 
 // ListSupportedSites 返回按 domain 升序的全部白名单站点。
