@@ -114,6 +114,71 @@ func TestRegisterCallbacks_UpdateEncryptsFields(t *testing.T) {
 	}
 }
 
+// §59.318 附六: map 形态（Update(col,v)/Updates(map)）凭证写入必须加密——
+// cookiecloud 同步/PUT 凭证编辑/stats_sync/client 密码共用此形态。
+type sitesTableRow struct {
+	ID      uint `gorm:"primaryKey"`
+	Name    string
+	Passkey string `encrypted:"true"`
+	Cookie  string `encrypted:"true"`
+	APIKey  string `encrypted:"true"`
+}
+
+func (sitesTableRow) TableName() string { return "sites" }
+
+func TestRegisterCallbacks_MapUpdateEncryptsFields(t *testing.T) {
+	db, enc := setupTestDB(t)
+	if err := db.AutoMigrate(&sitesTableRow{}); err != nil {
+		t.Fatalf("migrate sites table: %v", err)
+	}
+	db.Create(&sitesTableRow{Name: "s1"})
+
+	// ① Updates(map) 含凭证列
+	if err := db.Model(&sitesTableRow{}).Where("name = ?", "s1").
+		Updates(map[string]interface{}{"name": "s1", "passkey": "plain-map-passkey", "api_key": "plain-map-apikey"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	var row sitesTableRow
+	db.Raw("SELECT * FROM sites WHERE name = 's1'").Scan(&row)
+	if !enc.IsEncrypted(row.Passkey) {
+		t.Errorf("Updates(map) passkey should be encrypted, got %q", row.Passkey)
+	}
+	if !enc.IsEncrypted(row.APIKey) {
+		t.Errorf("Updates(map) api_key should be encrypted, got %q", row.APIKey)
+	}
+	if got, _ := enc.Decrypt(row.Passkey); got != "plain-map-passkey" {
+		t.Errorf("decrypted passkey mismatch: %q", got)
+	}
+
+	// ② Update(col, value) 单列形态（cookiecloud 同步同款）
+	if err := db.Model(&sitesTableRow{}).Where("name = ?", "s1").Update("cookie", "plain-cookie-sync").Error; err != nil {
+		t.Fatal(err)
+	}
+	db.Raw("SELECT * FROM sites WHERE name = 's1'").Scan(&row)
+	if !enc.IsEncrypted(row.Cookie) {
+		t.Errorf("Update(col) cookie should be encrypted, got %q", row.Cookie)
+	}
+
+	// ③ 已加密值不双重加密
+	alreadyEnc, _ := enc.Encrypt("already-value")
+	if err := db.Model(&sitesTableRow{}).Where("name = ?", "s1").Update("cookie", alreadyEnc).Error; err != nil {
+		t.Fatal(err)
+	}
+	db.Raw("SELECT * FROM sites WHERE name = 's1'").Scan(&row)
+	if row.Cookie != alreadyEnc {
+		t.Errorf("already encrypted value should not be double-encrypted")
+	}
+
+	// ④ 读回经 query callback 解密（端到端往返）
+	var viaOrm sitesTableRow
+	if err := db.Where("name = ?", "s1").First(&viaOrm).Error; err != nil {
+		t.Fatal(err)
+	}
+	if viaOrm.Passkey != "plain-map-passkey" || viaOrm.Cookie != "already-value" {
+		t.Errorf("decrypt roundtrip mismatch: passkey=%q cookie=%q", viaOrm.Passkey, viaOrm.Cookie)
+	}
+}
+
 func TestRegisterCallbacks_QueryDecryptsSlice(t *testing.T) {
 	db, _ := setupTestDB(t)
 

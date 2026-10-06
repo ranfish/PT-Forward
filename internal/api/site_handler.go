@@ -659,7 +659,45 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 			in.IsTarget = false
 			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: 未适配发布，is_target 已降级为 false", in.Domain))
 		}
-		if err := h.db.WithContext(r.Context()).Model(&existing).Select(siteImportFields).Updates(in).Error; err != nil {
+		// §59.318 附六: 值先并入 existing 再 Updates(&existing)（指针）——GORM
+		// 加密 callback 只加密 Statement.Model 的 encrypted 字段：Updates(in)
+		// 的 SET 取自无 tag 的 siteExportImport（明文直落库）；Updates(existing)
+		// 按值传参则 SET 用回调前拷贝，同样绕过（Save/指针形态实证加密生效）。
+		existing.Passkey = in.Passkey
+		existing.APIKey = in.APIKey
+		existing.BearerToken = in.BearerToken
+		existing.AuthKey = in.AuthKey
+		existing.AuthHash = in.AuthHash
+		existing.UserID = in.UserID
+		existing.RSSKey = in.RSSKey
+		existing.BaseURL = in.BaseURL
+		existing.AuthType = in.AuthType
+		existing.Enabled = in.Enabled
+		existing.CookieCloudSync = in.CookieCloudSync
+		existing.CookieCloudDomain = in.CookieCloudDomain
+		existing.IsSource = in.IsSource
+		existing.IsTarget = in.IsTarget
+		existing.IsReseedTarget = in.IsReseedTarget
+		existing.ParticipateAutoPublish = in.ParticipateAutoPublish
+		existing.HRStrategy = in.HRStrategy
+		existing.OverrideRSSURL = in.OverrideRSSURL
+		existing.OverrideSavePath = in.OverrideSavePath
+		existing.AssumeFree = in.AssumeFree
+		existing.ProxyURL = in.ProxyURL
+		existing.UseGlobalProxy = in.UseGlobalProxy
+		existing.SkipSSLVerify = in.SkipSSLVerify
+		existing.MaxConcurrent = in.MaxConcurrent
+		existing.DownloadHourlyLimit = in.DownloadHourlyLimit
+		existing.ReseedLimitCount = in.ReseedLimitCount
+		existing.ReseedLimitInterval = in.ReseedLimitInterval
+		existing.IYUULimitCount = in.IYUULimitCount
+		existing.IYUULimitInterval = in.IYUULimitInterval
+		existing.PublishFormConfig = in.PublishFormConfig
+		existing.AlternativeDomains = in.AlternativeDomains
+		existing.TrackerDomains = in.TrackerDomains
+		existing.SupportsPiecesHashAPI = in.SupportsPiecesHashAPI
+		existing.APIDomain = in.APIDomain
+		if err := h.db.WithContext(r.Context()).Model(&existing).Select(siteImportFields).Updates(&existing).Error; err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", in.Domain, err))
 			continue
 		}

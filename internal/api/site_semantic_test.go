@@ -3,10 +3,12 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/crypto"
 	"github.com/ranfish/pt-forward/internal/model"
-
+	"go.uber.org/zap"
 )
 
 // §59.318 D3+D7: isTarget PUT 三重门槛——未适配拒绝/适配未配置拒绝(引导)/
@@ -72,8 +74,17 @@ func TestSiteIsTargetGate(t *testing.T) {
 
 // §59.318 附四: 导入降级归 warnings——未适配发布站携带 is_target=true 降为 false
 // 并出警告（非 errors）；适配站 is_target=true 原样通过。
+// §59.318 附六: 导入的明文凭证必须加密落库（enc2:）——Updates(in) 绕过
+// GORM 加密 callback 的回归锚。
 func TestSiteImportDegradeWarning(t *testing.T) {
 	env := setupTestEnv(t)
+	enc, err := crypto.NewCredentialEncryptor("test-encryption-key-0123456789")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := crypto.RegisterCallbacks(env.db, enc, zap.NewNop()); err != nil {
+		t.Fatal(err)
+	}
 	mk := func(name, domain, cfg string) *model.Site {
 		s := &model.Site{Name: name, Domain: domain, BaseURL: "https://" + domain,
 			Framework: "nexusphp", AuthType: "cookie", Enabled: true, PublishFormConfig: cfg}
@@ -85,9 +96,10 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 	mk("未适配站", "longpt.org", "")                                     // 白名单内但未适配
 	mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配
 
+	const plainPasskey = "0123456789abcdef0123456789abcdef"
 	w := env.doRequest("POST", "/api/v1/sites/import", map[string]interface{}{
 		"sites": []map[string]interface{}{
-			{"domain": "longpt.org", "is_target": true},
+			{"domain": "longpt.org", "is_target": true, "passkey": plainPasskey},
 			{"domain": "xdypt.vip", "is_target": true},
 		},
 	})
@@ -118,5 +130,16 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 	}
 	if !configured2.IsTarget {
 		t.Error("适配站导入后 is_target 应保持 true")
+	}
+	// 附六：passkey 落库形态必须是 enc2: 密文，且可解密回明文
+	var rawPasskey string
+	if err := env.db.Raw("SELECT passkey FROM sites WHERE domain = 'longpt.org'").Scan(&rawPasskey).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(rawPasskey, "enc2:") {
+		t.Errorf("passkey 应加密落库, got %q", rawPasskey)
+	}
+	if got, err := enc.Decrypt(rawPasskey); err != nil || got != plainPasskey {
+		t.Errorf("passkey 密文应解密回明文, err=%v match=%v", err, got == plainPasskey)
 	}
 }
