@@ -29,17 +29,76 @@ func RegisterCallbacks(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger
 }
 
 func encryptFields(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
-	if d.Statement == nil || d.Statement.Model == nil {
+	if d.Statement == nil {
 		return
 	}
-	val := reflect.ValueOf(d.Statement.Model)
-	if val.Kind() == reflect.Pointer {
-		val = val.Elem()
+	// ① struct 形态（Create/Save/Updates 指针）：加密 Statement.Model 字段
+	if d.Statement.Model != nil {
+		val := reflect.ValueOf(d.Statement.Model)
+		if val.Kind() == reflect.Pointer {
+			val = val.Elem()
+		}
+		if val.Kind() == reflect.Struct {
+			encryptStruct(val, enc, logger)
+		}
 	}
-	if val.Kind() != reflect.Struct {
+	// ② map 形态（Update(col,v)/Updates(map)——GORM 内部归一为 map Dest）：
+	// §59.318 附六——SET 值不经 Model 反射，须按表+列名白名单加密 map 值，
+	// 否则 cookiecloud 同步/PUT 凭证编辑/stats_sync 等全部明文直落库
+	encryptMapDest(d, enc, logger)
+}
+
+// encryptedColumnIndex: 表名→加密列集合（getEncryptedModels 单源派生）
+var encryptedColumnIndex = func() map[string]map[string]bool {
+	idx := make(map[string]map[string]bool)
+	for _, m := range getEncryptedModels() {
+		cols := make(map[string]bool, len(m.Columns))
+		for _, c := range m.Columns {
+			cols[c] = true
+		}
+		idx[m.TableName] = cols
+	}
+	return idx
+}()
+
+func encryptMapDest(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
+	m, ok := d.Statement.Dest.(map[string]interface{})
+	if !ok || len(m) == 0 {
 		return
 	}
-	encryptStruct(val, enc, logger)
+	table := d.Statement.Table
+	if table == "" {
+		if d.Statement.Schema == nil && d.Statement.Model != nil {
+			if err := d.Statement.Parse(d.Statement.Model); err != nil {
+				return
+			}
+		}
+		if d.Statement.Schema != nil {
+			table = d.Statement.Schema.Table
+		}
+	}
+	if table == "" {
+		return
+	}
+	cols, ok := encryptedColumnIndex[table]
+	if !ok {
+		return
+	}
+	for col, v := range m {
+		if !cols[col] {
+			continue
+		}
+		s, ok := v.(string)
+		if !ok || s == "" || enc.IsEncrypted(s) {
+			continue
+		}
+		encValue, err := enc.Encrypt(s)
+		if err != nil {
+			logger.Error("encrypt map field failed", zap.String("table", table), zap.String("column", col), zap.Error(err))
+			continue
+		}
+		m[col] = encValue
+	}
 }
 
 func encryptStruct(val reflect.Value, enc *CredentialEncryptor, logger *zap.Logger) {
