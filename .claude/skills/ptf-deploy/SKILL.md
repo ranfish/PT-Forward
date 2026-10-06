@@ -37,12 +37,14 @@ description: 'PT-Forward 编译部署流程：先提交后部署铁律、部署�
 Agent 部署一律调 deploy-all.sh（**禁止**手工串联三脚本 + `| tail` 截断输出——调用侧管道吞退出码已四次事故[§59.157/159/163×2]）：
 
 ```bash
-bash .claude/skills/ptf-deploy/scripts/deploy-all.sh              # 全链：前端→后端→243
-bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --backend-only   # 后端→243（纯后端改动）
-bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --frontend-only  # 仅前端（不部署，后续走全链）
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh              # 全链：前端→后端（仅 29）
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --backend-only   # 仅后端（29）
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --frontend-only  # 仅前端构建（不部署 29 服务，后续走全链）
 ```
 
 判定：最后一行 `✅✅ 部署链全完成` = 真成功；失败即断链绝无此行。前端改动 hash 变化验证仍保留（index-*.js 前后对比）。
+
+⚠️ §59.244：**deploy-all 不触任何生产环境**（243/fnos/PT30/249 等一律用户自行 OTA）。下方"部署到 243"为历史脚本保留，与 §59.244/AGENTS 环境隔离铁律冲突时以铁律为准——Agent 勿用。
 
 ## 后端验证与部署（纯后端改动）
 
