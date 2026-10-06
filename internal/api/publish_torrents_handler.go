@@ -45,6 +45,8 @@ type PublishTorrentsHandler struct {
 	metadataFetcher     MetadataFetcherProvider
 	complianceChecker   *compliance.Checker
 	seedPipeline        SeedArtifactAnalyzer
+	bdinfoQueue         *publish.BDInfoScanQueue // §59.319 P1: 原盘扫描队列
+	bdinfoScanner       *publish.BDInfoScanner   // §59.319 P1: 识别门磁盘侧
 	shotStrategy        ScreenshotStrategyRunner
 	screenshotCacheDays int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
 	ptgen               PTGenAnalyzer
@@ -125,6 +127,103 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publis
 		strategySem:         make(chan struct{}, 5),
 		screenshotCacheDays: 30, // §59.63: 观察期默认 30 天（SetScreenshotCacheDays 由 settings 覆盖）
 	}
+}
+
+// SetBDInfoQueue §59.319 P1: 注入原盘扫描队列+识别器；完成回调（落库+簇传播+
+// 规格重算）在此注册（装配期一次性）。
+func (h *PublishTorrentsHandler) SetBDInfoQueue(q *publish.BDInfoScanQueue, s *publish.BDInfoScanner) {
+	h.bdinfoQueue = q
+	h.bdinfoScanner = s
+	if q != nil {
+		q.SetOnDone(h.onBDInfoScanDone)
+	}
+}
+
+// clusterHashes 簇内全部 hash（client_uid+save_path+name 紧键——与
+// propagateCluster* 同源）。
+func (h *PublishTorrentsHandler) clusterHashes(ctx context.Context, clientUID uint, savePath, name string) []string {
+	if clientUID == 0 || savePath == "" || name == "" {
+		return nil
+	}
+	var hashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0",
+			clientUID, savePath, name).
+		Pluck("hash", &hashes)
+	return hashes
+}
+
+// clusterHasBDInfo 簇查重：簇内任一行已有 bd_info 产物即无需重扫
+// （§59.319 D4 簇级缓存——59-74 站同盘共享一次扫描）。
+func (h *PublishTorrentsHandler) clusterHasBDInfo(ctx context.Context, clientUID uint, savePath, name string) bool {
+	hashes := h.clusterHashes(ctx, clientUID, savePath, name)
+	if len(hashes) == 0 {
+		return false
+	}
+	var cnt int64
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND bd_info != ''", hashes).
+		Limit(1).Count(&cnt)
+	return cnt > 0
+}
+
+// onBDInfoScanDone §59.319 P1: 扫描完成回调（queue 串行线程执行）——
+// 簇级产物落库（全簇行 bd_info 覆盖写）+ 伪 MI 清除（D8）+ 规格列重算
+// （BDInfo 报告经 ExtractMediaInfo 格式分流自动解析；簇同名同 title
+// 算一次写全簇）。
+func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, report string, err error) {
+	if err != nil {
+		h.logger.Warn("bdinfo scan done with error",
+			zap.String("name", task.Name), zap.Error(err))
+		return
+	}
+	if report == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	hashes := h.clusterHashes(ctx, task.ClientUID, task.SavePath, task.Name)
+	if len(hashes) == 0 {
+		h.logger.Warn("bdinfo scan done but cluster empty", zap.String("name", task.Name))
+		return
+	}
+
+	updates := map[string]interface{}{
+		"bd_info":           report,
+		"media_info":        "", // §59.319 D8: 原盘伪 MI（单 m2ts BDAV）清除
+		"media_info_source": "",
+	}
+
+	// 规格列重算：代表行取 title/DOM 源（簇行同名同标题——一次计算全簇复用）
+	var rep model.TorrentMetadata
+	if err := h.db.WithContext(ctx).Where("info_hash IN ?", hashes).First(&rep).Error; err == nil && rep.Title != "" {
+		domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(rep.DetailSourceJSON)
+		profile := titleparser.BuildTechProfile(rep.Title, report, domMedium, domRes, domVideo, domAudio)
+		updates["resolution"] = profile.Resolution
+		updates["video_codec"] = profile.VideoCodec
+		updates["audio_codec"] = profile.AudioCodec
+		updates["audio_channels"] = profile.AudioChannels
+		updates["audio_tech"] = profile.AudioTechnology
+		updates["audio_tracks"] = profile.AudioTracks
+		updates["hdr"] = profile.HDR
+		updates["bit_depth"] = profile.BitDepth
+		updates["source_type"] = profile.SourceType
+		updates["specification"] = profile.Specification
+	}
+
+	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ?", hashes).
+		Updates(updates)
+	if res.Error != nil {
+		h.logger.Error("bdinfo cluster persist failed",
+			zap.String("name", task.Name), zap.Error(res.Error))
+		return
+	}
+	h.logger.Info("bdinfo cluster persisted",
+		zap.String("name", task.Name),
+		zap.Int("cluster_rows", len(hashes)),
+		zap.Int64("rows_affected", res.RowsAffected))
 }
 
 // StartObservingCleanup §59.38: 观察期定时清理——日级扫描超 7 天的观察组并
@@ -2267,8 +2366,21 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 
 	// §59.36 修订: is_local=true 时本地 MI 提前获取（搜索反查前）——
 	// 音频 token 冲突时作为 MI 仲裁的源侧证据（真测量）。失败不阻断（降级②盲放行）。
+	// §59.319 P1: 原盘识别门（磁盘侧毫秒级）——命中则跳过伪 MI 生成
+	// （D8 单 m2ts BDAV 伪产物停产）+ 入队 BDInfo 扫描（簇查重免重扫）。
+	isDisc := false
+	if isLocal && savePath != "" && h.bdinfoScanner != nil {
+		if discPath := h.bdinfoScanner.DetectDiscPath(savePath, name); discPath != "" {
+			isDisc = true
+			if h.bdinfoQueue != nil && !h.clusterHasBDInfo(ctx, clientUID, savePath, name) {
+				h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
+					ClientUID: clientUID, SavePath: savePath, Name: name, DiscPath: discPath,
+				})
+			}
+		}
+	}
 	var localMI string
-	if isLocal && savePath != "" && h.seedPipeline != nil {
+	if isLocal && !isDisc && savePath != "" && h.seedPipeline != nil {
 		// §59.279: 本地 MI 分析限时 90s——ctx（批量=Background）无 deadline 时
 		// 大文件/慢挂载分析可无限挂起（pt29 批量获取卡死案 item[0] 现场特征）；
 		// 超时失败不阻断（§59.36 降级②盲放行语义保持）
@@ -2421,7 +2533,11 @@ fetched:
 
 		if finalMeta.Title != "" {
 			// §59.26: MI 优先 local（MediaInfo），fallback 源站（SourceMediaInfo）
-			miForProfile := finalMeta.MediaInfo
+			// §59.319 P1: 原盘优先 BDInfo（ExtractMediaInfo 格式分流自动解析）
+			miForProfile := finalMeta.BDInfo
+			if miForProfile == "" {
+				miForProfile = finalMeta.MediaInfo
+			}
 			if miForProfile == "" {
 				miForProfile = finalMeta.SourceMediaInfo
 			}
@@ -3109,7 +3225,10 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			// §59.171 D: MI 口径对齐设计（本地优先+源站兜底）——双列任一非空即"有 MI"。
 			// 原只查 media_info（本地列）："仅源站 MI"行 Tab5 能显示（消费侧兜底生效）、
 			// 列表却报红叉——口径自相矛盾。
-			item["has_mediainfo"] = meta.MediaInfo != "" || meta.SourceMediaInfo != ""
+			// §59.319 P1: BDInfo 计入完备性（原盘行 media_info 已清空）+ is_disc
+			// 供前端徽标显示 BD（D7 闭环：空 BDInfo 原盘红叉拦截）
+			item["has_mediainfo"] = meta.MediaInfo != "" || meta.SourceMediaInfo != "" || meta.BDInfo != ""
+			item["is_disc"] = meta.BDInfo != ""
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
@@ -3126,13 +3245,18 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			// （只填 3 字段）MI 铁证输入恒 false（MIEncoded/MIHasVideo 零值）——
 			// 与详情页（完整 profile 含 MI）同种子判定可能打架。改为：MI 本地列
 			// 存在时解析出铁证输入，与详情页同源。
+			// §59.319 P1: 原盘行 BDInfo 优先（Encoded 恒 false 铁证）
 			encProfile := titleparser.TechProfile{
 				SourceType:    meta.SourceType,
 				Specification: meta.Specification,
 				VideoCodec:    meta.VideoCodec,
 			}
-			if meta.MediaInfo != "" {
-				miTech := titleparser.ExtractMediaInfo(meta.MediaInfo)
+			miText := meta.BDInfo
+			if miText == "" {
+				miText = meta.MediaInfo
+			}
+			if miText != "" {
+				miTech := titleparser.ExtractMediaInfo(miText)
 				encProfile.MIEncoded = miTech.Encoded
 				encProfile.MIHasVideo = miTech.Encoded || miTech.Resolution != "" || miTech.VideoCodec != ""
 			}
@@ -3765,7 +3889,11 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo + DOM），5 标题字段始终用 profile，
 	// 14 平铺字段 DB 为空时 fallback 到 profile（兼容历史数据）
 	// MI 优先 local（MediaInfo），fallback 源站（SourceMediaInfo）
-	miForProfile := meta.MediaInfo
+	// §59.319 P1: 原盘优先 BDInfo（ExtractMediaInfo 格式分流自动解析）
+	miForProfile := meta.BDInfo
+	if miForProfile == "" {
+		miForProfile = meta.MediaInfo
+	}
 	if miForProfile == "" {
 		miForProfile = meta.SourceMediaInfo
 	}

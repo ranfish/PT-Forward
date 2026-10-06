@@ -160,7 +160,7 @@
             <span :class="record.poster ? 'ck' : 'ck-miss'">海报</span>
             <span :class="record.has_screenshots ? 'ck' : 'ck-miss'">截图</span>
             <span :class="record.has_description ? 'ck' : 'ck-miss'">简介</span>
-            <span :class="record.has_mediainfo ? 'ck' : 'ck-miss'">MI</span>
+            <span :class="record.has_mediainfo ? 'ck' : 'ck-miss'">{{ record.is_disc ? 'BD' : 'MI' }}</span>
           </div>
         </template>
 

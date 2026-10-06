@@ -525,6 +525,9 @@ func main() {
 	}
 	bdinfoScanner := publish.NewBDInfoScanner(log)
 	publishPipeline.SetBDInfoScanner(bdinfoScanner)
+	// §59.319 P1: 原盘 BDInfo 扫描队列（全局单例串行+簇去重）——Enqueue
+	// 首次触发时启动消费 goroutine；onDone 落库回调由 router.SetBDInfoQueue 注册
+	bdinfoQueue := publish.NewBDInfoScanQueue(bdinfoScanner, log)
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
@@ -538,6 +541,7 @@ func main() {
 	router.SetCookieCloudServer(ccServer)
 
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
+	router.SetBDInfoQueue(bdinfoQueue, bdinfoScanner)
 	router.SetupCompliance(complianceChecker)
 
 	orphanScanner := orphan.NewScanner(clientManager, db, log)

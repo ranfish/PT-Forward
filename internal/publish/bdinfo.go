@@ -83,6 +83,17 @@ func DetectBDPath(savePath string) string {
 	return ""
 }
 
+// DetectDiscPath 定位种子的盘根路径（§59.319 P1 识别门磁盘侧）。
+// 先 findTorrentEntry 精确定位种子目录（防根目录命中其他种子的 BDMV），
+// 再 DetectBDPath 判盘。非原盘返回空串。供 api 层获取链识别+入队使用。
+func (s *BDInfoScanner) DetectDiscPath(savePath, name string) string {
+	bdSearchPath := savePath
+	if entryPath, isDir := findTorrentEntry(savePath, name); entryPath != "" && isDir {
+		bdSearchPath = entryPath
+	}
+	return DetectBDPath(bdSearchPath)
+}
+
 // Scan 扫描 Blu-ray 内容并返回 BDInfo 文本报告
 // progressCB 可选：用于实时报告进度
 func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(percent int, text string)) (string, error) {
@@ -128,7 +139,9 @@ func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(p
 		},
 	}
 
-	scanCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	// §59.319 P1: 30min 上限（原 5min——90G 盘实测 ~11min 会拦腰截断；
+	// ctx 取消新版库真实生效——P0 真盘对拍同源）
+	scanCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 
 	result, err := bdinfo.Run(scanCtx, options)

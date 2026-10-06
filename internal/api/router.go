@@ -251,6 +251,13 @@ func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr 
 	rt.siteHandler.SetSourceDetector(sourceDetector)
 }
 
+// SetBDInfoQueue §59.319 P1: 注入原盘扫描队列+识别器（main 装配，
+// onBDInfoScanDone 落库回调在 Set 内注册）。
+func (rt *Router) SetBDInfoQueue(q *publish.BDInfoScanQueue, s *publish.BDInfoScanner) {
+	rt.publishTorrentsHandler.SetBDInfoQueue(q, s)
+	rt.manualForwardHandler.SetBDInfoScanner(s)
+}
+
 func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
 	return scheduler.Register("coverage-refresh", "coverage", "0 */12 * * *", rt.publishTorrentsHandler.ScheduledRefresh)
 }
