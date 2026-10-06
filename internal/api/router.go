@@ -473,6 +473,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/seed-data/", ptHandler)
 	mux.Handle("/api/v1/publish/stats", ptHandler)
 	mux.Handle("/api/v1/publish/stats/", ptHandler)
+	mux.Handle("/api/v1/publish/bdinfo", ptHandler)   // §59.319 P3
+	mux.Handle("/api/v1/publish/bdinfo/", ptHandler)  // §59.319 P3
 	mux.Handle("/api/v1/publish/coverage-cache", ptHandler)
 	mux.Handle("/api/v1/publish/coverage-cache/", ptHandler)
 	mux.Handle("/api/v1/publish/source-priority", ptHandler)
