@@ -1,3 +1,6 @@
+// Copyright (c) 2026, s0up and the autobrr contributors.
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package bdrom
 
 import (
@@ -127,21 +130,21 @@ func (p *PlaylistFile) FileSize() uint64 {
 	return size
 }
 
-// MainAngleFileSize returns the sum of file sizes for angle-0 clips only, deduplicating
-// loop repetitions. Mirrors TotalSize() but uses filesystem sizes instead of packet counts.
+// MainAngleFileSize returns the sum of file sizes for angle-0 clips only. Because
+// clip.FileSize is the WHOLE .m2ts size, dedup is per physical file (not per clipRefKey):
+// a seamless-branch playlist referencing several segments of one file counts it once.
 // Use as a metadata-only fallback when TotalSize() is zero and no M2TS scan was performed.
 func (p *PlaylistFile) MainAngleFileSize() uint64 {
-	seen := make(map[clipRefKey]struct{})
+	seen := make(map[string]struct{})
 	var size uint64
 	for _, clip := range p.StreamClips {
 		if clip.AngleIndex != 0 {
 			continue
 		}
-		key := newClipRefKey(clip)
-		if _, ok := seen[key]; ok {
+		if _, ok := seen[clip.Name]; ok {
 			continue
 		}
-		seen[key] = struct{}{}
+		seen[clip.Name] = struct{}{}
 		size += clip.FileSize
 	}
 	return size
@@ -606,8 +609,6 @@ func (p *PlaylistFile) loadStreamClips() {
 						ex.ForcedCaptions = cs.ForcedCaptions
 						ex.Width = cs.Width
 						ex.Height = cs.Height
-						ex.CaptionIDs = cs.CaptionIDs
-						ex.LastFrame = cs.LastFrame
 					}
 				}
 			}
@@ -989,5 +990,40 @@ func streamTypeSortIndex(streamType stream.StreamType) int {
 		return 3
 	default:
 		return 0
+	}
+}
+
+// UpdateGraphicsCaptions ports BDInfo's FormMain.UpdateSubtitleChapterCount. After a
+// stream scan, each playlist PGS stream reports the sum of the caption counts of all
+// its clips and the first non-zero frame size. The official CLI never runs this step
+// (see AGENTS.md, Output Quirks To Match).
+func (p *PlaylistFile) UpdateGraphicsCaptions() {
+	for _, st := range p.Streams {
+		if g, ok := st.(*stream.GraphicsStream); ok {
+			g.Captions, g.ForcedCaptions, g.Width, g.Height = 0, 0, 0, 0
+		}
+	}
+	for _, clip := range p.StreamClips {
+		if clip == nil || clip.StreamFile == nil {
+			continue
+		}
+		for pid, st := range clip.StreamFile.Streams {
+			cs, ok := st.(*stream.GraphicsStream)
+			if !ok {
+				continue
+			}
+			pl, ok := p.Streams[pid].(*stream.GraphicsStream)
+			if !ok {
+				continue
+			}
+			pl.Captions += cs.Captions
+			pl.ForcedCaptions += cs.ForcedCaptions
+			if pl.Width == 0 && cs.Width > 0 {
+				pl.Width = cs.Width
+			}
+			if pl.Height == 0 && cs.Height > 0 {
+				pl.Height = cs.Height
+			}
+		}
 	}
 }

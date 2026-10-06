@@ -21,6 +21,25 @@ func NewBDInfoScanner(logger *zap.Logger) *BDInfoScanner {
 	return &BDInfoScanner{logger: logger}
 }
 
+// DetectOriginalDisc 从种子文件列表判定是否原盘（§59.319 D2 识别门）。
+// 输入=RPC 文件相对路径列表（qbittorrent contents / transmission files[].name），
+// 远程本地通用于入队判定（无需磁盘访问）。
+// 判据：任一路径位于 BDMV/ 目录下（"BDMV/xxx" 或 "dir/BDMV/xxx"，大小写
+// 不敏感），或含 .iso 镜像文件。单 .m2ts 不算（无 CLPI/MPLS 非完整盘，
+// BDInfo 无法扫描）。
+func DetectOriginalDisc(fileNames []string) bool {
+	for _, name := range fileNames {
+		lower := strings.ToLower(name)
+		if strings.HasPrefix(lower, "bdmv/") || strings.Contains(lower, "/bdmv/") {
+			return true
+		}
+		if strings.HasSuffix(lower, ".iso") {
+			return true
+		}
+	}
+	return false
+}
+
 // DetectBDPath 检测 save_path 下是否有 Blu-ray 内容（BDMV 目录或 .iso 文件）
 // 返回 BD 内容的根路径，如果没有则返回空字符串
 func DetectBDPath(savePath string) string {
@@ -42,28 +61,22 @@ func DetectBDPath(savePath string) string {
 		return parent
 	}
 
-	// 检测 .iso 文件
+	// 检测 .iso 文件与子目录中的 BDMV（§59.319 P0：原子目录检测在
+	// .iso 分支后被 entry.IsDir() continue 不可达——重排修复）
 	entries, err := os.ReadDir(savePath)
 	if err != nil {
 		return ""
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			continue
-		}
-		lower := strings.ToLower(entry.Name())
-		if strings.HasSuffix(lower, ".iso") || strings.HasSuffix(lower, ".m2ts") {
-			fullPath := filepath.Join(savePath, entry.Name())
-			if strings.HasSuffix(lower, ".iso") {
-				return fullPath
-			}
-		}
-		// 检测子目录中的 BDMV
-		if entry.IsDir() {
 			subBDMV := filepath.Join(savePath, entry.Name(), "BDMV")
 			if info, err := os.Stat(subBDMV); err == nil && info.IsDir() {
 				return filepath.Join(savePath, entry.Name())
 			}
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(entry.Name()), ".iso") {
+			return filepath.Join(savePath, entry.Name())
 		}
 	}
 

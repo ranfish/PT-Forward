@@ -1,3 +1,6 @@
+// Copyright (c) 2026, s0up and the autobrr contributors.
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package stream
 
 import (
@@ -556,21 +559,19 @@ func ConvertSampleRate(rate SampleRate) int {
 }
 
 func (a *AudioStream) ChannelDescription() string {
-	if description := immersiveChannelDescription(a.ChannelLayoutText); description != "" {
-		return description
-	}
-
-	description := ""
-	if a.ChannelCount > 0 {
-		description += fmt.Sprintf("%d.%d", a.ChannelCount, a.LFE)
-	} else {
-		switch a.ChannelLayout {
-		case ChannelLayoutMono:
-			description += "1.0"
-		case ChannelLayoutStereo:
-			description += "2.0"
-		case ChannelLayoutMulti:
-			description += "5.1"
+	description := immersiveChannelDescription(a.ChannelLayoutText)
+	if description == "" {
+		if a.ChannelCount > 0 {
+			description += fmt.Sprintf("%d.%d", a.ChannelCount, a.LFE)
+		} else {
+			switch a.ChannelLayout {
+			case ChannelLayoutMono:
+				description += "1.0"
+			case ChannelLayoutStereo:
+				description += "2.0"
+			case ChannelLayoutMulti:
+				description += "5.1"
+			}
 		}
 	}
 
@@ -690,14 +691,19 @@ type GraphicsStream struct {
 	Height         int
 	Captions       int
 	ForcedCaptions int
-	CaptionIDs     map[int]any
-	LastFrame      any
+	LastFrame      PGSFrame
+}
+
+// PGSFrame mirrors BDInfo's TSCodecPGS.Frame: the composition state carried
+// between PES transfers while counting captions.
+type PGSFrame struct {
+	Forced   bool
+	Finished bool
 }
 
 func NewGraphicsStream() *GraphicsStream {
 	return &GraphicsStream{
-		Stream:     Stream{IsVBR: true, IsInitialized: false},
-		CaptionIDs: make(map[int]any),
+		Stream: Stream{IsVBR: true, IsInitialized: false},
 	}
 }
 
