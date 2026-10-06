@@ -249,7 +249,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.164: 修道院 cnname 独立中文名（FormFields 未配站点自然跳过）
 	setForm(model.FieldDomainCNName, chineseTitleOf(meta.Title))
 	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
-	setForm(model.FieldDomainTechInfo, meta.MediaInfo)
+	// §59.319 P2: 原盘 tech 文本源 BDInfo 优先（表单 techinfo 域/推断/审计同源）
+	setForm(model.FieldDomainTechInfo, TechTextOf(meta))
 	setForm(model.FieldDomainIMDBURL, meta.IMDbURL)
 	// §59.159: PT-Gen/豆瓣链接（用户实战指认——发布页面完整投递；PTNexus 同款
 	// pt_gen 值=豆瓣链接；FormFields 未配站点自然跳过）
@@ -261,7 +262,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 替代 meta 原始列。五案根治：From S04(WEBRip 媒介跟标题)/宽幅 2K(高度
 	// 1080 归一)/天空之城(audio)/Arco(MI 纠错 DDP)。type/team 域保持原源。
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
-	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	tp := titleparser.BuildTechProfile(meta.Title, TechTextOf(meta), domMedium, domRes, domVideo, domAudio)
 	// §59.254 项1: PTGen 第四源合并（year 校正+main_title 兜底+mismatch 可观测）
 	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
 	e.mergePTGenSource(ctx, &tp, meta)
@@ -959,10 +960,22 @@ func (e *PublishExecutor) teamMapping(cfg *model.PublishFormConfig, meta *model.
 	return e.lookupOtherOption(cfg, model.FieldDomainTeam)
 }
 
+// TechTextOf §59.319 P2: 原盘 tech 文本源统一——BDInfo 优先，普通种子
+// MediaInfo（SourceMediaInfo 兜底由调用方语境决定，发布链只消费本地列——
+// 与 FetchAndStore 落库语义一致）。表单 techinfo 域/BuildTechProfile/标签
+// 推断/审计 body/描述 quote 五消费点同源。ExtractMediaInfo 格式分流
+// （QUICK SUMMARY 锚）保证 BDInfo 文本自动走 BD 解析器。
+func TechTextOf(meta *model.TorrentMetadata) string {
+	if meta.BDInfo != "" {
+		return meta.BDInfo
+	}
+	return meta.MediaInfo
+}
+
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
 func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, overrides []string) []string {
 	// 判据引擎（§59.151 MI 唯一真相）
-	inferred := e.inferer.Infer(meta.MediaInfo, meta.Title, meta.Subtitle)
+	inferred := e.inferer.Infer(TechTextOf(meta), meta.Title, meta.Subtitle)
 	// 站方 tags 域 standard_key → value 映射 + auto:false 排除
 	allowed := map[string]string{}
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
@@ -1032,7 +1045,7 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		SmallDescr:    form[model.FieldDomainSmallDescr],
 		IMDBURL:       meta.IMDbURL,
 		Description:   form[cfg.FormFields[model.FieldDomainDescription]],
-		TechnicalInfo: meta.MediaInfo,
+		TechnicalInfo: TechTextOf(meta),
 		Quality:       map[string]idName{},
 		Tags:          []idName{},
 		ExportTime:    time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
@@ -1177,7 +1190,7 @@ func detailURLOf(cfg *model.SiteConfig, tid string) string {
 // §59.254 项4：重组空返回 ok=false（DryRun 同拒——预检正是发现问题的工具）。
 func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) (string, bool) {
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
-	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	tp := titleparser.BuildTechProfile(meta.Title, TechTextOf(meta), domMedium, domRes, domVideo, domAudio)
 	e.normalizeSeasonPackOf(meta, &tp) // §59.308: 预检 name 与上传标题同归一（双链分叉防）
 	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
 		return rt, true

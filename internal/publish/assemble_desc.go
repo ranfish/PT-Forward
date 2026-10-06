@@ -59,8 +59,9 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 	}
 	// §59.166 修道院规范：无 techinfo 表单域 → MI 引用格式入简介（半角原文——
 	// 无自动审核站，标准形态；全角化只服务幸运声明 quote）
+	// §59.319 P2: 原盘插 BDInfo（TechTextOf BDInfo 优先——伪 MI 已清空）
 	if cfg == nil || cfg.FormFields[model.FieldDomainTechInfo] == "" {
-		if mi := strings.TrimSpace(meta.MediaInfo); mi != "" {
+		if mi := strings.TrimSpace(TechTextOf(meta)); mi != "" {
 			b.WriteString("\n\n[quote]")
 			b.WriteString(mi)
 			b.WriteString("[/quote]")

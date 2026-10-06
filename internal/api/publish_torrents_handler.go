@@ -139,32 +139,41 @@ func (h *PublishTorrentsHandler) SetBDInfoQueue(q *publish.BDInfoScanQueue, s *p
 	}
 }
 
-// clusterHashes 簇内全部 hash（client_uid+save_path+name 紧键——与
-// propagateCluster* 同源）。
-func (h *PublishTorrentsHandler) clusterHashes(ctx context.Context, clientUID uint, savePath, name string) []string {
+// clusterHashesDB 簇内全部 hash（client_uid+save_path+name 紧键——与
+// propagateCluster* 同源；§59.319 P2 提包级供 manual refresh 链复用）。
+func clusterHashesDB(db *gorm.DB, ctx context.Context, clientUID uint, savePath, name string) []string {
 	if clientUID == 0 || savePath == "" || name == "" {
 		return nil
 	}
 	var hashes []string
-	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+	db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0",
 			clientUID, savePath, name).
 		Pluck("hash", &hashes)
 	return hashes
 }
 
-// clusterHasBDInfo 簇查重：簇内任一行已有 bd_info 产物即无需重扫
+// clusterHasBDInfoDB 簇查重：簇内任一行已有 bd_info 产物即无需重扫
 // （§59.319 D4 簇级缓存——59-74 站同盘共享一次扫描）。
-func (h *PublishTorrentsHandler) clusterHasBDInfo(ctx context.Context, clientUID uint, savePath, name string) bool {
-	hashes := h.clusterHashes(ctx, clientUID, savePath, name)
+func clusterHasBDInfoDB(db *gorm.DB, ctx context.Context, clientUID uint, savePath, name string) bool {
+	hashes := clusterHashesDB(db, ctx, clientUID, savePath, name)
 	if len(hashes) == 0 {
 		return false
 	}
 	var cnt int64
-	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+	db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash IN ? AND bd_info != ''", hashes).
 		Limit(1).Count(&cnt)
 	return cnt > 0
+}
+
+func (h *PublishTorrentsHandler) clusterHashes(ctx context.Context, clientUID uint, savePath, name string) []string {
+	return clusterHashesDB(h.db, ctx, clientUID, savePath, name)
+}
+
+// clusterHasBDInfo 簇查重薄壳。
+func (h *PublishTorrentsHandler) clusterHasBDInfo(ctx context.Context, clientUID uint, savePath, name string) bool {
+	return clusterHasBDInfoDB(h.db, ctx, clientUID, savePath, name)
 }
 
 // onBDInfoScanDone §59.319 P1: 扫描完成回调（queue 串行线程执行）——
