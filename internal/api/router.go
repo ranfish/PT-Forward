@@ -256,6 +256,7 @@ func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr 
 func (rt *Router) SetBDInfoQueue(q *publish.BDInfoScanQueue, s *publish.BDInfoScanner) {
 	rt.publishTorrentsHandler.SetBDInfoQueue(q, s)
 	rt.manualForwardHandler.SetBDInfoScanner(s)
+	rt.manualForwardHandler.SetBDInfoQueue(q)
 }
 
 func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {

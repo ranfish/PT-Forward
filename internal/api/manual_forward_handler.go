@@ -27,6 +27,7 @@ type ManualForwardHandler struct {
 	seedingCache        SeedingCacheProvider
 	declFilter          *publish.DeclarationFilter
 	bdinfoScanner       *publish.BDInfoScanner
+	bdinfoQueue         *publish.BDInfoScanQueue // §59.319 P2: 原盘扫描队列（手动刷新入队）
 	metadataFetcher     MetadataFetcherProvider
 	coverage            CoverageServiceProvider
 	sourceDetector      *publish.SourceSiteDetector
@@ -88,6 +89,7 @@ func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider)            
 func (h *ManualForwardHandler) SetSeedingCache(s SeedingCacheProvider)            { h.seedingCache = s }
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner)         { h.bdinfoScanner = s }
+func (h *ManualForwardHandler) SetBDInfoQueue(q *publish.BDInfoScanQueue)         { h.bdinfoQueue = q }
 func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
 func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider)      { h.coverage = c }
 func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector)   { h.sourceDetector = d }
@@ -239,6 +241,35 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			}
 			break
 		}
+		// §59.319 P2: 原盘分支——伪 MI 停产（D8）+ BDInfo 走扫描队列。
+		// 原 ScanIfBD 同步 2min 块对 5-11min 全盘扫描恒超时（死块已删）；
+		// 手动刷新语义：簇已有产物直接返回现值，无则入队返回 queued
+		// （前端提示扫描中，完成后 Tab5 重读列自然可见）。
+		if h.bdinfoScanner != nil && req.SavePath != "" {
+			if discPath := h.bdinfoScanner.DetectDiscPath(req.SavePath, req.Name); discPath != "" {
+				if clusterHasBDInfoDB(h.db, ctx, req.ClientUID, req.SavePath, req.Name) {
+					if req.InfoHash != "" {
+						var m model.TorrentMetadata
+						q := h.db.WithContext(ctx).Where("info_hash = ?", req.InfoHash)
+						if req.SiteName != "" {
+							q = q.Where("site_name = ?", req.SiteName)
+						}
+						if err := q.First(&m).Error; err == nil && m.BDInfo != "" {
+							result["bdinfo"] = m.BDInfo
+						}
+					}
+					break
+				}
+				if h.bdinfoQueue != nil {
+					h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
+						ClientUID: req.ClientUID, SavePath: req.SavePath,
+						Name: req.Name, DiscPath: discPath,
+					})
+					result["bdinfo_queued"] = true
+				}
+				break
+			}
+		}
 		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("MediaInfo 获取失败: %v", err))
@@ -264,18 +295,6 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 				} else {
 					propagateClusterMediainfoDB(h.db, h.logger, ctx, req.ClientUID, req.SavePath, req.Name, req.InfoHash, miStr)
 				}
-			}
-		}
-		// §59.20: 同时扫描 BDInfo（如有蓝光结构）
-		if h.bdinfoScanner != nil && req.SavePath != "" {
-			bdCtx, bdCancel := context.WithTimeout(ctx, 2*time.Minute)
-			bdReport, bdErr := h.bdinfoScanner.ScanIfBD(bdCtx, req.SavePath, req.Name, nil)
-			bdCancel()
-			if bdErr != nil {
-				h.logger.Warn("refresh: BDInfo scan failed", zap.Error(bdErr))
-			}
-			if bdReport != "" {
-				result["bdinfo"] = bdReport
 			}
 		}
 

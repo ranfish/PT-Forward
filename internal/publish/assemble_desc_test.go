@@ -92,6 +92,34 @@ func TestAssembleMIIinDescForNoTechInfoSite(t *testing.T) {
 	}
 }
 
+// §59.319 P2: 原盘描述组装——BDInfo 优先入 quote（伪 MI 清空后 TechTextOf=
+// BDInfo；并存防御 case BDInfo 赢）；TechTextOf 单测。
+func TestAssembleBDInfoForOriginalDisc(t *testing.T) {
+	meta := &model.TorrentMetadata{
+		Description: "剧情简介",
+		BDInfo:      "QUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 100 kbps / 2160p / 24 fps",
+		Screenshots: `["https://img.example.com/s1.jpg"]`,
+	}
+	cfg := &model.PublishFormConfig{FormFields: map[string]string{}}
+	out := assembleDescription(meta, cfg)
+	if !strings.Contains(out, "[quote]QUICK SUMMARY:") {
+		t.Error("原盘 BDInfo 应以引用格式插入简介")
+	}
+	// 并存防御：BDInfo 与 MediaInfo 同在（异常态）——BDInfo 赢
+	meta.MediaInfo = "General\nComplete name : leftover.mkv"
+	if got := TechTextOf(meta); got != meta.BDInfo {
+		t.Error("TechTextOf 应 BDInfo 优先")
+	}
+	out2 := assembleDescription(meta, cfg)
+	if strings.Contains(out2, "leftover.mkv") || !strings.Contains(out2, "QUICK SUMMARY:") {
+		t.Error("并存时描述应只含 BDInfo")
+	}
+	// 普通种子：无 BDInfo → MediaInfo
+	if got := TechTextOf(&model.TorrentMetadata{MediaInfo: "mi"}); got != "mi" {
+		t.Error("普通种子 MediaInfo 原样")
+	}
+}
+
 // §59.178: 引用块首行前空行修复——剥外层 [quote] 壳 + Trim 换行。
 func TestTrimQuoteWrapper(t *testing.T) {
 	cases := []struct{ in, want string }{

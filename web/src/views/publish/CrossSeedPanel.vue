@@ -677,6 +677,11 @@ async function doRefresh(type: string) {
       if (data.subtitle) form.value.subtitle = data.subtitle as string
     } else if (type === 'mediainfo') {
       if (data.mediainfo) form.value.mediaInfo = data.mediainfo as string
+      if (data.bdinfo) form.value.bdinfo = data.bdinfo as string
+      if (data.bdinfo_queued) {
+        message.info('检测到蓝光原盘：BDInfo 扫描已入队（全盘扫描约 5-11 分钟），完成后重新打开编辑器可见', 8)
+        return
+      }
     } else if (type === 'screenshots') {
       if (data.screenshots) form.value.screenshots = data.screenshots as string[]
     } else if (type === 'rehost_screenshots') {
