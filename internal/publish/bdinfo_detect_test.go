@@ -29,6 +29,48 @@ func TestDetectOriginalDisc(t *testing.T) {
 	}
 }
 
+// §59.319 P3 事故回归锚：单文件种子（mkv）住在盘目录旁——DetectDiscPath
+// 不得命中邻居盘（243 HDT 158 误入队案：WEB-DL mkv 的 savePath=HDT 根，
+// 子目录扫描命中 Alice 的 BDMV）。规则：文件仅 .iso；目录仅 BDMV 直下。
+func TestDetectDiscPath_NoNeighborHit(t *testing.T) {
+	s := NewBDInfoScanner(nil)
+	root := t.TempDir()
+	// 邻居盘（HDT/Alice.../BDMV）
+	alice := filepath.Join(root, "Alice.UHD-BDMV")
+	if err := os.MkdirAll(filepath.Join(alice, "BDMV"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// mkv 单文件种子住在 HDT 根
+	if err := os.WriteFile(filepath.Join(root, "96.2018.WEB-DL.mkv"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.DetectDiscPath(root, "96.2018.WEB-DL.mkv"); got != "" {
+		t.Errorf("mkv 单文件应非盘, got %q（命中邻居盘=事故）", got)
+	}
+	// iso 单文件种子 → 命中
+	if err := os.WriteFile(filepath.Join(root, "Movie.iso"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.DetectDiscPath(root, "Movie.iso"); got != filepath.Join(root, "Movie.iso") {
+		t.Errorf("iso 单文件应命中, got %q", got)
+	}
+	// 盘目录种子 → BDMV 直下命中
+	if got := s.DetectDiscPath(root, "Alice.UHD-BDMV"); got != alice {
+		t.Errorf("盘目录应命中, got %q", got)
+	}
+	// mp4 单文件 → 非盘
+	if err := os.WriteFile(filepath.Join(root, "show.mp4"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.DetectDiscPath(root, "show.mp4"); got != "" {
+		t.Errorf("mp4 应非盘, got %q", got)
+	}
+	// 定位失败（不存在的名字）→ 不回退扫 savePath
+	if got := s.DetectDiscPath(root, "ghost.torrent"); got != "" {
+		t.Errorf("定位失败应空（不回退扫根目录）, got %q", got)
+	}
+}
+
 // §59.319 P0：DetectBDPath 子目录 BDMV 检测曾不可达（.iso 分支后被
 // entry.IsDir() continue 跳过）——重排修复的回归锚
 func TestDetectBDPath_SubDirBDMV(t *testing.T) {

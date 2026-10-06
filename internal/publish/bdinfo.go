@@ -84,14 +84,29 @@ func DetectBDPath(savePath string) string {
 }
 
 // DetectDiscPath 定位种子的盘根路径（§59.319 P1 识别门磁盘侧）。
-// 先 findTorrentEntry 精确定位种子目录（防根目录命中其他种子的 BDMV），
-// 再 DetectBDPath 判盘。非原盘返回空串。供 api 层获取链识别+入队使用。
+// 收紧语义（P3 事故修复——243 HDT 158 误入队案）：WEB-DL mkv 单文件种子的
+// savePath=HDT 根目录，原实现回退到 DetectBDPath(savePath) 子目录扫描，
+// 命中邻居盘（Alice 的 BDMV）→ BDInfo 错挂 mkv 簇。现规则：
+//   - findTorrentEntry 必须精确定位到种子内容（失败不回退——savePath 级
+//     扫描天然会命中邻居盘）
+//   - 定位到文件：仅 .iso 算原盘（mkv/mp4/m2ts 单文件=非盘）
+//   - 定位到目录：仅"BDMV 直下"算原盘（不向上找父、不扫子目录——多盘
+//     合集种子挂账不支持）
 func (s *BDInfoScanner) DetectDiscPath(savePath, name string) string {
-	bdSearchPath := savePath
-	if entryPath, isDir := findTorrentEntry(savePath, name); entryPath != "" && isDir {
-		bdSearchPath = entryPath
+	entryPath, isDir := findTorrentEntry(savePath, name)
+	if entryPath == "" {
+		return ""
 	}
-	return DetectBDPath(bdSearchPath)
+	if !isDir {
+		if strings.EqualFold(filepath.Ext(entryPath), ".iso") {
+			return entryPath
+		}
+		return ""
+	}
+	if info, err := os.Stat(filepath.Join(entryPath, "BDMV")); err == nil && info.IsDir() {
+		return entryPath
+	}
+	return ""
 }
 
 // Scan 扫描 Blu-ray 内容并返回 BDInfo 文本报告
