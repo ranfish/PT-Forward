@@ -44,6 +44,13 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 		return result
 	}
 
+	// §59.319 P1: 格式单点分流——BDInfo 完整报告（QUICK SUMMARY 锚是
+	// BDInfo 特有标记，MI 格式无此串）走 BDInfo 解析器；全部消费方
+	// （BuildTechProfile/列表 tech/发布链/reseed）零改动自动获得 BD 能力
+	if strings.Contains(text, "QUICK SUMMARY:") {
+		return ExtractBDInfo(text)
+	}
+
 	streams := parseMIStreams(text)
 	// §59.235 P3: General 层容器 Format（BDAV 门用——Video 段的 format 是
 	// 编码格式 AVC/HEVC 非容器）

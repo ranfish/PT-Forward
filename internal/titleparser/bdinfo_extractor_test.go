@@ -104,6 +104,19 @@ func TestExtractBDInfo_Mercy_TrueHD_Atmos(t *testing.T) {
 	}
 }
 
+// §59.319 P1: ExtractMediaInfo 单点格式分流——BDInfo 报告自动路由到
+// ExtractBDInfo（全部 MI 消费方零改动获得 BD 能力）
+func TestExtractMediaInfo_BDInfoRouted(t *testing.T) {
+	report := loadBDTestdata(t, "bdinfo_alice_uhd.txt")
+	got := ExtractMediaInfo(report)
+	if got.VideoCodec != "HEVC" || got.Resolution != "2160p" || got.HDR != "DoVi HDR" {
+		t.Errorf("分流未生效: %+v", got)
+	}
+	if got.Encoded {
+		t.Error("原盘 Encoded 恒 false")
+	}
+}
+
 func TestExtractBDInfo_EdgeCases(t *testing.T) {
 	if got := ExtractBDInfo(""); got.Resolution != "" || got.VideoCodec != "" {
 		t.Error("空输入应返回零值")
