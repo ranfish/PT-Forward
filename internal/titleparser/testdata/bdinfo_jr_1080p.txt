@@ -1,0 +1,147 @@
+Disc Label:     Jungle Raiders 1945 BluRay 1080p AVC DTS-HD MA2.0-MTeam
+Disc Size:      40,166,855,136 bytes
+Protection:     AACS
+BDInfo:         0.8.0.0
+
+
+Notes:          
+
+
+BDINFO HOME:
+  Cinema Squid (old)
+    http://www.cinemasquid.com/blu-ray/tools/bdinfo
+  UniqProject GitHub (new)
+   https://github.com/UniqProject/BDInfo
+
+
+INCLUDES FORUMS REPORT FOR:
+  AVS Forum Blu-ray Audio and Video Specifications Thread
+    http://www.avsforum.com/avs-vb/showthread.php?t=1155731
+
+
+
+
+********************
+PLAYLIST: 00004.MPLS
+********************
+
+
+<--- BEGIN FORUMS PASTE --->
+[code]
+                                                                                                                Total   Video                                             
+Title                                                           Codec   Length  Movie Size      Disc Size       Bitrate Bitrate Main Audio Track                          Secondary Audio Track
+-----                                                           ------  ------- --------------  --------------  ------- ------- ------------------                        ---------------------
+00004.MPLS                                                      AVC     1:41:23 32,145,580,032  40,166,855,136  42.27   36.00   DTS-HD Master 2.0 1954Kbps (48kHz/24-bit) 
+[/code]
+
+
+[code]
+
+
+DISC INFO:
+
+
+Disc Label:     Jungle Raiders 1945 BluRay 1080p AVC DTS-HD MA2.0-MTeam
+Disc Size:      40,166,855,136 bytes
+Protection:     AACS
+BDInfo:         0.8.0.0
+
+
+PLAYLIST REPORT:
+
+
+Name:                   00004.MPLS
+Length:                 1:41:23.577 (h:m:s.ms)
+Size:                   32,145,580,032 bytes
+Total Bitrate:          42.27 Mbps
+
+
+VIDEO:
+
+
+Codec                   Bitrate             Description     
+-----                   -------             -----------     
+MPEG-4 AVC Video        36000 kbps          1080p / 23.976 fps / 16:9 / High Profile 4.1
+
+
+AUDIO:
+
+
+Codec                           Language        Bitrate         Description     
+-----                           --------        -------         -----------     
+DTS-HD Master Audio             English         1954 kbps       2.0 / 48 kHz /  1954 kbps / 24-bit (DTS Core: 2.0 / 48 kHz /  1509 kbps / 24-bit)
+DTS-HD Master Audio             Italian         1938 kbps       2.0 / 48 kHz /  1938 kbps / 24-bit (DTS Core: 2.0 / 48 kHz /  1509 kbps / 24-bit)
+
+
+SUBTITLES:
+
+
+Codec                           Language        Bitrate         Description     
+-----                           --------        -------         -----------     
+Presentation Graphics           English         37.262 kbps     1920x1080 / 1444 Captions
+Presentation Graphics           English         34.353 kbps     1920x1080 / 1143 Captions
+
+
+FILES:
+
+
+Name            Time In         Length          Size            Total Bitrate   
+----            -------         ------          ----            -------------   
+00006.M2TS      0:00:00.000     1:41:23.577     32,145,580,032  42,272          
+
+
+CHAPTERS:
+
+
+Number          Time In         Length          Avg Video Rate  Max 1-Sec Rate  Max 1-Sec Time  Max 5-Sec Rate  Max 5-Sec Time  Max 10Sec Rate  Max 10Sec Time  Avg Frame Size  Max Frame Size  Max Frame Time  
+------          -------         ------          --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  
+1               0:00:00.000     0:06:30.598     36,005 kbps     51,078 kbps     00:00:06.464    39,128 kbps     00:00:02.460    36,210 kbps     00:01:15.784    187,694 bytes   412,692 bytes   00:00:07.006    
+2               0:06:30.598     0:09:34.407     36,000 kbps     38,552 kbps     00:15:08.115    36,620 kbps     00:15:04.111    36,313 kbps     00:14:59.023    187,689 bytes   364,129 bytes   00:13:12.416    
+3               0:16:05.005     0:12:30.082     36,000 kbps     37,955 kbps     00:24:02.732    36,457 kbps     00:22:49.534    36,216 kbps     00:25:23.355    187,687 bytes   340,896 bytes   00:25:35.325    
+4               0:28:35.088     0:06:23.633     36,000 kbps     38,224 kbps     00:32:25.026    36,405 kbps     00:32:20.980    36,170 kbps     00:30:31.120    187,688 bytes   331,478 bytes   00:32:29.530    
+5               0:34:58.721     0:05:41.549     36,000 kbps     37,839 kbps     00:37:04.931    36,400 kbps     00:37:38.798    36,200 kbps     00:36:55.880    187,687 bytes   367,081 bytes   00:37:06.807    
+6               0:40:40.271     0:06:53.496     36,000 kbps     40,267 kbps     00:40:43.858    36,534 kbps     00:40:45.734    36,269 kbps     00:40:46.610    187,687 bytes   380,007 bytes   00:41:03.502    
+7               0:47:33.767     0:09:25.940     36,000 kbps     37,929 kbps     00:55:33.371    36,409 kbps     00:55:33.455    36,181 kbps     00:55:10.807    187,685 bytes   375,032 bytes   00:56:59.207    
+8               0:56:59.707     0:14:03.842     36,001 kbps     39,072 kbps     00:57:33.783    36,513 kbps     00:57:29.821    36,313 kbps     00:57:24.649    187,692 bytes   382,809 bytes   00:57:15.348    
+9               1:11:03.550     0:05:06.848     35,999 kbps     38,371 kbps     01:11:22.152    36,448 kbps     01:11:29.827    36,218 kbps     01:11:24.822    187,684 bytes   417,448 bytes   01:11:35.666    
+10              1:16:10.399     0:08:38.059     35,999 kbps     37,919 kbps     01:21:30.552    36,410 kbps     01:18:35.293    36,215 kbps     01:20:50.512    187,684 bytes   357,018 bytes   01:24:41.951    
+11              1:24:48.458     0:06:11.329     36,001 kbps     37,938 kbps     01:29:17.518    36,448 kbps     01:29:31.074    36,193 kbps     01:29:26.110    187,691 bytes   398,975 bytes   01:29:36.037    
+12              1:30:59.787     0:10:23.789     35,996 kbps     47,257 kbps     01:41:01.138    37,882 kbps     01:40:57.092    37,003 kbps     01:40:52.087    187,680 bytes   489,877 bytes   01:41:01.638    
+
+
+STREAM DIAGNOSTICS:
+
+
+File            PID             Type            Codec           Language                Seconds                 Bitrate                 Bytes           Packets         
+----            ---             ----            -----           --------                --------------          --------------          -------------   -----           
+00006.M2TS      4113 (0x1011)   0x1B            AVC                                     6083.411                36,001                  27,376,098,010  148,868,508     
+00006.M2TS      4352 (0x1100)   0x86            DTS-HD MA       eng (English)           6083.411                1,954                   1,485,832,908   9,061,689       
+00006.M2TS      4353 (0x1101)   0x86            DTS-HD MA       ita (Italian)           6083.411                1,938                   1,473,733,936   8,978,375       
+00006.M2TS      4608 (0x1200)   0x90            PGS             eng (English)           6083.411                37                      28,335,567      162,400         
+00006.M2TS      4609 (0x1201)   0x90            PGS             eng (English)           6083.411                34                      26,123,691      150,087         
+
+
+[/code]
+<---- END FORUMS PASTE ---->
+
+
+QUICK SUMMARY:
+
+
+Disc Label: Jungle Raiders 1945 BluRay 1080p AVC DTS-HD MA2.0-MTeam
+Disc Size: 40,166,855,136 bytes
+Protection: AACS
+Playlist: 00004.MPLS
+Size: 32,145,580,032 bytes
+Length: 1:41:23.577
+Total Bitrate: 42.27 Mbps
+Video: MPEG-4 AVC Video / 36000 kbps / 1080p / 23.976 fps / 16:9 / High Profile 4.1
+Audio: English / DTS-HD Master Audio / 2.0 / 48 kHz /  1954 kbps / 24-bit (DTS Core: 2.0 / 48 kHz /  1509 kbps / 24-bit)
+Audio: Italian / DTS-HD Master Audio / 2.0 / 48 kHz /  1938 kbps / 24-bit (DTS Core: 2.0 / 48 kHz /  1509 kbps / 24-bit)
+Subtitle: English / 37.262 kbps
+Subtitle: English / 34.353 kbps
+
+
+
+
+

@@ -1,7 +1,11 @@
+// Copyright (c) 2026, s0up and the autobrr contributors.
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package codec
 
 import (
 	"encoding/binary"
+	"strings"
 
 	"github.com/ranfish/pt-forward/internal/bdinfo/buffer"
 	"github.com/ranfish/pt-forward/internal/bdinfo/stream"
@@ -12,7 +16,11 @@ var dtsHdSampleRates = []int{
 	0x2B110, 0x56220, 0x2EE0, 0x5DC0, 0x0BB80, 0x17700, 0x2EE00, 0x5DC00,
 }
 
-func ScanDTSHD(a *stream.AudioStream, data []byte, fallbackBitrate int64) {
+// ScanDTSHD scans data whose PES transfers end at the offsets in transferEnds.
+// BDInfo scans one transfer at a time and stops after the first HD frame, so the
+// DTS:X pattern search must stay inside the transfer that holds the first HD
+// sync. With a nil transferEnds the search covers all of data.
+func ScanDTSHD(a *stream.AudioStream, data []byte, transferEnds []int, fallbackBitrate int64) {
 	if a.IsInitialized && (a.StreamType == stream.StreamTypeDTSHDSecondaryAudio || (a.CoreStream != nil && a.CoreStream.IsInitialized)) {
 		return
 	}
@@ -247,7 +255,7 @@ func ScanDTSHD(a *stream.AudioStream, data []byte, fallbackBitrate int64) {
 		}
 	}
 
-	a.HasExtensions = detectDTSX(data[syncOffset:])
+	a.HasExtensions = detectDTSX(data[syncOffset:transferEnd(syncOffset, transferEnds, len(data))])
 
 	if a.CoreStream != nil && a.CoreStream.AudioMode == stream.AudioModeExtended && a.ChannelCount == 5 {
 		a.AudioMode = stream.AudioModeExtended
@@ -279,65 +287,37 @@ func ScanDTSHD(a *stream.AudioStream, data []byte, fallbackBitrate int64) {
 	}
 }
 
+// dtsHDSpeakerActivityLayouts maps DTS-HD ExSS speaker activity mask bits (LSB first)
+// to MediaInfo-compatible speaker labels.
+var dtsHDSpeakerActivityLayouts = []string{
+	"C", "L R", "Ls Rs", "LFE", "Cs", "Lh Rh", "Lsr Rsr", "Ch",
+	"Oh", "Lc Rc", "Lw Rw", "Lss Rss", "LFE2", "Lhs Rhs", "Chr", "Lhr Rhr",
+}
+
 // dtsHDSpeakerActivityMaskChannelLayout converts a DTS-HD ExSS speaker activity mask
 // into MediaInfo-compatible speaker labels.
 func dtsHDSpeakerActivityMaskChannelLayout(mask uint16) string {
 	if mask == 1 {
 		return "M"
 	}
-	out := ""
-	if mask&0x0001 != 0 {
-		out += " C"
+	parts := make([]string, 0, 16)
+	for i, layout := range dtsHDSpeakerActivityLayouts {
+		if mask&(1<<i) != 0 {
+			parts = append(parts, layout)
+		}
 	}
-	if mask&0x0002 != 0 {
-		out += " L R"
+	return strings.Join(parts, " ")
+}
+
+// transferEnd returns the end of the transfer that contains offset, or n when
+// transfer boundaries are unknown.
+func transferEnd(offset int, transferEnds []int, n int) int {
+	for _, end := range transferEnds {
+		if end > offset {
+			return min(end, n)
+		}
 	}
-	if mask&0x0004 != 0 {
-		out += " Ls Rs"
-	}
-	if mask&0x0008 != 0 {
-		out += " LFE"
-	}
-	if mask&0x0010 != 0 {
-		out += " Cs"
-	}
-	if mask&0x0020 != 0 {
-		out += " Lh Rh"
-	}
-	if mask&0x0040 != 0 {
-		out += " Lsr Rsr"
-	}
-	if mask&0x0080 != 0 {
-		out += " Ch"
-	}
-	if mask&0x0100 != 0 {
-		out += " Oh"
-	}
-	if mask&0x0200 != 0 {
-		out += " Lc Rc"
-	}
-	if mask&0x0400 != 0 {
-		out += " Lw Rw"
-	}
-	if mask&0x0800 != 0 {
-		out += " Lss Rss"
-	}
-	if mask&0x1000 != 0 {
-		out += " LFE2"
-	}
-	if mask&0x2000 != 0 {
-		out += " Lhs Rhs"
-	}
-	if mask&0x4000 != 0 {
-		out += " Chr"
-	}
-	if mask&0x8000 != 0 {
-		out += " Lhr Rhr"
-	}
-	if out == "" {
-		return ""
-	}
-	return out[1:]
+	return n
 }
 
 func detectDTSX(data []byte) bool {

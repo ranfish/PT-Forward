@@ -1,0 +1,205 @@
+Disc Title:     Mercy
+Disc Label:     Mercy 2026 UHD BluRay 2160p HEVC Atmos TrueHD7.1-MTeam
+Disc Size:      60,264,769,953 bytes
+Protection:     AACS2
+Extras:         Ultra HD, BD-Java
+BDInfo:         0.8.0.0
+
+
+Notes:          
+
+
+BDINFO HOME:
+  Cinema Squid (old)
+    http://www.cinemasquid.com/blu-ray/tools/bdinfo
+  UniqProject GitHub (new)
+   https://github.com/UniqProject/BDInfo
+
+
+INCLUDES FORUMS REPORT FOR:
+  AVS Forum Blu-ray Audio and Video Specifications Thread
+    http://www.avsforum.com/avs-vb/showthread.php?t=1155731
+
+
+
+
+********************
+PLAYLIST: 00040.MPLS
+********************
+
+
+<--- BEGIN FORUMS PASTE --->
+[code]
+                                                                                                                Total   Video                                             
+Title                                                           Codec   Length  Movie Size      Disc Size       Bitrate Bitrate Main Audio Track                          Secondary Audio Track
+-----                                                           ------  ------- --------------  --------------  ------- ------- ------------------                        ---------------------
+00040.MPLS                                                      HEVC    1:39:33 59,687,835,648  60,264,769,953  79.93   61.75   Dolby Atmos 7.1 3807Kbps (48kHz/16-bit)   DD AC3 5.1 640Kbps
+[/code]
+
+
+[code]
+
+
+DISC INFO:
+
+
+Disc Title:     Mercy
+Disc Label:     Mercy 2026 UHD BluRay 2160p HEVC Atmos TrueHD7.1-MTeam
+Disc Size:      60,264,769,953 bytes
+Protection:     AACS2
+Extras:         Ultra HD, BD-Java
+BDInfo:         0.8.0.0
+
+
+PLAYLIST REPORT:
+
+
+Name:                   00040.MPLS
+Length:                 1:39:33.884 (h:m:s.ms)
+Size:                   59,687,835,648 bytes
+Total Bitrate:          79.93 Mbps
+
+(*) Indicates included stream hidden by this playlist.
+
+
+VIDEO:
+
+
+Codec                   Bitrate             Description     
+-----                   -------             -----------     
+MPEG-H HEVC Video       61749 kbps          2160p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020
+* MPEG-H HEVC Video     2101 kbps           1080p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / Dolby Vision / BT.2020
+
+
+AUDIO:
+
+
+Codec                           Language        Bitrate         Description     
+-----                           --------        -------         -----------     
+Dolby TrueHD/Atmos Audio        English         3807 kbps       7.1 / 48 kHz /  3167 kbps / 16-bit (AC3 Embedded: 5.1 / 48 kHz /   640 kbps / DN -31dB)
+DTS-HD Master Audio             French          2099 kbps       5.1 / 48 kHz /  2099 kbps / 16-bit (DTS Core: 5.1 / 48 kHz /  1509 kbps / 16-bit)
+DTS-HD Master Audio             German          2117 kbps       5.1 / 48 kHz /  2117 kbps / 16-bit (DTS Core: 5.1 / 48 kHz /  1509 kbps / 16-bit)
+Dolby Digital Audio             English         640 kbps        5.1 / 48 kHz /   640 kbps / DN -31dB
+Dolby Digital Audio             French          640 kbps        5.1 / 48 kHz /   640 kbps / DN -31dB
+Dolby Digital Audio             Japanese        640 kbps        5.1 / 48 kHz /   640 kbps / DN -31dB
+Dolby Digital Audio             Spanish         640 kbps        5.1 / 48 kHz /   640 kbps / DN -31dB
+
+
+SUBTITLES:
+
+
+Codec                           Language        Bitrate         Description     
+-----                           --------        -------         -----------     
+Presentation Graphics           English         60.397 kbps     1920x1080 / 1899 Captions
+Presentation Graphics           English         66.996 kbps     1920x1080 / 2004 Captions
+Presentation Graphics           Dutch           45.700 kbps     1920x1080 / 1317 Captions
+Presentation Graphics           French          52.542 kbps     1920x1080 / 2023 Captions
+Presentation Graphics           French          46.546 kbps     1920x1080 / 1779 Captions
+Presentation Graphics           French          1.763 kbps      1920x1080 / 52 Captions
+Presentation Graphics           French          1.951 kbps      1920x1080 / 59 Captions
+Presentation Graphics           German          59.210 kbps     1920x1080 / 1934 Captions
+Presentation Graphics           Japanese        28.027 kbps     1920x1080 / 1618 Captions
+Presentation Graphics           Japanese        0.830 kbps      1920x1080 / 55 Captions
+Presentation Graphics           Spanish         53.724 kbps     1920x1080 / 2022 Captions
+Presentation Graphics           Spanish         1.977 kbps      1920x1080 / 57 Captions
+
+
+FILES:
+
+
+Name            Time In         Length          Size            Total Bitrate   
+----            -------         ------          ----            -------------   
+00294.M2TS      0:00:00.000     1:39:33.884     59,687,835,648  79,932          
+
+
+CHAPTERS:
+
+
+Number          Time In         Length          Avg Video Rate  Max 1-Sec Rate  Max 1-Sec Time  Max 5-Sec Rate  Max 5-Sec Time  Max 10Sec Rate  Max 10Sec Time  Avg Frame Size  Max Frame Size  Max Frame Time  
+------          -------         ------          --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  --------------  
+1               0:00:00.000     0:08:06.444     60,009 kbps     114,820 kbps    00:02:27.313    81,341 kbps     00:02:27.188    74,130 kbps     00:01:49.984    312,859 bytes   1,974,192 bytes 00:01:59.744    
+2               0:08:06.444     0:06:56.666     64,412 kbps     101,144 kbps    00:14:57.771    77,527 kbps     00:12:35.296    73,032 kbps     00:12:29.999    335,817 bytes   1,961,973 bytes 00:13:39.235    
+3               0:15:03.110     0:08:15.703     64,028 kbps     107,673 kbps    00:23:17.687    74,886 kbps     00:19:50.522    71,784 kbps     00:20:00.199    333,813 bytes   1,942,249 bytes 00:23:18.397    
+4               0:23:18.814     0:08:04.984     64,118 kbps     105,854 kbps    00:28:11.648    76,100 kbps     00:29:46.284    72,094 kbps     00:31:00.191    334,281 bytes   1,892,363 bytes 00:28:11.856    
+5               0:31:23.798     0:05:52.518     64,114 kbps     99,568 kbps     00:32:36.579    80,434 kbps     00:33:23.084    77,049 kbps     00:33:23.084    334,263 bytes   1,932,333 bytes 00:33:10.613    
+6               0:37:16.317     0:09:00.289     63,680 kbps     103,262 kbps    00:44:57.903    76,851 kbps     00:40:43.023    72,649 kbps     00:40:43.566    331,997 bytes   1,813,532 bytes 00:44:58.570    
+7               0:46:16.607     0:07:54.015     63,498 kbps     98,870 kbps     00:51:26.124    75,430 kbps     00:50:28.900    70,616 kbps     00:50:44.416    331,050 bytes   1,933,588 bytes 00:49:46.858    
+8               0:54:10.622     0:03:42.138     63,355 kbps     108,950 kbps    00:55:46.426    73,656 kbps     00:54:40.151    69,400 kbps     00:54:40.360    330,303 bytes   2,196,769 bytes 00:55:46.509    
+9               0:57:52.760     0:08:15.203     64,427 kbps     114,857 kbps    01:03:35.645    78,355 kbps     01:04:19.480    74,243 kbps     01:02:27.785    335,894 bytes   2,332,221 bytes 01:04:22.775    
+10              1:06:07.964     0:05:51.476     64,274 kbps     116,148 kbps    01:06:50.715    86,344 kbps     01:06:49.088    81,019 kbps     01:06:47.378    335,095 bytes   2,201,048 bytes 01:09:03.514    
+11              1:11:59.440     0:02:29.983     65,021 kbps     104,817 kbps    01:13:41.041    86,337 kbps     01:13:41.041    74,869 kbps     01:13:40.666    338,989 bytes   1,893,587 bytes 01:13:02.336    
+12              1:14:29.423     0:06:16.334     64,594 kbps     102,816 kbps    01:14:46.148    73,708 kbps     01:14:46.148    69,796 kbps     01:18:07.349    336,763 bytes   2,033,452 bytes 01:14:46.231    
+13              1:20:45.757     0:02:44.539     62,220 kbps     103,614 kbps    01:21:21.084    71,650 kbps     01:21:16.955    68,530 kbps     01:21:42.063    324,388 bytes   1,918,414 bytes 01:21:21.793    
+14              1:23:30.296     0:08:30.968     64,133 kbps     104,280 kbps    01:29:33.409    84,358 kbps     01:26:24.179    79,415 kbps     01:26:21.968    334,362 bytes   1,940,224 bytes 01:27:56.354    
+15              1:32:01.265     0:07:32.618     38,150 kbps     113,529 kbps    01:32:56.946    87,292 kbps     01:37:31.387    81,239 kbps     01:37:29.260    198,917 bytes   1,887,893 bytes 01:32:57.488    
+
+
+STREAM DIAGNOSTICS:
+
+
+File            PID             Type            Codec           Language                Seconds                 Bitrate                 Bytes           Packets         
+----            ---             ----            -----           --------                --------------          --------------          -------------   -----           
+00294.M2TS      4113 (0x1011)   0x24            HEVC                                    5973.718                61,750                  46,109,486,116  250,678,234     
+00294.M2TS      4117 (0x1015)   0x24            HEVC                                    5973.718                2,101                   1,569,166,290   8,609,212       
+00294.M2TS      4352 (0x1100)   0x83            Atmos           eng (English)           5973.718                3,807                   2,842,740,992   19,350,490      
+00294.M2TS      4353 (0x1101)   0x81            AC3             eng (English)           5973.718                640                     477,911,040     2,800,260       
+00294.M2TS      4354 (0x1102)   0x81            AC3             fra (French)            5973.718                640                     477,911,040     2,800,260       
+00294.M2TS      4355 (0x1103)   0x86            DTS-HD MA       fra (French)            5973.718                2,099                   1,567,169,380   9,444,680       
+00294.M2TS      4356 (0x1104)   0x86            DTS-HD MA       deu (German)            5973.718                2,117                   1,580,842,472   9,519,606       
+00294.M2TS      4357 (0x1105)   0x81            AC3             jpn (Japanese)          5973.718                640                     477,911,040     2,800,260       
+00294.M2TS      4358 (0x1106)   0x81            AC3             spa (Spanish)           5973.718                640                     477,911,040     2,800,260       
+00294.M2TS      4768 (0x12A0)   0x90            PGS             eng (English)           5973.718                60                      45,100,465      258,678         
+00294.M2TS      4769 (0x12A1)   0x90            PGS             eng (English)           5973.718                67                      50,028,183      286,240         
+00294.M2TS      4770 (0x12A2)   0x90            PGS             fra (French)            5973.718                53                      39,234,648      227,616         
+00294.M2TS      4771 (0x12A3)   0x90            PGS             fra (French)            5973.718                47                      34,757,414      201,501         
+00294.M2TS      4772 (0x12A4)   0x90            PGS             deu (German)            5973.718                59                      44,214,148      254,107         
+00294.M2TS      4773 (0x12A5)   0x90            PGS             jpn (Japanese)          5973.718                28                      20,928,983      124,022         
+00294.M2TS      4774 (0x12A6)   0x90            PGS             nld (Dutch)             5973.718                46                      34,125,608      194,881         
+00294.M2TS      4775 (0x12A7)   0x90            PGS             spa (Spanish)           5973.718                54                      40,117,212      232,420         
+00294.M2TS      4776 (0x12A8)   0x90            PGS             fra (French)            5973.718                2                       1,316,835       7,534           
+00294.M2TS      4777 (0x12A9)   0x90            PGS             fra (French)            5973.718                2                       1,457,204       8,342           
+00294.M2TS      4778 (0x12AA)   0x90            PGS             jpn (Japanese)          5973.718                1                       619,907         3,718           
+00294.M2TS      4779 (0x12AB)   0x90            PGS             spa (Spanish)           5973.718                2                       1,476,159       8,429           
+
+
+[/code]
+<---- END FORUMS PASTE ---->
+
+
+QUICK SUMMARY:
+
+
+Disc Title: Mercy
+Disc Label: Mercy 2026 UHD BluRay 2160p HEVC Atmos TrueHD7.1-MTeam
+Disc Size: 60,264,769,953 bytes
+Protection: AACS2
+Playlist: 00040.MPLS
+Size: 59,687,835,648 bytes
+Length: 1:39:33.884
+Total Bitrate: 79.93 Mbps
+Video: MPEG-H HEVC Video / 61749 kbps / 2160p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020
+* Video: MPEG-H HEVC Video / 2101 kbps / 1080p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / Dolby Vision / BT.2020
+Audio: English / Dolby TrueHD/Atmos Audio / 7.1 / 48 kHz /  3167 kbps / 16-bit (AC3 Embedded: 5.1 / 48 kHz /   640 kbps / DN -31dB)
+Audio: French / DTS-HD Master Audio / 5.1 / 48 kHz /  2099 kbps / 16-bit (DTS Core: 5.1 / 48 kHz /  1509 kbps / 16-bit)
+Audio: German / DTS-HD Master Audio / 5.1 / 48 kHz /  2117 kbps / 16-bit (DTS Core: 5.1 / 48 kHz /  1509 kbps / 16-bit)
+Audio: English / Dolby Digital Audio / 5.1 / 48 kHz /   640 kbps / DN -31dB
+Audio: French / Dolby Digital Audio / 5.1 / 48 kHz /   640 kbps / DN -31dB
+Audio: Japanese / Dolby Digital Audio / 5.1 / 48 kHz /   640 kbps / DN -31dB
+Audio: Spanish / Dolby Digital Audio / 5.1 / 48 kHz /   640 kbps / DN -31dB
+Subtitle: English / 60.397 kbps
+Subtitle: English / 66.996 kbps
+Subtitle: Dutch / 45.700 kbps
+Subtitle: French / 52.542 kbps
+Subtitle: French / 46.546 kbps
+Subtitle: French / 1.763 kbps
+Subtitle: French / 1.951 kbps
+Subtitle: German / 59.210 kbps
+Subtitle: Japanese / 28.027 kbps
+Subtitle: Japanese / 0.830 kbps
+Subtitle: Spanish / 53.724 kbps
+Subtitle: Spanish / 1.977 kbps
+
+
+
+
+
