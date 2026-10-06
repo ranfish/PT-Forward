@@ -141,4 +141,14 @@ func TestExtractBDInfo_EdgeCases(t *testing.T) {
 	if got := ExtractBDInfo(dv); got.HDR != "DoVi" {
 		t.Errorf("HDR = %q, want DoVi", got.HDR)
 	}
+	// §59.319 P3 修复锚：全 playlist 报告多块 QUICK SUMMARY——只解析首块
+	// （243 Alice 跨块累计 6→18 事故）
+	multi := "QUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 100 kbps / 2160p / 24 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020\nAudio: English / Dolby TrueHD Audio / 7.1 / 48 kHz / 1000 kbps / 24-bit\n\n\n********************\nPLAYLIST: 00001.MPLS\n********************\nQUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 50 kbps / 1080p / 24 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020\nAudio: English / Dolby TrueHD Audio / 5.1 / 48 kHz / 500 kbps / 24-bit\nAudio: English / Dolby TrueHD Audio / 2.0 / 48 kHz / 300 kbps / 24-bit\n"
+	gotMulti := ExtractBDInfo(multi)
+	if gotMulti.AudioTracks != 1 {
+		t.Errorf("多块报告应只计首块音轨, got %d, want 1", gotMulti.AudioTracks)
+	}
+	if gotMulti.Resolution != "2160p" {
+		t.Errorf("首块分辨率, got %q", gotMulti.Resolution)
+	}
 }

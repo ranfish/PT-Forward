@@ -120,6 +120,11 @@ func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(p
 
 	settings := bdinfo.DefaultSettings("")
 	settings.GenerateTextSummary = true
+	// §59.319 P3 修复：只扫主 playlist——对齐站方惯例（发站贴的 BDInfo 均为
+	// 单主 playlist 形态，CLI --main 同款）。原全 playlist 报告多块 QUICK
+	// SUMMARY 致解析器跨块累计（243 Alice 6 轨变 18 实锤），且全 playlist
+	// 扫描耗时更长
+	settings.MainPlaylistOnly = true
 
 	options := bdinfo.Options{
 		Path:     path,

@@ -102,14 +102,20 @@ func ExtractBDInfo(text string) MediaInfoTech {
 	return result
 }
 
-// extractQuickSummaryBlock 截取 QUICK SUMMARY: 到文件尾（完整报告的尾部子集，
+// extractQuickSummaryBlock 截取首个 QUICK SUMMARY 块（完整报告的尾部子集，
 // §59.319 D3）。找不到锚=非完整报告形态，返回空。
+// §59.319 P3 修复：全 playlist 报告含多块 QUICK SUMMARY（243 Alice 6 轨
+// 被跨块累计成 18 实锤）——遇下一个块标记截断，只取首块。
 func extractQuickSummaryBlock(text string) string {
 	idx := strings.Index(text, "QUICK SUMMARY:")
 	if idx < 0 {
 		return ""
 	}
-	return text[idx+len("QUICK SUMMARY:"):]
+	block := text[idx+len("QUICK SUMMARY:"):]
+	if next := strings.Index(block, "QUICK SUMMARY:"); next >= 0 {
+		block = block[:next]
+	}
+	return block
 }
 
 // splitBDFields 按 " / " 分割（quick summary 规范拼接）。
