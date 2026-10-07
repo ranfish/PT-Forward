@@ -199,17 +199,16 @@
               </div>
             </a-tab-pane>
 
-            <!-- Tab 5: 媒体信息 -->
+            <!-- Tab 5: 媒体信息（§59.319 附四：原盘单框 BDInfo / 普通单框 MediaInfo） -->
             <a-tab-pane key="mediainfo" tab="媒体信息">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
                 <!-- §59.36: MI 重获是数据源修复动作（与 Tab3 截图同性质），维护模式放开 -->
-                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
+                <!-- §59.319 附四: 文案随 is_disc 分流 -->
+                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? (isDisc ? '重新获取 BDInfo' : '重新获取 MediaInfo') : (isDisc ? '从源站重新获取 BDInfo' : '从源站重新获取 MediaInfo') }}</a-button>
               </div>
-              <!-- §59.36: 维护模式 MI 只读展示，重获走上方按钮（数据修复动作） -->
-              <a-textarea v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" disabled />
-              <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
-                <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" disabled />
-              </a-form-item>
+              <!-- §59.319 附四: 单框化——原盘只显 BDInfo（MI 框与 bdinfo 恒同源冗余） -->
+              <a-textarea v-if="!isDisc" v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" disabled />
+              <a-textarea v-else v-model:value="form.bdinfo" :rows="36" placeholder="BDInfo 文本" style="font-family: monospace; font-size: 12px" disabled />
             </a-tab-pane>
 
             <!-- §59.20 Tab 6: 已过滤声明（只读预览） -->
@@ -454,6 +453,7 @@ async function loadSeedDetail(infoHash: string) {
       seedReviewed.value = d.reviewed || false
       seedEncode.value = d.encode ?? false
       seedIsLocal.value = (d as any).is_local ?? true
+      isDisc.value = (d as any).is_disc ?? false // §59.319 附四: 单框化/文案分流
       currentSourceSite.value = d.site_name || ''
       // §59.26: 标签（获取时推断，编辑时可修正）
       form.value.tags = d.tags || []
@@ -482,6 +482,7 @@ const seedReviewed = ref(false)
 // §59.34: Encode 派生标识（后端真相源；组件 SeedTechDescriptions 消费）
 const seedEncode = ref(false)
 const seedIsLocal = ref(true) // §59.21: 默认 true（向后兼容）
+const isDisc = ref(false) // §59.319 附四: 原盘单框 BDInfo/文案分流（detail 端点 is_disc）
 // §59.20 ⑨: 预览模式（保存即预览）
 const seedPreviewMode = ref(false)
 const previewRenderedDesc = ref('')

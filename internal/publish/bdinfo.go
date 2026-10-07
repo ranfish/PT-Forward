@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bdinfo "github.com/ranfish/pt-forward/internal/bdinfo"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 )
 type BDInfoScanner struct {
@@ -173,6 +174,8 @@ func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(p
 		zap.Int("playlists", len(result.Playlists)),
 		zap.Int("report_len", len(result.Report)))
 
-	return result.Report, nil
+	// §59.319 附四：展示形态规范化单点（截 DISC INFO: 起/剥 [code]/删
+	// END FORUMS 行）——本地生成与源站提取（fetch 归位）同函数统一形态
+	return titleparser.FormatBDInfoReport(result.Report), nil
 }
 
