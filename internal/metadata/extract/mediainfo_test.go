@@ -67,7 +67,7 @@ func TestIsLikelyBDInfoText(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := isLikelyBDInfoText(c.text)
+			got := IsLikelyBDInfoText(c.text)
 			if got != c.want {
 				t.Errorf("isLikelyBDInfoText(%q) = %v, want %v", c.name, got, c.want)
 			}

@@ -2,6 +2,7 @@ package titleparser
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -102,6 +103,54 @@ func TestExtractBDInfo_Mercy_TrueHD_Atmos(t *testing.T) {
 	if got.AudioTracks != 7 {
 		t.Errorf("AudioTracks = %d, want 7 (TrueHD/Atmos + DTS-HD MA×2 + DD×4)", got.AudioTracks)
 	}
+}
+
+// §59.319 附四：格式化三规则+幂等锚
+func TestFormatBDInfoReport(t *testing.T) {
+	report := loadBDTestdata(t, "bdinfo_mercy_truehd.txt")
+	got := FormatBDInfoReport(report)
+
+	// a. 头部清除（DISC INFO: 起步）——头部独有内容断言
+	// （Disc Label/Disc Size 在 DISC INFO 正文块内也有，属保留内容）
+	if !strings.HasPrefix(got, "DISC INFO:") {
+		t.Errorf("应以 DISC INFO: 开头, got %q", firstLine(got))
+	}
+	for _, gone := range []string{"BDINFO HOME", "Cinema Squid", "BEGIN FORUMS PASTE", "UniqProject"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("头部残留: %s", gone)
+		}
+	}
+	// b. [code] 标记清除
+	if strings.Contains(got, "[code]") || strings.Contains(got, "[/code]") {
+		t.Error("[code] 标记应剥除")
+	}
+	// c. END FORUMS 行清除
+	if strings.Contains(got, "END FORUMS PASTE") {
+		t.Error("END FORUMS 行应删除")
+	}
+	// 八块正文保留
+	for _, block := range []string{"DISC INFO:", "PLAYLIST REPORT:", "VIDEO:", "AUDIO:", "SUBTITLES:", "FILES:", "STREAM DIAGNOSTICS:", "QUICK SUMMARY:"} {
+		if !strings.Contains(got, block) {
+			t.Errorf("正文块缺失: %s", block)
+		}
+	}
+	// 幂等
+	if again := FormatBDInfoReport(got); again != got {
+		t.Error("重复格式化应幂等")
+	}
+	// 非报告形态原样
+	if got := FormatBDInfoReport("General\nComplete name : x.mkv"); got != "General\nComplete name : x.mkv" {
+		t.Error("非报告形态应原样返回")
+	}
+}
+
+func firstLine(s string) string {
+	for _, l := range strings.Split(s, "\n") {
+		if l != "" {
+			return l
+		}
+	}
+	return ""
 }
 
 // §59.319 P1: ExtractMediaInfo 单点格式分流——BDInfo 报告自动路由到

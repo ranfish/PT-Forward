@@ -102,6 +102,34 @@ func ExtractBDInfo(text string) MediaInfoTech {
 	return result
 }
 
+// FormatBDInfoReport §59.319 附四：BDInfo 报告展示形态规范化（幂等）。
+// 三规则：a.截 "DISC INFO:" 起（头部 Disc Label/BDINFO HOME 论坛致谢+
+// BEGIN FORUMS PASTE 行一并清除）；b.剥 [code]/[/code] 行；c.删
+// "<--- END FORUMS PASTE --->" 行。保留 DISC INFO/PLAYLIST REPORT/VIDEO/
+// AUDIO/SUBTITLES/FILES/STREAM DIAGNOSTICS/QUICK SUMMARY 八块正文。
+// 应用三口：BDInfoScanner.Scan 出口（本地生成）/fetch 归位（源站提取）/
+// 存量刷正——发布下发与解析器（QUICK SUMMARY 锚仍在）零影响。
+func FormatBDInfoReport(report string) string {
+	idx := strings.Index(report, "DISC INFO:")
+	if idx < 0 {
+		return report // 非报告形态原样（幂等安全）
+	}
+	out := report[idx:]
+	lines := strings.Split(out, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "[code]" || t == "[/code]" {
+			continue
+		}
+		if strings.Contains(t, "END FORUMS PASTE") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.TrimRight(strings.Join(kept, "\n"), "\n")
+}
+
 // extractQuickSummaryBlock 截取首个 QUICK SUMMARY 块（完整报告的尾部子集，
 // §59.319 D3）。找不到锚=非完整报告形态，返回空。
 // §59.319 P3 修复：全 playlist 报告含多块 QUICK SUMMARY（243 Alice 6 轨

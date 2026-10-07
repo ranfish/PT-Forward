@@ -3956,6 +3956,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"screenshots":     screenshots,
 		"mediainfo":       miForProfile,
 		"bdinfo":          meta.BDInfo,
+		"is_disc":         meta.BDInfo != "", // §59.319 附四：前端单框化/文案分流
 		"statement":       meta.Statement,
 		"imdb_url":        meta.IMDbURL,
 		"douban_url":      meta.DoubanURL,

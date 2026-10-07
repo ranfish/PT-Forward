@@ -575,9 +575,26 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		}
 	}
 
+	// §59.319 附四：源站 BDInfo 归位——站方原盘常把 BDInfo 贴 mediainfo
+	// 字段/描述（列名 MI 内容 BDInfo，243 Mercy 馒头行 13841 字节实证）。
+	// ①detail.BDInfo（extract 分流产物）此前只进 detail_source_json 侧账本，
+	//   bd_info 列 fetch 恒不写——补写归位
+	// ②detail.MediaInfo 实为 BDInfo 文本时（IsLikelyBDInfoText）转投 bd_info
+	//   列，不落 SourceMediaInfo（否则同文本双列冗余）
+	// 统一过 FormatBDInfoReport（源站形态带 [code]——与本地扫描同形态）。
+	// 远程原盘经此 is_disc=true（前端 BDInfo 框/文案/发布链全对齐）。
+	if detail.BDInfo != "" {
+		meta.BDInfo = titleparser.FormatBDInfoReport(detail.BDInfo)
+	}
 	if detail.MediaInfo != "" {
-		meta.SourceMediaInfo = detail.MediaInfo
-		meta.MediaInfoSource = "source_site"
+		if extract.IsLikelyBDInfoText(detail.MediaInfo) {
+			if meta.BDInfo == "" {
+				meta.BDInfo = titleparser.FormatBDInfoReport(detail.MediaInfo)
+			}
+		} else {
+			meta.SourceMediaInfo = detail.MediaInfo
+			meta.MediaInfoSource = "source_site"
+		}
 	}
 
 	// §56.13 + §56.14 方案 B: 构建 detail_source_json。

@@ -56,7 +56,7 @@ func ExtractMediaInfo(descrHTML, descrBBCode, siteCode string) (mediainfo, bdinf
 		if isLikelyMediaInfoText(text) {
 			validMI = append(validMI, text)
 		}
-		if isLikelyBDInfoText(text) {
+		if IsLikelyBDInfoText(text) {
 			validBD = append(validBD, text)
 		}
 	}
@@ -155,8 +155,10 @@ func isLikelyMediaInfoText(text string) bool {
 	return false
 }
 
-// isLikelyBDInfoText 判断文本是否为合法 BDInfo（单关键字命中即可）。
-func isLikelyBDInfoText(text string) bool {
+// IsLikelyBDInfoText 判断文本是否为合法 BDInfo（单关键字命中即可）。
+// §59.319 附四公共化：fetcher 归位路径判定 detail.MediaInfo 是否实为
+// BDInfo 文本（站方原盘常把 BDInfo 贴 mediainpo 字段/描述）。
+func IsLikelyBDInfoText(text string) bool {
 	upper := strings.ToUpper(text)
 	for _, kw := range bdInfoKeywords {
 		if strings.Contains(upper, kw) {
