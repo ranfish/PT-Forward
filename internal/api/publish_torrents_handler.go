@@ -4412,7 +4412,13 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 				Delete(&model.TorrentMetadata{})
 		}
 	}
-	_ = result
+	// §59.319 附七：清除审计——原 `_ = result` 零日志吞掉删除痕迹（243 Mercy
+	// 簇消失调查一小时主因：单行"清除"删整簇 62 行 metadata 无任何可观测信号）
+	h.logger.Info("seed metadata cleared",
+		zap.String("hash", infoHash[:min(10, len(infoHash))]),
+		zap.Bool("cluster_scope", hasCluster),
+		zap.Int64("rows", result.RowsAffected),
+		zap.Error(result.Error))
 	Success(w, map[string]interface{}{"message": "已清除"})
 }
 
