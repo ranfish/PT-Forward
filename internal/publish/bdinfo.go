@@ -9,10 +9,8 @@ import (
 	"time"
 
 	bdinfo "github.com/ranfish/pt-forward/internal/bdinfo"
-	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
-
 type BDInfoScanner struct {
 	logger *zap.Logger
 }
@@ -178,26 +176,3 @@ func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(p
 	return result.Report, nil
 }
 
-// ScanIfBD 检测并扫描（如果不是 BD 内容则返回空字符串，不报错）
-func (s *BDInfoScanner) ScanIfBD(ctx context.Context, savePath, name string, progressCB func(percent int, text string)) (string, error) {
-	// 精确定位种子目录（避免在根目录找到其他种子的 BDMV）
-	bdSearchPath := savePath
-	if entryPath, isDir := findTorrentEntry(savePath, name); entryPath != "" && isDir {
-		bdSearchPath = entryPath
-	}
-	bdPath := DetectBDPath(bdSearchPath)
-	if bdPath == "" {
-		return "", nil
-	}
-	if progressCB != nil {
-		progressCB(1, "检测到蓝光原盘，正在启动 BDInfo 扫描...")
-	}
-	return s.Scan(ctx, bdPath, progressCB)
-}
-
-// FillBDInfo 将 BDInfo 报告填充到 DescriptionData
-func FillBDInfo(descData *model.DescriptionData, bdinfoText string) {
-	if bdinfoText != "" {
-		descData.BDInfoText = bdinfoText
-	}
-}
