@@ -307,7 +307,7 @@ type SeedArtifactAnalyzer interface {
 
 // §59.53: 采集链截图策略（pipeline 实现）——auto 全策略/远程只转存
 type ScreenshotStrategyRunner interface {
-	ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool) []string
+	ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocalHint ...bool) []string
 }
 
 // PTGenAnalyzer PTGen 查询接口（§59.42 海报 fallback 链用）
@@ -3701,7 +3701,10 @@ func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata
 	// §59.171 D: MI 校验口径对齐设计（本地优先+源站兜底）——双列任一非空即通过。
 	// 原只查 MediaInfo："仅源站 MI"行九字段校验永缺 → reviewed 上不去（与列表
 	// 红叉同族误判）。
-	if meta.MediaInfo == "" && meta.SourceMediaInfo == "" {
+	// §59.319 附五：BDInfo 计入——原盘行 D8 伪 MI 停产后双列恒空、仅 bd_info
+	// 非空，漏此口径则原盘恒缺 mediainfo 审核失败（用户清除重获实测捕获；
+	// 与列表 has_mediainfo 三列口径一致）。
+	if meta.MediaInfo == "" && meta.SourceMediaInfo == "" && meta.BDInfo == "" {
 		missing = append(missing, "mediainfo")
 	}
 	if meta.Resolution == "" {
@@ -4649,7 +4652,9 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 		return
 	}
 	source := model.ParseScreenshotColumn(meta.Screenshots)
-	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal)
+	// §59.319 附六：force（单种获取/重获）传硬编码策略——无条件 mpv 全新
+	// 截传（与 skipCache 同一 force 语义闭合 §59.299 意图）
+	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal, noCache)
 	if len(final) == len(source) {
 		// 无变化（无图且截图失败/全白名单保留/远程无图）——不覆盖
 		same := true

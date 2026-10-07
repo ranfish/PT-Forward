@@ -128,8 +128,8 @@ func TestFormatBDInfoReport(t *testing.T) {
 	if strings.Contains(got, "END FORUMS PASTE") {
 		t.Error("END FORUMS 行应删除")
 	}
-	// 八块正文保留
-	for _, block := range []string{"DISC INFO:", "PLAYLIST REPORT:", "VIDEO:", "AUDIO:", "SUBTITLES:", "FILES:", "STREAM DIAGNOSTICS:", "QUICK SUMMARY:"} {
+	// 九块正文保留（用户权威清单 §59.319 附四）
+	for _, block := range []string{"DISC INFO:", "PLAYLIST REPORT:", "VIDEO:", "AUDIO:", "SUBTITLES:", "FILES:", "CHAPTERS:", "STREAM DIAGNOSTICS:", "QUICK SUMMARY:"} {
 		if !strings.Contains(got, block) {
 			t.Errorf("正文块缺失: %s", block)
 		}

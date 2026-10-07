@@ -886,7 +886,7 @@ func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string
 // ApplyScreenshotStrategy §59.53: 采集链截图策略——按库内截图值跑 auto
 // （白名单逐张/转存/差额补足/无图全量），isLocal=false 时只转存不截图（远程无图留空）。
 // 返回最终截图列表（落库由调用方执行）。
-func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool) []string {
+func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocalHint ...bool) []string {
 	if p.artifactGenerator == nil {
 		return sourceScreenshots
 	}
@@ -898,11 +898,15 @@ func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath s
 		// §59.53 第6点: 远程只转存（白名单逐张判定），无图留空——不截图
 		return p.artifactGenerator.ProcessScreenshotsRemote(sourceScreenshots)
 	}
-	// §59.250: 策略参数化；§59.254 附升级：**运行时动态读** settings
-	// （改配置即生效免重启——启动快照注入 PT30 不生效实证）。DB 读毫秒级
-	// 每获取一次可接受；settingsRepo 缺失（测试形态）回落启动注入值。
+	// §59.319 附六（§59.299 意图补全）：单种链（获取/重获）force 无条件
+	// mpv 全新截传——硬编码 local_upload 对齐 Tab3（§59.250 用户定案三场景：
+	// Tab3/未获取单种获取/已获取单种重获）；批量链 force=false 走配置
+	// （§59.254 运行时动态读不变）
+	forceLocal := len(forceLocalHint) > 0 && forceLocalHint[0]
 	strategy := ""
-	if p.settingsRepo != nil {
+	if forceLocal {
+		strategy = "local_upload"
+	} else if p.settingsRepo != nil {
 		if v, err := p.settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && v != "" {
 			strategy = v
 		}
