@@ -51,7 +51,6 @@ type Pipeline struct {
 	imageHostMgr      *imagehost.Manager
 	pusher            *pusher.Pusher // §56.30: 发布后自动加种
 	wsBroadcaster     event.WSBroadcaster
-	bdinfoScanner     *BDInfoScanner
 	// §59.146: TagApplier 灰度站点查询（nil=关闭；返回 settings 逗号分隔串）
 }
 
@@ -116,10 +115,6 @@ func (p *Pipeline) SetSettingsRepository(repo *setting.Repository) {
 
 func (p *Pipeline) SetWSBroadcaster(b event.WSBroadcaster) {
 	p.wsBroadcaster = b
-}
-
-func (p *Pipeline) SetBDInfoScanner(s *BDInfoScanner) {
-	p.bdinfoScanner = s
 }
 
 func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
