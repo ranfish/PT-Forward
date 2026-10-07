@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	_ "net/http/pprof" // §59.319 附六：DefaultServeMux 注册 pprof handler（§59.279 基建修复）
 	"os"
 	"os/signal"
 	"strings"
@@ -105,6 +106,8 @@ func main() {
 
 	// §59.279: pprof 诊断基建（config debug.pprof 开关——容器内 localhost:6060；
 	// docker exec <容器> curl localhost:6060/debug/pprof/goroutine?debug=1 即得全协程栈）
+	// §59.319 附六修复：此前缺 net/http/pprof import——DefaultServeMux 无 handler
+	// 恒 404（§59.279 基建自建成从未真正可用；243 截图调查中实证）
 	if cfg.Debug.Pprof {
 		go func() {
 			_ = http.ListenAndServe("localhost:6060", nil)

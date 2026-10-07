@@ -527,4 +527,18 @@ func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
 	if !found {
 		t.Errorf("双列皆空应判缺: %v", missing2)
 	}
+	// §59.319 附五：原盘行仅 bd_info 非空（D8 伪 MI 停产后常态）——不判缺
+	meta2 := &model.TorrentMetadata{
+		Title: "t", Poster: "p", Screenshots: `["1","2","3"]`, Description: "d",
+		MediaInfo: "", SourceMediaInfo: "", BDInfo: "DISC INFO:\nQUICK SUMMARY:",
+		Resolution: "2160p", VideoCodec: "HEVC", AudioCodec: "DTS-HD MA",
+	}
+	for _, m := range h.checkRequiredFields(meta2) {
+		if m == "mediainfo" {
+			t.Errorf("原盘仅 bd_info 不应判缺（三列口径）: %v", m)
+		}
+	}
+	if len(h.checkRequiredFields(meta2)) != 0 {
+		t.Errorf("原盘完整行应零缺失: %v", h.checkRequiredFields(meta2))
+	}
 }
