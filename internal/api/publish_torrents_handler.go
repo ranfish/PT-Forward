@@ -307,7 +307,7 @@ type SeedArtifactAnalyzer interface {
 
 // §59.53: 采集链截图策略（pipeline 实现）——auto 全策略/远程只转存
 type ScreenshotStrategyRunner interface {
-	ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocalHint ...bool) []string
+	ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocal bool, forcedSid int) []string
 }
 
 // PTGenAnalyzer PTGen 查询接口（§59.42 海报 fallback 链用）
@@ -4682,7 +4682,14 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	source := model.ParseScreenshotColumn(meta.Screenshots)
 	// §59.319 附六：force（单种获取/重获）传硬编码策略——无条件 mpv 全新
 	// 截传（与 skipCache 同一 force 语义闭合 §59.299 意图）
-	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal, noCache)
+	// §59.319 附十四：原盘 sid 预定——BDInfo Subtitle 行序+语言直接推
+	// mpv sid（m2ts PGS 语言在 CLPI/MPLS，ffprobe/mpv 容器层均读不到，
+	// 自动选轨对原盘失效源）；mkv（ffprobe 可达）传 0 走 generator 自动
+	bdSid := 0
+	if meta.BDInfo != "" {
+		bdSid = publish.PickSubtitleSidFromBDInfo(meta.BDInfo)
+	}
+	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal, noCache, bdSid)
 	if len(final) == len(source) {
 		// 无变化（无图且截图失败/全白名单保留/远程无图）——不覆盖
 		same := true

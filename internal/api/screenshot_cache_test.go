@@ -16,7 +16,7 @@ type mockShotStrategy struct {
 	result []string
 }
 
-func (m *mockShotStrategy) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, source []string, isLocal bool, forceLocalHint ...bool) []string {
+func (m *mockShotStrategy) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, source []string, isLocal bool, forceLocal bool, forcedSid int) []string {
 	m.called++
 	return m.result
 }

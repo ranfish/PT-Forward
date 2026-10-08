@@ -3,6 +3,32 @@ package publish
 import "testing"
 
 // §59.291: WEBVTT 中文字幕轨——UNABOMBER 案（NF WEB-DL 简繁双轨全 WEBVTT）
+// §59.319 附十四：BDInfo sid 推导锚（Under Current 实证数据）
+func TestPickSubtitleSidFromBDInfo(t *testing.T) {
+	// Under Current 实际报告形态：English 行 1 / Chinese 行 2 → 中文轨 sid=2
+	uc := "QUICK SUMMARY:\nVideo: x / 1080p\nSubtitle: English / 38.857 kbps\r\nSubtitle: Chinese / 27.796 kbps\n"
+	if got := PickSubtitleSidFromBDInfo(uc); got != 2 {
+		t.Errorf("Under Current 形态应选中文轨 sid=2, got %d", got)
+	}
+	// 简繁混合：繁在前简在后 → 简中优先
+	mix := "Subtitle: cht / 1 kbps\nSubtitle: chs / 2 kbps\n"
+	if got := PickSubtitleSidFromBDInfo(mix); got != 2 {
+		t.Errorf("简中应优先, got %d", got)
+	}
+	// 无中文：按行序第一轨
+	noCn := "Subtitle: English / 1 kbps\nSubtitle: French / 2 kbps\n"
+	if got := PickSubtitleSidFromBDInfo(noCn); got != 1 {
+		t.Errorf("无中文应第一轨, got %d", got)
+	}
+	// 无 Subtitle 行/非报告 → 0（调用方走原自动链）
+	if got := PickSubtitleSidFromBDInfo("QUICK SUMMARY:\nVideo: x\n"); got != 0 {
+		t.Errorf("无 Subtitle 行应 0, got %d", got)
+	}
+	if got := PickSubtitleSidFromBDInfo("General\nComplete name : x.mkv"); got != 0 {
+		t.Errorf("非报告形态应 0, got %d", got)
+	}
+}
+
 func TestSelectBestChinese_WebVTT(t *testing.T) {
 	// UNABOMBER 实测形态：#1 English CC / #2 简中 / #3 繁中（全 webvtt）
 	candidates := []SubtitleCandidate{
