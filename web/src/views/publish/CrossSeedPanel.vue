@@ -594,10 +594,14 @@ async function loadDeclPatterns() {
 let capturePollTimer: ReturnType<typeof setInterval> | null = null
 
 // §59.298 C: 字幕轨人工纠偏——MI Text 轨计数（无标记 PGS 蓝光盘自动选轨可能非中文）
+// §59.319 附八：原盘兼容——form.mediaInfo 对原盘=BDInfo 报告（P2 tech 源切换），
+// MI 格式 Text #N 计 0；BDInfo 的 Subtitle: 行（含 * 隐藏轨）=PGS 字幕轨计数
 const subtitleTrackCount = computed(() => {
   const mi: string = form.value.mediaInfo || ''
-  const matches = mi.match(/^Text #\d+/gm)
-  return matches ? matches.length : 0
+  const miText = mi.match(/^Text #\d+/gm)?.length ?? 0
+  if (miText > 0) return miText
+  const bdSubs = mi.match(/^(\* )?Subtitle: /gm)?.length ?? 0
+  return bdSubs
 })
 const selectedSubtitleSid = ref(0) // 0=自动
 
