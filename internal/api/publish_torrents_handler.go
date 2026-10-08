@@ -4603,6 +4603,21 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 }
 
 // applyScreenshotStrategy §59.53: 采集链截图策略异步执行（goroutine 内）。
+// screenshotStrategyFor §59.319 附十二：读当前截图策略（system_settings
+// 动态值；空默认 auto——与 pipeline.ApplyScreenshotStrategy 口径一致）。
+// 探活分流判定用（local_upload/force 无视源站图）。
+func (h *PublishTorrentsHandler) screenshotStrategyFor(ctx context.Context) string {
+	var v string
+	h.db.WithContext(ctx).Table("system_settings").
+		Where("key = ?", "image_host_strategy").
+		Select("value").Scan(&v)
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "auto"
+	}
+	return v
+}
+
 // §59.57 竞态修复: purgeDeadScreenshots 内联前序（串行）——原双 goroutine 并发时
 // 本函数可能读到 purge 前的死链列表，rehost 失败保源后 final==source → same 早退
 // → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
@@ -4646,7 +4661,14 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	}
 
 	// §59.57: 探活内联前序（自带 90s 独立 ctx，读自身快照；HEAD 秒级不占策略预算）
-	h.purgeDeadScreenshots(infoHash, siteName)
+	// §59.319 附十二：探活按策略分流——local_upload/force 链无视源站图
+	// （mpv 全新截传，源图仅作失败回退），探活→清除死链纯多余且有害
+	// （mpv 失败回退源图时已被 purge 清空 → 行空图）；auto（源图参与
+	// 决策）保持探活。用户定案：始终本地截图=无条件本地截，不走
+	// 探活→清除 的 auto 兜底动作。
+	if !noCache && h.screenshotStrategyFor(ctx) != "local_upload" {
+		h.purgeDeadScreenshots(infoHash, siteName)
+	}
 
 	strategyCtx, scancel := context.WithTimeout(ctx, 10*time.Minute) // §59.300 附十八
 	defer scancel()
