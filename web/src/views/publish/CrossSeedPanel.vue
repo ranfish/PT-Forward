@@ -169,9 +169,10 @@
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
                 <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图' : '从源站重新获取截图' }}</a-button>
                 <!-- §59.298 C: 字幕轨人工纠偏（MI Text 轨数>0 时显示——无标记 PGS 蓝光盘自动选轨可能非中文） -->
-                <a-select v-if="seedIsLocal && subtitleTrackCount > 0" v-model:value="selectedSubtitleSid" size="small" style="width: 120px; margin-left: 8px" @change="doRefresh('screenshots')">
+                <!-- §59.319 附九: label=语言（可解析时）或 字幕轨 N（§59.298 默认形态） -->
+                <a-select v-if="seedIsLocal && subtitleTracks.length > 0" v-model:value="selectedSubtitleSid" size="small" style="width: 160px; margin-left: 8px" @change="doRefresh('screenshots')">
                   <a-select-option :value="0">自动选轨</a-select-option>
-                  <a-select-option v-for="n in subtitleTrackCount" :key="n" :value="n">字幕轨 {{ n }}</a-select-option>
+                  <a-select-option v-for="t in subtitleTracks" :key="t.sid" :value="t.sid">{{ t.label }}</a-select-option>
                 </a-select>
                 <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
@@ -593,15 +594,50 @@ async function loadDeclPatterns() {
 // §59.51: 后台截图任务——启动 + 2s 轮询 + 会话一致性校验
 let capturePollTimer: ReturnType<typeof setInterval> | null = null
 
-// §59.298 C: 字幕轨人工纠偏——MI Text 轨计数（无标记 PGS 蓝光盘自动选轨可能非中文）
-// §59.319 附八：原盘兼容——form.mediaInfo 对原盘=BDInfo 报告（P2 tech 源切换），
-// MI 格式 Text #N 计 0；BDInfo 的 Subtitle: 行（含 * 隐藏轨）=PGS 字幕轨计数
-const subtitleTrackCount = computed(() => {
+// §59.298 C: 字幕轨人工纠偏（无标记 PGS 蓝光盘自动选轨可能非中文）
+// §59.319 附八: 原盘兼容——form.mediaInfo 对原盘=BDInfo 报告（P2 tech 源切换）
+// §59.319 附九: 语言解析——MI Text 段 Language 行 / BDInfo "Subtitle: 语言 / ..."
+// 双格式逐行解析；语言可解析显示语言，否则回落"字幕轨 N"（§59.298 默认形态）
+interface SubtitleTrackOption { sid: number; label: string }
+
+const subtitleTracks = computed<SubtitleTrackOption[]>(() => {
   const mi: string = form.value.mediaInfo || ''
-  const miText = mi.match(/^Text #\d+/gm)?.length ?? 0
-  if (miText > 0) return miText
-  const bdSubs = mi.match(/^(\* )?Subtitle: /gm)?.length ?? 0
-  return bdSubs
+  const out: SubtitleTrackOption[] = []
+  const lines = mi.split('\n')
+  let inTextSection = false
+  let currentLang = ''
+  const push = () => {
+    if (inTextSection) {
+      out.push({ sid: out.length + 1, label: currentLang || `字幕轨 ${out.length + 1}` })
+    }
+    inTextSection = false
+    currentLang = ''
+  }
+  for (const line of lines) {
+    // MI 格式：Text #N 开段
+    const miMatch = line.match(/^Text #(\d+)/)
+    if (miMatch) {
+      push()
+      inTextSection = true
+      continue
+    }
+    if (inTextSection) {
+      // MI 段内 Language 行（段的空行分隔由下一段 Text # 或文件尾触发 push）
+      const lang = line.match(/^\s*Language\s*:\s*(.+)$/)?.[1]?.trim()
+      if (lang && !currentLang) currentLang = lang
+      // 段结束：空行+缩进新段落标题（非字段行）视为段尾
+      if (line.trim() === '' && currentLang) { push() }
+      continue
+    }
+    // BDInfo 格式："(*)Subtitle: 语言 / 码率"（含 * 隐藏轨）
+    const bdMatch = line.match(/^\* ?Subtitle: ([^/]+?)(?:\s*\/|$)/)
+    if (bdMatch) {
+      const lang = bdMatch[1].trim()
+      out.push({ sid: out.length + 1, label: lang || `字幕轨 ${out.length + 1}` })
+    }
+  }
+  push()
+  return out
 })
 const selectedSubtitleSid = ref(0) // 0=自动
 
