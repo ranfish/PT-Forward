@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
+	bdrom "github.com/ranfish/pt-forward/internal/bdinfo/bdrom"
+	bdsettings "github.com/ranfish/pt-forward/internal/bdinfo/settings"
 	"go.uber.org/zap"
 )
 
@@ -228,8 +231,19 @@ func (d *SubtitleDetector) SelectBestChinese(candidates []SubtitleCandidate) (in
 
 func (d *SubtitleDetector) FindSubtitleStreamID(ctx context.Context, videoPath string) (int, error) {
 	candidates, err := d.Detect(ctx, videoPath)
-	if err != nil {
-		return 0, err
+	if err != nil || len(candidates) == 0 {
+		// §59.319 附十五：原盘回退——m2ts PGS 语言在 CLPI/MPLS 不在容器流，
+		// ffprobe 对 m2ts 返回空流（Under Current 实证）；ISO 同理由 bdrom
+		// 内部 UDF 读取器统一处理。CLPI 快速解析毫秒级（13ms 实测），
+		// 不依赖 BDInfo 报告落库时序（三链统一：fetch/手动/任何时刻）。
+		if disc := detectDiscForSubtitle(videoPath); disc != "" {
+			if clpiCands := probeDiscSubtitleCandidates(ctx, disc, videoPath); len(clpiCands) > 0 {
+				candidates = clpiCands
+			}
+		}
+		if len(candidates) == 0 {
+			return 0, err
+		}
 	}
 
 	streamID, _ := d.SelectBestChinese(candidates)
@@ -269,4 +283,99 @@ func containsAny(s string, keywords ...string) bool {
 		}
 	}
 	return false
+}
+
+// detectDiscForSubtitle §59.319 附十五：从 videoPath 定位原盘根。
+// .m2ts → 向上找 BDMV 父目录（盘根）；.iso → 原样（bdrom 内部 UDF 分流）。
+// 非原盘形态返回空。
+func detectDiscForSubtitle(videoPath string) string {
+	lower := strings.ToLower(videoPath)
+	if strings.HasSuffix(lower, ".iso") {
+		return videoPath
+	}
+	if !strings.HasSuffix(lower, ".m2ts") {
+		return ""
+	}
+	dir := filepath.Dir(videoPath) // .../BDMV/STREAM
+	if !strings.HasSuffix(strings.ToLower(filepath.ToSlash(dir)), "/bdmv/stream") {
+		return ""
+	}
+	return filepath.Dir(filepath.Dir(dir)) // 盘根（BDMV 父）
+}
+
+// probeDiscSubtitleCandidates §59.319 附十五：CLPI 快速解析（毫秒级）——
+// 构造与 ffprobe Detect 同构的候选列表（StreamIndex=字幕序 1..N，与 mpv
+// sid 对应——CLPI StreamOrder 过滤字幕流后的序=容器字幕轨序，Under
+// Current 实证 1:1）。目录盘取 videoPath 同名 CLPI（精确该文件流表）；
+// ISO 取主 playlist（FileSize 最大）流序（mpv 直读 ISO 不可行的既有
+// 边界下为将来留位）。语言为 ISO3 码（zho/eng），chineseTier 词表覆盖。
+func probeDiscSubtitleCandidates(ctx context.Context, discRoot, videoPath string) []SubtitleCandidate {
+	rom, err := bdrom.New(discRoot, bdsettings.Default(""))
+	if err != nil {
+		return nil
+	}
+	defer rom.Close()
+	if res := rom.ScanMetadataWithProgress(ctx, nil); res.ScanError != nil && ctx.Err() == nil {
+		return nil
+	}
+
+	// 定位目标 CLPI 流表
+	var clip *bdrom.StreamClipFile
+	if strings.HasSuffix(strings.ToLower(videoPath), ".m2ts") {
+		name := strings.ToUpper(strings.TrimSuffix(filepath.Base(videoPath), filepath.Ext(videoPath))) + ".CLPI"
+		if cf, ok := rom.StreamClipFiles[name]; ok {
+			clip = cf
+		}
+	}
+	if clip == nil {
+		// ISO/未命中：主 playlist（文件体积最大）首 clip
+		var best *bdrom.PlaylistFile
+		for _, pl := range rom.PlaylistFiles {
+			if best == nil || pl.TotalSize() > best.TotalSize() {
+				best = pl
+			}
+		}
+		if best == nil || len(best.StreamClips) == 0 {
+			return nil
+		}
+		clip = best.StreamClips[0].StreamClipFile
+	}
+	if clip == nil {
+		return nil
+	}
+
+	var out []SubtitleCandidate
+	for _, pid := range clip.StreamOrder {
+		s := clip.Streams[pid]
+		if s == nil {
+			continue
+		}
+		isSub := false
+		if x, ok := s.(interface{ IsGraphicsStream() bool }); ok {
+			isSub = x.IsGraphicsStream()
+		}
+		if !isSub {
+			if x, ok := s.(interface{ IsTextStream() bool }); ok {
+				isSub = x.IsTextStream()
+			}
+		}
+		if !isSub {
+			continue
+		}
+		lang := ""
+		if x, ok := s.(interface{ LanguageCode() string }); ok {
+			lang = x.LanguageCode()
+		}
+		codec := "hdmv_pgs_subtitle"
+		if x, ok := s.(interface{ IsTextStream() bool }); ok && x.IsTextStream() {
+			codec = "text"
+		}
+		out = append(out, SubtitleCandidate{
+			StreamIndex: len(out) + 1,
+			Codec:       codec,
+			Language:    strings.ToLower(lang),
+			IsText:      codec == "text",
+		})
+	}
+	return out
 }

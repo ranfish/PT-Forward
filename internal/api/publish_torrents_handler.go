@@ -4682,14 +4682,11 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	source := model.ParseScreenshotColumn(meta.Screenshots)
 	// §59.319 附六：force（单种获取/重获）传硬编码策略——无条件 mpv 全新
 	// 截传（与 skipCache 同一 force 语义闭合 §59.299 意图）
-	// §59.319 附十四：原盘 sid 预定——BDInfo Subtitle 行序+语言直接推
-	// mpv sid（m2ts PGS 语言在 CLPI/MPLS，ffprobe/mpv 容器层均读不到，
-	// 自动选轨对原盘失效源）；mkv（ffprobe 可达）传 0 走 generator 自动
-	bdSid := 0
-	if meta.BDInfo != "" {
-		bdSid = publish.PickSubtitleSidFromBDInfo(meta.BDInfo)
-	}
-	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal, noCache, bdSid)
+	// §59.319 附十五：bdSid 注入退役——原盘选轨单点下沉 FindSubtitleStreamID
+	// 的 CLPI 快速回退（毫秒级现场解析，不依赖 BDInfo 报告落库时序——
+	// 附十四的 api 注入在"清除后重获"场景截图先于扫描落库而失效）；
+	// 三链（fetch/手动/任意时刻）经同一函数统一。forcedSid 恒 0（自动）。
+	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal, noCache, 0)
 	if len(final) == len(source) {
 		// 无变化（无图且截图失败/全白名单保留/远程无图）——不覆盖
 		same := true
