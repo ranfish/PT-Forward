@@ -201,3 +201,39 @@ func TestExtractBDInfo_EdgeCases(t *testing.T) {
 		t.Errorf("首块分辨率, got %q", gotMulti.Resolution)
 	}
 }
+
+// §59.319 附十六: FromBDInfo 原盘铁证——压制写法启发式不覆盖
+func TestMediumCanonicalOf_FromBDInfo(t *testing.T) {
+	// Under Current 形态：标题无连字符 BluRay（MTeam 惯用）+ BDInfo 报告
+	report := "QUICK SUMMARY:\n\nVideo: MPEG-4 AVC Video / 28143 kbps / 1080p / 23.976 fps / 16:9 / High Profile 4.1\n"
+	p := BuildTechProfile("Under Current 2025 BluRay 1080p AVC LPCM5.1-MTeam", report, "", "", "", "")
+	if !p.FromBDInfo {
+		t.Fatal("BDInfo 输入应置 FromBDInfo")
+	}
+	if got := MediumCanonicalOf(p); got != "Blu-ray 原盘" {
+		t.Errorf("Medium = %q, want Blu-ray 原盘（BDInfo 铁证不受压制写法覆盖）", got)
+	}
+	if IsEncode(p) {
+		t.Error("原盘 IsEncode 应 false")
+	}
+	// UHD 联动：2160p + BluRay 标题写法 + BDInfo → UHD Blu-ray 原盘
+	uhdReport := "QUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 81085 kbps / 2160p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020\n"
+	pu := BuildTechProfile("Alice 1951 BluRay 2160p HEVC DTS-HD MA5.1-MTeam", uhdReport, "", "", "", "")
+	if got := MediumCanonicalOf(pu); got != "UHD Blu-ray 原盘" {
+		t.Errorf("UHD Medium = %q, want UHD Blu-ray 原盘", got)
+	}
+	// 对照回归：同标题写法但输入是普通 MI（无编码痕迹）→ 维持 Encode 判定（启发式不回归）
+	mi := "General\nComplete name : x.mkv\nVideo\nFormat : AVC\nWriting library : x265"
+	pm := BuildTechProfile("Some 2025 BluRay 1080p x265-MTeam", mi, "", "", "", "")
+	if pm.FromBDInfo {
+		t.Error("MI 输入不应置 FromBDInfo")
+	}
+	if !IsEncode(pm) {
+		t.Error("压制写法+x265 编码族应维持 Encode（回归锚）")
+	}
+	// 对照：连字符原盘写法无 BDInfo → 原盘族（既有行为不回归）
+	pd := BuildTechProfile("Some.Disc.2025.Blu-ray.AVC-GRP", "", "", "", "", "")
+	if got := MediumCanonicalOf(pd); got != "Blu-ray 原盘" {
+		t.Errorf("连字符原盘 Medium = %q, want Blu-ray 原盘（回归）", got)
+	}
+}

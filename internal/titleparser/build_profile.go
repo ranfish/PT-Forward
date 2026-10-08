@@ -1,6 +1,9 @@
 package titleparser
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // BuildTechProfile 三源分层合并 → TechProfile（§56.34 决策 4 的公共入口）。
 //
@@ -19,6 +22,12 @@ func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVide
 	if mediaInfo != "" {
 		miTech := ExtractMediaInfo(mediaInfo)
 		MergeMediaInfoInto(&profile, &miTech)
+		// §59.319 附十六: BDInfo 报告输入=原盘铁证（报告仅原盘存在）——
+		// QUICK SUMMARY 锚与 ExtractMediaInfo 分流同源；MediumCanonicalOf
+		// 最高优先级消费（压制写法启发式不覆盖——Under Current 案）
+		if strings.Contains(mediaInfo, "QUICK SUMMARY:") {
+			profile.FromBDInfo = true
+		}
 	}
 	MergeDOMInto(&profile, domMedium, domResolution, domVideoCodec, domAudioCodec)
 	// §59.76: 实现步骤 3 承诺的合并——ReleaseVersion(PROPER/REPACK/RERIP/DIRFIX/INTERNAL)
