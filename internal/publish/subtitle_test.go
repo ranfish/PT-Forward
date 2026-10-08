@@ -85,13 +85,14 @@ func TestSelectBestChinese_UnmarkedPGS(t *testing.T) {
 	if idx2 != 4 {
 		t.Errorf("有标记轨应优先: got %d", idx2)
 	}
-	// 纯文本轨与 PGS 混合：文本零分 PGS 零分——文本槽优先语义（bestSRT 仍要求分>0 → 落 PGS 兜底）
+	// §59.319 附十语义更新：混合零分（无中文）→ 按顺序第一轨（英文文本在前则选文本）
+	// （旧 PGS 兜底优先语义废止——原盘场景双 PGS 无标记时新旧行为一致=首轨）
 	c3 := []SubtitleCandidate{
 		{StreamIndex: 2, Codec: "subrip", Language: "eng", Title: "English", IsText: true, Score: 0},
 		{StreamIndex: 3, Codec: "hdmv_pgs_subtitle", Language: "", Title: "", IsText: false, Score: 0},
 	}
 	idx3, codec3 := d.SelectBestChinese(c3)
-	if idx3 != 3 || codec3 != "hdmv_pgs_subtitle" {
-		t.Errorf("混合零分应落 PGS 兜底: got %d %q", idx3, codec3)
+	if idx3 != 2 || codec3 != "subrip" {
+		t.Errorf("混合零分应选第一轨: got %d %q", idx3, codec3)
 	}
 }
