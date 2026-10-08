@@ -630,9 +630,11 @@ const subtitleTracks = computed<SubtitleTrackOption[]>(() => {
       continue
     }
     // BDInfo 格式："(*)Subtitle: 语言 / 码率"（含 * 隐藏轨）
-    const bdMatch = line.match(/^\* ?Subtitle: ([^/]+?)(?:\s*\/|$)/)
+    // §59.319 附十一修复：^(\* )? 可选星组——原 ^\* ? 把星写成必选字面量，
+    // 无星正常行全不命中（Under Current 实测 0 轨根因，附九重写引入回归）
+    const bdMatch = line.match(/^(\* )?Subtitle: ([^/]+?)(?:\s*\/|$)/)
     if (bdMatch) {
-      const lang = bdMatch[1].trim()
+      const lang = bdMatch[2].trim()
       out.push({ sid: out.length + 1, label: lang || `字幕轨 ${out.length + 1}` })
     }
   }
