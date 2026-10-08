@@ -231,19 +231,25 @@ func (d *SubtitleDetector) SelectBestChinese(candidates []SubtitleCandidate) (in
 
 func (d *SubtitleDetector) FindSubtitleStreamID(ctx context.Context, videoPath string) (int, error) {
 	candidates, err := d.Detect(ctx, videoPath)
-	if err != nil || len(candidates) == 0 {
-		// §59.319 附十五：原盘回退——m2ts PGS 语言在 CLPI/MPLS 不在容器流，
-		// ffprobe 对 m2ts 返回空流（Under Current 实证）；ISO 同理由 bdrom
-		// 内部 UDF 读取器统一处理。CLPI 快速解析毫秒级（13ms 实测），
-		// 不依赖 BDInfo 报告落库时序（三链统一：fetch/手动/任何时刻）。
-		if disc := detectDiscForSubtitle(videoPath); disc != "" {
-			if clpiCands := probeDiscSubtitleCandidates(ctx, disc, videoPath); len(clpiCands) > 0 {
-				candidates = clpiCands
-			}
+	// §59.319 附十五修订：回退条件=无候选**或无语言信号**——m2ts PGS 常态是
+	// ffprobe 报出无语言候选（Under Current 实证 2 条空语言 PGS），原
+	// "空才回退"致 tier 全 0 恒选第一轨（英文）。语言信号=任一候选
+	// lang/title 非空（mkv 正常有）；全空且是原盘 → CLPI 补语言（权威源）。
+	hasLangSignal := false
+	for _, c := range candidates {
+		if c.Language != "" || c.Title != "" {
+			hasLangSignal = true
+			break
 		}
-		if len(candidates) == 0 {
-			return 0, err
+	}
+	if (err != nil || len(candidates) == 0 || !hasLangSignal) && detectDiscForSubtitle(videoPath) != "" {
+		if clpiCands := probeDiscSubtitleCandidates(ctx, detectDiscForSubtitle(videoPath), videoPath); len(clpiCands) > 0 {
+			candidates = clpiCands
+			err = nil
 		}
+	}
+	if len(candidates) == 0 {
+		return 0, err
 	}
 
 	streamID, _ := d.SelectBestChinese(candidates)
@@ -328,10 +334,11 @@ func probeDiscSubtitleCandidates(ctx context.Context, discRoot, videoPath string
 		}
 	}
 	if clip == nil {
-		// ISO/未命中：主 playlist（文件体积最大）首 clip
+		// ISO/未命中：主 playlist（时长最长——metadata 扫描可得；TotalSize
+		// 在 metadata 阶段恒 0，按体积选必错，243 实证 00001.MPLS size=0）
 		var best *bdrom.PlaylistFile
 		for _, pl := range rom.PlaylistFiles {
-			if best == nil || pl.TotalSize() > best.TotalSize() {
+			if best == nil || pl.TotalLength() > best.TotalLength() {
 				best = pl
 			}
 		}
