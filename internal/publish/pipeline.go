@@ -886,7 +886,7 @@ func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string
 // ApplyScreenshotStrategy §59.53: 采集链截图策略——按库内截图值跑 auto
 // （白名单逐张/转存/差额补足/无图全量），isLocal=false 时只转存不截图（远程无图留空）。
 // 返回最终截图列表（落库由调用方执行）。
-func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocalHint ...bool) []string {
+func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool, forceLocal bool, forcedSid int) []string {
 	if p.artifactGenerator == nil {
 		return sourceScreenshots
 	}
@@ -902,7 +902,6 @@ func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath s
 	// mpv 全新截传——硬编码 local_upload 对齐 Tab3（§59.250 用户定案三场景：
 	// Tab3/未获取单种获取/已获取单种重获）；批量链 force=false 走配置
 	// （§59.254 运行时动态读不变）
-	forceLocal := len(forceLocalHint) > 0 && forceLocalHint[0]
 	strategy := ""
 	if forceLocal {
 		strategy = "local_upload"
@@ -917,7 +916,7 @@ func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath s
 	if strategy == "" {
 		strategy = "auto"
 	}
-	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, strategy)
+	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, strategy, forcedSid)
 	if err != nil || artifact == nil {
 		return sourceScreenshots
 	}

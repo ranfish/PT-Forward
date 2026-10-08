@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -137,6 +138,40 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 	}
 
 	return candidates, nil
+}
+
+// PickSubtitleSidFromBDInfo §59.319 附十四：从 BDInfo 报告的 Subtitle 行
+// 序+语言直接推 mpv sid（原盘场景——m2ts PGS 语言在 CLPI/MPLS 不在容器
+// 流，ffprobe/mpv 均读不到，ffprobe 自动选轨失效源）。
+// 行序≈m2ts 流序（PMT/PID 同源——Under Current 实证：报告 English 行 1/
+// Chinese 行 2 与 mpv --sid=1/2 一一对应）。
+// 三级优先与 SelectBestChinese 同语义：简中>繁中>无中文（含无显式语言）
+// 按行序第一轨。非报告形态/无 Subtitle 行返回 0（调用方走原自动链）。
+var bdSubtitleLineRe = regexp.MustCompile(`^(\* )?Subtitle: ([^/]+?)(?:\s*\/|$)`)
+
+func PickSubtitleSidFromBDInfo(report string) int {
+	subs := []int{}
+	for _, line := range strings.Split(report, "\n") {
+		m := bdSubtitleLineRe.FindStringSubmatch(strings.TrimRight(line, "\r"))
+		if m == nil {
+			continue
+		}
+		// BDInfo Subtitle 行无 title 槽——语言即唯一信号
+		subs = append(subs, chineseTier(strings.ToLower(strings.TrimSpace(m[2])), ""))
+	}
+	if len(subs) == 0 {
+		return 0
+	}
+	best, bestTier := 0, -1
+	for i, tier := range subs {
+		if tier > bestTier {
+			best, bestTier = i+1, tier // 1-based = mpv sid
+		}
+	}
+	if bestTier == 0 {
+		return 1 // 无中文：按行序第一轨
+	}
+	return best
 }
 
 // chineseTier §59.319 附十：字幕轨语言层级（用户定案三级优先）——
