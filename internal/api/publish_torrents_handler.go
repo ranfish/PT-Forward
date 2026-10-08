@@ -3274,6 +3274,10 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 				miTech := titleparser.ExtractMediaInfo(miText)
 				encProfile.MIEncoded = miTech.Encoded
 				encProfile.MIHasVideo = miTech.Encoded || miTech.Resolution != "" || miTech.VideoCodec != ""
+				// §59.319 附十六: BDInfo 输入=原盘铁证（与 BuildTechProfile 同源判定）
+				if strings.Contains(miText, "QUICK SUMMARY:") {
+					encProfile.FromBDInfo = true
+				}
 			}
 			item["encode"] = titleparser.IsEncode(encProfile)
 			item["category"] = meta.Category

@@ -34,6 +34,7 @@ type TechProfile struct {
 	BitDepth        string `json:"bit_depth"`        // 11. bit 信息（8bit/10bit）
 	MIEncoded       bool   `json:"-"`                // §59.151: MI Writing library 重编码铁证
 	MIHasVideo      bool   `json:"-"`                // §59.151: MI 存在 Video 层（判据可信前提）
+	FromBDInfo      bool   `json:"-"`                // §59.319 附十六: MI 输入为 BDInfo 报告（原盘铁证——报告仅原盘存在）
 	VideoCodec      string `json:"video_codec"`      // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
 	AudioCodec      string `json:"audio_codec"`      // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
 	AudioChannels   string `json:"audio_channels"`   // 14. 声道数（2.0/5.1/7.1）
@@ -62,13 +63,30 @@ type TechProfile struct {
 // Encode/DVD/原盘族）。发布映射（lookupByStdKey 站点适配）与前端
 // 展示统一消费同一判定（前端 siteMediumDisplay 规则副本废除）。
 //
-// 优先级：①spec 显式（Remux/WEB-DL/WEBRip/HDTV/UHDTV/BDRip/DVDRip→Encode）
+// 优先级：⓪FromBDInfo 原盘铁证（§59.319 附十六——压制写法启发式不覆盖，
+// MTeam 等站方标题恒无连字符致 ③ 误判 Encode——Under Current 案）
+// ①spec 显式（Remux/WEB-DL/WEBRip/HDTV/UHDTV/BDRip/DVDRip→Encode）
 // ②ST 原盘连字符族 ③ST 压制写法（无连字符 BluRay）→Encode ④UHD Remux
 // 联动（§59.226 附八: 2160p ∧ Remux → "UHD Remux"——站点词表独立项）
 // ⑤DVD 非 Rip ⑥IsEncode 兜底 ⑦空。
 func MediumCanonicalOf(p TechProfile) string {
 	spec := p.Specification
 	st := p.SourceType
+	// §59.319 附十六: BDInfo 报告=原盘实锤（证据等级高于标题写法启发式）——
+	// 无连字符压制写法归原盘族+连字符规范化；分辨率联动 UHD
+	if p.FromBDInfo {
+		switch st {
+		case "UHD Blu-ray", "Blu-ray", "3D Blu-ray", "UHD BluRay", "BluRay", "3D BluRay":
+			uhd := strings.EqualFold(p.Resolution, "2160p") || p.Resolution == "4K"
+			if uhd {
+				return "UHD Blu-ray 原盘"
+			}
+			if strings.Contains(st, "3D") {
+				return "3D Blu-ray 原盘"
+			}
+			return "Blu-ray 原盘"
+		}
+	}
 	switch spec {
 	case "Remux":
 		// §59.226 附八: UHD Remux canonical 区分（分辨率联动）
