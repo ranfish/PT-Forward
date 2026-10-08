@@ -139,51 +139,56 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 	return candidates, nil
 }
 
+// chineseTier §59.319 附十：字幕轨语言层级（用户定案三级优先）——
+// 简中(3) > 繁中(2) > 无中文(0)。
+// 繁中标记先判（防宽松词 "zh" 误吞 zh-hant）；不分简繁的中文
+// （chi/zho/zh/chinese/标题"中"）默认归简体级（中文即中，尽量烧上）。
+func chineseTier(lang, title string) int {
+	if containsAny(lang, "zh-hant", "zh-tw", "zh-hk", "cht") {
+		return 2
+	}
+	if containsAny(title, "繁", "cht", "traditional") {
+		return 2
+	}
+	if containsAny(lang, "zh-hans", "zh-cn", "chs", "chi", "zho", "zh", "chinese") {
+		return 3
+	}
+	if containsAny(title, "简", "chs", "simplified") || containsAny(title, "中", "chinese") {
+		return 3
+	}
+	return 0
+}
+
 func (d *SubtitleDetector) SelectBestChinese(candidates []SubtitleCandidate) (int, string) {
-	var bestASS, bestSRT, bestPGS *SubtitleCandidate
-
+	// §59.319 附十：主序=语言 tier（简中>繁中），次序=codec（ass>文本>图形），
+	// 同分保序（ffprobe 流序）。tier 全 0（无中文或无显式语言）→ 按顺序第一
+	// 字幕轨（宁英文不裸图——§59.298 PGS 兜底语义扩展到文本轨）。
+	best := -1
+	bestTier, bestRank := -1, -1
+	codecRank := func(c *SubtitleCandidate) int {
+		if c.Codec == "ass" {
+			return 2
+		}
+		if c.IsText {
+			return 1
+		}
+		return 0
+	}
 	for i := range candidates {
-		c := &candidates[i]
-		switch {
-		case c.Codec == "ass" && c.Score > 0:
-			if bestASS == nil || c.Score > bestASS.Score {
-				bestASS = c
-			}
-		case c.IsText && c.Score > 0:
-			// §59.291: 文本轨统一 SRT 槽（subrip/webvtt/mov_text/未知 codec
-			// 兜底候选——纯文本渲染同质，ass 优先级不变）
-			if bestSRT == nil || c.Score > bestSRT.Score {
-				bestSRT = c
-			}
-		case !c.IsText && c.Score > 0:
-			if bestPGS == nil || c.Score > bestPGS.Score {
-				bestPGS = c
-			}
+		tier := chineseTier(strings.ToLower(candidates[i].Language), strings.ToLower(candidates[i].Title))
+		rank := codecRank(&candidates[i])
+		if tier > bestTier || (tier == bestTier && rank > bestRank) {
+			best, bestTier, bestRank = i, tier, rank
 		}
 	}
-
-	switch {
-	case bestASS != nil:
-		return bestASS.StreamIndex, bestASS.Codec
-	case bestSRT != nil:
-		return bestSRT.StreamIndex, bestSRT.Codec
-	case bestPGS != nil:
-		return bestPGS.StreamIndex, bestPGS.Codec
+	if best < 0 {
+		return 0, ""
 	}
-	// §59.298: 无标记 PGS 双兜底——蓝光原盘结构性缺失（m2ts 容器不存 language/
-	// title/disposition，Under Current 2026 双 PGS 全 0 分实证）
-	//   A. 副标题中字特征词（简/繁/中字/双语字幕）+ 原盘轨序约定（首 PGS 常中字）→ 首个 PGS
-	//   B. 纯兜底：唯一/首个 PGS 轨（宁英文不裸图）——比无字幕好（人工纠偏见 C 层 tab3）
-	var pgs []*SubtitleCandidate
-	for i := range candidates {
-		if !candidates[i].IsText {
-			pgs = append(pgs, &candidates[i])
-		}
+	if bestTier == 0 {
+		// 无中文：按顺序第一字幕轨（非 codec 优先）
+		return candidates[0].StreamIndex, candidates[0].Codec
 	}
-	if len(pgs) > 0 {
-		return pgs[0].StreamIndex, pgs[0].Codec
-	}
-	return 0, ""
+	return candidates[best].StreamIndex, candidates[best].Codec
 }
 
 func (d *SubtitleDetector) FindSubtitleStreamID(ctx context.Context, videoPath string) (int, error) {
