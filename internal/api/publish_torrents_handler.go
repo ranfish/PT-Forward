@@ -3935,6 +3935,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	// WEB-DL 剧集 Encode 误判根因：IsEncode 走不进 MI 分支回落旧 spec 判定）
 	displayProfile.MIEncoded = profile.MIEncoded
 	displayProfile.MIHasVideo = profile.MIHasVideo
+	// §59.319 附十六补: BDInfo 铁证传递（displayProfile 同样丢 FromBDInfo——
+	// detail 端点 medium_canonical 仍走压制写法启发式→Encode 误标，243
+	// Tab1 实测捕获；与列表 encProfile/BuildTechProfile 三处同源）
+	displayProfile.FromBDInfo = profile.FromBDInfo
 
 	// §59.46: 展示优先级兜底——description 列为空（源站无简介形态）时按
 	// douban_url 查 ptgen_cache（format BBCode）；非空不覆盖（尊重源站/用户编辑）

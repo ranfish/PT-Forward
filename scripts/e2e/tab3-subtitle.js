@@ -14,7 +14,7 @@ const h = require('./helpers')
     console.log('ROWS=' + JSON.stringify(rows))
     await h.openEditor(page, 'Under Current')
     await h.switchTab(page, '截图')
-    const opts = await h.dropdownOptions(page, '.ant-drawer-content') // 编辑器是 Drawer 容器
+    const opts = await h.dropdownOptions(page, '.ant-drawer-content')
     console.log('SUBTITLE_OPTIONS=' + JSON.stringify(opts))
     const joined = (opts || []).join('|')
     if (!joined.includes('English') || !joined.includes('Chinese')) {
