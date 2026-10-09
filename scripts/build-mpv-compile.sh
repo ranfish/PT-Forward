@@ -17,7 +17,7 @@ meson setup build --buildtype=minsize \
   -Dshaderc=disabled -Dspirv-cross=disabled \
   -Dcuda-hwaccel=disabled -Dcuda-interop=disabled \
   -Dcdda=disabled -Ddvbin=disabled -Ddvdnav=disabled \
-  -Dlibbluray=disabled -Dlibavdevice=disabled \
+  -Dlibbluray=enabled -Dlibavdevice=disabled \
   -Dlibarchive=disabled \
   -Dlua=disabled -Djavascript=disabled \
   -Drubberband=disabled -Dvapoursynth=disabled \
