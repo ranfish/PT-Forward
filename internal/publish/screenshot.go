@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	bdrom "github.com/ranfish/pt-forward/internal/bdinfo/bdrom"
+	bdsettings "github.com/ranfish/pt-forward/internal/bdinfo/settings"
 	"go.uber.org/zap"
 )
 
@@ -85,7 +87,14 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 
 	info, err := e.probeVideo(ctx, videoPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("probe video: %w", err)
+		// §59.319 附二十补: ISO 原盘——ffprobe 读不了 UDF 容器，改用
+		// bdrom CLPI 快速解析（duration/fps/HDR 从结构元数据取，毫秒级）
+		if isISODisc(videoPath) {
+			info, err = e.probeDisc(ctx, videoPath)
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("probe video: %w", err)
+		}
 	}
 
 	points := e.generateTimePoints(info.duration)
@@ -469,4 +478,72 @@ func (e *ScreenshotEngine) findIDRBefore(ctx context.Context, videoPath string, 
 // （--bluray-device=<path> bd://），libbluray 从 MPLS/CLPI 提供语言元数据。
 func isISODisc(videoPath string) bool {
 	return strings.HasSuffix(strings.ToLower(videoPath), ".iso")
+}
+
+// probeDisc §59.319 附二十补: ISO 原盘 videoInfo——CLPI/MPLS 快速解析
+// （ffprobe 读不了 UDF 容器；duration 从主 playlist TotalLength、fps/HDR
+// 从视频流元数据）。DoVi profile 在 CLPI 不可得——留 0（步骤②待完善）。
+func (e *ScreenshotEngine) probeDisc(ctx context.Context, isoPath string) (*videoInfo, error) {
+	rom, err := bdrom.New(isoPath, bdsettings.Default(""))
+	if err != nil {
+		return nil, fmt.Errorf("bdrom open: %w", err)
+	}
+	defer rom.Close()
+	if res := rom.ScanMetadataWithProgress(ctx, nil); res.ScanError != nil {
+		return nil, fmt.Errorf("bdrom scan: %w", res.ScanError)
+	}
+
+	// 主 playlist（时长最长）
+	var best *bdrom.PlaylistFile
+	for _, pl := range rom.PlaylistFiles {
+		if best == nil || pl.TotalLength() > best.TotalLength() {
+			best = pl
+		}
+	}
+	if best == nil || best.TotalLength() <= 0 {
+		return nil, fmt.Errorf("no playable playlist")
+	}
+
+	info := &videoInfo{
+		duration: best.TotalLength(),
+		isMpegTS: true,
+	}
+
+	// 主 clip 的视频流（fps/HDR 判定）
+	if len(best.StreamClips) > 0 && best.StreamClips[0].StreamClipFile != nil {
+		clip := best.StreamClips[0].StreamClipFile
+		for _, pid := range clip.StreamOrder {
+			s := clip.Streams[pid]
+			if s == nil {
+				continue
+			}
+			if x, ok := s.(interface{ IsVideoStream() bool }); !ok || !x.IsVideoStream() {
+				continue
+			}
+			// 视频流——从 codec/format 判定
+			if vs, ok := s.(interface {
+				IsVideoStream() bool
+				GetStreamInfo() (int, int, float64) // width, height, fps
+			}); ok {
+				_, _, fps := vs.GetStreamInfo()
+				if fps > 0 {
+					info.fps = fps
+				}
+			}
+			// HEVC → HDR 判定（UHD 蓝光 HEVC 全部 HDR 系）
+			if strings.Contains(strings.ToLower(fmt.Sprintf("%T", s)), "hevc") ||
+				strings.Contains(strings.ToLower(fmt.Sprintf("%v", s)), "HEVC") {
+				info.isHDR = true
+			}
+			break // 只取首个视频流
+		}
+	}
+	if info.fps == 0 {
+		info.fps = 23.976 // BD 默认
+	}
+	e.logger.Info("ISO disc probed",
+		zap.Float64("duration", info.duration),
+		zap.Float64("fps", info.fps),
+		zap.Bool("isHDR", info.isHDR))
+	return info, nil
 }
