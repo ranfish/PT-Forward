@@ -135,6 +135,13 @@
               观察期 {{ record.cleanup_in_days }}天
             </a-tag>
           </a-tooltip>
+          <!-- §59.319 附十八: 原盘扫描中提示——bd_info 落库前 5-11 分钟窗口 -->
+          <a-tooltip v-else-if="record.disc_scan_pending" title="正在扫描蓝光原盘（BDInfo 分析中，约 5-11 分钟）">
+            <a-tag color="processing" size="small">
+              {{ statusLabel(record.status) }}
+              <LoadingOutlined spin style="margin-left: 4px" />
+            </a-tag>
+          </a-tooltip>
           <a-tag v-else :color="statusColor(record.status)" size="small">
             {{ statusLabel(record.status) }}
           </a-tag>
@@ -227,7 +234,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
