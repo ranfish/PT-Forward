@@ -119,6 +119,7 @@ export interface SeedListItem {
   fetch_source?: string
   has_mediainfo?: boolean
   is_disc?: boolean
+  disc_scan_pending?: boolean
   has_description?: boolean
   has_screenshots?: boolean
   fetched_at?: string

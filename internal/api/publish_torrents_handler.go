@@ -3302,6 +3302,13 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			// 供前端徽标显示 BD（D7 闭环：空 BDInfo 原盘红叉拦截）
 			item["has_mediainfo"] = meta.MediaInfo != "" || meta.SourceMediaInfo != "" || meta.BDInfo != ""
 			item["is_disc"] = meta.BDInfo != ""
+			// §59.319 附十八: 扫盘中提示——原盘簇 bd_info 空+簇内有快照+本地
+			// 下载器=扫描进行中（D6 自动入队后 5-11 分钟窗口；清除后重获/存量
+			// 补扫期间用户可见"视频文件分析中"而非误以为系统停摆）。is_disc
+			// false+disc_scan_pending true 并存是常态（is_disc 以 bd_info 落库
+			// 为准，扫描完成前两者同时可见）
+			item["disc_scan_pending"] = meta.BDInfo == "" && h.bdinfoScanner != nil &&
+				h.bdinfoScanner.DetectDiscPath(snap.SavePath, snap.Name) != ""
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
