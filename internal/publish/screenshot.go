@@ -346,16 +346,36 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	}
 
 	if subtitleStreamID > 0 {
-		args = append(args,
-			"--sid="+strconv.Itoa(subtitleStreamID),
-			"--sub-visibility=yes",
-			"--blend-subtitles=yes",
-		)
+		if isISODisc(videoPath) {
+			// §59.319 附二十: ISO 原盘——libbluray 原生语言元数据，用 --slang
+			// 替代 --sid（bd:// 轨道编号由 libbluray playlist 决定，与 CLPI
+			// StreamOrder 可能不对齐；--slang 按语言匹配更稳健）。sid 编号
+			// 复用为 slang 强度信号：>0=有中文字幕轨（语言列表覆盖三级优先）
+			args = append(args,
+				"--slang=zh-Hans,chs,zh,chi,zho,zh-Hant,cht",
+				"--sub-visibility=yes",
+				"--blend-subtitles=yes",
+			)
+		} else {
+			args = append(args,
+				"--sid="+strconv.Itoa(subtitleStreamID),
+				"--sub-visibility=yes",
+				"--blend-subtitles=yes",
+			)
+		}
 	} else {
 		args = append(args, "--sid=no")
 	}
 
-	args = append(args, videoPath)
+	// §59.319 附二十: ISO 原盘——bd:// 协议 + --bluray-device
+	if isISODisc(videoPath) {
+		args = append(args,
+			"--bluray-device="+videoPath,
+			"bd://",
+		)
+	} else {
+		args = append(args, videoPath)
+	}
 
 	cmd := exec.CommandContext(ctx, e.mpvPath, args...) //nolint:gosec // intentional subprocess
 	output, err := cmd.CombinedOutput()
@@ -443,4 +463,10 @@ func (e *ScreenshotEngine) findIDRBefore(ctx context.Context, videoPath string, 
 		}
 	}
 	return 0, fmt.Errorf("no keyframe found before %f", t)
+}
+
+// isISODisc §59.319 附二十: ISO 原盘判定——mpv 走 bd:// 协议
+// （--bluray-device=<path> bd://），libbluray 从 MPLS/CLPI 提供语言元数据。
+func isISODisc(videoPath string) bool {
+	return strings.HasSuffix(strings.ToLower(videoPath), ".iso")
 }
