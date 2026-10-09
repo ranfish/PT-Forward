@@ -235,6 +235,64 @@ func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, r
 		zap.String("name", task.Name),
 		zap.Int("cluster_rows", len(hashes)),
 		zap.Int64("rows_affected", res.RowsAffected))
+
+	// §59.319 附十七: 扫描落库后标签重推——清除重获场景 fetch 期推断时
+	// BDInfo 空（高码/高帧数值判据缺失）；NFO 通道现在有数据。InferFull
+	// 算一次（簇内输入同构），MergeTags 逐行（各行 existing 可能不同），
+	// 直采优先+互斥仲裁语义既有（源站显式/用户编辑不覆盖，只增不删）
+	h.reinferTagsForCluster(ctx, task, rep, hashes)
+}
+
+// reinferTagsForCluster §59.319 附十七: 簇级标签重推（onDone 后置）。
+func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task publish.BDInfoScanTask, rep model.TorrentMetadata, hashes []string) {
+	if rep.Title == "" {
+		return
+	}
+	var snapSize int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", rep.InfoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
+	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
+		MediaInfo:   rep.MediaInfo,
+		Title:       rep.Title,
+		Subtitle:    rep.Subtitle,
+		Description: rep.Description,
+		NFO:         rep.BDInfo,
+		Statement:   rep.Statement,
+		Region:      rep.RegionCode,
+		Size:        snapSize,
+	})
+	if len(inferred) == 0 {
+		return
+	}
+	var rows []model.TorrentMetadata
+	if err := h.db.WithContext(ctx).Where("info_hash IN ?", hashes).Find(&rows).Error; err != nil {
+		return
+	}
+	updated := 0
+	for i := range rows {
+		var existing []string
+		if rows[i].Tags != "" {
+			if err := json.Unmarshal([]byte(rows[i].Tags), &existing); err != nil {
+				existing = nil
+			}
+		}
+		all := publish.MergeTags(existing, inferred)
+		data, _ := json.Marshal(all)
+		if string(data) == rows[i].Tags {
+			continue
+		}
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ?", rows[i].InfoHash).
+			Update("tags", string(data)).Error; err == nil {
+			updated++
+		}
+	}
+	if updated > 0 {
+		h.logger.Info("bdinfo cluster tags reinferred",
+			zap.String("name", task.Name),
+			zap.Int("rows", updated),
+			zap.Int("inferred", len(inferred)))
+	}
 }
 
 // StartObservingCleanup §59.38: 观察期定时清理——日级扫描超 7 天的观察组并
