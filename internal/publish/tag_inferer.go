@@ -90,6 +90,20 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// 显示代码、与"英语"重复显示——Life.Unexpected 案用户报）。站规判定单点收敛到
 	// executor.luckptEnglishTagValue（预检/DryRun/上传三链同源），本处不再产标记。
 	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
+	// §59.319 附十七: BDInfo 数值判据（NFO 通道）——原盘行 MediaInfo 空且
+	// BDInfo 文本非 MI 格式，MI sections 无数值（高码/高帧在清除重获后
+	// 扫描完成前的 fetch 期推断恒缺）；NFO=BDInfo 报告时从 QUICK SUMMARY
+	// 的 Total Bitrate + Video 行补数值，阈值与 §59.69 五判据同源
+	if !hasHB || !hasHF {
+		if hb, hf := inferNumericSpecTagsBDInfo(in.NFO); hb || hf {
+			if hb {
+				hasHB = true
+			}
+			if hf {
+				hasHF = true
+			}
+		}
+	}
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
 	hasHR := parseDoubanRatingScore(in.Description) >= 8.0
@@ -448,4 +462,46 @@ func regexAny(s string, subs []string) bool {
 		}
 	}
 	return false
+}
+
+// inferNumericSpecTagsBDInfo §59.319 附十七：BDInfo 报告（NFO 通道）数值
+// 判据——QUICK SUMMARY 的 "Total Bitrate: 42.27 Mbps" + Video 行
+// "2160p / 23.976 fps"。阈值与 inferNumericSpecTagsSections 同源
+// （≥4K 且 ≥15Mb/s；<4K 且 ≥9Mb/s；fps≥60）。
+func inferNumericSpecTagsBDInfo(nfo string) (highBitrate, highFrameRate bool) {
+	if !strings.Contains(nfo, "QUICK SUMMARY:") {
+		return false, false
+	}
+	// 码率：Total Bitrate: 42.27 Mbps
+	rate := 0.0
+	if m := regexp.MustCompile(`Total Bitrate:\s*([\d.]+)\s*Mbps`).FindStringSubmatch(nfo); m != nil {
+		fmt.Sscanf(m[1], "%f", &rate)
+	}
+	// 分辨率+帧率：Video 行 "MPEG-H HEVC Video / 81085 kbps / 2160p / 23.976 fps / ..."
+	is4K := false
+	fps := 0.0
+	for _, line := range strings.Split(nfo, "\n") {
+		trimmed := strings.TrimPrefix(strings.TrimSpace(line), "* ")
+		if !strings.HasPrefix(trimmed, "Video: ") {
+			continue
+		}
+		if m := regexp.MustCompile(` (\d{3,4}[pi]) / `).FindStringSubmatch(trimmed); m != nil {
+			is4K = m[1] == "2160p" || m[1] == "4320p"
+		}
+		if m := regexp.MustCompile(` ([\d.]+) fps`).FindStringSubmatch(trimmed); m != nil {
+			fmt.Sscanf(m[1], "%f", &fps)
+		}
+		break // 主 Video 行（首条非隐藏）
+	}
+	if rate > 0 {
+		if is4K {
+			highBitrate = rate >= 15
+		} else {
+			highBitrate = rate >= 9
+		}
+	}
+	if fps >= 60 {
+		highFrameRate = true
+	}
+	return highBitrate, highFrameRate
 }

@@ -301,3 +301,47 @@ func TestInferHDRTagsFromMI_VividCanonical(t *testing.T) {
 		}
 	}
 }
+
+// §59.319 附十七: BDInfo 数值判据（NFO 通道）
+func TestInferNumericSpecTagsBDInfo(t *testing.T) {
+	// Under Current 实测形态：1080p + 42.27 Mbps → <4K 且 ≥9Mb/s → 高码
+	uc := "QUICK SUMMARY:\n\nVideo: MPEG-4 AVC Video / 28143 kbps / 1080p / 23.976 fps / 16:9 / High Profile 4.1\nTotal Bitrate: 42.27 Mbps\n"
+	if hb, hf := inferNumericSpecTagsBDInfo(uc); !hb || hf {
+		t.Errorf("Under Current 形态应高码不高帧, got hb=%v hf=%v", hb, hf)
+	}
+	// Alice UHD：2160p + 100.55 Mbps → ≥4K 且 ≥15Mb/s → 高码
+	alice := "QUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 81085 kbps / 2160p / 23.976 fps / 16:9 / Main 10 / 10 bits / HDR10 / BT.2020\nTotal Bitrate: 100.55 Mbps\n"
+	if hb, _ := inferNumericSpecTagsBDInfo(alice); !hb {
+		t.Error("Alice UHD 应高码")
+	}
+	// 低码不命中：1080p + 5 Mbps
+	low := "Total Bitrate: 5.0 Mbps\nVideo: x / 1080p / 23.976 fps\n"
+	if hb, _ := inferNumericSpecTagsBDInfo(low); hb {
+		t.Error("5Mbps 不应高码")
+	}
+	// 4K 低码（8Mbps < 15）不命中
+	low4k := "Total Bitrate: 8.0 Mbps\nVideo: x / 2160p / 24 fps\n"
+	if hb, _ := inferNumericSpecTagsBDInfo(low4k); hb {
+		t.Error("4K 8Mbps 不应高码")
+	}
+	// 高帧：60fps
+	hfCase := "QUICK SUMMARY:\nTotal Bitrate: 12.0 Mbps\nVideo: x / 1080p / 60 fps\n"
+	if _, hf := inferNumericSpecTagsBDInfo(hfCase); !hf {
+		t.Error("60fps 应高帧")
+	}
+	// InferFull 端到端：MediaInfo 空 + NFO=BDInfo → high_bitrate 标签出现
+	inferer := NewMediaTagInferer()
+	tags := inferer.InferFull(TagInput{
+		Title: "Under Current 2025 BluRay 1080p AVC LPCM5.1-MTeam",
+		NFO:   "QUICK SUMMARY:\n\nVideo: MPEG-4 AVC Video / 28143 kbps / 1080p / 23.976 fps / 16:9 / High Profile 4.1\nTotal Bitrate: 42.27 Mbps\n",
+	})
+	found := false
+	for _, tg := range tags {
+		if tg == "high_bitrate" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("InferFull NFO 通道应产出 high_bitrate, got %v", tags)
+	}
+}
