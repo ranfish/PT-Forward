@@ -401,6 +401,7 @@ func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) 
 		".mkv": true, ".mp4": true, ".avi": true, ".ts": true,
 		".m2ts": true, ".wmv": true, ".flv": true, ".mov": true,
 		".webm": true, ".mpg": true, ".mpeg": true, ".vob": true,
+		".iso": true, // §59.319 附二十: ISO 原盘（mpv bd:// 协议直读）
 	}
 
 	var candidates []string
