@@ -254,13 +254,22 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		return nil
 	}
 	subtitleSID := 0
+	subtitleSource := "none"
 	if len(forcedSid) > 0 && forcedSid[0] > 0 {
 		subtitleSID = forcedSid[0] // §59.298 C: 人工指定轨（tab3 下拉）——跳过自动选择
+		subtitleSource = "forced"
 	} else if g.subtitleDetector.Available() {
 		if sid, err := g.subtitleDetector.FindSubtitleStreamID(ctx, videoPath); err == nil && sid > 0 {
 			subtitleSID = sid
+			subtitleSource = "auto"
 		}
 	}
+	// §59.319 附十九: sid 可观测——附十五三轮排查全靠手写探针二分（check-sid
+	// 三版），根因是链上零日志（mpv 实际收到什么 sid、走了哪条路径均不可见）
+	g.logger.Info("screenshot subtitle selection",
+		zap.Int("sid", subtitleSID),
+		zap.String("source", subtitleSource),
+		zap.String("video", filepath.Base(videoPath)))
 	localShots, tmpDir, err := engineProbe.Capture(ctx, videoPath, subtitleSID)
 	if err != nil || len(localShots) == 0 {
 		if tmpDir != "" {
