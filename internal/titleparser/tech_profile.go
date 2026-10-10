@@ -74,7 +74,10 @@ func MediumCanonicalOf(p TechProfile) string {
 	st := p.SourceType
 	// §59.319 附十六: BDInfo 报告=原盘实锤（证据等级高于标题写法启发式）——
 	// 无连字符压制写法归原盘族+连字符规范化；分辨率联动 UHD
-	if p.FromBDInfo {
+	// §59.319 附二十三: MINBD 排除——x264/x265 重编码后保持 BDMV 结构的
+	// "缩小版原盘"（CMCT 等组），有 BDInfo 报告但非原盘（PT 站归 Encode）；
+	// 标题的重编码标记（x264/x265）不被铁证覆盖
+	if p.FromBDInfo && !hasReencodeCodecInTitle(p.MainTitle) {
 		switch st {
 		case "UHD Blu-ray", "Blu-ray", "3D Blu-ray", "UHD BluRay", "BluRay", "3D BluRay":
 			uhd := strings.EqualFold(p.Resolution, "2160p") || p.Resolution == "4K"
@@ -201,4 +204,18 @@ func TechProfileToComponents(p TechProfile) TitleComponents {
 		ReleaseGroupFull: p.ReleaseGroupFull,
 		ChinesePrefix:  p.ChinesePrefix,
 	}
+}
+
+// hasReencodeCodecInTitle §59.319 附二十三: 标题含重编码标记——
+// x264/x265/Xvid 词形（词边界防误命中如 "x264" 在文件名中为编码声明）。
+// MINBD（CMCT 等组的"缩小版原盘"）标题必带 x264/x265——是重编码的
+// 明确声明，不被 FromBDInfo 原盘铁证覆盖（PT 站归 Encode 非原盘）。
+func hasReencodeCodecInTitle(title string) bool {
+	lower := strings.ToLower(title)
+	for _, codec := range []string{"x264", "x265", "xvid"} {
+		if strings.Contains(lower, codec) {
+			return true
+		}
+	}
+	return false
 }

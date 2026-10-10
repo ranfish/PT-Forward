@@ -25,8 +25,15 @@ func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVide
 		// §59.319 附十六: BDInfo 报告输入=原盘铁证（报告仅原盘存在）——
 		// QUICK SUMMARY 锚与 ExtractMediaInfo 分流同源；MediumCanonicalOf
 		// 最高优先级消费（压制写法启发式不覆盖——Under Current 案）
+		// §59.319 附二十三: MINBD 排除——标题 x264/x265 重编码标记（CMCT
+		// 等组的"缩小版原盘"，有 BDMV 结构+BDInfo 报告但非原盘，PT 站归
+		// Encode）；设 MIEncoded=true 走 IsEncode 编码路径，不设 FromBDInfo
 		if strings.Contains(mediaInfo, "QUICK SUMMARY:") {
-			profile.FromBDInfo = true
+			if hasReencodeCodecInTitle(title) {
+				profile.MIEncoded = true
+			} else {
+				profile.FromBDInfo = true
+			}
 		}
 	}
 	MergeDOMInto(&profile, domMedium, domResolution, domVideoCodec, domAudioCodec)
