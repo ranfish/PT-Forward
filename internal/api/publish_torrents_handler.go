@@ -4101,9 +4101,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 			}
 			return profile.MainTitle
 		}(),
-		// §59.226 附二十一 #21: 帧率（MI 原值/标题兜底——非默认帧率才显示，
-		// 默认 23.976/24/25/29.970 展示空——标题不标默认）
-		"frame_rate": nonDefaultFrameRate(profile.FrameRate),
+		// §59.319 附二十一: 规格表忠实显示帧率（含默认值）——"默认不显示"
+		// 仅适用于标题重组（§59.226 附二十一），技术规格表是信息展示应完整
+		"frame_rate": profile.FrameRate,
 		// §59.226 附四: 媒介 canonical 单点（后端出值——前端 siteMediumDisplay 副本废除）
 		"medium_canonical": titleparser.MediumCanonicalOf(displayProfile),
 
