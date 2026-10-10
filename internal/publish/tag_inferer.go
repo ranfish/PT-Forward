@@ -85,6 +85,10 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			tags = append(tags, st)
 		}
 	}
+	// §59.319 附二十六: 副标题关键词 + PTGen 产地语言联合推断
+	// 设计定案（用户）：零字幕轨=MI 无法提供语言证据 → PTGen 兜底；
+	// 有字幕轨时 MI Text 是权威不需要兜底。产地=影片国别（非发行平台）。
+	tags = inferRegionLanguageTags(miSec, in, tags)
 	// §59.151 附7（§59.304 修订）: 原此处追加内部标记 lucky_english_audio——被追加
 	// 的前提即 english_audio 已在 tags（纯冗余），且落库+Tab1 展示污染（无 dict 词条
 	// 显示代码、与"英语"重复显示——Life.Unexpected 案用户报）。站规判定单点收敛到
@@ -504,4 +508,57 @@ func inferNumericSpecTagsBDInfo(nfo string) (highBitrate, highFrameRate bool) {
 		highFrameRate = true
 	}
 	return highBitrate, highFrameRate
+}
+
+// inferRegionLanguageTags §59.319 附二十六: 副标题关键词 + PTGen 产地
+// 语言联合推断——用户定案规则：
+//
+// 副标题路径（任何时候，不依赖零字幕轨）：
+//   副标题含 普通话/国语 → chinese_audio
+//   副标题含 粤语       → cantonese_audio
+//
+// PTGen 联合回退（仅零字幕轨——MI 无语言证据时兜底）：
+//   零字幕轨 + 产地(中国/港/台) + 语言(汉语/普通话/国语) → chinese_audio
+//   零字幕轨 + 产地(香港) + 语言(粤语)                 → cantonese_audio
+//   零字幕轨 + 产地(中国/港/台)                        → chinese_subtitle（硬字幕推定）
+//
+// 产地=影片国别（非发行平台）——产地中国=中国影片，零字幕轨=Bilibili
+// 等流媒体平台烧字幕，硬字幕推定安全（零误报）。
+func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []string) []string {
+	has := func(k string) bool { return containsStr(tags, k) }
+
+	// A. 副标题关键词（任何时候——源站声明是直接证据）
+	subLower := strings.ToLower(in.Subtitle)
+	if !has("chinese_audio") && containsAny(subLower, "普通话", "国语") {
+		tags = append(tags, "chinese_audio")
+	}
+	if !has("cantonese_audio") && containsAny(subLower, "粤语", "广东话") {
+		tags = append(tags, "cantonese_audio")
+	}
+
+	// B. PTGen 联合回退（仅零字幕轨——MI 无语言证据时兜底）
+	if len(miSec.Texts) > 0 {
+		return tags // 有字幕轨——MI Text 已提供权威证据，PTGen 不兜底
+	}
+
+	regionLower := strings.ToLower(in.Region)
+	isChineseRegion := containsAny(regionLower, "中国大陆", "中国香港", "中国台湾", "大陆", "香港", "台湾", "中国")
+	if !isChineseRegion {
+		return tags
+	}
+
+	descLower := strings.ToLower(in.Description)
+	// 中文音频：产地中文区 + 语言(汉语/普通话/国语)
+	if !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
+		tags = append(tags, "chinese_audio")
+	}
+	// 粤语音频：产地香港 + 语言(粤语)
+	if !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
+		tags = append(tags, "cantonese_audio")
+	}
+	// 硬字幕推定：产地中文区 + 零字幕轨（中国影片无软字幕=几乎确定硬字幕）
+	if !has("chinese_subtitle") {
+		tags = append(tags, "chinese_subtitle")
+	}
+	return tags
 }

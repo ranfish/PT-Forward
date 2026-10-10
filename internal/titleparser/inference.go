@@ -7,8 +7,16 @@ import (
 // InferCategory 从多源信号推断类型分类
 // 优先级: 源站分类 > 标题季集 > PTGen genre > 默认电影
 func InferCategory(c TitleComponents, sourceCategory string, ptgenGenre string, ptgenEpisodes string) string {
-	// ① 源站分类优先（最可信）
+	// ① 源站分类优先（最可信）——但泛化 movie 让位 PTGen 精确类型
+	// §59.319 附二十六: 光之子案——源站(CSWEB)将纪录片归 movie，PTGen
+	// genre=纪录片更具体；泛化分类不应覆盖精确分类
 	if cat := NormalizeSourceCategory(sourceCategory); cat != "" {
+		if cat == "category.movie" {
+			// 泛化 movie：PTGen 有更具体类型时让位
+			if specific := ptgenGenreToSpecificCategory(ptgenGenre); specific != "" && specific != "category.movie" {
+				return specific
+			}
+		}
 		return cat
 	}
 
@@ -118,4 +126,30 @@ func containsAny(s string, substrs ...string) bool {
 		}
 	}
 	return false
+}
+
+// ptgenGenreToSpecificCategory §59.319 附二十六: PTGen genre → 具体
+// category（仅当比泛化 movie 更具体时有值）。documentary/music/sports/
+// tv_shows/animation 均比 movie 更具体。
+func ptgenGenreToSpecificCategory(ptgenGenre string) string {
+	genreLower := strings.ToLower(ptgenGenre)
+	if genreLower == "" {
+		return ""
+	}
+	if containsAny(genreLower, "动画", "anime", "animation") {
+		return "category.animation"
+	}
+	if containsAny(genreLower, "纪录", "documentary") {
+		return "category.documentary"
+	}
+	if containsAny(genreLower, "综艺", "variety", "show") {
+		return "category.tv_shows"
+	}
+	if containsAny(genreLower, "音乐", "music", "演唱会", "concert") {
+		return "category.music"
+	}
+	if containsAny(genreLower, "体育", "sport") {
+		return "category.sports"
+	}
+	return ""
 }
