@@ -345,3 +345,71 @@ func TestInferNumericSpecTagsBDInfo(t *testing.T) {
 		t.Errorf("InferFull NFO 通道应产出 high_bitrate, got %v", tags)
 	}
 }
+
+// §59.319 附二十六: 副标题关键词 + PTGen 产地语言联合推断
+func TestInferRegionLanguageTags(t *testing.T) {
+	inf := NewMediaTagInferer()
+
+	// 光之子场景：零字幕轨 + 产地中国 + 语言汉语普通话 → 中文+中字
+	tags := inf.InferFull(TagInput{
+		Title:       "Daughter Of The Light 2020 2160p WEB-DL H.265 AAC2.0-CSWEB",
+		Subtitle:    "光之子 | 类型: 纪录片",
+		Description: "◎产　地　中国大陆\n◎语　言　汉语普通话",
+		Region:      "中国大陆",
+	})
+	assertHas := func(tags []string, want string) {
+		for _, t := range tags {
+			if t == want {
+				return
+			}
+		}
+		t.Errorf("缺少 %s, got %v", want, tags)
+	}
+	assertHas(tags, "chinese_audio")
+	assertHas(tags, "chinese_subtitle")
+
+	// 港片粤语：零字幕轨 + 产地香港 + 语言粤语 → 粤语+中字
+	tags2 := inf.InferFull(TagInput{
+		Title:       "Some HK Movie 2020 BluRay",
+		Description: "◎产　地　中国香港\n◎语　言　粤语",
+		Region:      "中国香港",
+	})
+	assertHas(tags2, "cantonese_audio")
+	assertHas(tags2, "chinese_subtitle")
+
+	// 副标题关键词（不依赖产地/零字幕轨）
+	tags3 := inf.InferFull(TagInput{
+		Title:    "Some.Movie.2020",
+		Subtitle: "国语配音版",
+	})
+	assertHas(tags3, "chinese_audio")
+
+	tags4 := inf.InferFull(TagInput{
+		Title:    "Some.Movie.2020",
+		Subtitle: "粤语版",
+	})
+	assertHas(tags4, "cantonese_audio")
+
+	// 有字幕轨 → PTGen 不兜底（MI Text 是权威）
+	tags5 := inf.InferFull(TagInput{
+		Title:       "Some.Movie.2020",
+		MediaInfo:   "Text #1\nLanguage : English\n\nText #2\nLanguage : Chinese",
+		Description: "◎产　地　中国大陆\n◎语　言　汉语普通话",
+		Region:      "中国大陆",
+	})
+	assertHas(tags5, "english_subtitle")
+	assertHas(tags5, "chinese_subtitle") // 来自 MI Text，不是硬字幕推定
+	// 不应有重复
+
+	// 非中文区 → 不触发
+	tags6 := inf.InferFull(TagInput{
+		Title:       "Korean.Movie.2020",
+		Description: "◎产　地　韩国\n◎语　言　韩语",
+		Region:      "韩国",
+	})
+	for _, tg := range tags6 {
+		if tg == "chinese_audio" || tg == "chinese_subtitle" {
+			t.Errorf("韩国影片不应有中文标签, got %v", tags6)
+		}
+	}
+}
