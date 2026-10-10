@@ -237,3 +237,38 @@ func TestMediumCanonicalOf_FromBDInfo(t *testing.T) {
 		t.Errorf("连字符原盘 Medium = %q, want Blu-ray 原盘（回归）", got)
 	}
 }
+
+// §59.319 附二十三: MINBD 排除——x264 标记不被 FromBDInfo 铁证覆盖
+func TestMediumCanonicalOf_MINBD(t *testing.T) {
+	// Inception MINBD 实测形态：标题 x264 + BDInfo 报告（BDMV 结构在）
+	report := "QUICK SUMMARY:\n\nVideo: MPEG-4 AVC Video / 9418 kbps / 1080p / 23.976 fps / 16:9 / High Profile 4.1\n"
+	p := BuildTechProfile("Inception.2010.BluRay.x264.DTS.MINBD1080P-CMCT", report, "", "", "", "")
+	if p.FromBDInfo {
+		t.Fatal("MINBD 不应置 FromBDInfo（x264 重编码排除）")
+	}
+	if !p.MIEncoded {
+		t.Fatal("MINBD 应置 MIEncoded（x264 重编码证据）")
+	}
+	if got := MediumCanonicalOf(p); got != "Encode" {
+		t.Errorf("MINBD Medium = %q, want Encode（x264 重编码不被铁证覆盖）", got)
+	}
+	if !IsEncode(p) {
+		t.Error("MINBD IsEncode 应 true")
+	}
+	// 对照回归：真原盘（无 x264 标记）不被影响
+	pure := BuildTechProfile("Under Current 2025 BluRay 1080p AVC LPCM5.1-MTeam", report, "", "", "", "")
+	if got := MediumCanonicalOf(pure); got != "Blu-ray 原盘" {
+		t.Errorf("真原盘 Medium = %q, want Blu-ray 原盘（回归锚）", got)
+	}
+	// 对照回归：HEVC UHD 真原盘（无 x265）
+	uhd := BuildTechProfile("Alice 1951 UHD BluRay 2160p HEVC DTS-HD MA5.1-MTeam",
+		"QUICK SUMMARY:\n\nVideo: MPEG-H HEVC Video / 81085 kbps / 2160p / 23.976 fps / 16:9 / Main 10 / 10 bits / HDR10 / BT.2020\n", "", "", "", "")
+	if got := MediumCanonicalOf(uhd); got != "UHD Blu-ray 原盘" {
+		t.Errorf("真 UHD 原盘 Medium = %q, want UHD Blu-ray 原盘（回归）", got)
+	}
+	// x265 MINBD 也排除
+	x265 := BuildTechProfile("Some.2025.BluRay.x265.MINBD1080P-CMCT", report, "", "", "", "")
+	if got := MediumCanonicalOf(x265); got != "Encode" {
+		t.Errorf("x265 MINBD Medium = %q, want Encode", got)
+	}
+}
