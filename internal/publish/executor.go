@@ -975,7 +975,18 @@ func TechTextOf(meta *model.TorrentMetadata) string {
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
 func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, overrides []string) []string {
 	// 判据引擎（§59.151 MI 唯一真相）
-	inferred := e.inferer.Infer(TechTextOf(meta), meta.Title, meta.Subtitle)
+	// §59.319 附二十七: Infer→InferFull——发布链补传 Description/Region/
+	// NFO（产地语言联合推断在发布时也需要完整输入；光之子案：fetch 时
+	// chinese_audio 正确产出，发布时 Infer 缺 Description → 零产出 →
+	// 幸运预审 TAGS_EMPTY）
+	inferred := e.inferer.InferFull(TagInput{
+		MediaInfo:   TechTextOf(meta),
+		Title:       meta.Title,
+		Subtitle:    meta.Subtitle,
+		Description: meta.Description,
+		NFO:         meta.BDInfo,
+		Region:      meta.RegionCode,
+	})
 	// 站方 tags 域 standard_key → value 映射 + auto:false 排除
 	allowed := map[string]string{}
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
