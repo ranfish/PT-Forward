@@ -130,38 +130,47 @@ func buildRetryChain(base http.RoundTripper, domain string) http.RoundTripper {
 // 根因：部分环境 IPv6 路径 TCP/TLS 通但应用层数据不通（Cloudflare
 // 边缘节点半开），Go Happy Eyeballs 竞速可能选中 IPv6 后挂死。
 // 不破坏纯 IPv6 站点（无 A 记录时不过滤）。
+// dialContextIPv4First §59.319 附二十四修订: IPv4 优先+IPv6 回落——
+// 部分环境 IPv6 TCP 通但 HTTPS 数据不通（keepfrds），另一部分 IPv4 不通
+// （cspt.top 财神）——单向强制任一族都会破坏另一族。
+// 修订：IPv4 先试（3s 短超时），失败回落 IPv6。
 func dialContextIPv4First(dial func(ctx context.Context, network, addr string) (net.Conn, error)) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return dial(ctx, network, addr)
 		}
-		// 已经是 IP 直连（非域名）——检查是否 IPv6
+		// IP 字面量直通
 		if ip := net.ParseIP(host); ip != nil {
-			if ip.To4() != nil || network == "tcp4" {
-				return dial(ctx, network, addr)
-			}
-			// IPv6 字面量——查 A 记录回落
-			addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err == nil {
-				if v4 := filterIPv4(addrs); len(v4) > 0 {
-					return dial(ctx, "tcp4", net.JoinHostPort(v4[0].String(), port))
-				}
-			}
-			return dial(ctx, network, addr) // 无 IPv4——原样
+			return dial(ctx, network, addr)
 		}
 
-		// 域名——解析并过滤
+		// 域名——解析
 		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 		if err != nil {
-			return dial(ctx, network, addr) // DNS 失败——走原始 dial（错误一致）
+			return dial(ctx, network, addr)
 		}
 		v4 := filterIPv4(addrs)
+		v6 := filterIPv6(addrs)
+
+		// 纯 IPv6 站点——不过滤
 		if len(v4) == 0 {
-			return dial(ctx, network, addr) // 纯 IPv6 站点——不过滤
+			return dial(ctx, network, addr)
 		}
-		// 有 IPv4——强制 tcp4 直连首个 A 记录
-		return dial(ctx, "tcp4", net.JoinHostPort(v4[0].String(), port))
+		// 纯 IPv4——直接用
+		if len(v6) == 0 {
+			return dial(ctx, "tcp4", net.JoinHostPort(v4[0].String(), port))
+		}
+
+		// 双栈——IPv4 先试（3s 短超时），失败回落 IPv6
+		v4Ctx, v4Cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer v4Cancel()
+		conn, v4Err := dial(v4Ctx, "tcp4", net.JoinHostPort(v4[0].String(), port))
+		if v4Err == nil {
+			return conn, nil
+		}
+		// IPv4 失败——回落 IPv6
+		return dial(ctx, "tcp6", net.JoinHostPort(v6[0].String(), port))
 	}
 }
 
@@ -170,6 +179,17 @@ func filterIPv4(addrs []net.IPAddr) []net.IPAddr {
 	var out []net.IPAddr
 	for _, a := range addrs {
 		if a.IP.To4() != nil {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// filterIPv6 从地址列表提取 IPv6（To4 为 nil）。
+func filterIPv6(addrs []net.IPAddr) []net.IPAddr {
+	var out []net.IPAddr
+	for _, a := range addrs {
+		if a.IP.To4() == nil {
 			out = append(out, a)
 		}
 	}
