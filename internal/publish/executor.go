@@ -974,19 +974,17 @@ func TechTextOf(meta *model.TorrentMetadata) string {
 
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
 func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, overrides []string) []string {
-	// 判据引擎（§59.151 MI 唯一真相）
-	// §59.319 附二十七: Infer→InferFull——发布链补传 Description/Region/
-	// NFO（产地语言联合推断在发布时也需要完整输入；光之子案：fetch 时
-	// chinese_audio 正确产出，发布时 Infer 缺 Description → 零产出 →
-	// 幸运预审 TAGS_EMPTY）
-	inferred := e.inferer.InferFull(TagInput{
-		MediaInfo:   TechTextOf(meta),
-		Title:       meta.Title,
-		Subtitle:    meta.Subtitle,
-		Description: meta.Description,
-		NFO:         meta.BDInfo,
-		Region:      meta.RegionCode,
-	})
+	// §59.319 附二十七定案（用户）：发布只消费，不推断——
+	// 推断唯一发生在 fetch 链（InferFull → DB tags 列），发布读 DB
+	// 消费。消除双链分叉（光之子案：fetch 推断 chinese_audio ✓，
+	// 发布重新 Infer 缺 Description → 零产出 → TAGS_EMPTY）。
+	// 用户在种子配置页编辑的 tags 也存 DB——发布尊重用户编辑。
+	var storedTags []string
+	if meta.Tags != "" {
+		if err := json.Unmarshal([]byte(meta.Tags), &storedTags); err != nil {
+			storedTags = nil // 坏 JSON 按空处理（§59.28 G 语义）
+		}
+	}
 	// 站方 tags 域 standard_key → value 映射 + auto:false 排除
 	allowed := map[string]string{}
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
@@ -995,7 +993,7 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 		}
 		for _, k := range m.StandardKeys {
 			allowed[k] = m.Value
-			// canonical 双形态（Infer 产出无前缀 "dolby_vision"；standard_key
+			// canonical 双形态（stored 无前缀 "dolby_vision"；standard_key
 			// 形态 "tag.dolby_vision"——两者同值）
 			if i := strings.Index(k, "."); i > 0 {
 				allowed[k[i+1:]] = m.Value
@@ -1004,11 +1002,10 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 	}
 	out := []string{}
 	seen := map[string]bool{}
-	for _, t := range inferred {
-		if v, ok := allowed[t]; ok && !seen[t] {
+	for _, t := range storedTags {
+		if _, ok := allowed[t]; ok && !seen[t] {
 			out = append(out, t)
 			seen[t] = true
-			_ = v
 		}
 	}
 	for _, t := range overrides {
