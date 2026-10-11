@@ -413,3 +413,69 @@ func TestInferRegionLanguageTags(t *testing.T) {
 		}
 	}
 }
+
+// §59.319 附三十一: BDInfo 语言/HDR 通道——Mercy 美国电影含中字轨+DoVi 案
+func TestInferBDInfoLanguageHDR(t *testing.T) {
+	// Mercy 实际 BDInfo 报告形态（美国电影，亚洲发行版含中字轨）
+	nfo := "QUICK SUMMARY:\n\n" +
+		"Video: MPEG-H HEVC Video / 81085 kbps / 2160p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 @ High / 10 bits / HDR10 / BT.2020\n" +
+		"* Video: MPEG-H HEVC Video / 6216 kbps / 1080p / 23.976 fps / 16:9 / Main 10 @ Level 5.1 / High / 10 bits / Dolby Vision / BT.2020\n" +
+		"Audio: English / Dolby TrueHD/Atmos Audio / 7.1 / 48 kHz / 3167 kbps / 24-bit\n" +
+		"Audio: Chinese / Dolby Digital Audio / 5.1 / 48 kHz / 640 kbps\n" +
+		"Subtitle: Chinese / 29.516 kbps\n" +
+		"Subtitle: English / 38.857 kbps\n"
+
+	inf := NewMediaTagInferer()
+	tags := inf.InferFull(TagInput{
+		Title:       "Mercy 2026 UHD BluRay 2160p HEVC Atmos TrueHD7.1-MTeam",
+		Subtitle:    "【原盘首发】极限审判",
+		Description: "◎产　地　美国\n◎语　言　英语",
+		NFO:         nfo,
+	})
+	assertHas := func(tags []string, want string) {
+		for _, tg := range tags {
+			if tg == want { return }
+		}
+		t.Errorf("缺少 %s, got %v", want, tags)
+	}
+	// BDInfo Audio 行: English + Chinese
+	assertHas(tags, "english_audio")
+	assertHas(tags, "chinese_audio")
+	// BDInfo Subtitle 行: Chinese + English
+	assertHas(tags, "chinese_subtitle")
+	assertHas(tags, "english_subtitle")
+	// BDInfo Video 行: HDR10 + 隐藏 DV → DoVi HDR
+	assertHas(tags, "dolby_vision")
+	assertHas(tags, "hdr10")
+
+	// 对照：MI 有证据时 BDInfo 不覆盖（miSec 已有 Text）
+	mi := "Text #1\nLanguage : English"
+	tags2 := inf.InferFull(TagInput{
+		Title:      "Some 2020 Disc",
+		MediaInfo:  mi,
+		NFO:        nfo, // BDInfo 也有，但 MI 优先
+	})
+	assertHas(tags2, "english_subtitle") // 来自 MI Text
+	// chinese_subtitle 应该也产出（BDInfo 有但 MI 无中文 Text）
+	assertHas(tags2, "chinese_subtitle")
+
+	// 纯 HDR10（无 DV）
+	hdr10Only := "QUICK SUMMARY:\nVideo: MPEG-H HEVC Video / 100 kbps / 2160p / 24 fps / 16:9 / Main 10 / 10 bits / HDR10 / BT.2020\n"
+	tags3 := inf.InferFull(TagInput{NFO: hdr10Only})
+	assertHas(tags3, "hdr10")
+	for _, tg := range tags3 {
+		if tg == "dolby_vision" {
+			t.Error("纯 HDR10 不应产出 dolby_vision")
+		}
+	}
+
+	// 单层 DoVi（主行 DV 无 HDR10）
+	dvOnly := "QUICK SUMMARY:\nVideo: MPEG-H HEVC Video / 100 kbps / 2160p / 24 fps / 16:9 / Main 10 / 10 bits / Dolby Vision / BT.2020\n"
+	tags4 := inf.InferFull(TagInput{NFO: dvOnly})
+	assertHas(tags4, "dolby_vision")
+	for _, tg := range tags4 {
+		if tg == "hdr10" {
+			t.Error("单层 DoVi 不应产出 hdr10")
+		}
+	}
+}
