@@ -240,23 +240,26 @@ func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, r
 	// BDInfo 空（高码/高帧数值判据缺失）；NFO 通道现在有数据。InferFull
 	// 算一次（簇内输入同构），MergeTags 逐行（各行 existing 可能不同），
 	// 直采优先+互斥仲裁语义既有（源站显式/用户编辑不覆盖，只增不删）
-	h.reinferTagsForCluster(ctx, task, rep, hashes)
+	// §59.319 附二十九: rep 是 DB 更新前读的（BDInfo=旧值/空）——
+	// reinferTagsForCluster 需要新报告，直接传入 report 参数
+	h.reinferTagsForCluster(ctx, task, rep, report, hashes)
 }
 
 // reinferTagsForCluster §59.319 附十七: 簇级标签重推（onDone 后置）。
-func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task publish.BDInfoScanTask, rep model.TorrentMetadata, hashes []string) {
+func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task publish.BDInfoScanTask, rep model.TorrentMetadata, bdinfoReport string, hashes []string) {
 	if rep.Title == "" {
 		return
 	}
 	var snapSize int64
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("hash = ?", rep.InfoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
+	// §59.319 附二十九: NFO 用扫描产出报告（rep 是更新前快照，BDInfo 恒空）
 	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
 		MediaInfo:   rep.MediaInfo,
 		Title:       rep.Title,
 		Subtitle:    rep.Subtitle,
 		Description: rep.Description,
-		NFO:         rep.BDInfo,
+		NFO:         bdinfoReport,
 		Statement:   rep.Statement,
 		Region:      rep.RegionCode,
 		Size:        snapSize,
@@ -3998,6 +4001,11 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		SourceType:    pickNonEmpty(meta.SourceType, profile.SourceType),
 		Specification: pickNonEmpty(meta.Specification, profile.Specification),
 		VideoCodec:    pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
+		// §59.319 附二十八: Resolution 必传——MediumCanonicalOf 的 FromBDInfo
+		// 分支需要 Resolution=2160p 判 UHD（缺失时 Mercy 2160p 盘误显示
+		// "Blu-ray 原盘" 而非 "UHD Blu-ray 原盘"）；mini profile 构造点
+		// 第四处漏传（displayProfile/encProfile/auditProfile/preAuditTitle 清单化）
+		Resolution: pickNonEmpty(meta.Resolution, profile.Resolution),
 	}
 	// §59.151: MI 铁证传递（displayProfile 原列值构造丢 MIEncoded——
 	// WEB-DL 剧集 Encode 误判根因：IsEncode 走不进 MI 分支回落旧 spec 判定）
