@@ -541,7 +541,19 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 		return tags // 有字幕轨——MI Text 已提供权威证据，PTGen 不兜底
 	}
 
+	// §59.319 附二十六补: Region 兜底——fetch 时 TagInput 未传 Region
+	// （调用点未填），从 Description "◎产　地　XX" 解析
 	regionLower := strings.ToLower(in.Region)
+	if regionLower == "" && in.Description != "" {
+		descLower := strings.ToLower(in.Description)
+		// ◎产　地　中国大陆 / ◎产地 中国香港 等变体
+		if m := regexp.MustCompile(`◎产[　地]*\s*([^\n]+)`).FindStringSubmatch(in.Description); m != nil {
+			regionLower = strings.ToLower(strings.TrimSpace(m[1]))
+		} else if strings.Contains(descLower, "产地") {
+			// 宽松兜底
+			regionLower = descLower
+		}
+	}
 	isChineseRegion := containsAny(regionLower, "中国大陆", "中国香港", "中国台湾", "大陆", "香港", "台湾", "中国")
 	if !isChineseRegion {
 		return tags
