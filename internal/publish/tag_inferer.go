@@ -89,6 +89,11 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// 设计定案（用户）：零字幕轨=MI 无法提供语言证据 → PTGen 兜底；
 	// 有字幕轨时 MI Text 是权威不需要兜底。产地=影片国别（非发行平台）。
 	tags = inferRegionLanguageTags(miSec, in, tags)
+	// §59.319 附三十一: BDInfo 报告语言/HDR 通道——原盘 MI 恒空（D8 停产），
+	// 语言（Audio/Subtitle 行）和 HDR（Video 行标记）信息全在 BDInfo 报告
+	// 但引擎无解析通道（Mercy 案：美国电影含中字轨+DoVi HDR 全漏）。
+	// 与附十七 inferNumericSpecTagsBDInfo（NFO 数值通道）同构。
+	tags = inferBDInfoLanguageHDR(in.NFO, miSec, tags)
 	// §59.151 附7（§59.304 修订）: 原此处追加内部标记 lucky_english_audio——被追加
 	// 的前提即 english_audio 已在 tags（纯冗余），且落库+Tab1 展示污染（无 dict 词条
 	// 显示代码、与"英语"重复显示——Life.Unexpected 案用户报）。站规判定单点收敛到
@@ -575,3 +580,223 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	return tags
 }
 
+
+// inferBDInfoLanguageHDR §59.319 附三十一: BDInfo 报告语言/HDR 推断通道。
+// 原盘 MI 恒空（D8 停产）→ miSec 无 Text/Audio/Video 段 → 语言/HDR 推断
+// 全灭。BDInfo 报告（QUICK SUMMARY 格式）包含：
+//   Video 行: "MPEG-H HEVC Video / 81085 kbps / 2160p / ... / HDR10 / BT.2020"
+//   * Video 隐藏行: "... / Dolby Vision / BT.2020"（DoVi 双层盘增强层）
+//   Audio 行: "Chinese / Dolby TrueHD/Atmos Audio / 7.1 / ..."
+//   Subtitle 行: "Chinese / 29.516 kbps"
+// 解析这些行产出语言/HDR 标签——MI 已有证据时优先（不重复）。
+func inferBDInfoLanguageHDR(nfo string, miSec titleparser.MISections, tags []string) []string {
+	if !strings.Contains(nfo, "QUICK SUMMARY:") {
+		return tags
+	}
+	has := func(k string) bool { return containsStr(tags, k) }
+
+	miHasAudio := len(miSec.Audios) > 0
+	miHasText := len(miSec.Texts) > 0
+	miHasVideo := len(miSec.Videos) > 0
+
+	// Audio 行语言
+	if !miHasAudio {
+		if bdAudioLangs := extractBDInfoAudioLangs(nfo); len(bdAudioLangs) > 0 {
+			for lang := range bdAudioLangs {
+				switch {
+				case lang == "chinese":
+					if !has("chinese_audio") {
+						tags = append(tags, "chinese_audio")
+						has = func(k string) bool { return containsStr(tags, k) }
+					}
+				case lang == "cantonese":
+					if !has("cantonese_audio") {
+						tags = append(tags, "cantonese_audio")
+						has = func(k string) bool { return containsStr(tags, k) }
+					}
+				case lang == "english":
+					if !has("english_audio") {
+						tags = append(tags, "english_audio")
+						has = func(k string) bool { return containsStr(tags, k) }
+					}
+				case lang == "japanese":
+					if !has("japanese_audio") {
+						tags = append(tags, "japanese_audio")
+						has = func(k string) bool { return containsStr(tags, k) }
+					}
+				case lang == "korean":
+					if !has("korean_audio") {
+						tags = append(tags, "korean_audio")
+						has = func(k string) bool { return containsStr(tags, k) }
+					}
+				}
+			}
+		}
+	}
+
+	// Subtitle 行语言
+	if !miHasText {
+		if bdSubLangs := extractBDInfoSubtitleLangs(nfo); len(bdSubLangs) > 0 {
+			for lang := range bdSubLangs {
+				switch {
+				case lang == "chinese":
+					if !has("chinese_subtitle") {
+						tags = append(tags, "chinese_subtitle")
+					}
+				case lang == "english":
+					if !has("english_subtitle") {
+						tags = append(tags, "english_subtitle")
+					}
+				}
+			}
+		}
+	}
+
+	// Video 行 HDR 标记
+	if !miHasVideo {
+		if hdr := extractBDInfoHDR(nfo); hdr != "" {
+			switch hdr {
+			case "DoVi HDR10+":
+				if !has("dolby_vision") {
+					tags = append(tags, "dolby_vision")
+				}
+				if !has("hdr10_plus") {
+					tags = append(tags, "hdr10_plus")
+				}
+			case "DoVi HDR":
+				if !has("dolby_vision") {
+					tags = append(tags, "dolby_vision")
+				}
+				if !has("hdr10") {
+					tags = append(tags, "hdr10")
+				}
+			case "DoVi":
+				if !has("dolby_vision") {
+					tags = append(tags, "dolby_vision")
+				}
+			case "HDR10+":
+				if !has("hdr10_plus") {
+					tags = append(tags, "hdr10_plus")
+				}
+			case "HDR10":
+				if !has("hdr10") {
+					tags = append(tags, "hdr10")
+				}
+			case "HDR Vivid":
+				if !has("hdr_vivid") {
+					tags = append(tags, "hdr_vivid")
+				}
+			}
+		}
+	}
+	return tags
+}
+
+// extractBDInfoAudioLangs 从 BDInfo 报告 Audio 行提取语言集合。
+// 行格式: "Audio: Chinese / Dolby TrueHD/Atmos Audio / 7.1 / 48 kHz / ..."
+// 语言在首个 " / " 分隔段。
+func extractBDInfoAudioLangs(nfo string) map[string]string {
+	langs := map[string]string{}
+	for _, line := range strings.Split(nfo, "\n") {
+		trimmed := strings.TrimPrefix(strings.TrimSpace(line), "* ")
+		if !strings.HasPrefix(trimmed, "Audio: ") {
+			continue
+		}
+		rest := strings.TrimPrefix(trimmed, "Audio: ")
+		langRaw := strings.TrimSpace(strings.SplitN(rest, "/", 2)[0])
+		lang := mapBDInfoLang(langRaw)
+		if lang != "" {
+			langs[lang] = langRaw
+		}
+	}
+	return langs
+}
+
+// extractBDInfoSubtitleLangs 从 BDInfo 报告 Subtitle 行提取语言集合。
+func extractBDInfoSubtitleLangs(nfo string) map[string]string {
+	langs := map[string]string{}
+	for _, line := range strings.Split(nfo, "\n") {
+		trimmed := strings.TrimPrefix(strings.TrimSpace(line), "* ")
+		if !strings.HasPrefix(trimmed, "Subtitle: ") {
+			continue
+		}
+		rest := strings.TrimPrefix(trimmed, "Subtitle: ")
+		langRaw := strings.TrimSpace(strings.SplitN(rest, "/", 2)[0])
+		lang := mapBDInfoLang(langRaw)
+		if lang != "" {
+			langs[lang] = langRaw
+		}
+	}
+	return langs
+}
+
+// mapBDInfoLang BDInfo 语言名 → canonical。
+func mapBDInfoLang(raw string) string {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case lower == "chinese" || strings.HasPrefix(lower, "chinese"):
+		return "chinese"
+	case lower == "mandarin":
+		return "chinese"
+	case lower == "cantonese":
+		return "cantonese"
+	case lower == "english":
+		return "english"
+	case lower == "japanese":
+		return "japanese"
+	case lower == "korean":
+		return "korean"
+	}
+	return ""
+}
+
+// extractBDInfoHDR 从 BDInfo Video 行提取 HDR 类型。
+// 判据与 ExtractBDInfo 的 hdrFromBD 同构：
+//   主行 HDR10 + 隐藏行 Dolby Vision → "DoVi HDR"
+//   主行 HDR10+ → "HDR10+"（+隐藏 DV → "DoVi HDR10+"）
+//   主行 Dolby Vision（无 HDR10）→ "DoVi"
+//   主行 HDR10 → "HDR10"
+//   主行 HDR Vivid → "HDR Vivid"
+func extractBDInfoHDR(nfo string) string {
+	mainHDR := ""
+	hasDoVi := false
+	for _, line := range strings.Split(nfo, "\n") {
+		trimmed := strings.TrimSpace(line)
+		hidden := strings.HasPrefix(trimmed, "* ")
+		if hidden {
+			trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "*"))
+		}
+		if !strings.HasPrefix(trimmed, "Video: ") {
+			continue
+		}
+		if hidden {
+			if strings.Contains(trimmed, "Dolby Vision") {
+				hasDoVi = true
+			}
+			continue // 隐藏行只提取 DV 标记
+		}
+		// 主 Video 行
+		if strings.Contains(trimmed, "HDR10+") {
+			mainHDR = "HDR10+"
+		} else if strings.Contains(trimmed, "HDR10") {
+			mainHDR = "HDR10"
+		} else if strings.Contains(trimmed, "Dolby Vision") {
+			mainHDR = "DoVi" // 单层 DV
+		} else if strings.Contains(trimmed, "HDR Vivid") {
+			mainHDR = "HDR Vivid"
+		}
+		// 主 Video 行标记后继续——隐藏行在主行之后，不能 break
+		// （DoVi 双层盘：主行 HDR10 + 隐藏行 Dolby Vision）
+	}
+	if hasDoVi {
+		switch mainHDR {
+		case "HDR10+":
+			return "DoVi HDR10+"
+		case "HDR10":
+			return "DoVi HDR"
+		default:
+			return "DoVi"
+		}
+	}
+	return mainHDR
+}
