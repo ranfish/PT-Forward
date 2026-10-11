@@ -252,7 +252,8 @@
     "压制(Encode)": "medium.encode",
     "流媒体(WEB-DL)": "medium.webdl",
     "蓝光原盘(Blu-ray)": "medium.bluray",
-    "黑胶": "medium.vinyl"
+    "黑胶": "medium.vinyl",
+    "UHD BluRay": "medium.uhd_bluray"
   },
   "processing": {
     "7z": "format.sevenz",
