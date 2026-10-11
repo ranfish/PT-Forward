@@ -2703,6 +2703,7 @@ fetched:
 			}
 
 			// §59.26: 标签推断（对齐 auto_feed：副标题+标题+简介+MI 多源关键词匹配）
+			// §59.319 附二十六补: Region+Statement 传入——产地语言联合推断依赖
 			inferer := publish.NewMediaTagInferer()
 			inferredTags := inferer.InferFull(publish.TagInput{
 				MediaInfo:   finalMeta.MediaInfo,
@@ -2711,6 +2712,8 @@ fetched:
 				Description: finalMeta.Description,
 				NFO:         finalMeta.BDInfo,
 				Size:        size, // §59.72 B2: big_pack >1TB
+				Region:      finalMeta.RegionCode,
+				Statement:   finalMeta.Statement,
 			})
 			// 源站显式标签优先，推断只补空（§59.28 G：坏 JSON 不静默——记录并按空处理）
 			var existingTags []string
