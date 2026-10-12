@@ -65,7 +65,7 @@ func (f *Fetcher) fetchWithClient(ctx context.Context, url string, client *http.
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "构造请求失败", err)
 	}
-	req.Header.Set("User-Agent", "PT-Forward/1.0")
+	httpclient.SetBrowserHeaders(req.Header, "")
 
 	resp, err := client.Do(req)
 	if err != nil {

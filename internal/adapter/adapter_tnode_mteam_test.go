@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -514,7 +515,7 @@ func TestMTeamAdapter_setAPIHeaders(t *testing.T) {
 	if req.Header.Get("Accept") != "application/json" {
 		t.Errorf("expected Accept: application/json")
 	}
-	if req.Header.Get("User-Agent") != mteamUserAgent {
+	if req.Header.Get("User-Agent") != httpclient.BrowserUserAgent() {
 		t.Errorf("expected custom User-Agent")
 	}
 }

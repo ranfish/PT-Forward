@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
+
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -95,7 +97,7 @@ func (a *RousiAdapter) setAuthHeaders(req *http.Request, passkey string) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Origin", "https://rousi.pro")
 	req.Header.Set("Referer", "https://rousi.pro/")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 }
 
 func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {

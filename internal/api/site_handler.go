@@ -1465,7 +1465,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 		return false, "构造请求失败: " + err.Error()
 	}
 	req.Header.Set("x-api-key", s.APIKey)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	req.Header.Set("Accept", "application/json")
 
 	noRedirectClient := &http.Client{
@@ -2330,7 +2330,7 @@ func (h *SiteHandler) resolveTorrentIDsForTest(ctx context.Context, a model.Site
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	if config.Cookie != "" {
 		req.Header.Set("Cookie", config.Cookie)
 	}
@@ -2462,7 +2462,7 @@ func (h *SiteHandler) resolveTnodeTorrentIDs(ctx context.Context, config *model.
 	csrfReq, err := http.NewRequestWithContext(ctx, "GET", base+"/index", nil)
 	if err == nil {
 		csrfReq.Header.Set("Cookie", config.Cookie)
-		csrfReq.Header.Set("User-Agent", "Mozilla/5.0")
+		csrfReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 		if resp, err := client.Do(csrfReq); err == nil {
 			defer func() { httpclient.DrainBody(resp) }()
 			if body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024)); err == nil {
@@ -2485,7 +2485,7 @@ func (h *SiteHandler) resolveTnodeTorrentIDs(ctx context.Context, config *model.
 		}
 		req.Header.Set("Cookie", config.Cookie)
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 		if csrfToken != "" {
 			req.Header.Set("x-csrf-token", csrfToken)
 		}
@@ -2554,7 +2554,7 @@ func (h *SiteHandler) resolveYemaptTorrentIDs(ctx context.Context, config *model
 		}
 		req.Header.Set("x-api-key", config.APIKey)
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -2631,7 +2631,7 @@ func (h *SiteHandler) resolveUnit3DTorrentIDs(ctx context.Context, config *model
 		}
 		req.Header.Set("Cookie", config.Cookie)
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 		if config.APIKey != "" {
 			req.Header.Set("Authorization", "Bearer "+config.APIKey)
 		} else if config.AuthKey != "" {

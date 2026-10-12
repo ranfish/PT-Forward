@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/httpclient"
 )
 
 // trustedPosterSuffixes 可信海报图源域名后缀（§59.42 白名单）。
@@ -63,7 +65,7 @@ func defaultPosterAlive(ctx context.Context, posterURL string) bool {
 	if err != nil {
 		return false
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

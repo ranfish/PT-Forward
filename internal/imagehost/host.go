@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/httpclient"
 )
 
 // toURL 把字符串转 *url.URL（供 Manager.SetProxy 用）
@@ -38,7 +40,7 @@ func downloadURL(ctx context.Context, url string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64)")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 	resp, err := client.Do(req)
 	if err != nil {
