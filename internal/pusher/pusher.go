@@ -36,8 +36,12 @@ type PushResult struct {
 	Success      bool
 	InfoHash     string
 	AlreadyExist bool
-	SkipReason   string
 	Error        error
+	SkipReason   string
+	// Retryable §59.321：SkipReason 因网络/检测不可得（复检失败≠不免费）——
+	// 消费方标 blocked 走 retryBlocked 自动重推；确认性跳过（free 过期/
+	// HR 保护）为终态，不重试。
+	Retryable bool
 }
 
 type PushedEvent struct {
@@ -141,7 +145,11 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		discResult, discErr := adapter.DetectDiscount(recheckCtx, siteCfg, req.TorrentID)
 		recheckCancel()
 		if discErr != nil {
+			// §59.321: 复检失败≠不免费（网络错家族）——Retryable 让消费方
+			// 标 blocked 重推，杜绝"网络坏→静默丢弃→seen 终态永不重试"
+			// （243 keepfrds 十种滞留 seen 案根因）。
 			result.SkipReason = "discount recheck failed"
+			result.Retryable = true
 			return result
 		}
 		if discResult == nil || !discResult.Level.IsFree() {
