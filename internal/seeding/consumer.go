@@ -239,6 +239,31 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientUID uint, subs
 					zap.String("info_hash", c.Event.InfoHash),
 					zap.Float64("score", c.Score),
 					zap.Error(result.Error))
+			} else if result.SkipReason != "" {
+				// §59.321: SkipReason 可观测化——原分支零日志（243 keepfrds
+				// 十种 recheck failed 静默滞留 seen 案，grep 计数=0 才暴露）
+				e.logger.Info("scoreAndPush: push skipped",
+					zap.Uint("client_uid", clientUID),
+					zap.String("site", c.Event.SiteName),
+					zap.String("torrent_id", c.Event.TorrentID),
+					zap.String("reason", result.SkipReason),
+					zap.Bool("retryable", result.Retryable))
+			}
+			if result.Retryable {
+				// §59.321: 复检失败（网络）≠不免费——seen→blocked 升级，
+				// retryBlocked 通道自动重推（§59.174 磁盘守卫同模式，
+				// 仅动 seen 态，不碰 pushed/expired 终态）。
+				if c.Event.SubscriptionID != "" {
+					res := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+						Where("subscription_id = ? AND site_name = ? AND torrent_id = ? AND status = ?",
+							c.Event.SubscriptionID, c.Event.SiteName, c.Event.TorrentID, "seen").
+						Update("status", "blocked")
+					if res.Error == nil && res.RowsAffected > 0 {
+						e.logger.Info("scoreAndPush: recheck-failed candidate marked blocked for retry",
+							zap.String("torrent_id", c.Event.TorrentID),
+							zap.Int64("marked", res.RowsAffected))
+					}
+				}
 			}
 			continue
 		}
