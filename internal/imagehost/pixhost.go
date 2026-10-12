@@ -162,7 +162,7 @@ func (p *PixhostHost) resolveDirectURL(ctx context.Context, showURL string) (str
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64)")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 	resp, err := p.client.Do(req)
 	if err != nil {

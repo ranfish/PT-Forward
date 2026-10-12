@@ -31,8 +31,6 @@ var (
 	reMTeamErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 )
 
-const mteamUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-
 type flexInt int64
 
 func (f *flexInt) UnmarshalJSON(data []byte) error {
@@ -196,7 +194,7 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 }
 
 func (a *MTeamAdapter) setAPIHeaders(req *http.Request, apiKey string) {
-	req.Header.Set("User-Agent", mteamUserAgent)
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("Accept", "application/json")
 }
