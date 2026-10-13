@@ -111,6 +111,12 @@ func MediumCanonicalOf(p TechProfile) string {
 	}
 	switch st {
 	case "UHD Blu-ray", "Blu-ray", "3D Blu-ray":
+		// §59.319 附三十二: 连字符原盘分支补重编码排除——标题含
+		// x264/x265/xvid 时是压制写法（雀起乡 Blu-ray.x265 误判原盘案），
+		// 与 FromBDInfo 分支的 MINBD 排除（附二十三）同语义。
+		if hasReencodeCodecInTitle(p.MainTitle) {
+			return "Encode"
+		}
 		return st + " 原盘"
 	case "UHD BluRay", "BluRay", "3D BluRay":
 		return "Encode"
