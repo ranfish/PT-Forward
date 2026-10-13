@@ -110,3 +110,35 @@ func truncateStr(s string, n int) string {
 	}
 	return s
 }
+
+// TestSiteExtractors_HHanClub_LongSubtitle §59.323: 长副标题不被 rune 上限误杀。
+// 憨憨神奇动物2 实录（tid=206156，副标题 205 rune 译名列表+导演主演简介）——
+// 原 200 上限直接丢弃致 SUBTITLE_EMPTY 三连案。
+func TestSiteExtractors_HHanClub_LongSubtitle(t *testing.T) {
+	testdataDir := findAdapterTestdata()
+	if testdataDir == "" {
+		t.Skip("testdata not found")
+	}
+	htmlBytes, err := os.ReadFile(filepath.Join(testdataDir, "hhanclub_long_subtitle.html"))
+	if err != nil {
+		t.Skipf("read testdata: %v", err)
+	}
+
+	p := NewPublicExtractor("hhanclub", "")
+	seed, err := p.Extract(Input{
+		Domain:       "hhanclub.net",
+		SiteCode:     "hhanclub",
+		PageHTML:     string(htmlBytes),
+		FallbackTitle: "fallback",
+	})
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	if seed.Subtitle == "" {
+		t.Fatal("长副标题（205 rune）不应被上限丢弃（§59.323 神奇动物2 案）")
+	}
+	if !strings.Contains(seed.Subtitle, "神奇动物") {
+		t.Fatalf("副标题内容不符: %s", truncateStr(seed.Subtitle, 60))
+	}
+	t.Logf("Subtitle (%d rune): %s", len([]rune(seed.Subtitle)), truncateStr(seed.Subtitle, 80))
+}
