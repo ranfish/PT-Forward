@@ -3336,6 +3336,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 				SourceType:    meta.SourceType,
 				Specification: meta.Specification,
 				VideoCodec:    meta.VideoCodec,
+				// §59.319 附三十二: RawTitle 必传（同 displayProfile——
+				// IsEncode 重编码标记排除扫原始标题）
+				RawTitle: meta.Title,
 			}
 			miText := meta.BDInfo
 			if miText == "" {
@@ -4006,6 +4009,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		// "Blu-ray 原盘" 而非 "UHD Blu-ray 原盘"）；mini profile 构造点
 		// 第四处漏传（displayProfile/encProfile/auditProfile/preAuditTitle 清单化）
 		Resolution: pickNonEmpty(meta.Resolution, profile.Resolution),
+		// §59.319 附三十二: RawTitle 必传——重编码标记排除扫原始标题
+		// （雀起乡 Blu-ray.x265 误判原盘案：漏传致扫描恒空）
+		RawTitle: meta.Title,
 	}
 	// §59.151: MI 铁证传递（displayProfile 原列值构造丢 MIEncoded——
 	// WEB-DL 剧集 Encode 误判根因：IsEncode 走不进 MI 分支回落旧 spec 判定）

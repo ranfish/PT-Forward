@@ -17,6 +17,9 @@ import (
 func ParseTitleTech(title string) TechProfile {
 	tc := ParseTitle(title)
 	p := TechProfileFromTitle(tc)
+	// §59.319 附三十二: RawTitle=原始完整标题——重编码标记排除的扫描源
+	// （MainTitle 是净化剧名不含编码词——雀起乡 Blu-ray.x265 误判案）
+	p.RawTitle = title
 
 	p.EditionInfo = extractEditionInfo(title)
 	// §59.76 步骤 3 / §59.184 G2: ReleaseVersion 并入 EditionInfo（空时补，

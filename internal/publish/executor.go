@@ -935,6 +935,9 @@ func (e *PublishExecutor) mediumMapping(cfg *model.PublishFormConfig, meta *mode
 			SourceType:    meta.SourceType,
 			Specification: meta.Specification,
 			VideoCodec:    meta.VideoCodec,
+			// §59.319 附三十二: RawTitle 必传（重编码排除扫原始标题——
+			// 雀起乡 Blu-ray.x265 连字符压制写法发布链错映原盘）
+			RawTitle: meta.Title,
 		}) {
 			stdKey = "medium.encode"
 		} else {

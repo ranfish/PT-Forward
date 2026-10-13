@@ -62,8 +62,10 @@ func TestMediumCanonicalOf(t *testing.T) {
 	{TechProfile{SourceType: "Blu-ray"}, "Blu-ray 原盘"},
 	{TechProfile{SourceType: "BluRay"}, "Encode"},
 	// §59.319 附三十二: 连字符原盘分支重编码排除（雀起乡 Blu-ray.x265 案）
-	{TechProfile{SourceType: "Blu-ray", MainTitle: "雀起乡到烛镇S01-S04.Lark.Rise.to.Candleford.2008-2011.1080p.Blu-ray.x265.AC3￡cXcY@FRDS"}, "Encode"},
-	{TechProfile{SourceType: "UHD Blu-ray", MainTitle: "Movie 2026 2160p UHD Blu-ray x264"}, "Encode"},
+	// 完整路径（ParseTitleTech 填 RawTitle）+ mini profile 形态（DB 列 VideoCodec=HEVC 归一化丢 x265）
+	{TechProfile{SourceType: "Blu-ray", RawTitle: "雀起乡到烛镇S01-S04.Lark.Rise.to.Candleford.2008-2011.1080p.Blu-ray.x265.AC3￡cXcY@FRDS"}, "Encode"},
+	{TechProfile{SourceType: "UHD Blu-ray", RawTitle: "Movie 2026 2160p UHD Blu-ray x264"}, "Encode"},
+	{TechProfile{SourceType: "Blu-ray", VideoCodec: "HEVC", RawTitle: "Movie 1080p Blu-ray x265 DDP5.1 GRP"}, "Encode"},
 		{TechProfile{SourceType: "DVD"}, "DVD"},
 	}
 	for _, c := range cases {

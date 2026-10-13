@@ -50,8 +50,9 @@ func TestIsEncode(t *testing.T) {
 		// WEB/HDTV：规格排除
 		{"Movie 1080p WEB-DL x264 DDP5.1 GRP", false},
 		{"Movie 1080p HDTV x264 GRP", false},
-		// 原盘写法 + 压制编码族矛盾：以片源写法为准
-		{"Movie 1080p Blu-ray x264 GRP", false},
+		// §59.319 附三十二修订（§59.34 边界条款废止）：x264/x265/Xvid
+		// 是 CLI 编码器标记，真原盘恒无——压制写法覆盖连字符片源
+		{"Movie 1080p Blu-ray x264 GRP", true},
 	}
 	for _, c := range cases {
 		p := ParseTitleTech(c.title)

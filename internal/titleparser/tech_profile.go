@@ -24,6 +24,10 @@ type TechProfile struct {
 	// 原意：限定词=压制源标记非组名）；Tab1/簇识别/映射等下游一律读 ReleaseGroup
 	// （纯组名）。@FRDS 成员署名两值相等（extractGroup @ 锚本返全段）
 	ReleaseGroupFull string `json:"release_group_full,omitempty"`
+	// §59.319 附三十二: 原始完整标题——重编码标记排除（x264/x265/Xvid）
+	// 扫这里而非 MainTitle（净化剧名不含编码词——雀起乡 Blu-ray.x265
+	// 误判原盘案第三层根因）。Mini profile 构造点必传（meta.Title）。
+	RawTitle       string `json:"raw_title,omitempty"`
 	Stereo3D       string `json:"stereo_3d"`       // 19. 3D 封装（HSBS/HOU/SBS/OU——§59.197 仅标题解析；双显异值=不同封装形态）
 	ChinesePrefix  string `json:"chinese_prefix"`  // 18. 中文名前缀 [中文名]
 
@@ -69,6 +73,16 @@ type TechProfile struct {
 // ②ST 原盘连字符族 ③ST 压制写法（无连字符 BluRay）→Encode ④UHD Remux
 // 联动（§59.226 附八: 2160p ∧ Remux → "UHD Remux"——站点词表独立项）
 // ⑤DVD 非 Rip ⑥IsEncode 兜底 ⑦空。
+// hasReencodeMark §59.319 附三十二: 重编码标记检测统一单点——扫
+// RawTitle（原始标题，Mini profile 构造点传 meta.Title），
+// MainTitle 兜底（老调用方只填净化剧名的场景恒 false，无害）。
+func hasReencodeMark(p TechProfile) bool {
+	if p.RawTitle != "" {
+		return hasReencodeCodecInTitle(p.RawTitle)
+	}
+	return hasReencodeCodecInTitle(p.MainTitle)
+}
+
 func MediumCanonicalOf(p TechProfile) string {
 	spec := p.Specification
 	st := p.SourceType
@@ -114,7 +128,7 @@ func MediumCanonicalOf(p TechProfile) string {
 		// §59.319 附三十二: 连字符原盘分支补重编码排除——标题含
 		// x264/x265/xvid 时是压制写法（雀起乡 Blu-ray.x265 误判原盘案），
 		// 与 FromBDInfo 分支的 MINBD 排除（附二十三）同语义。
-		if hasReencodeCodecInTitle(p.MainTitle) {
+		if hasReencodeMark(p) {
 			return "Encode"
 		}
 		return st + " 原盘"
@@ -157,9 +171,16 @@ func IsEncode(p TechProfile) bool {
 	case "BluRay", "UHD BluRay", "3D BluRay":
 		return true
 	}
+	// §59.319 附三十二: 标题重编码标记（x264/x265/Xvid）=压制写法，
+	// 覆盖一切原盘信号（连字符不宣示原盘——雀起乡 Blu-ray.x265 案）。
+	// 置于编码族 switch 前：mini profile 的 VideoCodec 列归一化为
+	// HEVC（丢 x265）时 RawTitle 是唯一线索（构造点必传 meta.Title）。
+	// spec 排除已先行（Remux/WEB/HDTV 不受影响）。
+	if hasReencodeMark(p) {
+		return true
+	}
 	switch p.VideoCodec {
 	case "x264", "x265", "Xvid":
-		// 编码族为压制，但片源写法为原盘（Blu-ray 带连字符）时以片源为准
 		return p.SourceType != "Blu-ray" && p.SourceType != "UHD Blu-ray" && p.SourceType != "3D Blu-ray"
 	}
 	return false
