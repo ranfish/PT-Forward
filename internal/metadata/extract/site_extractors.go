@@ -269,7 +269,8 @@ func (p *PublicExtractor) extractBasicInfoFromDivLabel(doc *goquery.Document, se
 			return
 		}
 		value := strings.TrimSpace(next.Text())
-		if value == "" || len([]rune(value)) > 200 {
+		// §59.323: subtitle 特例放宽（长文本字段——200 误杀憨憨 205 rune 案）
+		if value == "" || len([]rune(value)) > maxFieldRunes(field, 200) {
 			return
 		}
 		assignExtractorField(seed, field, standardizeFieldValueWithDomain(domain, siteCode, field, value))
@@ -332,7 +333,7 @@ func (p *PublicExtractor) extractBasicInfoFromGridSpan(doc *goquery.Document, se
 				return
 			}
 			value := strings.TrimSpace(valueSpan.Text())
-			if value == "" || len([]rune(value)) > 200 {
+			if value == "" || len([]rune(value)) > maxFieldRunes(field, 200) {
 				return
 			}
 			assignExtractorField(seed, field, standardizeFieldValueWithDomain(domain, siteCode, field, value))

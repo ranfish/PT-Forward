@@ -24,6 +24,17 @@ var defaultBasicInfoLabels = map[string][]string{
 	"subtitle": {"副标题", "副標題", "subtitle"},
 }
 
+
+// maxFieldRunes §59.323: 字段值 rune 上限——短规格字段（类型/媒介/编码等）
+// 80 防吞"基本信息"整块文本；subtitle 是长文本字段（译名列表+导演主演
+// 简介，憨憨神奇动物2 205 rune 误杀案）放宽至 1000。
+func maxFieldRunes(field string, def int) int {
+	if field == "subtitle" {
+		return 1000
+	}
+	return def
+}
+
 // fillBasicInfoFieldsWithCode 显式传入 domain + siteCode 的版本（并发安全）。
 func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, seed *SeedData, domain, siteCode string) {
 	// 每个字段的候选 labels：site-specific source_key 优先 + default 变体
@@ -47,7 +58,7 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 				return
 			}
 			value := strings.TrimSpace(follow.Text())
-			if value == "" || len([]rune(value)) > 80 {
+			if value == "" || len([]rune(value)) > maxFieldRunes(field, 80) {
 				return
 			}
 			if _, exists := values[field]; !exists {
@@ -73,7 +84,7 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 					return
 				}
 				value := strings.TrimSpace(span.Text())
-				if value == "" || len([]rune(value)) > 80 {
+				if value == "" || len([]rune(value)) > maxFieldRunes(field, 80) {
 					return
 				}
 				if _, exists := values[field]; !exists {
@@ -118,7 +129,7 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 						// 元素节点（如 <span>value</span>）：取元素内文本
 						value = strings.TrimSpace(b.Next().Text())
 					}
-					if value == "" || len([]rune(value)) > 80 {
+					if value == "" || len([]rune(value)) > maxFieldRunes(field, 80) {
 						return
 					}
 					if _, exists := values[field]; !exists {
@@ -197,7 +208,7 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 		if nextTD.Find("td").Length() > 0 {
 			return
 		}
-		if len([]rune(value)) > 80 {
+		if len([]rune(value)) > maxFieldRunes(field, 80) {
 			return
 		}
 		if _, exists := values[field]; !exists {
