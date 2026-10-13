@@ -56,6 +56,12 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	// 编码格式 AVC/HEVC 非容器）
 	sections := ParseMISections(text)
 	containerFormat := sections.General["format"]
+	// §59.319 附三十二: General 段重编码器词表——ShanaEncoder 等压制前端
+	// 的 Writing library 写在 General 段（Video 段扫描漏检——雀起乡案：
+	// General "libebml+libmatroska / ShanaEncoder" 铁证存在但 MIEncoded
+	// 恒 false）。词表只收压制工具，封装器（mkvmerge/libebml/libmatroska
+	// ——Remux 重封装也写）排除。
+	result.Encoded = generalReencoderDetected(sections.General)
 	for _, s := range streams {
 		if s.name == "video" {
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
@@ -79,8 +85,11 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 			// 编码器痕迹，此语境 x264=制作管线非民间重编码（PERFUME OF THE LADY
 			// IN BLACK 1974 案：BDAV+AVC High@L4.1+x264 core148+DTS-HD MA 双无损
 			// 音轨+原盘体积目录——站方 Blu-ray 连字符标注与文件事实一致）。
-			result.Encoded = strings.TrimSpace(s.fields["writing library"]) != "" &&
-				!strings.EqualFold(strings.TrimSpace(containerFormat), "BDAV")
+			// 附三十二: 叠加不覆盖——General 段词表铁证（ShanaEncoder 等）
+			// 与 Video 段 writing library 铁证任一命中即 Encoded
+			result.Encoded = result.Encoded ||
+				(strings.TrimSpace(s.fields["writing library"]) != "" &&
+					!strings.EqualFold(strings.TrimSpace(containerFormat), "BDAV"))
 			break
 		}
 	}
@@ -106,7 +115,25 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	return result
 }
 
-// parseMIStreams 将 MediaInfo 纯文本解析为段列表。
+// generalReencoderDetected §59.319 附三十二: General 段 Writing
+// library/application 扫压制前端词表。mkvmerge/libebml/libmatroska
+// 等封装器排除（Remux 重封装同样写入，非重编码铁证）。
+func generalReencoderDetected(general map[string]string) bool {
+	if general == nil {
+		return false
+	}
+	lib := strings.ToLower(general["writing library"] + " " + general["writing application"])
+	for _, kw := range []string{
+		"shanaencoder", "handbrake", "staxrip", "hybrid", "megui",
+		"mediacoder", "virtualdub", "nvenc", "qsvenc", "vceenc",
+		"tmpgenc", "ffmpeg", "avidemux", "formatfactory",
+	} {
+		if strings.Contains(lib, kw) {
+			return true
+		}
+	}
+	return false
+}
 //
 // 段标题是不含 ":" 的独立行（Video / Audio #1 / Audio #2 / General / Text / Menu）。
 // 只保留 video 和 audio 段（其他段忽略）。
