@@ -72,7 +72,11 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			break
 		}
 	}
-	if len(miSec.Audios) > 0 && miHasLangEvidence {
+	// §59.326 附三: BDInfo Audio 行证据合并——原盘 MI 恒空（UnderCurrent
+	// 案：region_code 脏值致 B 通道跳过、第一通道 TagInferMatches 扫
+	// desc"◎语 言 粤语"直接命中越权——门必须覆盖第一通道）。
+	bdHasAudioEvidence := len(extractBDInfoAudioLangs(in.NFO)) > 0
+	if (len(miSec.Audios) > 0 && miHasLangEvidence) || bdHasAudioEvidence {
 		filtered := tags[:0]
 		for _, t := range tags {
 			if !IsAudioLanguageTag(t) {

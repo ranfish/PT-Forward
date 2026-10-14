@@ -556,8 +556,8 @@ func TestBDInfoEvidenceGateBeatsDoubanFallback(t *testing.T) {
 		NFO:         nfo,
 		Title:       "Under Current 2025 BluRay 1080p AVC LPCM5.1-MTeam",
 		Subtitle:    "【原盘首发】内幕 / 廉政风云·内幕",
-		Description: "◎语　　言　粤语\n◎产　　地　中国香港",
-		Region:      "中国香港",
+		Description: "◎语　　言　粤语 / 汉语普通话 / 日语\n◎产　　地　中国香港",
+		Region:      "USA", // DB region_code 脏值实录——B 通道被 region 门跳过的真实形态
 	})
 	joined := strings.Join(tags, ",")
 	if strings.Contains(joined, "cantonese_audio") {
