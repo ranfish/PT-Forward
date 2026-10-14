@@ -164,3 +164,17 @@ func TestTechTextOf_StripsCodeBBCode(t *testing.T) {
 		t.Error("无 code 标记原样返回")
 	}
 }
+
+// §59.325: MinBD 站点映射特例——有 MiniBD 精确选项的站点映
+// medium.minibd（True.Grit MinBD1080p 案）；无该选项站点 fallback 原链。
+func TestHasMinBDToken(t *testing.T) {
+	if !hasMinBDToken("True.Grit.2011.Bluray.x264.DTS.MinBD1080p-CMCT") {
+		t.Error("MinBD 形态应命中")
+	}
+	if !hasMinBDToken("Movie 1080p MiniBD x264") {
+		t.Error("MiniBD 形态应命中")
+	}
+	if hasMinBDToken("Movie 1080p BluRay x264") {
+		t.Error("普通压制不应命中")
+	}
+}

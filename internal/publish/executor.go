@@ -888,6 +888,17 @@ func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCode
 
 // mediumMappingOf §59.166 A 层：TechProfile 源媒介映射（标题纠错终态——
 // WEBRip/WEB-DL/Encode 规格优先 §59.150 二维规则）。
+
+// hasMinBDToken §59.325: 标题 MinBD 词形检测（MinBD/MiniBD/MINBD——
+// §59.213 变体归一，lower contains 单词覆盖）——站点映射层特例：
+// 有 MiniBD 精确选项的站点优先映射（True.Grit MinBD1080p 案站方
+// TYPE_MISMATCH——canonical 判 Encode 正确，站点选项更精确）。
+func hasMinBDToken(rawTitle string) bool {
+	lower := strings.ToLower(rawTitle)
+	// MinBD（minbd）与 MiniBD（minibd）互不为子串——双词形检测
+	return strings.Contains(lower, "minbd") || strings.Contains(lower, "minibd")
+}
+
 func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
 	stdKey := ""
 	switch strings.ToLower(tp.Specification) {
@@ -901,6 +912,13 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 		// WEBRip=Encode（§59.166 From S04 案站方 TYPE_MISMATCH 对照——源站 WEB-DL
 		// 标错、MI 痕迹证 WEBRip，重组已归 WEBRip，媒介跟 Encode 而非 WEB-DL）
 		stdKey = "medium.encode"
+	}
+	// §59.325: MinBD 特例优先——有 MiniBD 精确选项的站点映 medium.minibd，
+	// miss 时 fallback 原链（无该选项的站点走 Encode/原盘原语义）
+	if hasMinBDToken(tp.RawTitle) {
+		if m := e.lookupByStdKey(cfg, model.FieldDomainMedium, "medium.minibd"); m != nil {
+			return m
+		}
 	}
 	if stdKey == "" {
 		// §59.166 回归补：IsEncode 铁证（老 mediumMapping 原有——tp 同源化时丢失
@@ -928,6 +946,12 @@ func (e *PublishExecutor) mediumMapping(cfg *model.PublishFormConfig, meta *mode
 		stdKey = "medium.hdtv"
 	case "bdrip", "dvdrip", "tvrip", "encode":
 		stdKey = "medium.encode"
+	}
+	// §59.325: MinBD 特例优先（同 mediumMappingOf）
+	if hasMinBDToken(meta.Title) {
+		if m := e.lookupByStdKey(cfg, model.FieldDomainMedium, "medium.minibd"); m != nil {
+			return m
+		}
 	}
 	if stdKey == "" {
 		// Encode 二维：碟转压（片源碟+编码痕迹）——IsEncode 铁证
