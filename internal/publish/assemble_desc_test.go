@@ -140,3 +140,27 @@ func TestTrimQuoteWrapper(t *testing.T) {
 		}
 	}
 }
+
+// §59.324: 源站采集 BDInfo/MI 常裹 [code] BBCode——TechTextOf 输出剥
+// code 标记对（True.Grit MinBD 案，站方 MEDIAINFO_CONTAINS_BBCODE 拒收）。
+func TestTechTextOf_StripsCodeBBCode(t *testing.T) {
+	meta := &model.TorrentMetadata{
+		BDInfo: "[code]Disc Label:     True.Grit.2011.Bluray.x264.DTS.MinBD1080p-CMCT\nDisc Size:      9,400,967,208 bytes\nProtection:     AACS\n\nQUICK SUMMARY:[/code]",
+	}
+	got := TechTextOf(meta)
+	if strings.Contains(got, "[code]") || strings.Contains(got, "[/code]") {
+		t.Fatalf("TechTextOf 应剥 code 标记: %q", got[:50])
+	}
+	if !strings.Contains(got, "QUICK SUMMARY:") {
+		t.Error("内容本体应保留")
+	}
+	// MediaInfo 路径同样剥
+	mi := TechTextOf(&model.TorrentMetadata{MediaInfo: "[code]General\nComplete name : x.mkv[/code]"})
+	if strings.Contains(mi, "[code]") {
+		t.Error("MI 路径同样剥 code")
+	}
+	// 无 code 的原样
+	if got := TechTextOf(&model.TorrentMetadata{BDInfo: "QUICK SUMMARY: raw"}); got != "QUICK SUMMARY: raw" {
+		t.Error("无 code 标记原样返回")
+	}
+}

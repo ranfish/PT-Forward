@@ -968,11 +968,21 @@ func (e *PublishExecutor) teamMapping(cfg *model.PublishFormConfig, meta *model.
 // 与 FetchAndStore 落库语义一致）。表单 techinfo 域/BuildTechProfile/标签
 // 推断/审计 body/描述 quote 五消费点同源。ExtractMediaInfo 格式分流
 // （QUICK SUMMARY 锚）保证 BDInfo 文本自动走 BD 解析器。
+// §59.324: 源站采集的 BDInfo/MI 文本常裹 [code] BBCode 块（True.Grit
+// MinBD 案——站方 MEDIAINFO_CONTAINS_BBCODE 拒收）——发布链输出剥
+// code 标记对（描述域的 [code] 是合法 BBCode 不受影响，仅此处剥）。
 func TechTextOf(meta *model.TorrentMetadata) string {
+	raw := ""
 	if meta.BDInfo != "" {
-		return meta.BDInfo
+		raw = meta.BDInfo
+	} else {
+		raw = meta.MediaInfo
 	}
-	return meta.MediaInfo
+	if strings.Contains(raw, "[code]") || strings.Contains(raw, "[/code]") {
+		raw = strings.ReplaceAll(raw, "[code]", "")
+		raw = strings.ReplaceAll(raw, "[/code]", "")
+	}
+	return raw
 }
 
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
