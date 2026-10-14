@@ -57,6 +57,36 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// Language/Title 字段直证（跨行 regex 补丁废除）; 数值判据层内化
 	// （General["overall bit rate"] / Videos[0]["width"/"frame rate"]）。
 	miSec := titleparser.ParseMISections(in.MediaInfo)
+	// §59.326: MI 音轨完备门——Audios 非空且至少一轨有语言证据=MI 是
+	// 完备音轨清单，desc_raw 通道（TagInferMatches 扫豆瓣简介"◎语 言"=
+	// 作品元数据非本种音轨）产出的音频语言标签全部剔除（智齿案：LiTV
+	// 版单英语轨，豆瓣"粤语"元数据打了 cantonese_audio 致站方
+	// WRONGLY_CANTONESE）；MI 直证随后补上真实轨语言。
+	// 语义：冲突信 MI（用户定案：MI > 副标题 > 豆瓣）；一致时 MI 直证
+	// 等价补回无损（天空之城副标题声明同 MI 轨）；MI 语言证据缺失
+	// （站方 MI 不标 Language）不启用门——副标题声明保留。
+	miHasLangEvidence := false
+	for _, a := range miSec.Audios {
+		if strings.TrimSpace(a["language"]) != "" || strings.TrimSpace(a["title"]) != "" {
+			miHasLangEvidence = true
+			break
+		}
+	}
+	if len(miSec.Audios) > 0 && miHasLangEvidence {
+		audioLangTags := map[string]bool{
+			"chinese_audio": true, "cantonese_audio": true, "english_audio": true,
+			"japanese_audio": true, "korean_audio": true, "russian_audio": true,
+			"french_audio": true, "german_audio": true, "spanish_audio": true,
+			"thai_audio": true, "hindi_audio": true, "italian_audio": true,
+		}
+		filtered := tags[:0]
+		for _, t := range tags {
+			if !audioLangTags[t] {
+				filtered = append(filtered, t)
+			}
+		}
+		tags = filtered
+	}
 	for _, lt := range inferLanguageFromMIAudios(miSec) {
 		if !containsStr(tags, lt) {
 			tags = append(tags, lt)
@@ -407,7 +437,12 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 		}
 		// §59.151: Language+Title 双通道（Title-only 形态防御——CHS/CHT/简/繁
 		// 无 Language 行的压制组标记；48/48 假纯英语料的 Text 实证）
-		cnSub := strings.Contains(lang, "chinese") || regexAny(title, []string{"chs", "cht", "简", "繁", "中文"})
+		// §59.326: 词形补齐——iTunes 系 MI 的字幕轨 Language 用
+		// "Mandarin (Hans)/(Hant)"/"Cantonese (Hant)" 形态（不含 chinese），
+		// Title 用 "Chinese (Simplified)" 全词（词表原只认 chs/cht 缩写）——
+		// 鸡皮疙瘩 37 字幕轨中字全漏案。
+		cnSub := containsAny(lang, "chinese", "mandarin", "cantonese") ||
+			regexAny(title, []string{"chs", "cht", "简", "繁", "中文", "chinese", "mandarin", "cantonese"})
 		enSub := strings.Contains(lang, "english") || strings.Contains(title, "eng")
 		if cnSub {
 			out["chinese_subtitle"] = true
@@ -532,13 +567,27 @@ func inferNumericSpecTagsBDInfo(nfo string) (highBitrate, highFrameRate bool) {
 func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []string) []string {
 	has := func(k string) bool { return containsStr(tags, k) }
 
-	// A. 副标题关键词（任何时候——源站声明是直接证据）
-	subLower := strings.ToLower(in.Subtitle)
-	if !has("chinese_audio") && containsAny(subLower, "普通话", "国语") {
-		tags = append(tags, "chinese_audio")
+	// §59.326: MI 音轨完备门（用户三级定案：MI > 副标题 > 豆瓣元数据）——
+	// MI 有音轨语言证据时 A/B 音频声明让位：冲突信 MI（智齿案：LiTV 单
+	// 英语轨 × 副标题"国语"/豆瓣"粤语"全让位）；一致时 MI 直证已打标签，
+	// !has 门自然跳过无损（天空之城副标题声明同 MI 轨）。
+	miHasLangEvidence := false
+	for _, a := range miSec.Audios {
+		if strings.TrimSpace(a["language"]) != "" || strings.TrimSpace(a["title"]) != "" {
+			miHasLangEvidence = true
+			break
+		}
 	}
-	if !has("cantonese_audio") && containsAny(subLower, "粤语", "广东话") {
-		tags = append(tags, "cantonese_audio")
+
+	// A. 副标题关键词（MI 无音轨语言证据时——源站声明是直接证据）
+	subLower := strings.ToLower(in.Subtitle)
+	if !miHasLangEvidence {
+		if !has("chinese_audio") && containsAny(subLower, "普通话", "国语") {
+			tags = append(tags, "chinese_audio")
+		}
+		if !has("cantonese_audio") && containsAny(subLower, "粤语", "广东话") {
+			tags = append(tags, "cantonese_audio")
+		}
 	}
 
 	// B. PTGen 联合回退（仅零字幕轨——MI 无语言证据时兜底）
@@ -565,12 +614,12 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	}
 
 	descLower := strings.ToLower(in.Description)
-	// 中文音频：产地中文区 + 语言(汉语/普通话/国语)
-	if !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
+	// 中文音频：产地中文区 + 语言(汉语/普通话/国语)——MI 完备门让位（§59.326）
+	if !miHasLangEvidence && !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
 		tags = append(tags, "chinese_audio")
 	}
-	// 粤语音频：产地香港 + 语言(粤语)
-	if !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
+	// 粤语音频：产地香港 + 语言(粤语)——MI 完备门让位（§59.326）
+	if !miHasLangEvidence && !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
 		tags = append(tags, "cantonese_audio")
 	}
 	// 硬字幕推定：产地中文区 + 零字幕轨（中国影片无软字幕=几乎确定硬字幕）
