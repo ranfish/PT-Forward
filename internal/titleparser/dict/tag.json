@@ -213,7 +213,7 @@
       "label": "中文字幕",
       "aliases": "CHS/简繁",
       "group": "字幕",
-      "infer_pattern": "([简繁].{0,12}字幕|[简繁中].{0,3}字|简中|DIY.{1,5}字|内封.{0,3}[繁中字]|Presentation Graphics.*Chinese|(Text[^\\n]*Chinese)|(subtitles?[^\\n]*chs)|(subtitles?[^\\n]*mandarin)|(subtitle[^\\n]*chinese))",
+      "infer_pattern": "([简繁].{0,12}字幕|[简繁中].{0,3}字|简中|繁中|DIY.{1,5}字|内封.{0,3}[繁中字]|Presentation Graphics.*Chinese|(Text[^\\n]*Chinese)|(subtitles?[^\\n]*chs)|(subtitles?[^\\n]*mandarin)|(subtitle[^\\n]*chinese))",
       "infer_scope": "all_raw",
       "standard_key": "tag.chinese_subtitle",
       "variants": [

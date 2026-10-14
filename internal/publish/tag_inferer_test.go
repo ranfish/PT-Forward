@@ -526,3 +526,22 @@ func TestLanguageTagPriority(t *testing.T) {
 		}
 	})
 }
+
+// §59.326 附二: 造雨人案——副标题"[英语/繁中]"的裸"繁中"词形
+// （] 前结束无"字"后缀）不在 chinese_subtitle pattern——补独立分支。
+func TestFanchungSubtitleWordForm(t *testing.T) {
+	inf := NewMediaTagInferer()
+	mi := "General\nFormat : MPEG-4\n\nVideo\nFormat : AVC\n\nAudio\nFormat : AAC\nLanguage : English\n"
+	tags := inf.InferFull(TagInput{
+		MediaInfo: mi,
+		Title:     "The.Rainmaker.1997.1080p.HamiVideo.WEB-DL.H264.AAC-UBWEB",
+		Subtitle:  "造雨人/約翰葛里遜之造雨人(台) | 导演: 弗朗西斯·福特·科波拉 [英语/繁中]",
+	})
+	joined := strings.Join(tags, ",")
+	if !strings.Contains(joined, "chinese_subtitle") {
+		t.Fatalf("裸'繁中'词形应产出中字标签: %v", tags)
+	}
+	if !strings.Contains(joined, "english_audio") {
+		t.Fatalf("MI 单英语轨应产出英语: %v", tags)
+	}
+}
