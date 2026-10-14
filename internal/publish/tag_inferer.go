@@ -608,12 +608,19 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	}
 
 	descLower := strings.ToLower(in.Description)
+	// §59.326 附三: BDInfo Audio 行证据门——原盘 MI 恒空但 BDInfo
+	// 报告是文件真相（UnderCurrent 案：Audio "Chinese / LPCM"×2 显式
+	// 关键词已在，豆瓣"◎语 言 粤语"+产地香港兜底仍越权打粤语——站方
+	// WRONGLY_CANTONESE）。用户兜底规则前提"无显式语言关键词"同时覆盖
+	// MI 与 BDInfo 两层。
+	bdHasAudioEvidence := len(extractBDInfoAudioLangs(in.NFO)) > 0
+	hasAudioEvidence := miHasLangEvidence || bdHasAudioEvidence
 	// 中文音频：产地中文区 + 语言(汉语/普通话/国语)——MI 完备门让位（§59.326）
-	if !miHasLangEvidence && !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
+	if !hasAudioEvidence && !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
 		tags = append(tags, "chinese_audio")
 	}
-	// 粤语音频：产地香港 + 语言(粤语)——MI 完备门让位（§59.326）
-	if !miHasLangEvidence && !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
+	// 粤语音频：产地香港 + 语言(粤语)——MI/BDInfo 完备门让位（§59.326 附三）
+	if !hasAudioEvidence && !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
 		tags = append(tags, "cantonese_audio")
 	}
 	// 硬字幕推定：产地中文区 + 零字幕轨（中国影片无软字幕=几乎确定硬字幕）
