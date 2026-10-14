@@ -1,6 +1,8 @@
 package publish
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/titleparser"
@@ -478,4 +480,49 @@ func TestInferBDInfoLanguageHDR(t *testing.T) {
 			t.Error("单层 DoVi 不应产出 hdr10")
 		}
 	}
+}
+
+// §59.326: 语言标签优先级修复双锚——鸡皮疙瘩（iTunes 系字幕轨词形）+
+// 智齿（MI 音轨完备门压豆瓣元数据）。
+func TestLanguageTagPriority(t *testing.T) {
+	inf := NewMediaTagInferer()
+
+	t.Run("Goosebumps_Mandarin字幕词形", func(t *testing.T) {
+		data, err := os.ReadFile("testdata/goosebumps_mi.txt")
+		if err != nil {
+			t.Skip("testdata missing")
+		}
+		tags := inf.InferFull(TagInput{
+			MediaInfo: string(data),
+			Title:     "Goosebumps 2015 2160p iTunes WEB-DL H265",
+			Subtitle:  "鸡皮疙瘩 | 导演: 罗伯·莱特曼 [英语/多语字幕] [4K版]",
+		})
+		joined := strings.Join(tags, ",")
+		if !strings.Contains(joined, "chinese_subtitle") {
+			t.Fatalf("Mandarin (Hans)/(Hant) 字幕轨应产出中字标签: %v", tags)
+		}
+		if !strings.Contains(joined, "english_audio") {
+			t.Fatalf("单英语音轨应产出英语标签: %v", tags)
+		}
+		if strings.Contains(joined, "chinese_audio") || strings.Contains(joined, "cantonese_audio") {
+			t.Fatalf("单英语音轨不应有国/粤语音频标签: %v", tags)
+		}
+	})
+
+	t.Run("Limbo_MI完备门压豆瓣元数据", func(t *testing.T) {
+		mi := "General\nComplete name : limbo.mkv\nFormat : Matroska\n\nVideo\nID : 1\nFormat : AVC\n\nAudio\nID : 2\nFormat : AC-3\nLanguage : English\nTitle : English\n"
+		tags := inf.InferFull(TagInput{
+			MediaInfo:   mi,
+			Title:       "Limbo 2021 1080p LiTV WEB-DL H264 AAC-UBWEB",
+			Subtitle:    "智齿 | 导演: 郑保瑞 [国语/中字]",
+			Description: "◎语　　言　粤语\n◎产　　地　中国香港",
+		})
+		joined := strings.Join(tags, ",")
+		if strings.Contains(joined, "cantonese_audio") {
+			t.Fatalf("MI 单英语轨：豆瓣'粤语'元数据不应打粤语标签: %v", tags)
+		}
+		if !strings.Contains(joined, "english_audio") {
+			t.Fatalf("MI 直证英语应保留: %v", tags)
+		}
+	})
 }
