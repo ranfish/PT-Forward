@@ -73,15 +73,9 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		}
 	}
 	if len(miSec.Audios) > 0 && miHasLangEvidence {
-		audioLangTags := map[string]bool{
-			"chinese_audio": true, "cantonese_audio": true, "english_audio": true,
-			"japanese_audio": true, "korean_audio": true, "russian_audio": true,
-			"french_audio": true, "german_audio": true, "spanish_audio": true,
-			"thai_audio": true, "hindi_audio": true, "italian_audio": true,
-		}
 		filtered := tags[:0]
 		for _, t := range tags {
-			if !audioLangTags[t] {
+			if !IsAudioLanguageTag(t) {
 				filtered = append(filtered, t)
 			}
 		}
@@ -848,4 +842,19 @@ func extractBDInfoHDR(nfo string) string {
 		}
 	}
 	return mainHDR
+}
+
+
+// audioLanguageTags §59.326: 音频语言族标签清单——推断独占域
+// （InferFull 完备门剔除 + fetch 合并前清旧——两处共用）。
+var audioLanguageTags = map[string]bool{
+	"chinese_audio": true, "cantonese_audio": true, "english_audio": true,
+	"japanese_audio": true, "korean_audio": true, "russian_audio": true,
+	"french_audio": true, "german_audio": true, "spanish_audio": true,
+	"thai_audio": true, "hindi_audio": true, "italian_audio": true,
+}
+
+// IsAudioLanguageTag 判定是否音频语言族标签（§59.326 推断独占域）。
+func IsAudioLanguageTag(tag string) bool {
+	return audioLanguageTags[tag]
 }

@@ -2728,8 +2728,18 @@ fetched:
 				}
 			}
 			if len(inferredTags) > 0 {
+				// §59.326: 音频语言族=推断独占域——existing（DB tags 列，可能含
+				// 上轮推断写入）中的音频语言标签先剔除再合并（智齿案：旧推断的
+				// 国/粤被当"源站显式"保留自我强化，MI 完备门重算永不纠错）；
+				// 其他类（HDR/规格）保持源站/人工优先语义。
+				cleaned := make([]string, 0, len(existingTags))
+				for _, t := range existingTags {
+					if !publish.IsAudioLanguageTag(t) {
+						cleaned = append(cleaned, t)
+					}
+				}
 				// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁于合并结果
-				all := publish.MergeTags(existingTags, inferredTags)
+				all := publish.MergeTags(cleaned, inferredTags)
 				if data, err := json.Marshal(all); err == nil {
 					updates["tags"] = string(data)
 				}
