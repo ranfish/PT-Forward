@@ -545,3 +545,25 @@ func TestFanchungSubtitleWordForm(t *testing.T) {
 		t.Fatalf("MI 单英语轨应产出英语: %v", tags)
 	}
 }
+
+// §59.326 附三: UnderCurrent 案——BDInfo Audio 行显式语言关键词
+// （Chinese/LPCM×2）在场时，豆瓣"粤语"元数据+产地香港兜底不越权
+// 打粤语（泛 Chinese→chinese_audio 保留，粤语细化由站方人工判）。
+func TestBDInfoEvidenceGateBeatsDoubanFallback(t *testing.T) {
+	inf := NewMediaTagInferer()
+	nfo := "DISC INFO:\n\nQUICK SUMMARY:\n\n* Audio: Chinese / LPCM Audio / 5.1 / 48 kHz / 6912 kbps / 24-bit\n* Audio: Chinese / LPCM Audio / 2.0 / 48 kHz / 2304 kbps / 24-bit\n* Subtitle: English / 38.857 kbps\n* Subtitle: Chinese / 27.796 kbps\n"
+	tags := inf.InferFull(TagInput{
+		NFO:         nfo,
+		Title:       "Under Current 2025 BluRay 1080p AVC LPCM5.1-MTeam",
+		Subtitle:    "【原盘首发】内幕 / 廉政风云·内幕",
+		Description: "◎语　　言　粤语\n◎产　　地　中国香港",
+		Region:      "中国香港",
+	})
+	joined := strings.Join(tags, ",")
+	if strings.Contains(joined, "cantonese_audio") {
+		t.Fatalf("BDInfo Chinese 轨在场：豆瓣粤语兜底不应越权: %v", tags)
+	}
+	if !strings.Contains(joined, "chinese_audio") {
+		t.Fatalf("BDInfo Chinese 轨应打中文音频: %v", tags)
+	}
+}
