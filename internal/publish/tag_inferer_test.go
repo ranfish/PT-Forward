@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
@@ -565,5 +566,28 @@ func TestBDInfoEvidenceGateBeatsDoubanFallback(t *testing.T) {
 	}
 	if !strings.Contains(joined, "chinese_audio") {
 		t.Fatalf("BDInfo Chinese 轨应打中文音频: %v", tags)
+	}
+}
+
+// §59.326 附三补2: luckptEnglishTagValue 证据读 stored 双源——assembleTags
+// auto:false 滤掉 english_audio 后过滤后 tags 恒无英语（Alice 三案）。
+func TestLuckptEnglishValue_StoredEvidence(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainTags: {
+			{Label: "Dolby Vision", Value: "20", StandardKeys: []string{"tag.dolby_vision"}},
+			{Label: "英语", Value: "22", Auto: boolPtr(false), StandardKeys: []string{"tag.english_audio"}},
+		},
+	}}
+	meta := &model.TorrentMetadata{
+		Tags:     `["dolby_vision","english_audio"]`,
+		Subtitle: "【原盘首发】Alice in Wonderland",
+	}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"dolby_vision"}); v != "22" {
+		t.Fatalf("stored english_audio 应注入 22, got %q", v)
+	}
+	// 有华语区标签（stored）——不要求英语
+	meta2 := &model.TorrentMetadata{Tags: `["chinese_subtitle","english_audio"]`}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{}); v != "" {
+		t.Fatalf("有中字不应注入: %q", v)
 	}
 }

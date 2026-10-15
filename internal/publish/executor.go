@@ -791,13 +791,23 @@ func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *
 	if siteName != "幸运" || cfg == nil {
 		return ""
 	}
-	for _, t := range tags {
+	// §59.326 附三补2: 证据判定读 stored 原始推断（meta.Tags）+ 过滤后双源
+	// ——assembleTags 按 auto:false 滤掉 english_audio 后再问"有英语吗"
+	// 恒 false（Alice 三案：tags=[dolby_vision,hdr10] 英语证据不可见）。
+	stored := []string{}
+	if meta != nil && meta.Tags != "" {
+		if err := json.Unmarshal([]byte(meta.Tags), &stored); err != nil {
+			stored = nil
+		}
+	}
+	merged := append(append([]string{}, tags...), stored...)
+	for _, t := range merged {
 		if t == "chinese_audio" || t == "cantonese_audio" || t == "chinese_subtitle" {
 			return "" // 已有华语区标签——站规不要求英语
 		}
 	}
 	hasEnglish := false
-	for _, t := range tags {
+	for _, t := range merged {
 		if t == "english_audio" || t == "lucky_english_audio" {
 			hasEnglish = true
 			break
