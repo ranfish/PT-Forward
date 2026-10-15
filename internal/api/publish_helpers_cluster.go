@@ -257,6 +257,44 @@ func (h *PublishTorrentsHandler) propagateClusterMetadata(ctx context.Context, c
 			zap.String("hash", selfHash[:min(10, len(selfHash))]),
 			zap.Int("replicas", n))
 	}
+
+	// §59.326 附四: 推断产物回传——已有 cluster 副本行用源行终态覆盖
+	// （造雨人 40 副本案：副本是一次性快照非引用——force re-fetch 刷新
+	// 代表行 tags/subtitle 后 haveSet 跳过不回传，副本持有旧数据，
+	// 发布链 ResolveResource 选行分叉"API 新数据/发布旧数据"）。
+	// 白名单=fetch 链演化的全部推断产物；排除三类——行身份
+	// （id/info_hash/site_name/torrent_id/fetch_source）、reviewed
+	// （§59.94 独立簇同步通道——回传会双通道竞争覆盖审核状态）、
+	// 时间戳/行级状态（no_transfer_until 等）。幂等 UPDATE。
+	if res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND fetch_source = ?", siblingHashes, "cluster").
+		Select(clusterInferredFields).
+		Updates(src); res.Error != nil {
+		h.logger.Warn("cluster inferred-fields propagate failed",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Error(res.Error))
+	} else if res.RowsAffected > 0 {
+		h.logger.Info("cluster inferred-fields propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
+
+// clusterInferredFields §59.326 附四: 簇回传白名单（推断产物 Go 字段
+// 名——GORM Select+Updates 自动映射列名，杜绝手写列名漂移）。新推断
+// 字段入列时同步此处（README 映射命名铁律同源纪律）。
+var clusterInferredFields = []string{
+	"Title", "TorrentRawName", "Subtitle", "SourceCategory", "StandardType",
+	"Tags", "Flags", "SourceDescription", "Description", "Screenshots",
+	"Poster", "MediaInfo", "SourceMediaInfo", "MediaInfoSource",
+	"IMDbURL", "DoubanURL", "TMDbURL",
+	"ChineseTitle", "EnglishTitle", "Genre",
+	"DetailSourceJSON", "PTGenSourceJSON", "LocalSourceJSON",
+	"MergedJSON", "LastMergeMode", "Statement", "BDInfo",
+	"Category", "Form", "Resolution", "VideoCodec", "AudioCodec",
+	"AudioChannels", "AudioTech", "AudioTracks", "HDR", "BitDepth",
+	"SourceType", "Specification", "SourcePlatform", "EditionInfo",
+	"RegionCode", "FetchedAt",
 }
 
 // propagateClusterScreenshots 截图策略完成后：补簇内空截图行

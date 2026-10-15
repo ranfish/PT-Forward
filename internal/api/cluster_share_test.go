@@ -542,3 +542,42 @@ func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
 		t.Errorf("原盘完整行应零缺失: %v", h.checkRequiredFields(meta2))
 	}
 }
+
+// §59.326 附四: 推断产物回传——已有 cluster 副本行被源行终态覆盖；
+// reviewed 不回传（§59.94 独立通道）；非 cluster 行（真源站 rss_detail）不碰。
+func TestPropagateClusterInferredFieldsSync(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	for _, hh := range []string{"selfhash0000000000000000000000000000000000000", "sibA0000000000000000000000000000000000000", "sibB0000000000000000000000000000000000000"} {
+		db.Create(&model.TorrentSnapshot{Hash: hh, ClientUID: 1, Name: "Rain.1997", SavePath: "/x"})
+	}
+	// 源行：新 tags（含 chinese_subtitle）+ subtitle
+	db.Create(&model.TorrentMetadata{InfoHash: "selfhash0000000000000000000000000000000000000", SiteName: "优堡",
+		TorrentID: "1", Title: "Rain", Tags: `["high_rating","chinese_subtitle","english_audio"]`, Subtitle: "[英语/繁中]"})
+	// 副本A：cluster 行（旧 tags，reviewed=True——不应被回传覆盖回 False）
+	db.Create(&model.TorrentMetadata{InfoHash: "sibA0000000000000000000000000000000000000", SiteName: "优堡",
+		FetchSource: "cluster", Title: "Rain", Tags: `["english_audio"]`, Reviewed: true})
+	// 副本B：真源站行（rss_detail）——不碰
+	db.Create(&model.TorrentMetadata{InfoHash: "sibB0000000000000000000000000000000000000", SiteName: "财神",
+		FetchSource: "rss_detail", Tags: `["old"]`})
+
+	h.propagateClusterMetadata(context.Background(), 1, "/x", "Rain.1997",
+		"selfhash0000000000000000000000000000000000000", "优堡")
+
+	var cA model.TorrentMetadata
+	db.Where("info_hash = ?", "sibA0000000000000000000000000000000000000").First(&cA)
+	if cA.Tags != `["high_rating","chinese_subtitle","english_audio"]` {
+		t.Fatalf("cluster 副本 tags 应回传源行终态: %s", cA.Tags)
+	}
+	if cA.Subtitle != "[英语/繁中]" {
+		t.Fatalf("subtitle 应回传: %q", cA.Subtitle)
+	}
+	if !cA.Reviewed {
+		t.Fatal("reviewed 不应被回传覆盖（§59.94 独立通道）")
+	}
+	var cB model.TorrentMetadata
+	db.Where("info_hash = ?", "sibB0000000000000000000000000000000000000").First(&cB)
+	if cB.Tags != `["old"]` {
+		t.Fatalf("rss_detail 真源站行不应被覆盖: %s", cB.Tags)
+	}
+}
