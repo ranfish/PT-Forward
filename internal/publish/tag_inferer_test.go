@@ -585,9 +585,14 @@ func TestLuckptEnglishValue_StoredEvidence(t *testing.T) {
 	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"dolby_vision"}); v != "22" {
 		t.Fatalf("stored english_audio 应注入 22, got %q", v)
 	}
-	// 有华语区标签（stored）——不要求英语
+	// §59.326 附五: 华语区拦截废止——有中字也注入（机器判据无条件+人工规则是必要非禁止）
 	meta2 := &model.TorrentMetadata{Tags: `["chinese_subtitle","english_audio"]`}
-	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{}); v != "" {
-		t.Fatalf("有中字不应注入: %q", v)
+	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{}); v != "22" {
+		t.Fatalf("有中字也应注入（附五定案）: %q", v)
+	}
+	// 无英语证据——不注入
+	meta3 := &model.TorrentMetadata{Tags: `["chinese_subtitle"]`, Subtitle: "【国语】"}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta3, []string{}); v != "" {
+		t.Fatalf("无英语证据不应注入: %q", v)
 	}
 }
