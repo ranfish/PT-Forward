@@ -596,3 +596,53 @@ func TestLuckptEnglishValue_StoredEvidence(t *testing.T) {
 		t.Fatalf("无英语证据不应注入: %q", v)
 	}
 }
+
+// §59.326 附六: 单音轨歧义收敛——产地香港+豆瓣国粤+单条无语言音轨
+// → 只国语不打粤语（功夫三案）；双轨国粤双打保留。
+func TestSingleAudioTrackCantoneseCollapse(t *testing.T) {
+	inf := NewMediaTagInferer()
+	// 功夫实录形态：MI 单 Audio 段无 Language 行
+	mi := "General\nFormat : MPEG-4\n\nVideo\nFormat : HEVC\n\nAudio\nID : 2\nFormat : AAC\n"
+	tags := inf.InferFull(TagInput{
+		MediaInfo:   mi,
+		Title:       "功夫.Kung.Fu.Hustle.2004.2160p.WEB-DL.H.265.AAC-CSWEB",
+		Subtitle:    "功夫/功夫3D/Kung Fu Hustle | 类型：喜剧/动作",
+		Description: "◎语　　言　汉语普通话 / 粤语\n◎产　　地　中国香港",
+		Region:      "中国香港",
+	})
+	joined := strings.Join(tags, ",")
+	if strings.Contains(joined, "cantonese_audio") {
+		t.Fatalf("单轨歧义不应打粤语（附六定案）: %v", tags)
+	}
+	if !strings.Contains(joined, "chinese_audio") {
+		t.Fatalf("国语应保留: %v", tags)
+	}
+	// 双轨形态：国粤双打保留
+	mi2 := "General\nFormat : MPEG-4\n\nAudio\nID : 1\nFormat : AAC\n\nAudio\nID : 2\nFormat : AC-3\n"
+	tags2 := inf.InferFull(TagInput{
+		MediaInfo:   mi2,
+		Title:       "Movie 2024 BluRay",
+		Description: "◎语　　言　汉语普通话 / 粤语\n◎产　　地　中国香港",
+		Region:      "中国香港",
+	})
+	if !strings.Contains(strings.Join(tags2, ","), "cantonese_audio") {
+		t.Fatalf("双轨国粤双打应保留: %v", tags2)
+	}
+}
+
+// §59.326 附六补: 统一收敛层——粤语来自 A 通道（副标题声明）单轨也收敛。
+func TestSingleAudioCollapseAnyChannel(t *testing.T) {
+	inf := NewMediaTagInferer()
+	mi := "General\nFormat : MPEG-4\n\nVideo\nFormat : HEVC\n\nAudio\nID : 2\nFormat : AAC\n"
+	// 副标题声明"国粤双语"（A 通道双打）+ 单轨 MI（声明不实形态）
+	tags := inf.InferFull(TagInput{
+		MediaInfo:   mi,
+		Title:       "Movie 2024 WEB-DL",
+		Subtitle:    "【国粤双语】Movie 2024",
+		Description: "◎语　　言　汉语普通话 / 粤语",
+	})
+	joined := strings.Join(tags, ",")
+	if strings.Contains(joined, "cantonese_audio") && strings.Contains(joined, "chinese_audio") {
+		t.Fatalf("单轨不应双中文标签（统一收敛层）: %v", tags)
+	}
+}

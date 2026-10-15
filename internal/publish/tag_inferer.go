@@ -117,6 +117,21 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// 设计定案（用户）：零字幕轨=MI 无法提供语言证据 → PTGen 兜底；
 	// 有字幕轨时 MI Text 是权威不需要兜底。产地=影片国别（非发行平台）。
 	tags = inferRegionLanguageTags(miSec, in, tags)
+	// §59.326 附六: 单音轨中文音频统一收敛——单轨物理上只有一种中文
+	// 音频，国+粤双标签必有一错（功夫三案——粤语可能来自任一通道：
+	// desc_raw 词条/副标题声明/产地兜底）。统一在末尾收敛：单轨+无
+	// MI 语言证据+双中文标签 → 去 cantonese 留 chinese（流媒体单轨
+	// 主流=国语，站方 WRONGLY 实证方向）。
+	if len(miSec.Audios) == 1 && !miHasLangEvidence &&
+		containsStr(tags, "chinese_audio") && containsStr(tags, "cantonese_audio") {
+		filtered := tags[:0]
+		for _, t := range tags {
+			if t != "cantonese_audio" {
+				filtered = append(filtered, t)
+			}
+		}
+		tags = filtered
+	}
 	// §59.319 附三十一: BDInfo 报告语言/HDR 通道——原盘 MI 恒空（D8 停产），
 	// 语言（Audio/Subtitle 行）和 HDR（Video 行标记）信息全在 BDInfo 报告
 	// 但引擎无解析通道（Mercy 案：美国电影含中字轨+DoVi HDR 全漏）。
@@ -624,7 +639,12 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 		tags = append(tags, "chinese_audio")
 	}
 	// 粤语音频：产地香港 + 语言(粤语)——MI/BDInfo 完备门让位（§59.326 附三）
-	if !hasAudioEvidence && !has("cantonese_audio") && containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
+	// §59.326 附六: 单音轨歧义收敛（用户定案）——单轨物理上不可能国粤
+	// 双语，双打必有一错；流媒体港片单轨主流=国语（功夫三案站方
+	// WRONGLY_CANTONESE 实证）。双轨（≥2，国粤双语经典配置）与 MI
+	// 缺失（0，无从判轨数保守保留）不受影响。
+	if !hasAudioEvidence && !has("cantonese_audio") && len(miSec.Audios) != 1 &&
+		containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
 		tags = append(tags, "cantonese_audio")
 	}
 	// 硬字幕推定：产地中文区 + 零字幕轨（中国影片无软字幕=几乎确定硬字幕）
