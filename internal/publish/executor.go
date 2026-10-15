@@ -801,11 +801,10 @@ func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *
 		}
 	}
 	merged := append(append([]string{}, tags...), stored...)
-	for _, t := range merged {
-		if t == "chinese_audio" || t == "cantonese_audio" || t == "chinese_subtitle" {
-			return "" // 已有华语区标签——站规不要求英语
-		}
-	}
+	// §59.326 附五: 华语区拦截废止——站方机器判据无条件要英语（造雨人
+	// 实证：有中字+强制英语仍报 MISSING→判据不豁免中字）；§59.277 人工
+	// 种审文本"无国语/粤语/中字时需要选择英语"是必要条件非禁止条件——
+	// 有中字时提交英语不违反人工规则（机器满意+人工不挑）。
 	hasEnglish := false
 	for _, t := range merged {
 		if t == "english_audio" || t == "lucky_english_audio" {
