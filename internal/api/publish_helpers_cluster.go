@@ -280,6 +280,47 @@ func (h *PublishTorrentsHandler) propagateClusterMetadata(ctx context.Context, c
 	}
 }
 
+// propagateEditedClusterFields §59.328 (#7): PUT 编辑簇传播——编辑
+// 字段全簇生效。复用 clusterInferredFields 白名单幂等 UPDATE
+// （WHERE fetch_source='cluster'——与 fetch 回传同语义；编辑路由
+// 已由 §59.44 ResolveResource 保证写权威行）。
+func (h *PublishTorrentsHandler) propagateEditedClusterFields(ctx context.Context, src model.TorrentMetadata) {
+	if h.db == nil || src.InfoHash == "" || src.SiteName == "" {
+		return
+	}
+	// 编辑源行的簇兄弟（同下载器簇语义——从快照反查 (client,path,name)）
+	var snaps []model.TorrentSnapshot
+	h.db.WithContext(ctx).
+		Where("hash = ?", src.InfoHash).
+		Find(&snaps)
+	if len(snaps) == 0 {
+		return
+	}
+	for _, s := range snaps {
+		var siblings []string
+		h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+			Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+				s.ClientUID, s.SavePath, s.Name, src.InfoHash).
+			Limit(500).
+			Pluck("hash", &siblings)
+		if len(siblings) == 0 {
+			continue
+		}
+		if res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash IN ? AND fetch_source = ?", siblings, "cluster").
+			Select(clusterInferredFields).
+			Updates(src); res.Error != nil {
+			h.logger.Warn("cluster edit propagate failed",
+				zap.String("hash", src.InfoHash[:min(10, len(src.InfoHash))]),
+				zap.Error(res.Error))
+		} else if res.RowsAffected > 0 {
+			h.logger.Info("cluster edit propagated",
+				zap.String("hash", src.InfoHash[:min(10, len(src.InfoHash))]),
+				zap.Int64("rows", res.RowsAffected))
+		}
+	}
+}
+
 // clusterInferredFields §59.326 附四: 簇回传白名单（推断产物 Go 字段
 // 名——GORM Select+Updates 自动映射列名，杜绝手写列名漂移）。新推断
 // 字段入列时同步此处（README 映射命名铁律同源纪律）。

@@ -4282,6 +4282,17 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		Where("id = ?", meta.ID).
 		Updates(updates)
 
+	// §59.328: PUT 编辑簇传播——编辑是用户意图写入，与 fetch 链同语义
+	// 全簇生效（#7 挂账兑现：原只写选中行，副本不跟——展示层不一致；
+	// 且编辑落在 cluster 行场景下次 fetch 回传会覆盖丢失）。路由已由
+	// §59.44 ResolveResource 保证写权威行；此处复用 v0.0.1144
+	// clusterInferredFields 传播（编辑字段全在白名单内）。幂等：只覆盖
+	// fetch_source='cluster' 行，不碰其他站独立行。
+	var editedSrc model.TorrentMetadata
+	if err := h.db.WithContext(r.Context()).Where("id = ?", meta.ID).First(&editedSrc).Error; err == nil {
+		h.propagateEditedClusterFields(r.Context(), editedSrc)
+	}
+
 	// 重新查询获取更新后的数据（§59.28 C：并发删除时返回明确错误而非零值）
 	var updated model.TorrentMetadata
 	if err := h.db.WithContext(r.Context()).Where("id = ?", meta.ID).First(&updated).Error; err != nil {

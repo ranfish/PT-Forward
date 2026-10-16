@@ -581,3 +581,36 @@ func TestPropagateClusterInferredFieldsSync(t *testing.T) {
 		t.Fatalf("rss_detail 真源站行不应被覆盖: %s", cB.Tags)
 	}
 }
+
+// §59.328 (#7): PUT 编辑簇传播——编辑权威行后 cluster 副本同步；
+// rss_detail 独立行不碰。
+func TestPropagateEditedClusterFields(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	for _, hh := range []string{"selfhash0000000000000000000000000000000000000", "sibA0000000000000000000000000000000000000", "sibB0000000000000000000000000000000000000"} {
+		db.Create(&model.TorrentSnapshot{Hash: hh, ClientUID: 1, Name: "Edit.2024", SavePath: "/x"})
+	}
+	db.Create(&model.TorrentMetadata{InfoHash: "selfhash0000000000000000000000000000000000000", SiteName: "优堡",
+		FetchSource: "rss_detail", Tags: `["old"]`, Subtitle: "旧副标题"})
+	db.Create(&model.TorrentMetadata{InfoHash: "sibA0000000000000000000000000000000000000", SiteName: "优堡",
+		FetchSource: "cluster", Tags: `["old"]`})
+	db.Create(&model.TorrentMetadata{InfoHash: "sibB0000000000000000000000000000000000000", SiteName: "财神",
+		FetchSource: "rss_detail", Tags: `["other"]`})
+
+	// 模拟 PUT：编辑权威行 tags
+	var src model.TorrentMetadata
+	db.Where("info_hash = ?", "selfhash0000000000000000000000000000000000000").First(&src)
+	src.Tags = `["edited_new"]`
+	h.propagateEditedClusterFields(context.Background(), src)
+
+	var cA model.TorrentMetadata
+	db.Where("info_hash = ?", "sibA0000000000000000000000000000000000000").First(&cA)
+	if cA.Tags != `["edited_new"]` {
+		t.Fatalf("cluster 副本应同步编辑: %s", cA.Tags)
+	}
+	var cB model.TorrentMetadata
+	db.Where("info_hash = ?", "sibB0000000000000000000000000000000000000").First(&cB)
+	if cB.Tags != `["other"]` {
+		t.Fatalf("rss_detail 独立行不应被覆盖: %s", cB.Tags)
+	}
+}
