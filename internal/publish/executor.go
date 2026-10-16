@@ -801,10 +801,18 @@ func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *
 		}
 	}
 	merged := append(append([]string{}, tags...), stored...)
-	// §59.326 附五: 华语区拦截废止——站方机器判据无条件要英语（造雨人
-	// 实证：有中字+强制英语仍报 MISSING→判据不豁免中字）；§59.277 人工
-	// 种审文本"无国语/粤语/中字时需要选择英语"是必要条件非禁止条件——
-	// 有中字时提交英语不违反人工规则（机器满意+人工不挑）。
+	// §59.326 附七（用户三规则定案，取代附五"无条件注入"）：
+	// 规则 1（人工审核）+规则 3（用户提出，机器实证支持——造雨人
+	// 中字+英语同选 passed）：**音轨与字幕物理语义**——国语/粤语音轨
+	// 是版本属性（国配/粤配版与英语原声版互斥）→ 硬排斥英语标签；
+	// 中文字幕是叠加属性（英语原声+中字=最常见原声中字版，正交）→
+	// 不排斥。注入条件=英语证据在场 ∧ 无 chinese_audio ∧ 无
+	// cantonese_audio（附五全拦→全放的精细回归：只拦音轨放行字幕）。
+	for _, t := range merged {
+		if t == "chinese_audio" || t == "cantonese_audio" {
+			return "" // 国/粤语音轨在场——版本互斥，禁英语（规则 1）
+		}
+	}
 	hasEnglish := false
 	for _, t := range merged {
 		if t == "english_audio" || t == "lucky_english_audio" {

@@ -585,10 +585,20 @@ func TestLuckptEnglishValue_StoredEvidence(t *testing.T) {
 	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"dolby_vision"}); v != "22" {
 		t.Fatalf("stored english_audio 应注入 22, got %q", v)
 	}
-	// §59.326 附五: 华语区拦截废止——有中字也注入（机器判据无条件+人工规则是必要非禁止）
+	// §59.326 附七: 中字在场仍注入（字幕正交——规则 3+机器实证造雨人 passed）
 	meta2 := &model.TorrentMetadata{Tags: `["chinese_subtitle","english_audio"]`}
 	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{}); v != "22" {
-		t.Fatalf("有中字也应注入（附五定案）: %q", v)
+		t.Fatalf("中字+英语共存应注入（附七规则 3）: %q", v)
+	}
+	// 国语音轨在场——版本互斥禁英语（规则 1 音轨硬排斥）
+	meta4 := &model.TorrentMetadata{Tags: `["chinese_audio","english_audio"]`}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta4, []string{}); v != "" {
+		t.Fatalf("国语轨在场禁英语（附七规则 1）: %q", v)
+	}
+	// 粤语音轨在场——同上
+	meta5 := &model.TorrentMetadata{Tags: `["cantonese_audio","english_audio"]`}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta5, []string{}); v != "" {
+		t.Fatalf("粤语轨在场禁英语（附七规则 1）: %q", v)
 	}
 	// 无英语证据——不注入
 	meta3 := &model.TorrentMetadata{Tags: `["chinese_subtitle"]`, Subtitle: "【国语】"}

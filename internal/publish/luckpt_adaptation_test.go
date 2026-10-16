@@ -118,10 +118,13 @@ func TestLuckptEnglishTagValue(t *testing.T) {
 	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{"lucky_english_audio"}); v != "22" {
 		t.Errorf("[lucky_english_audio] got %q", v)
 	}
-	// ④ 有中字也注入（§59.326 附五：华语区拦截废止——站方机器判据
-	// 无条件要英语；§59.277 人工文本是必要非禁止条件）
+	// ④ 有中字仍注入（§59.326 附七规则 3：字幕正交——机器实证造雨人 passed）
 	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_subtitle"}); v != "22" {
-		t.Errorf("[有中字·附五] got %q", v)
+		t.Errorf("[有中字·附七] got %q", v)
+	}
+	// ④b 国语音轨在场禁英语（附七规则 1：音轨版本互斥）
+	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_audio"}); v != "" {
+		t.Errorf("[有国语轨·附七] got %q", v)
 	}
 	// ⑤ 无英语证据 → 不注入
 	meta3 := &model.TorrentMetadata{Subtitle: "4K HDR"}
