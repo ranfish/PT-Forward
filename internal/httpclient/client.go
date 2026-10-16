@@ -97,31 +97,32 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 		detector = NewWAFResponseDetector(cfg.WAFPatterns)
 	}
 
+	// §59.327: 层序对调——limiter 下沉 retry 内层（每物理请求 1 配额）。
+	// 原层序 limiter{ breaker{ retry{} } } 一次配额被 retry 内部最多
+	// 4 次物理请求放大（0.5 RPS 标称实际 2 RPS 峰值——12 环境批量 71%
+	// 失败案），且 429 被判定 retryable 形成对抗循环。对调后：
+	// breaker 最外（数逻辑失败——与原语义一致）→ retry → limiter
+	// （每物理请求 Acquire + detector 首响应即冻结）→ 原始 transport。
+	var inner http.RoundTripper = &domainLimiterTransport{
+		limiter:  GlobalLimiter,
+		detector: detector,
+		emitter:  GlobalEmitter,
+		domain:   cfg.Domain,
+		base:     transport,
+	}
+	inner = NewRetryTransport(inner, DefaultRetryConfig(), nil)
+	if cb := GlobalCircuitBreaker; cb != nil {
+		inner = &circuitBreakerTransport{
+			base:     inner,
+			config:   cb.config,
+			logger:   cb.logger,
+			mu:       cb.mu,
+			circuits: cb.circuits,
+		}
+	}
 	return &http.Client{
-		Timeout: cfg.Timeout,
-		Transport: &domainLimiterTransport{
-			limiter:  GlobalLimiter,
-			detector: detector,
-			emitter:  GlobalEmitter,
-			domain:   cfg.Domain,
-			base:     buildRetryChain(transport, cfg.Domain),
-		},
-	}
-}
-
-func buildRetryChain(base http.RoundTripper, domain string) http.RoundTripper {
-	retry := NewRetryTransport(base, DefaultRetryConfig(), nil)
-
-	cb := GlobalCircuitBreaker
-	if cb == nil {
-		return retry
-	}
-	return &circuitBreakerTransport{
-		base:     retry,
-		config:   cb.config,
-		logger:   cb.logger,
-		mu:       cb.mu,
-		circuits: cb.circuits,
+		Timeout:   cfg.Timeout,
+		Transport: inner,
 	}
 }
 
