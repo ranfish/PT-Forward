@@ -35,9 +35,9 @@ func DefaultRetryableCheck(resp *http.Response, err error) bool {
 		return true
 	}
 
-	if resp.StatusCode == 429 {
-		return true
-	}
+	// §59.327: 429 不再重试——站方明确限流信号，重试是对抗；返回后由
+	// 内层 limiter 的 WAF detector（http_429 规则 30s freeze）接管，
+	// 后续逻辑请求在 Acquire 处阻塞退避（全局退避取代单请求硬刚）。
 	if resp.StatusCode >= 500 && resp.StatusCode <= 599 {
 		return true
 	}

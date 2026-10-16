@@ -165,8 +165,9 @@ func TestDefaultRetryableCheck_EdgeCases(t *testing.T) {
 	if !DefaultRetryableCheck(nil, errors.New("err")) {
 		t.Error("error should be retryable")
 	}
-	if !DefaultRetryableCheck(&http.Response{StatusCode: 429}, nil) {
-		t.Error("429 should be retryable")
+	// §59.327: 429 不再重试（站方限流信号——交 WAF detector 冻结退避）
+	if DefaultRetryableCheck(&http.Response{StatusCode: 429}, nil) {
+		t.Error("429 should NOT be retryable (§59.327)")
 	}
 	if !DefaultRetryableCheck(&http.Response{StatusCode: 502}, nil) {
 		t.Error("502 should be retryable")
@@ -602,9 +603,10 @@ func TestBuildRetryChain_WithGlobalCB(t *testing.T) {
 	logger := zap.NewNop()
 	Init(logger)
 
-	chain := buildRetryChain(http.DefaultTransport, "chain-test.local")
-	if chain == nil {
-		t.Error("buildRetryChain should return non-nil")
+	// §59.327: buildRetryChain 已被层序对调取代——验证新构造链非空
+	c := NewSiteHTTPClient(SiteHTTPConfig{Domain: "chain-test.local"})
+	if c == nil || c.Transport == nil {
+		t.Error("NewSiteHTTPClient should return non-nil client/transport")
 	}
 }
 
@@ -613,9 +615,9 @@ func TestBuildRetryChain_WithoutGlobalCB(t *testing.T) {
 	GlobalCircuitBreaker = nil
 	defer func() { GlobalCircuitBreaker = orig }()
 
-	chain := buildRetryChain(http.DefaultTransport, "no-cb.local")
-	if chain == nil {
-		t.Error("buildRetryChain should return non-nil without CB")
+	c := NewSiteHTTPClient(SiteHTTPConfig{Domain: "no-cb.local"})
+	if c == nil || c.Transport == nil {
+		t.Error("client/transport should be non-nil without CB")
 	}
 }
 
