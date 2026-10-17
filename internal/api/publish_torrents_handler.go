@@ -2439,7 +2439,8 @@ func isTransientFetchErr(err error) bool {
 		strings.Contains(s, "domain rate limit") ||
 		strings.Contains(s, "domain frozen") ||
 		strings.Contains(s, "empty_response") ||
-		strings.Contains(s, "Client.Timeout")
+		strings.Contains(s, "Client.Timeout") ||
+		strings.Contains(s, "transient upstream")
 }
 
 // retryDeferredBatch §59.330 P4: deferred 集探测式二轮——等冻结状态归零
@@ -2580,6 +2581,10 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		if err == nil {
 			goto fetched
 		}
+		// §59.330 P4 补丁 c: 上游瞬态标记——直达失败的瞬态语义记录，
+		// 链尾（IYUU 无候选提前 nil / exhausted 裸串）不携带时聚合穿透
+		// （243 三轮实证：keepfrds 全断期 deferred=0 的盲区路径）。
+		upstreamTransient := isTransientFetchErr(err)
 		// 直达失败（D3 拒绝/tid 失效）→ 降级链 §59.65（方案 B，The.Boys 实锤重排——
 		// 老 FetchAndStore 内嵌 IYUU 兜底在此抢跑，克隆 iyuu_cache 覆盖源站语义）:
 		// §59.330 P1（用户链路定案）: ② ②a 簇内其他 comment 直达（D3 校验）
@@ -2618,6 +2623,14 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 				zap.String("hash", hash[:min(10, len(hash))]))
 			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, result.SourceSite)
 			if err != nil {
+				// §59.330 P4 补丁 c: 链尾瞬态聚合——上游（直达/搜索）瞬态
+				// 而 IYUU 无候选提前 nil（裸 exhausted 不含 last 链）时，
+				// 用 upstreamTransient 补判（deferred 语义不因链尾包装丢失）
+				if upstreamTransient || isTransientFetchErr(err) {
+					if !isTransientFetchErr(err) {
+						return fmt.Errorf("transient upstream (direct/search failed transiently): %w", err)
+					}
+				}
 				return err
 			}
 			h.logger.Info("IYUU fallback hit",

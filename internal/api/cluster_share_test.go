@@ -642,3 +642,11 @@ func TestIsTransientFetchErr(t *testing.T) {
 		}
 	}
 }
+
+// §59.330 P4 补丁 c：上游瞬态聚合穿透——IYUU 无候选路径（裸 exhausted）
+// 在 upstreamTransient 时被包装为 transient upstream 可分类。
+func TestTransientUpstreamWrapper(t *testing.T) {
+	if !isTransientFetchErr(fmt.Errorf("transient upstream (direct/search failed transiently): iyuu fallback exhausted: abc")) {
+		t.Error("transient upstream 包装串应判瞬态")
+	}
+}
