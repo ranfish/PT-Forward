@@ -217,6 +217,30 @@ type FreezeStatus struct {
 	Reason      string     `json:"reason,omitempty"`
 }
 
+// MaxFreeRemaining §59.330 P4: 全域冻结状态探测——返回剩余冻结的最大毫秒数
+// （0=全部解冻）。批量二轮的探测式等待判据（L2 定案）。
+func (l *DomainRateLimiter) MaxFreeRemaining() time.Duration {
+	l.mu.Lock()
+	states := make([]*domainState, 0, len(l.domains))
+	for _, s := range l.domains {
+		states = append(states, s)
+	}
+	l.mu.Unlock()
+
+	maxRemain := time.Duration(0)
+	now := time.Now()
+	for _, s := range states {
+		s.mu.Lock()
+		if now.Before(s.frozenUntil) {
+			if d := s.frozenUntil.Sub(now); d > maxRemain {
+				maxRemain = d
+			}
+		}
+		s.mu.Unlock()
+	}
+	return maxRemain
+}
+
 func (l *DomainRateLimiter) GetFreezeStatus(domain string) FreezeStatus {
 	l.mu.Lock()
 	state := l.getOrCreate(domain)

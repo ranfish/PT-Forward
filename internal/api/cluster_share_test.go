@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"strings"
@@ -612,5 +613,30 @@ func TestPropagateEditedClusterFields(t *testing.T) {
 	db.Where("info_hash = ?", "sibB0000000000000000000000000000000000000").First(&cB)
 	if cB.Tags != `["other"]` {
 		t.Fatalf("rss_detail 独立行不应被覆盖: %s", cB.Tags)
+	}
+}
+
+// §59.330 P4: 瞬态错误分类——冻结/熔断/超时类 true；结构类 false。
+func TestIsTransientFetchErr(t *testing.T) {
+	transient := []string{
+		"circuit open for domain https://pt.keepfrds.com",
+		"context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+		"domain rate limit acquire failed",
+		"iyuu fallback exhausted: 瞬态包装 context deadline exceeded",
+	}
+	for _, s := range transient {
+		if !isTransientFetchErr(fmt.Errorf("%s", s)) {
+			t.Errorf("应判瞬态: %s", s)
+		}
+	}
+	structural := []string{
+		"无可用源站（制作组未映射 + 无覆盖）",
+		"iyuu fallback exhausted: abc123",
+		"hash mismatch",
+	}
+	for _, s := range structural {
+		if isTransientFetchErr(fmt.Errorf("%s", s)) {
+			t.Errorf("应判结构: %s", s)
+		}
 	}
 }

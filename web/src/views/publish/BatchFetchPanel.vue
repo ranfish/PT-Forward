@@ -37,7 +37,7 @@
     <!-- 完成汇总 -->
     <a-alert
       v-if="fetchDone"
-      :message="`完成: ${progress.done - progress.failed} 成功${progress.failed > 0 ? ', ' + progress.failed + ' 失败' : ''}`"
+      :message="`完成: ${progress.done - progress.failed} 成功${progress.failed > 0 ? ', ' + progress.failed + ' 失败' : ''}${deferredCount > 0 ? ', ' + deferredCount + ' 瞬态延后重试中' : ''}`"
       :type="progress.failed > 0 ? 'warning' : 'success'"
       show-icon
       closable
@@ -47,6 +47,7 @@
       <div v-if="progress.items.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
         <div v-for="item in progress.items" :key="item.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
           <span v-if="item.status === 'done'" style="color: #52c41a">✓</span>
+          <span v-else-if="item.status === 'deferred'" style="color: #faad14">⏳</span>
           <span v-else-if="item.status === 'failed'" style="color: #ff4d4f">✗</span>
           <span v-else style="color: #999">…</span>
           <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.name }}</span>
@@ -178,6 +179,8 @@ const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
   { title: '大小', key: 'size', width: 80 },
 ]
+
+const deferredCount = computed(() => progress.value.items.filter((it: { status: string }) => it.status === 'deferred').length)
 
 const filteredTorrents = computed(() => {
   if (!searchText.value) return torrents.value

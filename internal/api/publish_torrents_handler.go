@@ -19,6 +19,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -81,6 +82,8 @@ type batchFetchState struct {
 type batchFetchItem struct {
 	Hash   string `json:"hash"`
 	Name   string `json:"name"`
+	Size   int64  `json:"size"`
+	SavePath string `json:"savePath"`
 	Status string `json:"status"` // pending / done / failed
 	Error  string `json:"error,omitempty"`
 }
@@ -2345,7 +2348,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	h.batchFetch.failed = 0
 	h.batchFetch.items = make([]batchFetchItem, len(req.Items))
 	for i, item := range req.Items {
-		h.batchFetch.items[i] = batchFetchItem{Hash: item.Hash, Name: item.Name, Status: "pending"}
+		h.batchFetch.items[i] = batchFetchItem{Hash: item.Hash, Name: item.Name, Size: item.Size, SavePath: item.SavePath, Status: "pending"}
 	}
 	h.batchFetch.mu.Unlock()
 
@@ -2400,15 +2403,106 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 		h.batchFetch.mu.Lock()
 		h.batchFetch.done++
 		if err != nil {
-			h.batchFetch.failed++
-			h.batchFetch.items[i].Status = "failed"
-			h.batchFetch.items[i].Error = err.Error()
+			if isTransientFetchErr(err) {
+				// §59.330 P4: 瞬态失败（冻结/熔断/超时/限流——站会恢复）
+				// → deferred（延后重试）而非 failed（终态）
+				h.batchFetch.items[i].Status = "deferred"
+				h.batchFetch.items[i].Error = err.Error()
+			} else {
+				h.batchFetch.failed++
+				h.batchFetch.items[i].Status = "failed"
+				h.batchFetch.items[i].Error = err.Error()
+			}
 		} else {
 			h.batchFetch.items[i].Status = "done"
 		}
 		h.batchFetch.mu.Unlock()
 
 		time.Sleep(50 * time.Millisecond)
+	}
+
+	// §59.330 P4: deferred 二轮（L2 探测式——等全部冻结状态归零，上限 5min；
+	// RSS 轮询会反复触碰冻结窗，固定等待不稳）。二轮仍瞬态失败转 failed
+	// （错误信息标注瞬态类建议重跑——N1 定案）。
+	h.retryDeferredBatch(ctx, clientUID, isLocal)
+}
+
+// isTransientFetchErr §59.330 P4: 瞬态错误分类——冻结/熔断/超时/限流类
+// （站会恢复）与结构类（无源站/版本不匹配——重试无用）的判定。
+func isTransientFetchErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "circuit open") ||
+		strings.Contains(s, "context deadline exceeded") ||
+		strings.Contains(s, "domain rate limit") ||
+		strings.Contains(s, "domain frozen") ||
+		strings.Contains(s, "empty_response") ||
+		strings.Contains(s, "Client.Timeout")
+}
+
+// retryDeferredBatch §59.330 P4: deferred 集探测式二轮——等冻结状态归零
+// （上限 5min）后重试一轮；仍瞬态失败转 failed（标注建议重跑）。
+func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientUID uint, isLocal bool) {
+	h.batchFetch.mu.Lock()
+	deferred := make([]int, 0)
+	for i := range h.batchFetch.items {
+		if h.batchFetch.items[i].Status == "deferred" {
+			deferred = append(deferred, i)
+		}
+	}
+	h.batchFetch.mu.Unlock()
+	if len(deferred) == 0 {
+		return
+	}
+
+	// 探测等待：全部冻结域归零或上限 5min（每 15s 探测一次）
+	deadline := time.Now().Add(5 * time.Minute)
+	for time.Now().Before(deadline) {
+		if httpclient.GlobalLimiter.MaxFreeRemaining() <= 0 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(15 * time.Second):
+		}
+	}
+
+	retried := 0
+	for _, i := range deferred {
+		h.batchFetch.mu.Lock()
+		if h.batchFetch.items[i].Status != "deferred" {
+			h.batchFetch.mu.Unlock()
+			continue
+		}
+		item := h.batchFetch.items[i]
+		h.batchFetch.mu.Unlock()
+
+		err := h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
+		retried++
+
+		h.batchFetch.mu.Lock()
+		if err == nil {
+			h.batchFetch.items[i].Status = "done"
+			h.batchFetch.items[i].Error = ""
+		} else if isTransientFetchErr(err) {
+			h.batchFetch.failed++
+			h.batchFetch.items[i].Status = "failed"
+			h.batchFetch.items[i].Error = "瞬态失败（站方限流/冻结未恢复），建议稍后重跑: " + err.Error()
+		} else {
+			h.batchFetch.failed++
+			h.batchFetch.items[i].Status = "failed"
+			h.batchFetch.items[i].Error = err.Error()
+		}
+		h.batchFetch.mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+	}
+	if retried > 0 {
+		h.logger.Info("batch-fetch deferred retry round complete",
+			zap.Int("deferred", len(deferred)),
+			zap.Int("retried", retried))
 	}
 }
 
@@ -2473,9 +2567,16 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	var meta *model.TorrentMetadata
 	var err error
 	if result.TorrentID != "" {
+		// §59.330 P4: 直达子预算——直达（等冻结/超时最多烧 25s）即释放，
+		// fallback 链继承 fetchCtx 剩余（活 ctx）。243 批量实证：直达
+		// 60s 烧光后 fallback 全链在死 ctx 上空转（"站点不存在"假象/
+		// 秒过 exhausted——GetSiteConfig 的 GORM ctx 检查失败被文案
+		// 掩盖）。25s=冻结一窗（25s 冻结 × 1 次等待）+ 请求余量。
+		directCtx, directCancel := context.WithTimeout(fetchCtx, 25*time.Second)
 		// §59.61: tid 来源含 coverage_tid/comment_tid——统一走 D3 轻校验入口
 		// （coverage_tid 历史也校验：错缓存宁可降级搜索，符合审计精神）
-		meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, result.SourceSite, result.TorrentID, name)
+		meta, err = h.metadataFetcher.FetchAndStoreDirect(directCtx, hash, result.SourceSite, result.TorrentID, name)
+		directCancel()
 		if err == nil {
 			goto fetched
 		}
