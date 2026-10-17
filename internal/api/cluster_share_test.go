@@ -623,6 +623,8 @@ func TestIsTransientFetchErr(t *testing.T) {
 		"context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
 		"domain rate limit acquire failed",
 		"iyuu fallback exhausted: 瞬态包装 context deadline exceeded",
+		// §59.330 P4 补丁 a：链尾携带 last 错误链（瞬态穿透）
+		"iyuu fallback exhausted: abc123; last: Get \"https://x/details.php?id=1\": circuit open for domain https://x",
 	}
 	for _, s := range transient {
 		if !isTransientFetchErr(fmt.Errorf("%s", s)) {
