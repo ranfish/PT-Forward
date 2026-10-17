@@ -2632,7 +2632,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		// （D3 校验内建）→ IYUU 兜底。
 		// §59.234 ①: 组映射确定源站——搜索词附加组名（suffix 变参——
 		// 提取管道后追加；直接附加 name 会被提取层剥组名尾段）
-		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI, h.canonicalGroupName(ctx, result.GroupName))
+		// §59.330 P4 补丁 b: 搜索分支同款子预算——搜索烧 25s 即释放，
+		// 簇 comment/IYUU 兜底继承剩余（活 ctx——243 实证搜索分支漏改）
+		searchCtx, searchCancel := context.WithTimeout(fetchCtx, 25*time.Second)
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(searchCtx, hash, result.SourceSite, name, size, localMI, h.canonicalGroupName(ctx, result.GroupName))
+		searchCancel()
 		if err == nil {
 			goto fetched
 		}

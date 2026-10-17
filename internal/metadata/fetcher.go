@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"sync"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"context"
 	"encoding/json"
@@ -28,6 +29,10 @@ type Fetcher struct {
 	logger       *zap.Logger
 	siteProvider SiteAdapterProvider
 	settingsRepo *setting.Repository
+
+	// §59.330 P4 补丁：IYUU 兜底最后候选错误（瞬态分类穿透链尾）
+	mu         sync.Mutex
+	lastIYUUErr error
 }
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
@@ -155,6 +160,17 @@ func (f *Fetcher) FetchFromSiteNoFallback(ctx context.Context, infoHash, siteNam
 func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error) {
 	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSite)
 	if meta == nil {
+		// §59.330 P4 补丁：exhausted 携带最后候选错误链——批量瞬态分类
+		// （isTransientFetchErr）依赖错误串判定，链尾裸 hash 丢失上游
+		// 瞬态语义（243 实证：keepfrds 全断期 16 冻结零 deferred——
+		// 瞬态被 exhausted 包装后分类 miss）。
+		f.mu.Lock()
+		last := f.lastIYUUErr
+		f.lastIYUUErr = nil
+		f.mu.Unlock()
+		if last != nil {
+			return nil, fmt.Errorf("iyuu fallback exhausted: %s; last: %w", infoHash, last)
+		}
 		return nil, fmt.Errorf("iyuu fallback exhausted: %s", infoHash)
 	}
 	if err := f.store(ctx, meta); err != nil {
@@ -503,6 +519,7 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 		return nil
 	}
 
+	var lastErr error
 	for _, c := range caches {
 		f.logger.Debug("trying IYUU fallback site",
 			zap.String("fallback_site", c.SiteName),
@@ -511,6 +528,7 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 
 		meta, err := f.fetchFromSite(ctx, infoHash, c.SiteName, c.TorrentID, "iyuu_cache")
 		if err != nil {
+			lastErr = err
 			f.logger.Debug("IYUU fallback site failed",
 				zap.String("site", c.SiteName),
 				zap.Error(err))
@@ -518,6 +536,8 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 		}
 		return meta
 	}
+	_ = lastErr // §59.330 P4 补丁：供调用方分类（见 FetchAndStoreIYUU）——见下
+	f.lastIYUUErr = lastErr
 	return nil
 }
 
