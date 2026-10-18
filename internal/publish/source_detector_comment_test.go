@@ -73,3 +73,33 @@ func TestSelectFetchSite_J2_GrayLogOnly(t *testing.T) {
 		t.Fatalf("J2 应直达财神: got %+v", res)
 	}
 }
+
+// §59.331: 层选落库——SelectFetchSite 带 hash 时 fetch_select_events 留痕
+// （error 级环境可查）。
+func TestSelectFetchSite_PersistEvent(t *testing.T) {
+	d, db := setupDetector(t)
+	if err := db.AutoMigrate(&model.FetchSelectEvent{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// setupDetector 自带：FRDS→朋友 组映射 + 朋友站 cookie 就绪
+	targets := []comment.DirectTarget{{SiteName: "朋友", TorrentID: "123"}}
+	_ = d.SelectFetchSite(context.Background(), "Movie 2024 1080p FRDS", nil, targets, "abcd1234abcd1234abcd1234abcd1234abcd1234")
+
+	var rec model.FetchSelectEvent
+	if err := db.Where("info_hash = ?", "abcd1234abcd1234abcd1234abcd1234abcd1234").First(&rec).Error; err != nil {
+		t.Fatalf("层选事件应落库: %v", err)
+	}
+	if rec.Layer == "" || rec.TorrentID != "123" {
+		t.Fatalf("层选记录不符: %+v", rec)
+	}
+
+	// 不传 hash（旧调用形态）——不落库
+	db.Exec("DELETE FROM fetch_select_events")
+	_ = d.SelectFetchSite(context.Background(), "Movie 2024 1080p CMCTV", nil, targets)
+	var cnt int64
+	db.Model(&model.FetchSelectEvent{}).Count(&cnt)
+	if cnt != 0 {
+		t.Fatalf("无 hash 不应落库: %d", cnt)
+	}
+}

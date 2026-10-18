@@ -2522,7 +2522,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
 	clusterTargets := h.buildClusterTargets(ctx, clientUID, savePath, name, hash)
 
-	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets)
+	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets, hash)
 	if result.SourceSite == "" {
 		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
 	}
