@@ -18,6 +18,8 @@ type SourceSiteDetector struct {
 	logger *zap.Logger
 	cache  map[string]string // group_name → site_name
 	mu     sync.RWMutex
+	// §59.331: 当前层选的种子标识（SelectFetchSite set，logSelect 落库读）
+	pendingHash string
 }
 
 func NewSourceSiteDetector(db *gorm.DB, logger *zap.Logger) *SourceSiteDetector {
@@ -248,8 +250,17 @@ func (d *SourceSiteDetector) getFetchPriority(ctx context.Context) []string {
 // （(client_id, save_path, name) 群内各副本 comment 聚合，调用方经
 // GetClusterComments + comment.Resolve 产出）。官组链消费指向源站的候选（J1/J1b），
 // 非官组链消费任意候选（J2）。nil 表示无簇数据（旧调用方等价行为）。
-func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, coverageSites []model.SiteCoverageCache, clusterTargets []comment.DirectTarget) SourceDetectResult {
+func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, coverageSites []model.SiteCoverageCache, clusterTargets []comment.DirectTarget, infoHash ...string) SourceDetectResult {
 	result := SourceDetectResult{}
+	// §59.331: 层选落库标识（变参形态——现有调用/测试零改动）
+	selHash := ""
+	if len(infoHash) > 0 {
+		selHash = infoHash[0]
+	}
+	d.mu.Lock()
+	d.pendingHash = selHash
+	d.mu.Unlock()
+	defer func() { d.mu.Lock(); d.pendingHash = ""; d.mu.Unlock() }()
 
 	siteMap := make(map[string]model.SiteCoverageCache)
 	for _, c := range coverageSites {
@@ -360,13 +371,39 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 // logSelect §59.59: 选站层选日志——记录命中层级/组名/站点/tid 及其证据来源，
 // "为什么从这站获取"的永久回放依据。layer 为空串时不记（防御）。
 func (d *SourceSiteDetector) logSelect(layer, groupName, siteName, torrentID, evidence string) {
-	if d.logger == nil || layer == "" {
+	if layer == "" {
 		return
 	}
-	d.logger.Info("source site selected",
-		zap.String("layer", layer),
-		zap.String("group", groupName),
-		zap.String("site", siteName),
-		zap.String("tid", torrentID),
-		zap.String("evidence", evidence))
+	if d.logger != nil {
+		d.logger.Info("source site selected",
+			zap.String("layer", layer),
+			zap.String("group", groupName),
+			zap.String("site", siteName),
+			zap.String("tid", torrentID),
+			zap.String("evidence", evidence))
+	}
+	// §59.331: 层选落库——error 级环境可查（freeze_events 同款先例；
+	// pt4 案实证 info/debug 被吞后只能 DB 反向验证——机制化）
+	d.persistSelectEvent(layer, groupName, siteName, torrentID, evidence)
+}
+
+// persistSelectEvent §59.331: 层选事件落库（失败不阻断选站）。
+func (d *SourceSiteDetector) persistSelectEvent(layer, groupName, siteName, torrentID, evidence string) {
+	if d.db == nil {
+		return
+	}
+	d.mu.RLock()
+	h := d.pendingHash
+	d.mu.RUnlock()
+	if h == "" {
+		return
+	}
+	rec := &model.FetchSelectEvent{
+		InfoHash: h, Layer: layer, GroupName: groupName,
+		SiteName: siteName, TorrentID: torrentID, Evidence: evidence,
+	}
+	if err := d.db.Create(rec).Error; err != nil {
+		// 静默失败——落库是可观测增强非主链
+		_ = err
+	}
 }
