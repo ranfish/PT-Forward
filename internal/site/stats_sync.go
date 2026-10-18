@@ -104,7 +104,7 @@ func (s *StatsSyncService) SyncSelectedSites(ctx context.Context, ids []uint) (s
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			siteCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+			siteCtx, cancel := context.WithTimeout(ctx, 50*time.Second)
 			defer cancel()
 
 			if err := s.syncSingleSite(siteCtx, site); err != nil {
@@ -149,7 +149,7 @@ func (s *StatsSyncService) SyncAllSites(ctx context.Context) (synced int, failed
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			siteCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+			siteCtx, cancel := context.WithTimeout(ctx, 50*time.Second)
 			defer cancel()
 
 			if err := s.syncSingleSite(siteCtx, site); err != nil {
@@ -181,7 +181,9 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 	// 使用 NewSiteHTTPClient（经过 GlobalLimiter 流控 + 断路器 + WAF 检测）
 	doer := &adapter.HTTPDoer{Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
 		Domain:              site.Domain,
-		Timeout:             20 * time.Second,
+		// §59.332: keepfrds 慢网络+新版页面——20s 三连超时实证（40-46s
+		// 才完成）；45s 覆盖（走全局代理路径时往返更慢）
+		Timeout:             45 * time.Second,
 		ProxyURL:            effectiveProxy,
 		SkipSSLVerify:       site.SkipSSLVerify,
 		MaxIdleConnsPerHost: 5,
