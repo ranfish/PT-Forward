@@ -1892,6 +1892,14 @@ var (
 	reFontLabelBonus            = regexp.MustCompile(`(?is)魔力值[^<]*</(?:font|span)>.*?]:\s*([\d,.]+)`)
 	reFontLabelBonusSpan        = regexp.MustCompile(`(?is)魔力值[^<]*</(?:font|span)>.*?]:\s*(?:<[^>]*>)*\s*([\d,.]+)`)
 	reFontArrowSeeding          = regexp.MustCompile(`(?i)当前做种[^>]*>[^⬆]*⬆</(?:font|span)>\s*(\d+)`)
+	// §59.332: keepfrds 新版（NexusPHP tailwind/htmx——2026-10-05 改版，
+	// /api/user 下线+DOM 全换）。做种体积站方已不提供（页面体系全无展示——
+	// 首页/userdetails/mybonus/列表页汇总均无），SeedingSize 保持 0。
+	reKfNewSeedingCount        = regexp.MustCompile(`(?is)title=["']当前做种["'][^>]*>\s*</i>\s*(\d+)`)
+	reKfNewUploaded            = regexp.MustCompile(`(?i)class=["']?uploaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
+	reKfNewDownloaded          = regexp.MustCompile(`(?i)class=["']?downloaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
+	reKfNewRatio               = regexp.MustCompile(`(?is)color_ratio["']?>\s*分享率：?</span>\s*([\d.]+)`)
+	reKfNewBonus               = regexp.MustCompile(`(?i)id=["']?totalBonus["']?>([\d,.]+)`)
 	reLinkBonus                 = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
 	reYuanbaoBonus              = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
 )
@@ -2193,7 +2201,10 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		}
 	}
 
-	if m := reNexusFontUploaded.FindStringSubmatch(searchHTML); len(m) > 1 {
+	// §59.332: keepfrds 新版形态最优先（span.uploaded / span.downloaded）
+	if m := reKfNewUploaded.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusFontUploaded.FindStringSubmatch(searchHTML); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reNexusLabelUpload.FindStringSubmatch(searchHTML); len(m) > 1 && !isSiteTotalMatch(searchHTML, m) {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
@@ -2316,6 +2327,12 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 	}
 	if result.SeedingCount == 0 {
 		if m := reAltSeedingCount.FindStringSubmatch(html); len(m) > 1 {
+			result.SeedingCount, _ = strconv.Atoi(m[1])
+		}
+	}
+	if result.SeedingCount == 0 {
+		// §59.332: 新版形态最优先（title="当前做种" 图标后数字）
+		if m := reKfNewSeedingCount.FindStringSubmatch(html); len(m) > 1 {
 			result.SeedingCount, _ = strconv.Atoi(m[1])
 		}
 	}
