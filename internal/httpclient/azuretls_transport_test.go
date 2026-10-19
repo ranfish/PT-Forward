@@ -12,7 +12,7 @@ func TestAzuretlsTransport_Fingerprint(t *testing.T) {
 	if testing.Short() {
 		t.Skip("网络测试")
 	}
-	tr := &azuretlsTransport{session: getAzureSession("tls.peet.ws")}
+	tr := &azuretlsTransport{session: getAzureSession("tls.peet.ws", "")}
 	req, _ := http.NewRequest("GET", "https://tls.peet.ws/api/all", nil)
 	SetBrowserHeaders(req.Header, "")
 	resp, err := tr.RoundTrip(req)
@@ -41,7 +41,7 @@ func TestAzuretlsTransport_POST(t *testing.T) {
 		t.Skip("网络测试")
 	}
 	// 标准 POST 语义（body 传递）
-	tr := &azuretlsTransport{session: getAzureSession("httpbin.org")}
+	tr := &azuretlsTransport{session: getAzureSession("httpbin.org", "")}
 	req, _ := http.NewRequest("POST", "https://httpbin.org/post", strings.NewReader("hello=azuretls"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := tr.RoundTrip(req)
