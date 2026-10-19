@@ -180,13 +180,14 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 	}
 	// 使用 NewSiteHTTPClient（经过 GlobalLimiter 流控 + 断路器 + WAF 检测）
 	doer := &adapter.HTTPDoer{Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
-		Domain:              site.Domain,
+		Domain: site.Domain,
 		// §59.332: keepfrds 慢网络+新版页面——20s 三连超时实证（40-46s
 		// 才完成）；45s 覆盖（走全局代理路径时往返更慢）
 		Timeout:             45 * time.Second,
 		ProxyURL:            effectiveProxy,
 		SkipSSLVerify:       site.SkipSSLVerify,
 		MaxIdleConnsPerHost: 5,
+		TLSPretend:          site.TLSPretend, // §59.333
 	})}
 	a := s.factory.Create(site.Framework, doer)
 

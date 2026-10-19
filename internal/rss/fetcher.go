@@ -22,9 +22,13 @@ type Fetcher struct {
 	logger      *zap.Logger
 }
 
-func NewFetcher(logger *zap.Logger) *Fetcher {
+func NewFetcher(logger *zap.Logger, tlsPretend ...string) *Fetcher {
+	cfg := httpclient.SiteHTTPConfig{}
+	if len(tlsPretend) > 0 {
+		cfg.TLSPretend = tlsPretend[0] // §59.333
+	}
 	return &Fetcher{
-		client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{}),
+		client: httpclient.NewSiteHTTPClient(cfg),
 		logger: logger,
 	}
 }
@@ -40,21 +44,26 @@ func (f *Fetcher) Fetch(ctx context.Context, url string) (*RSSFeed, error) {
 	return f.fetchWithClient(ctx, url, f.client)
 }
 
-func (f *Fetcher) FetchWithProxy(ctx context.Context, url, proxyURL string, skipSSLVerify bool) (*RSSFeed, error) {
-	return f.fetchWithClient(ctx, url, f.clientFor(proxyURL, skipSSLVerify))
+func (f *Fetcher) FetchWithProxy(ctx context.Context, url, proxyURL string, skipSSLVerify bool, tlsPretend ...string) (*RSSFeed, error) {
+	return f.fetchWithClient(ctx, url, f.clientFor(proxyURL, skipSSLVerify, tlsPretend...))
 }
 
-func (f *Fetcher) clientFor(proxyURL string, skipSSLVerify bool) *http.Client {
-	if proxyURL == "" && !skipSSLVerify {
+func (f *Fetcher) clientFor(proxyURL string, skipSSLVerify bool, tlsPretend ...string) *http.Client {
+	tp := ""
+	if len(tlsPretend) > 0 {
+		tp = tlsPretend[0]
+	}
+	if proxyURL == "" && !skipSSLVerify && tp == "" {
 		return f.client
 	}
-	key := proxyURL + "|" + strconv.FormatBool(skipSSLVerify)
+	key := proxyURL + "|" + strconv.FormatBool(skipSSLVerify) + "|" + tp
 	if cached, ok := f.clientCache.Load(key); ok {
 		return cached.(*http.Client)
 	}
 	c := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
 		ProxyURL:      proxyURL,
 		SkipSSLVerify: skipSSLVerify,
+		TLSPretend:    tp, // §59.333
 	})
 	actual, _ := f.clientCache.LoadOrStore(key, c)
 	return actual.(*http.Client)

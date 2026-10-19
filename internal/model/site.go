@@ -159,6 +159,7 @@ type SiteInfo struct {
 	Name        string `json:"name"`
 	BaseURL     string `json:"base_url"`
 	Framework   string `json:"framework"`
+	TLSPretend  string `json:"tls_pretend,omitempty"` // §59.333
 	Enabled     bool   `json:"enabled"`
 	ContentType string `json:"content_type,omitempty"`
 
@@ -345,6 +346,7 @@ type SiteConfig struct {
 
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
+	TLSPretend    string `json:"tls_pretend,omitempty"` // §59.333
 
 	// §59.183: 站点级 .torrent 下载限流（次/小时；0=不限，>0=限额）
 	DownloadHourlyLimit int    `json:"download_hourly_limit,omitempty"`

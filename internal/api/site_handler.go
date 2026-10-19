@@ -1660,6 +1660,7 @@ func buildSiteHTTPClient(s *model.Site, timeout time.Duration) *http.Client {
 		Timeout:       timeout,
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
+		TLSPretend:    s.TLSPretend, // §59.333
 	})
 }
 

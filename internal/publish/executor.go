@@ -1166,6 +1166,7 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		ProxyURL:      proxyURL,
 		SkipSSLVerify: site.SkipSSLVerify,
 		Timeout:       40 * time.Second,
+		TLSPretend:    site.TLSPretend, // §59.333
 	})
 	resp, err := httpClient.Do(req)
 	if err != nil {
