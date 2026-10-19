@@ -203,7 +203,7 @@ func (p *Provider) GetAdapter(ctx context.Context, domain string) (model.SiteAda
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 
-	a := p.factory.Create(site.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, site), site.SkipSSLVerify))
+	a := p.factory.Create(site.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, site), site.SkipSSLVerify, site.TLSPretend))
 
 	p.mu.Lock()
 	p.adapters[domain] = a
@@ -271,7 +271,7 @@ func (p *Provider) BatchLoadSiteResources(ctx context.Context, domains []string)
 			adapters[s.BaseURL] = a
 		} else {
 			p.mu.RUnlock()
-			a := p.factory.Create(s.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, s), s.SkipSSLVerify))
+			a := p.factory.Create(s.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, s), s.SkipSSLVerify, s.TLSPretend))
 			p.mu.Lock()
 			p.adapters[s.BaseURL] = a
 			p.mu.Unlock()

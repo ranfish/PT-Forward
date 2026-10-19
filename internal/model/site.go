@@ -42,11 +42,14 @@ type Site struct {
 	DownloadMode        string `json:"download_mode" gorm:"size:20;default:'template'"`
 	DownloadURLTemplate string `json:"download_url_template" gorm:"size:512"`
 	DownloadPagePattern string `json:"download_page_pattern" gorm:"size:512"`
+	// DetailsURLTemplate: 详情页 URL 模板（如 /t-{id
 	// DetailsURLTemplate: 详情页 URL 模板（如 /t-{id}），空则使用框架默认 /details.php?id={id}
 	DetailsURLTemplate string `json:"details_url_template" gorm:"size:512"`
 
 	FrameworkDetected bool   `json:"framework_detected" gorm:"default:false"`
 	FrameworkVerified bool   `json:"framework_verified" gorm:"default:false"`
+	// §59.333: TLS/H2 指纹伪装（"chrome"=azuretls；空=Go 原生）
+	TLSPretend string `json:"tlsPretend" gorm:"column:tls_pretend;size:20;default:''"`
 	DetectionDetail   string `json:"detection_detail,omitempty" gorm:"size:1024"`
 
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
@@ -384,3 +387,6 @@ type PublishExclusion struct {
 }
 
 func (PublishExclusion) TableName() string { return "publish_exclusions" }
+
+// TLSPretendField §59.333: TLS/H2 指纹伪装列名（sites 表 tls_pretend）。
+const TLSPretendField = "tls_pretend"
