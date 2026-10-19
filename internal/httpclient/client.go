@@ -52,6 +52,9 @@ type SiteHTTPConfig struct {
 	WAFPatterns         []wafPattern
 	MaxIdleConnsPerHost int
 	IdleConnTimeout     time.Duration
+	// §59.333: TLS/H2 指纹伪装开关（"chrome"=azuretls Chrome spec——
+	// keepfrds 案 Ja3/H2 双层 Go 特征被 Cloudflare 识别；空=Go 原生）
+	TLSPretend string
 }
 
 func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
@@ -118,6 +121,16 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 			logger:   cb.logger,
 			mu:       cb.mu,
 			circuits: cb.circuits,
+		}
+	}
+	if cfg.TLSPretend != "" {
+		// §59.333: 伪装域整链替换——azuretls 自带连接池/超时；
+		// domainLimiter 冻结语义由外层 fetch 重试链承接（简化：
+		// 伪装站点极少，先豁免限流链——观察期后按需补 limiter 桥接）
+		s := getAzureSession(cfg.Domain)
+		return &http.Client{
+			Timeout:   cfg.Timeout,
+			Transport: &azuretlsTransport{session: s},
 		}
 	}
 	return &http.Client{

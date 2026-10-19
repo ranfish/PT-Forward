@@ -19,12 +19,16 @@ func NewHTTPDoer() *HTTPDoer {
 	}
 }
 
-func NewHTTPDoerWithSite(proxyURL string, skipSSLVerify bool) *HTTPDoer {
+func NewHTTPDoerWithSite(proxyURL string, skipSSLVerify bool, tlsPretend ...string) *HTTPDoer {
+	cfg := httpclient.SiteHTTPConfig{
+		ProxyURL:      proxyURL,
+		SkipSSLVerify: skipSSLVerify,
+	}
+	if len(tlsPretend) > 0 {
+		cfg.TLSPretend = tlsPretend[0]
+	}
 	return &HTTPDoer{
-		Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
-			ProxyURL:      proxyURL,
-			SkipSSLVerify: skipSSLVerify,
-		}),
+		Client: httpclient.NewSiteHTTPClient(cfg),
 	}
 }
 
