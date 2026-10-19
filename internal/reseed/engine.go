@@ -635,6 +635,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 				Timeout:       10 * time.Second,
 				ProxyURL:      config.ProxyURL,
 				SkipSSLVerify: config.SkipSSLVerify,
+				TLSPretend:    siteInfo.TLSPretend, // §59.333
 			}),
 		})
 	}
