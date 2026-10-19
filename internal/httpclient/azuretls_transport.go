@@ -28,18 +28,28 @@ var (
 	azureSessionsMu sync.Mutex
 )
 
-// getAzureSession §59.333: 站点级 Session 复用（连接池）——同域同 session。
-func getAzureSession(domain string) *azuretls.Session {
+// getAzureSession §59.333: 站点级 Session 复用（连接池）——
+// 缓存 key=domain+proxy（同域不同代理独立 session）。
+// proxyURL 跟随站点配置（ResolveSiteProxy 已解析——站点显式 > 全局开关 >
+// 空直连；azuretls 层不引入额外代理判断）。
+func getAzureSession(domain, proxyURL string) *azuretls.Session {
 	azureSessionsMu.Lock()
 	defer azureSessionsMu.Unlock()
-	if s, ok := azureSessions[domain]; ok {
+	key := domain + "|" + proxyURL
+	if s, ok := azureSessions[key]; ok {
 		return s
 	}
 	s := azuretls.NewSession()
 	s.ApplyJa3("", azuretls.Chrome) // 内置 Chrome spec（Ja3+H2+伪头序一体）
 	s.ApplyHTTP2("")
+	if proxyURL != "" {
+		if err := s.SetProxy(proxyURL); err != nil {
+			// 代理设置失败——降级直连（不阻断——外层错误分类承接）
+			_ = err
+		}
+	}
 	s.MaxRedirects = 5
-	azureSessions[domain] = s
+	azureSessions[key] = s
 	return s
 }
 
