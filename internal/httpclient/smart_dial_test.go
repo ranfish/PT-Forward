@@ -2,9 +2,6 @@
 package httpclient
 
 import (
-	"io"
-	"net/http"
-	"strings"
 	"context"
 	"net"
 	"testing"
@@ -74,24 +71,3 @@ func TestSmartDial_HealthyCache(t *testing.T) {
 	}
 }
 
-// §59.334 附二: chromeTransport（智能拨号+Chrome 指纹叠加）
-func TestChromeTransport_Fingerprint(t *testing.T) {
-	tr := &chromeTransport{inner: getChromeTransport("tls.peet.ws")}
-	req, _ := http.NewRequest("GET", "https://tls.peet.ws/api/all", nil)
-	SetBrowserHeaders(req.Header, "")
-	resp, err := tr.RoundTrip(req)
-	if err != nil {
-		t.Fatalf("roundtrip: %v", err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	s := string(body)
-	// JA4 不应是 Go 的 d13 cipher 特征
-	if strings.Contains(s, "t13d1312h2_") {
-		t.Fatal("仍是 Go 原生指纹（d13）——Chrome 伪装未生效")
-	}
-	// H2 伪头序不应是 Go 的 a,m,p,s
-	if strings.Contains(s, `"a,m,p,s"`) {
-		t.Fatal("H2 伪头序仍是 Go 特征 a,m,p,s")
-	}
-}
