@@ -37,17 +37,23 @@ var (
 )
 
 // getChromeSession §59.334 附二: 站点级 Session 复用
-func getChromeSession(domain string) *azuretls.Session {
+func getChromeSession(domain, proxyURL string) *azuretls.Session {
 	chromeSessionsMu.Lock()
 	defer chromeSessionsMu.Unlock()
-	if s, ok := chromeSessions[domain]; ok {
+	key := domain + "|" + proxyURL
+	if s, ok := chromeSessions[key]; ok {
 		return s
 	}
 	s := azuretls.NewSession()
 	s.ApplyJa3("", azuretls.Chrome)
 	s.ApplyHTTP2("")
+	if proxyURL != "" {
+		if err := s.SetProxy(proxyURL); err != nil {
+			_ = err // 代理失败降级直连（外层错误分类承接）
+		}
+	}
 	s.MaxRedirects = 5
-	chromeSessions[domain] = s
+	chromeSessions[key] = s
 	return s
 }
 
