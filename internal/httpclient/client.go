@@ -127,7 +127,7 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 		// （智能拨号 + Chrome TLS/H2 指纹完全叠加，替代 azuretlsTransport）
 		return &http.Client{
 			Timeout:   cfg.Timeout,
-			Transport: &chromeTransport{session: getChromeSession(cfg.Domain), domain: cfg.Domain},
+			Transport: &chromeTransport{session: getChromeSession(cfg.Domain, cfg.ProxyURL), domain: cfg.Domain},
 		}
 	}
 	return &http.Client{
