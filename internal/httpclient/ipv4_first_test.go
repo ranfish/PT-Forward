@@ -49,7 +49,7 @@ func TestFilterIPv4(t *testing.T) {
 	}
 }
 
-// dialContextIPv4First 对 IP 字面量的处理
+// dialContextSmart 对 IP 字面量的处理
 func TestDialContextIPv4First_IPLiteral(t *testing.T) {
 	ctx := context.Background()
 	called := false
@@ -61,7 +61,7 @@ func TestDialContextIPv4First_IPLiteral(t *testing.T) {
 		}
 		return nil, nil
 	}
-	fn := dialContextIPv4First(mockDial)
+	fn := dialContextSmart(mockDial)
 	_, _ = fn(ctx, "tcp", "127.0.0.1:80")
 	if !called {
 		t.Error("IPv4 字面量应直接走原始 dial")
