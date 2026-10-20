@@ -123,13 +123,11 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 		}
 	}
 	if cfg.TLSPretend != "" {
-		// §59.333: 伪装域整链替换——azuretls 自带连接池/超时；
-		// domainLimiter 冻结语义由外层 fetch 重试链承接（简化：
-		// 伪装站点极少，先豁免限流链——观察期后按需补 limiter 桥接）
-		s := getAzureSession(cfg.Domain, cfg.ProxyURL) // §59.333 附：代理跟随站点配置
+		// §59.334 附二: Chrome 指纹传输层——拆解 azuretls 分层组合
+		// （智能拨号 + Chrome TLS/H2 指纹完全叠加，替代 azuretlsTransport）
 		return &http.Client{
 			Timeout:   cfg.Timeout,
-			Transport: &azuretlsTransport{session: s},
+			Transport: &chromeTransport{inner: getChromeTransport(cfg.Domain)},
 		}
 	}
 	return &http.Client{
