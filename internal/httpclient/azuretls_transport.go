@@ -48,6 +48,7 @@ func getAzureSession(domain, proxyURL string) *azuretls.Session {
 			_ = err
 		}
 	}
+
 	s.MaxRedirects = 5
 	azureSessions[key] = s
 	return s
