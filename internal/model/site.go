@@ -50,6 +50,9 @@ type Site struct {
 	FrameworkVerified bool   `json:"framework_verified" gorm:"default:false"`
 	// §59.333: TLS/H2 指纹伪装（"chrome"=azuretls；空=Go 原生）
 	TLSPretend string `json:"tlsPretend" gorm:"column:tls_pretend;size:20;default:''"`
+	// §59.336: 浏览器 fallback——详情页 HTTP 失败时用内置 Chromium 兜底
+	// （keepfrds 案：CF 对详情页检测严于首页/RSS，azuretls 不足，真实浏览器通过）
+	BrowserFallback bool `json:"browserFallback" gorm:"column:browser_fallback;default:false"`
 	DetectionDetail   string `json:"detection_detail,omitempty" gorm:"size:1024"`
 
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
@@ -160,6 +163,8 @@ type SiteInfo struct {
 	BaseURL     string `json:"base_url"`
 	Framework   string `json:"framework"`
 	TLSPretend  string `json:"tls_pretend,omitempty"` // §59.333
+	// §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
+	BrowserFallback bool   `json:"browser_fallback,omitempty"`
 	Enabled     bool   `json:"enabled"`
 	ContentType string `json:"content_type,omitempty"`
 
@@ -347,6 +352,9 @@ type SiteConfig struct {
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
 	TLSPretend    string `json:"tls_pretend,omitempty"` // §59.333
+
+	// §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
+	BrowserFallback bool `json:"browser_fallback,omitempty"` // §59.336
 
 	// §59.183: 站点级 .torrent 下载限流（次/小时；0=不限，>0=限额）
 	DownloadHourlyLimit int    `json:"download_hourly_limit,omitempty"`
