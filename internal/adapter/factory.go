@@ -3,6 +3,7 @@ package adapter
 import (
 	"net/http"
 
+	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -34,15 +35,22 @@ func NewHTTPDoerWithSite(proxyURL string, skipSSLVerify bool, tlsPretend ...stri
 
 // Factory 按框架名创建 adapter 实例。
 // §56.13 方案 B: engine 可选注入到 NexusPHP/Unit3D 等 HTML 框架的 adapter。
+// §59.336: browser 可选注入到 NexusPHP adapter（详情页 fallback）。
 type Factory struct {
-	logger *zap.Logger
-	engine *extract.Engine
+	logger  *zap.Logger
+	engine  *extract.Engine
+	browser *browser.Fetcher
 }
 
-// NewFactory 创建 adapter 工厂。engine 可为 nil（退化为 legacy regexp 提取）。
+// NewFactory 创建 adapter 工厂。engine/browser 可为 nil
+// （engine nil 退化为 legacy regexp；browser nil 不启用 fallback）。
 func NewFactory(logger *zap.Logger, engine *extract.Engine) *Factory {
 	return &Factory{logger: logger, engine: engine}
 }
+
+// SetBrowserFetcher 注入浏览器获取器（§59.336）。
+// 容器无 Chromium 时保持 nil——fallback 优雅降级为纯 HTTP。
+func (f *Factory) SetBrowserFetcher(b *browser.Fetcher) { f.browser = b }
 
 func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 	switch framework {
@@ -50,6 +58,9 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		a := NewNexusPHPAdapter(doer, f.logger)
 		if f.engine != nil {
 			a.SetEngine(f.engine)
+		}
+		if f.browser != nil {
+			a.SetBrowserFetcher(f.browser)
 		}
 		return a
 	case "tnode":

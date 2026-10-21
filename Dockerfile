@@ -42,6 +42,8 @@ RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/bookworm.li
         fonts-noto-cjk \
         libass9 libfontconfig1 libharfbuzz0b libfribidi0 \
         libplacebo349 libzimg2 libjpeg62-turbo \
+        chromium \
+        chromium-sandbox \
     && rm /etc/apt/bookworm.list \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r pt-forward && useradd -r -g pt-forward pt-forward

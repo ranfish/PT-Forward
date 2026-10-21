@@ -11,6 +11,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // §59.319 附六：DefaultServeMux 注册 pprof handler（§59.279 基建修复）
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/ranfish/pt-forward/frontend"
 	"github.com/ranfish/pt-forward/internal/adapter"
+	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/api"
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/auth"
@@ -306,6 +308,18 @@ func main() {
 	publicExtractor := extract.NewPublicExtractor("", "")
 	extractEngine := extract.NewEngine(publicExtractor, nil)
 	adapterFactory := adapter.NewFactory(log, extractEngine)
+	// §59.336: 浏览器 fallback——容器内置 Chromium 时注入（29 裸机无
+	// Chromium 自动跳过；mpv 同模式）。keepfrds 案：CF 详情页检测严于
+	// 首页/RSS，真实浏览器 + Cookie 实测通过，azuretls 不足。
+	if _, err := exec.LookPath("chromium"); err == nil {
+		adapterFactory.SetBrowserFetcher(browser.NewFetcher(log))
+		log.Info("browser fallback enabled (chromium found)")
+	} else if _, err := exec.LookPath("chromium-browser"); err == nil {
+		adapterFactory.SetBrowserFetcher(browser.NewFetcher(log))
+		log.Info("browser fallback enabled (chromium-browser found)")
+	} else {
+		log.Info("browser fallback disabled (no chromium in PATH)")
+	}
 	siteProvider := site.NewProvider(db, adapterFactory, log)
 
 	clientManager := client.NewManager(db, log)

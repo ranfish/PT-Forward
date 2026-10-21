@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -70,14 +71,19 @@ var (
 )
 
 type NexusPHPAdapter struct {
-	doer   *HTTPDoer
-	logger *zap.Logger
-	engine *extract.Engine // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
+	doer    *HTTPDoer
+	logger  *zap.Logger
+	engine  *extract.Engine   // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
+	browser *browser.Fetcher  // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
 }
 
 func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
 	return &NexusPHPAdapter{doer: doer, logger: logger}
 }
+
+// SetBrowserFetcher 注入浏览器获取器（§59.336）。
+// nil 时不启用 fallback（默认）——容器无 Chromium 时优雅降级。
+func (a *NexusPHPAdapter) SetBrowserFetcher(f *browser.Fetcher) { a.browser = f }
 
 // SetEngine 注入 Engine（§56.13 方案 B）。
 // 启动时由 adapter.Factory.Create 调用。engine == nil 时退化为 legacy regexp 提取。
@@ -327,9 +333,43 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 }
 
 // fetchDetailsHTML 负责详情页 HTTP GET，返回原始 HTML。
+// §59.336: site.browser_fallback=true 且 HTTP 失败时，用内置
+// Chromium 兜底（keepfrds 案：CF 对详情页检测严于首页/RSS，
+// azuretls Chrome 不足，真实浏览器 + Cookie 实测一次通过）。
 func (a *NexusPHPAdapter) fetchDetailsHTML(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
+	html, httpErr := a.fetchDetailsHTMLViaHTTP(ctx, config, u)
+	if httpErr == nil {
+		return html, nil
+	}
+
+	// §59.336: 浏览器 fallback（开关开+获取器可用才走）
+	if config.BrowserFallback && a.browser != nil {
+		if a.logger != nil {
+			a.logger.Info("nexusphp: detail HTTP failed, browser fallback",
+				zap.String("domain", config.Domain),
+				zap.String("torrent_id", torrentID),
+				zap.Error(httpErr))
+		}
+		brHTML, brErr := a.browser.FetchHTML(ctx, u, config.Cookie, "", 45*time.Second)
+		if brErr == nil && len(brHTML) > 1000 {
+			return brHTML, nil
+		}
+		if a.logger != nil {
+			a.logger.Warn("nexusphp: browser fallback failed",
+				zap.String("domain", config.Domain),
+				zap.String("torrent_id", torrentID),
+				zap.Int("html_len", len(brHTML)),
+				zap.Error(brErr))
+		}
+	}
+	return "", httpErr
+}
+
+// fetchDetailsHTMLViaHTTP 原详情页 HTTP GET 逻辑（§59.336 从
+// fetchDetailsHTML 拆出，零改动）。
+func (a *NexusPHPAdapter) fetchDetailsHTMLViaHTTP(ctx context.Context, config *model.SiteConfig, u string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return "", networkError("构造请求失败", err)

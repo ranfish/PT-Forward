@@ -408,6 +408,7 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		ProxyURL:            s.ProxyURL,
 		SkipSSLVerify:       s.SkipSSLVerify,
 		TLSPretend:          s.TLSPretend, // §59.333
+		BrowserFallback:     s.BrowserFallback, // §59.336
 		AssumeFree:          s.AssumeFree,
 	}
 	return info
@@ -466,6 +467,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
 		TLSPretend:    s.TLSPretend, // §59.333
+		BrowserFallback: s.BrowserFallback, // §59.336
 		HRStrategy:    s.HRStrategy,
 
 		DownloadHourlyLimit:   s.DownloadHourlyLimit,
