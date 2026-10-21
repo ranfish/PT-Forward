@@ -71,9 +71,11 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 		return "", fmt.Errorf("browser navigate: %w", err)
 	}
 
-	f.logger.Debug("browser fetch success",
-		zap.String("url", url),
-		zap.Int("html_len", len(html)))
+	if f.logger != nil {
+		f.logger.Debug("browser fetch success",
+			zap.String("url", url),
+			zap.Int("html_len", len(html)))
+	}
 	return html, nil
 }
 
