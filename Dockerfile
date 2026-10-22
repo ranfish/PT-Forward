@@ -44,6 +44,7 @@ RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/bookworm.li
         libplacebo349 libzimg2 libjpeg62-turbo \
         chromium \
         chromium-sandbox \
+        tini \
     && rm /etc/apt/bookworm.list \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r pt-forward && useradd -r -g pt-forward pt-forward
@@ -51,6 +52,9 @@ RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/bookworm.li
 COPY --from=builder /pt-forward /usr/local/bin/pt-forward
 COPY bin/amd64/mpv-new /usr/local/bin/mpv
 RUN chmod 755 /usr/local/bin/pt-forward /usr/local/bin/mpv
+# §59.336 附四: tini 作 PID 1——reap chromedp/Chromium 僵尸进程
+# （243 实测 384 进程中 288 zombie：chromedp kill 后无人 wait）
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # §59.167 容器日志默认 error 级（仅错误+首次密码直打印——info 级刷屏用户定案治理；
 # 需要详细日志：docker run -e PTF_LOG_LEVEL=info）
