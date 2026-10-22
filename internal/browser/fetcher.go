@@ -32,6 +32,13 @@ func NewFetcher(logger *zap.Logger) *Fetcher {
 
 // FetchHTML 用 Chromium 加载页面并返回完整 HTML。
 // cookie 格式：与 PT-Forward 站点 cookie 一致（"k=v; k2=v2"）。
+//
+// §59.336 附：独立超时预算——调用方 ctx 常是已被 HTTP 尝试烧掉
+// 大部分的预算（如批量直达 25s 子预算），fallback 若继承之则
+// Chromium 启动即死（243 实测 3 次触发全败 context deadline
+// exceeded、进程数 0）。故 WithoutCancel 隔离父 ctx deadline，
+// 用本函数的 timeout 参数作为完整独立预算。父 ctx 主动取消
+// （Done 关闭）仍会中断浏览器任务——通过 watchCancel 转发。
 func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, timeout time.Duration) (string, error) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
@@ -39,6 +46,17 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 	if userAgent == "" {
 		userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	}
+
+	// 隔离父 deadline，保留父取消信号
+	taskCtx, taskCancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer taskCancel()
+	go func() {
+		select {
+		case <-ctx.Done():
+			taskCancel()
+		case <-taskCtx.Done():
+		}
+	}()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
@@ -49,7 +67,7 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 		chromedp.UserAgent(userAgent),
 	)
 
-	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	allocCtx, allocCancel := chromedp.NewExecAllocator(taskCtx, opts...)
 	defer allocCancel()
 
 	browserCtx, browserCancel := chromedp.NewContext(allocCtx)
