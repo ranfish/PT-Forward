@@ -48,12 +48,18 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 	}
 
 	// 隔离父 deadline，保留父取消信号
+	// §59.336 附三：只转发主动取消（context.Canceled）——父 deadline
+	// 到期（DeadlineExceeded）是 fallback 的常态触发条件（HTTP 烧光
+	// 预算后才轮到浏览器），不能转发；243 二轮实测 deadline 到期被
+	// 误转发致 Chromium 全灭（context canceled、进程数 0）。
 	taskCtx, taskCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer taskCancel()
 	go func() {
 		select {
 		case <-ctx.Done():
-			taskCancel()
+			if ctx.Err() == context.Canceled {
+				taskCancel()
+			}
 		case <-taskCtx.Done():
 		}
 	}()
