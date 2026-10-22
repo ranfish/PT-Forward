@@ -67,5 +67,7 @@ VOLUME /data
 VOLUME /config
 VOLUME /logs
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://localhost:8765/healthz || exit 1
-ENTRYPOINT ["/usr/local/bin/pt-forward"]
-CMD ["--config", "/config/config.yaml"]
+# §59.336 附四修订: 原此处 ENTRYPOINT 覆盖了上方 tini（Docker 多 ENTRYPOINT
+# 后者生效——243 重建后 PID 1 仍 pt-forward 实证）；pt-forward 移入 CMD 由
+# tini 拉起。
+CMD ["/usr/local/bin/pt-forward", "--config", "/config/config.yaml"]
