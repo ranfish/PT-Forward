@@ -393,7 +393,9 @@
     "blockedSiteWarning": "This site cannot be added currently",
     "createModeDomainLocked": "Auto-filled by system whitelist",
     "reseedTarget": "Reseed Probe",
-    "publishUnsupported": "Publish not adapted"
+    "publishUnsupported": "Publish not adapted",
+    "browserFallback": "Browser Fallback",
+    "browserFallbackHint": "Fetch detail pages with built-in Chromium when HTTP fails (Docker image required)"
   },
   "downloader": {
     "title": "Downloader Management",

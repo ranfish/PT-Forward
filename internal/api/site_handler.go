@@ -132,6 +132,8 @@ type updateSiteRequest struct {
 	UseGlobalProxy *bool   `json:"useGlobalProxy,omitempty"`
 	SkipSSLVerify  *bool   `json:"skipSslVerify,omitempty"`
 	MaxConcurrent  *int    `json:"maxConcurrent,omitempty"`
+	// §59.336: 浏览器 fallback（详情页 HTTP 失败时内置 Chromium 兜底）
+	BrowserFallback *bool `json:"browserFallback,omitempty"`
 	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
 	DownloadHourlyLimit *int `json:"downloadHourlyLimit,omitempty"`
 
@@ -201,6 +203,7 @@ type siteResponse struct {
 	ProxyURL            string `json:"proxyUrl,omitempty"`
 	UseGlobalProxy      bool   `json:"useGlobalProxy"`
 	SkipSSLVerify       bool   `json:"skipSslVerify"`
+	BrowserFallback     bool   `json:"browserFallback"` // §59.336
 	MaxConcurrent       int    `json:"maxConcurrent"`
 	DownloadHourlyLimit int    `json:"downloadHourlyLimit"`
 
@@ -325,6 +328,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		ProxyURL:            s.ProxyURL,
 		UseGlobalProxy:      s.UseGlobalProxy,
 		SkipSSLVerify:       s.SkipSSLVerify,
+		BrowserFallback:     s.BrowserFallback, // §59.336
 		MaxConcurrent:       s.MaxConcurrent,
 		DownloadHourlyLimit: s.DownloadHourlyLimit,
 
@@ -980,6 +984,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.SkipSSLVerify != nil {
 		s.SkipSSLVerify = *req.SkipSSLVerify
+	}
+	if req.BrowserFallback != nil { // §59.336
+		s.BrowserFallback = *req.BrowserFallback
 	}
 	if req.MaxConcurrent != nil {
 		s.MaxConcurrent = *req.MaxConcurrent
