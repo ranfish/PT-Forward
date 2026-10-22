@@ -57,6 +57,7 @@
         <a-descriptions-item v-if="needsCookie" :label="t('site.cookieCloudSyncLabel')">{{ site.cookieCloudSync ? t('common.yes') : t('common.no') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.proxyAddress')">{{ site.proxyUrl || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.skipSslVerify')">{{ site.skipSslVerify ? t('common.yes') : t('common.no') }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.browserFallback')">{{ site.browserFallback ? t('common.yes') : t('common.no') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.maxConcurrent')">{{ site.maxConcurrent || 2 }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(site.createdAt) }}</a-descriptions-item>
       </a-descriptions>
@@ -156,6 +157,12 @@
             <a-col :span="8">
               <a-form-item :label="t('site.skipSslVerify')">
                 <a-switch v-model:checked="settingsForm.skipSslVerify" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item :label="t('site.browserFallback')">
+                <a-switch v-model:checked="settingsForm.browserFallback" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.browserFallbackHint') }}</div>
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -349,6 +356,7 @@ const settingsForm = reactive({
   cookieCloudSync: false,
   proxyUrl: '',
   skipSslVerify: false,
+  browserFallback: false,
   maxConcurrent: 2,
   downloadHourlyLimit: 95,
   hrStrategy: '',
@@ -491,6 +499,7 @@ async function fetchSite() {
       cookieCloudSync: site.value.cookieCloudSync || false,
       proxyUrl: site.value.proxyUrl || '',
       skipSslVerify: site.value.skipSslVerify || false,
+      browserFallback: site.value.browserFallback || false,
       maxConcurrent: site.value.maxConcurrent || 2,
       downloadHourlyLimit: site.value.downloadHourlyLimit !== undefined ? site.value.downloadHourlyLimit : 95,
       hrStrategy: site.value.hrStrategy || '',
@@ -545,6 +554,7 @@ async function updateSettings() {
       cookieCloudSync: settingsForm.cookieCloudSync,
       proxyUrl: settingsForm.proxyUrl,
       skipSslVerify: settingsForm.skipSslVerify,
+      browserFallback: settingsForm.browserFallback,
       maxConcurrent: settingsForm.maxConcurrent,
       downloadHourlyLimit: settingsForm.downloadHourlyLimit,
       hrStrategy: settingsForm.hrStrategy,

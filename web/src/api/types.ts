@@ -287,6 +287,7 @@ export interface Site {
   overrideSavePath?: string
   proxyUrl?: string
   skipSslVerify: boolean
+  browserFallback: boolean
   maxConcurrent: number
   downloadHourlyLimit: number
   uploadBytes: string
