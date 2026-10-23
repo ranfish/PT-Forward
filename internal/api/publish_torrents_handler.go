@@ -2398,7 +2398,25 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 			continue
 		}
 
-		err := h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
+		// §59.339: 单颗 watchdog——链路任何一环挂死（如 HTTP/2 半死流）
+		// 时兜底放行批次（防 active 永锁 409）。根修在 DrainBody 限时，
+		// 此为结构性第二防线；超时 goroutine 由根修唤醒退出（若仍有
+		// 极端泄漏，代价一颗 goroutine 换整批可用）。
+		type fetchResult struct{ err error }
+		fetchDone := make(chan fetchResult, 1)
+		go func() {
+			fetchDone <- fetchResult{h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)}
+		}()
+		var err error
+		select {
+		case r := <-fetchDone:
+			err = r.err
+		case <-time.After(10 * time.Minute):
+			err = fmt.Errorf("单颗获取 watchdog 超时 10min（链路挂死兜底）: %s", item.Name[:min(40, len(item.Name))])
+			h.logger.Error("batch-fetch: watchdog timeout, skipping stuck item",
+				zap.String("hash", item.Hash[:min(10, len(item.Hash))]),
+				zap.String("name", item.Name[:min(50, len(item.Name))]))
+		}
 
 		h.batchFetch.mu.Lock()
 		h.batchFetch.done++
