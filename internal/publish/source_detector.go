@@ -365,6 +365,45 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 		}
 	}
 
+	// §59.337 ④: tracker-only 覆盖选站搜索——组映射/comment/coverage(tid) 全
+	// miss 后的救回层：tracker 铁证（种子 announce 在该站 = confidence 1.0）
+	// 仍可确定站点，只是无 tid（L0 tracker 解析不产生 tid）→ 选站 + 空 tid
+	// 走搜索反查。位置最后：前四层有 tid 直达更便宜（§59.330 P1 本地决策
+	// 优先于网络操作同理）。多站按 fetch_priority 单选（与 ② 对称）；
+	// 无优先级命中时任选第一个有 cookie 的站（确定性兜底）。
+	{
+		trackerOnly := make(map[string]struct{})
+		for siteName, c := range siteMap {
+			if c.TorrentID == "" && c.Source == model.CoverageSourceTracker {
+				trackerOnly[siteName] = struct{}{}
+			}
+		}
+		if len(trackerOnly) > 0 {
+			tryOrder := make([]string, 0, len(trackerOnly))
+			for _, siteName := range d.getFetchPriority(ctx) {
+				if _, ok := trackerOnly[siteName]; ok {
+					tryOrder = append(tryOrder, siteName)
+				}
+			}
+			if len(tryOrder) == 0 {
+				for siteName := range trackerOnly {
+					tryOrder = append(tryOrder, siteName)
+				}
+			}
+			for _, siteName := range tryOrder {
+				var site model.Site
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+					result.SourceSite = site.Name
+					result.SourceSiteID = site.ID
+					result.TorrentID = ""
+					result.AutoDetected = true
+					d.logSelect("④tracker覆盖_搜索", groupName, site.Name, "", model.CoverageSourceTracker)
+					return result
+				}
+			}
+		}
+	}
+
 	return result
 }
 

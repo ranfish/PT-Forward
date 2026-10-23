@@ -157,8 +157,10 @@ func (f *Fetcher) FetchFromSiteNoFallback(ctx context.Context, infoHash, siteNam
 
 // FetchAndStoreIYUU §59.65: IYUU coverage 兜底公开化——降级链最后一环
 // （老 FetchAndStore 内嵌私有版抢跑问题已摘除直达链；本方法供调用方显式编排）。
-func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error) {
-	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSite)
+// §59.337: excludeSites 变参化——排除"本次已试站全集"（层选源站+簇直达
+// 试过的站），避免重复直达已失败站烧预算（原单站排除盲区）。
+func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites ...string) (*model.TorrentMetadata, error) {
+	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSites...)
 	if meta == nil {
 		// §59.330 P4 补丁：exhausted 携带最后候选错误链——批量瞬态分类
 		// （isTransientFetchErr）依赖错误串判定，链尾裸 hash 丢失上游
@@ -508,12 +510,17 @@ func fillDetailFromTitle(detail *model.TorrentDetail) {
 // §56.13 方案 B: deriveSiteCode 和 mergeSeedIntoDetail 已移到 adapter 包
 // （adapter 内部调 Engine 时用）。
 
-func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySite string) *model.TorrentMetadata {
+// fetchWithIYUUFallback §59.337: excludeSites 变参——读本地 coverage 缓存
+// （confirmed_has + tid 非空，confidence DESC，限 5 候选）逐站直达。
+func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, excludeSites ...string) *model.TorrentMetadata {
 	var caches []model.SiteCoverageCache
-	if err := f.db.WithContext(ctx).
-		Where("info_hash = ? AND site_name != ? AND status = ? AND torrent_id != ''",
-			infoHash, primarySite, model.CoverageConfirmedHas).
-		Order("confidence DESC").
+	q := f.db.WithContext(ctx).
+		Where("info_hash = ? AND status = ? AND torrent_id != ''",
+			infoHash, model.CoverageConfirmedHas)
+	if len(excludeSites) > 0 {
+		q = q.Where("site_name NOT IN ?", excludeSites)
+	}
+	if err := q.Order("confidence DESC").
 		Limit(5).
 		Find(&caches).Error; err != nil || len(caches) == 0 {
 		return nil

@@ -2519,6 +2519,41 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		}
 	}
 
+	// §59.337: tracker coverage 保证——批量入口不产生 tracker 行（写入只在
+	// 探测查询端点），新种子层选 ④ 空转。此处无 tracker 行时单颗补拉
+	// （GetTrackers 1 次 RPC + MatchAll + 写缓存 tid 空行）——L0 同口径。
+	if h.coverage != nil {
+		hasTracker := false
+		for _, c := range coverageSites {
+			if c.Source == model.CoverageSourceTracker {
+				hasTracker = true
+				break
+			}
+		}
+		if !hasTracker && h.clientMgr != nil {
+			if client, err := h.clientMgr.Get(clientUID); err == nil {
+				if trackers, terr := client.GetTrackers(ctx, hash); terr == nil && len(trackers) > 0 {
+					tm := site.NewTrackerMatcher(h.db)
+					now := time.Now()
+					ttl := now.Add(24 * time.Hour)
+					for _, sn := range tm.MatchAll(trackers) {
+						if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+							InfoHash: hash, SiteName: sn,
+							Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+							Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+						}); cerr == nil {
+							coverageSites = append(coverageSites, model.SiteCoverageCache{
+								InfoHash: hash, SiteName: sn,
+								Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+								Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
 	clusterTargets := h.buildClusterTargets(ctx, clientUID, savePath, name, hash)
 
@@ -2584,14 +2619,21 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		// §59.330 P4 补丁 c: 上游瞬态标记——直达失败的瞬态语义记录，
 		// 链尾（IYUU 无候选提前 nil / exhausted 裸串）不携带时聚合穿透
 		// （243 三轮实证：keepfrds 全断期 deferred=0 的盲区路径）。
-		upstreamTransient := isTransientFetchErr(err)
+		// §59.337: 聚合域扩展全链（直达/簇/IYUU/搜索任一瞬态即 deferred）——
+		// IYUU 提前后链尾变搜索，IYUU 候选全冻结的瞬态原会被搜索错误串掩盖。
+		transientSeen := isTransientFetchErr(err)
+		// §59.337: 已试站全集——IYUU 兜底排除集（原仅排除层选源站，簇直达
+		// 试过的站会重复直达烧预算）。
+		triedSites := []string{result.SourceSite}
 		// 直达失败（D3 拒绝/tid 失效）→ 降级链 §59.65（方案 B，The.Boys 实锤重排——
 		// 老 FetchAndStore 内嵌 IYUU 兜底在此抢跑，克隆 iyuu_cache 覆盖源站语义）:
 		// §59.330 P1（用户链路定案）: ② ②a 簇内其他 comment 直达（D3 校验）
 		// 提到同站搜索前——本地 DB 决策毫秒级优先于网络搜索（243 FRDS 批量
 		// 25 失败案实证：朋友站瞬态失败后先做了同站搜索=再撞冻结墙，簇
-		// comment 直达被饿死在 60s 预算尾部）；仍失败才 ③ 同站搜索（五闸门）
-		// → ④ IYUU coverage 末位兜底（fetch_source=iyuu_cache 审计可辨）。
+		// comment 直达被饿死在 60s 预算尾部）；
+		// §59.337（用户定案链路重排）: ③ IYUU coverage 直达（本地 DB 挑候选
+		// 毫秒级+排除已试站）提到 ④ 同站搜索前——搜索仅在"tid 失效反查"
+		// 场景有价值，异站直达凭证成功率高成本更低。
 		h.logger.Info("direct fetch failed, fallback chain start",
 			zap.String("hash", hash[:min(10, len(hash))]),
 			zap.String("site", result.SourceSite),
@@ -2609,33 +2651,43 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 					zap.String("tid", tgt.TorrentID))
 				goto fetched
 			}
+			triedSites = append(triedSites, tgt.SiteName)
+			if isTransientFetchErr(err) {
+				transientSeen = true
+			}
 		}
-		// ③ 同站搜索（五闸门验证）
+		// ③ IYUU coverage 直达（本地缓存挑未试站，≤5 候选；冻结机制自然限流）
 		if err != nil {
-			h.logger.Info("cluster comments exhausted, trying same-site search",
+			h.logger.Info("cluster comments exhausted, trying IYUU coverage direct",
+				zap.String("hash", hash[:min(10, len(hash))]),
+				zap.Strings("tried_sites", triedSites))
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites...)
+			if err == nil {
+				h.logger.Info("IYUU coverage direct hit",
+					zap.String("hash", hash[:min(10, len(hash))]),
+					zap.String("site", meta.SiteName))
+				goto fetched
+			}
+			if isTransientFetchErr(err) {
+				transientSeen = true
+			}
+		}
+		// ④ 同站搜索（五闸门验证——tid 失效反查的最后手段）
+		if err != nil {
+			h.logger.Info("IYUU coverage exhausted, trying same-site search",
 				zap.String("hash", hash[:min(10, len(hash))]),
 				zap.Error(err))
 			meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
-		}
-		if err != nil {
-			// ④ IYUU coverage 末位兜底
-			h.logger.Info("search failed, IYUU fallback",
-				zap.String("hash", hash[:min(10, len(hash))]))
-			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, result.SourceSite)
 			if err != nil {
-				// §59.330 P4 补丁 c: 链尾瞬态聚合——上游（直达/搜索）瞬态
-				// 而 IYUU 无候选提前 nil（裸 exhausted 不含 last 链）时，
-				// 用 upstreamTransient 补判（deferred 语义不因链尾包装丢失）
-				if upstreamTransient || isTransientFetchErr(err) {
+				// §59.337: 链尾瞬态聚合——全链（直达/簇/IYUU/搜索）任一瞬态
+				// 即 deferred（deferred 语义不因链尾位置变化丢失）。
+				if transientSeen {
 					if !isTransientFetchErr(err) {
-						return fmt.Errorf("transient upstream (direct/search failed transiently): %w", err)
+						return fmt.Errorf("transient upstream (direct/cluster/iyuu/search chain): %w", err)
 					}
 				}
 				return err
 			}
-			h.logger.Info("IYUU fallback hit",
-				zap.String("hash", hash[:min(10, len(hash))]),
-				zap.String("site", meta.SiteName))
 		}
 	} else {
 		// §59.231: ①b 组映射_搜索模式（tid 空）——此前搜索失败直接短路，
@@ -2657,6 +2709,8 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			zap.String("hash", hash[:min(10, len(hash))]),
 			zap.String("site", result.SourceSite),
 			zap.Error(err))
+		// §59.337: 已试站全集（层选源站+簇直达试过的）——IYUU 排除集
+		triedSites := []string{result.SourceSite}
 		for _, tgt := range clusterTargets {
 			if tgt.TorrentID == "" || tgt.SiteName == result.SourceSite {
 				continue
@@ -2669,12 +2723,14 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 					zap.String("tid", tgt.TorrentID))
 				break
 			}
+			triedSites = append(triedSites, tgt.SiteName)
 		}
 		if err != nil {
 			h.logger.Info("cluster comments exhausted, IYUU fallback (mapped-site search path)",
 				zap.String("hash", hash[:min(10, len(hash))]),
+				zap.Strings("tried_sites", triedSites),
 				zap.Error(err))
-			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, result.SourceSite)
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites...)
 		}
 	}
 	if err != nil {

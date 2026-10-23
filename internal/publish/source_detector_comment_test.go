@@ -103,3 +103,39 @@ func TestSelectFetchSite_PersistEvent(t *testing.T) {
 		t.Fatalf("无 hash 不应落库: %d", cnt)
 	}
 }
+
+// §59.337 ④: tracker-only 覆盖选站搜索——组映射/comment/coverage(tid) 全 miss 后，
+// tracker 铁证（tid 空）仍可救：选站+空 tid 走搜索反查
+func TestSelectFetchSite_TrackerOnlySearch(t *testing.T) {
+	d, _ := setupDetector(t)
+	// 组映射 miss（无组名后缀）+ 无 comment + coverage 只有 tracker 行（tid 空）
+	res := d.SelectFetchSite(
+		context.Background(),
+		"Some.Movie.2024.1080p.BluRay.x264", // 无组名——组映射 miss
+		[]model.SiteCoverageCache{{SiteName: "朋友", TorrentID: "", Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker, Confidence: 1.0}},
+		nil,
+	)
+	if res.SourceSite != "朋友" {
+		t.Fatalf("④ tracker-only 应选朋友站, got %q", res.SourceSite)
+	}
+	if res.TorrentID != "" {
+		t.Fatalf("④ tracker-only 应空 tid（搜索模式）, got %q", res.TorrentID)
+	}
+}
+
+// §59.337 ④: 有 tid 的 coverage 层不受影响——③ 兜底先于 ④ 命中
+func TestSelectFetchSite_CoverageTidBeforeTrackerOnly(t *testing.T) {
+	d, _ := setupDetector(t)
+	res := d.SelectFetchSite(
+		context.Background(),
+		"Some.Movie.2024.1080p.BluRay.x264",
+		[]model.SiteCoverageCache{
+			{SiteName: "朋友", TorrentID: "", Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker, Confidence: 1.0},
+			{SiteName: "朋友", TorrentID: "555", Status: model.CoverageConfirmedHas, Source: "iyuu"},
+		},
+		nil,
+	)
+	if res.TorrentID != "555" {
+		t.Fatalf("有 tid 的 coverage 应先于 ④ 命中, got %q", res.TorrentID)
+	}
+}
