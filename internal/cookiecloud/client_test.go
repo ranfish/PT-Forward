@@ -58,7 +58,9 @@ func TestDomainMatches(t *testing.T) {
 		{"example.com", "example.com", true},
 		{".sub.example.com", "example.com", true},
 		{".other.com", "example.com", false},
-		{"example.com", "sub.example.com", false},
+		// §59.338 修正：父域 cookie 适用于子域站点（RFC 6265）——原断言
+		// false 是 bug 本身（cf_clearance/_ga 挂顶层域全被过滤丢失）
+		{"example.com", "sub.example.com", true},
 	}
 	for _, tt := range tests {
 		got := DomainMatches(tt.cookie, tt.target)

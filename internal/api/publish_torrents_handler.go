@@ -2567,7 +2567,10 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	_ = result // 源站选择按组映射/coverage——成人区不会成为组映射目标站，
 	// 此处无需额外代码（防御性注释）
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	// §59.338: 总预算 60s→100s——直达 25s + browser fallback 45s（独立预算
+	// 但父预算不暂停）= 70s 必然击穿 60s，簇直达/IYUU/搜索死 ctx 空转
+	// （243 实证：危情24小时 12 站簇直达 1ms 全灭，凭证从未被真实请求）。
+	fetchCtx, cancel := context.WithTimeout(ctx, 100*time.Second)
 	defer cancel()
 
 	// §59.36 修订: is_local=true 时本地 MI 提前获取（搜索反查前）——
@@ -2603,12 +2606,13 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	var meta *model.TorrentMetadata
 	var err error
 	if result.TorrentID != "" {
-		// §59.330 P4: 直达子预算——直达（等冻结/超时最多烧 25s）即释放，
-		// fallback 链继承 fetchCtx 剩余（活 ctx）。243 批量实证：直达
-		// 60s 烧光后 fallback 全链在死 ctx 上空转（"站点不存在"假象/
-		// 秒过 exhausted——GetSiteConfig 的 GORM ctx 检查失败被文案
-		// 掩盖）。25s=冻结一窗（25s 冻结 × 1 次等待）+ 请求余量。
-		directCtx, directCancel := context.WithTimeout(fetchCtx, 25*time.Second)
+	// §59.338: 直达预算 25s→90s——覆盖主 fallback 45s + enrich fallback 45s
+	// 的物理时长（fallback 独立预算不烧本 ctx，但返回后 enrich/store 继续
+	// 用本 ctx——243 实证 90s 真实工作被 25s ctx 绞杀在最后一步 store：
+	// "store metadata: context deadline exceeded"，browser fetch success
+	// 9 次零落库）。HTTP 尝试的快速失败由 fetchDetailsHTML 内 readBody
+	// 15s 停滞保护承担（不再依赖短 directCtx）。
+	directCtx, directCancel := context.WithTimeout(fetchCtx, 90*time.Second)
 		// §59.61: tid 来源含 coverage_tid/comment_tid——统一走 D3 轻校验入口
 		// （coverage_tid 历史也校验：错缓存宁可降级搜索，符合审计精神）
 		meta, err = h.metadataFetcher.FetchAndStoreDirect(directCtx, hash, result.SourceSite, result.TorrentID, name)

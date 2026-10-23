@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -102,11 +103,30 @@ func fmtES(format string, args ...interface{}) string {
 const maxResponseBodySize = 10 * 1024 * 1024
 
 func readBody(resp *http.Response) ([]byte, error) {
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
-	if err != nil {
-		return nil, networkError("读取响应失败", err)
+	// §59.338: 读停滞保护——死连接 body 阶段挂起（RoundTrip 已返回但
+	// 断流；29/243 实证"写成功读挂起"烧满外层预算 25s）。15s 无进展
+	// 即快速失败（正常 body 毫秒级到达；慢站瓶颈在响应头等待，属
+	// RoundTrip 阶段不受此影响）。错误串带 timeout 关键词——可被
+	// isTransientFetchErr 分类为瞬态（deferred 二轮兜底）。
+	type readResult struct {
+		b   []byte
+		err error
 	}
-	return body, nil
+	ch := make(chan readResult, 1)
+	go func() {
+		b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+		ch <- readResult{b, err}
+	}()
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			return nil, networkError("读取响应失败", r.err)
+		}
+		return r.b, nil
+	case <-time.After(15 * time.Second):
+		resp.Body.Close() // 中断挂起的 Read（goroutine 随之退出）
+		return nil, networkError("读取响应停滞 stalled timeout 15s", nil)
+	}
 }
 
 func drainBody(resp *http.Response) {
