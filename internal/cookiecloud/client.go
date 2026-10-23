@@ -157,10 +157,15 @@ func normalizeDomain(d string) string {
 func DomainMatches(cookieDomain, target string) bool {
 	cd := normalizeDomain(cookieDomain)
 	td := normalizeDomain(target)
-	if cd == td || cd == strings.TrimPrefix(td, "www.") {
+	if cd == td {
 		return true
 	}
-	if strings.HasSuffix(cd, "."+td) {
+	// §59.338: RFC 6265 domain-match 双向——① cookie 域是站点域的父域
+	// 后缀（.keepfrds.com 的 cookie 适用于 pt.keepfrds.com——cf_clearance/
+	// _ga 挂顶层域，原方向反了导致全丢）；② cookie 域是站点域的子域
+	// （站点配置粗粒度域 example.com 时收子域 cookie——旧语义保护场景）。
+	// cookie 同步宁多勿漏（多发 cookie 给站方无害）。
+	if strings.HasSuffix(td, "."+cd) || strings.HasSuffix(cd, "."+td) {
 		return true
 	}
 	cdBase := strings.TrimPrefix(cd, "www.")

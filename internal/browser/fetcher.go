@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"go.uber.org/zap"
 )
@@ -83,8 +84,23 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 	defer timeoutCancel()
 
 	var html string
+	// §59.338: 不用 chromedp.Navigate——它阻塞到 load 事件（全子资源加载完，
+	// 源码 EventLoadEventFired→finished）。keepfrds 详情页图片资源走 CF 慢
+	// 通道永不完成 → 45s 挂满（243 实证：外部 Playwright domcontentloaded
+	// 秒回 54KB，内嵌两轮全超时 html_len=0）。改 page.Navigate 发起即返+
+	// WaitReady("body")（DOM 就绪语义≈domcontentloaded）。
+	navigate := chromedp.ActionFunc(func(ctx context.Context) error {
+		_, _, errorText, err := page.Navigate(url).Do(ctx)
+		if err != nil {
+			return err
+		}
+		if errorText != "" {
+			return fmt.Errorf("page load error %s", errorText)
+		}
+		return nil
+	})
 	tasks := chromedp.Tasks{
-		chromedp.Navigate(url),
+		navigate,
 		chromedp.WaitReady("body"),
 		chromedp.OuterHTML("html", &html),
 	}
@@ -126,7 +142,19 @@ func prependCookieTask(rawURL, cookie string, next chromedp.Tasks) chromedp.Task
 		}
 	}
 	pre := chromedp.Tasks{
-		chromedp.Navigate(scheme + "://" + domain + "/favicon.ico"),
+		// §59.338: 同主任务——page.Navigate 发起即返（favicon 无子资源
+		// 本可 Navigate，统一防患）
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, _, errorText, err := page.Navigate(scheme + "://" + domain + "/favicon.ico").Do(ctx)
+			if err != nil {
+				return err
+			}
+			if errorText != "" {
+				return fmt.Errorf("page load error %s", errorText)
+			}
+			return nil
+		}),
+		chromedp.WaitReady("body"),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return network.SetCookies(params).Do(ctx)
 		}),

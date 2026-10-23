@@ -64,7 +64,11 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 		cfg.MaxIdleConnsPerHost = 10
 	}
 	if cfg.IdleConnTimeout <= 0 {
-		cfg.IdleConnTimeout = 90 * time.Second
+		// §59.338: 90s→45s——CF/keepfrds 空闲连接寿命 60-120s 随机掐（29
+		// 实证空闲 120s 后复用死连接"写成功读挂起"）；45s 主动关闭空闲
+		// 连接，永远不复用可能被服务端掐死的连接（重试 transport 兜底
+		// 概率性失败）。
+		cfg.IdleConnTimeout = 45 * time.Second
 	}
 
 	// §59.319 附二十四: IPv4 优先拨号——部分环境 IPv6 TCP 通但 HTTPS 数据
