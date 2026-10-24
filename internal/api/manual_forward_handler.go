@@ -155,6 +155,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		SiteName    string   `json:"siteName"`
 		Screenshots []string `json:"screenshots"`
 		ClientUID   uint     `json:"clientId"` // §59.21: 查 is_local
+		// §59.341 ③: 用户手动注入的豆瓣链接（Tab4 输入框）——空走 DB 键三级链
+		DoubanLink string `json:"doubanLink"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -184,7 +186,12 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		// （用户报"重新获取海报报 无法解析资源URL"根因）；§59.286 三级顺序链。
 		// §59.286 终版: 三级顺序链（douban→imdb→name，失败落下一级，成功短路
 		// ——与主链同构）+ Force 绕缓存（§59.173 手动重获语义）
+		// §59.341 ③: 用户注入豆瓣链接最高优先（Tab4 输入框——From S01 类
+		// 数据质量差的行用户手动补键）。
 		keys := h.resolvePTGenQueryKeys(ctx, req.InfoHash, req.SiteName, req.Name)
+		if req.DoubanLink != "" {
+			keys = append([]string{req.DoubanLink}, keys...)
+		}
 		var ptgen *model.PTGenResult
 		var lastErr error
 		for _, k := range keys {
@@ -208,6 +215,18 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			} else {
 				result["description"] = ptgen.RawBBCode
 				// §59.20: 不再返回 subtitle——副标题来自源站，PTGen 不覆盖
+			}
+			// §59.341 ③: PTGen 成功且用户注入了链接 → 写回 DB 行的
+			// douban_url（该行从此有键，后续链路/重获复用）。
+			// 写回条件：用户链接与 PTGen 解析结果一致（正常）或 PTGen 未回
+			// 豆瓣链接（部分端点形态）——不一致时不写（防错链污染）。
+			if req.DoubanLink != "" && req.InfoHash != "" &&
+				(ptgen.DoubanURL == req.DoubanLink || ptgen.DoubanURL == "") {
+				if uErr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+					Where("info_hash = ?", req.InfoHash).
+					Updates(map[string]interface{}{"douban_url": req.DoubanLink}).Error; uErr != nil {
+					h.logger.Warn("douban link writeback failed", zap.Error(uErr))
+				}
 			}
 		}
 

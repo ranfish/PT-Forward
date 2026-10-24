@@ -35,7 +35,10 @@ func (h *PublishTorrentsHandler) buildClusterTargets(ctx context.Context, client
 	// 用覆盖缓存 tracker 来源域近似——仅纯数字/相对路径方言需要，缺失则跳过）
 	trackerHost := h.lookupTrackerHost(ctx, selfHash)
 	hosts := map[string]string{selfHash: trackerHost}
-	return publish.BuildClusterTargets(members, resolver, hosts)
+	targets := publish.BuildClusterTargets(members, resolver, hosts)
+	// §59.341 ①: 簇凭证按 fetch_priority 排序（单点——层选②a与执行链簇
+	// 循环共用；原快照插入序——From S01 案 PT地带恒先中分叉修复）。
+	return publish.SortTargetsByFetchPriority(targets, publish.FetchPriorityList(ctx, h.db))
 }
 
 // lookupTrackerHost 从覆盖缓存取该 hash 已知 tracker 域（近似上下文）。

@@ -33,6 +33,11 @@ type Fetcher struct {
 	// §59.330 P4 补丁：IYUU 兜底最后候选错误（瞬态分类穿透链尾）
 	mu         sync.Mutex
 	lastIYUUErr error
+
+	// §59.341 ②（方案 a）: PTGen 可行性回调——IYUU 候选循环内
+	// "获取成功但 PTGen 不可行"换下一候选（与 handler 簇循环同判定）。
+	// nil 时不过滤（未装配）。
+	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool
 }
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
@@ -539,6 +544,13 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 			f.logger.Debug("IYUU fallback site failed",
 				zap.String("site", c.SiteName),
 				zap.Error(err))
+			continue
+		}
+		// §59.341 ②（方案 a）: 获取成功但 PTGen 不可行（站方数据质量差）
+		// → 行保留，换下一 IYUU 候选
+		if f.PTGenViable != nil && !f.PTGenViable(ctx, meta) {
+			f.logger.Info("IYUU fallback site hit but ptgen not viable, trying next",
+				zap.String("site", c.SiteName))
 			continue
 		}
 		return meta

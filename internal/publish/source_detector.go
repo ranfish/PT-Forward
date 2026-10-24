@@ -4,6 +4,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/comment"
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"sync"
 
@@ -353,15 +354,39 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 
 	// ③ coverage ∩ cookie 兜底（map 遍历无序——tid 来源为确定性证据时直达，
 	// §59.59 Q3b 定案保持现状）
-	for siteName, c := range siteMap {
-		var site model.Site
-		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
-			result.SourceSite = site.Name
-			result.SourceSiteID = site.ID
-			result.TorrentID = c.TorrentID
-			result.AutoDetected = false
-			d.logSelect("③coverage兜底", groupName, site.Name, c.TorrentID, c.Source)
-			return result
+	// §59.341 ①: 原 map 遍历无序——改按 fetch_priority 排序遍历
+	// （配置内站按序在前、未配置站字典序兜底确定性）。
+	{
+		coverSites := make([]string, 0, len(siteMap))
+		for siteName := range siteMap {
+			coverSites = append(coverSites, siteName)
+		}
+		rank := make(map[string]int)
+		for i, s := range d.getFetchPriority(ctx) {
+			rank[s] = i
+		}
+		sort.SliceStable(coverSites, func(i, j int) bool {
+			ri, oki := rank[coverSites[i]]
+			rj, okj := rank[coverSites[j]]
+			if oki && okj {
+				return ri < rj
+			}
+			if oki != okj {
+				return oki
+			}
+			return coverSites[i] < coverSites[j]
+		})
+		for _, siteName := range coverSites {
+			c := siteMap[siteName]
+			var site model.Site
+			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+				result.SourceSite = site.Name
+				result.SourceSiteID = site.ID
+				result.TorrentID = c.TorrentID
+				result.AutoDetected = false
+				d.logSelect("③coverage兜底", groupName, site.Name, c.TorrentID, c.Source)
+				return result
+			}
 		}
 	}
 
