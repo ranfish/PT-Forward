@@ -204,6 +204,9 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
 	if metadataFetcher != nil {
 		rt.publishTorrentsHandler.SetMetadataFetcher(metadataFetcher)
+		// §59.341 ②（方案 a）: Fetcher 的 IYUU 候选循环接入 PTGen 可行性
+		// 判定（与 handler 簇循环同函数——装配点单点注入）。
+		metadataFetcher.PTGenViable = rt.publishTorrentsHandler.ptgenViable
 	}
 	if complianceChecker != nil {
 		rt.publishTorrentsHandler.SetComplianceChecker(complianceChecker)

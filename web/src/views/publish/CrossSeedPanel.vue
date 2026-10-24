@@ -191,10 +191,12 @@
                 <a-button :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
               </div>
               <a-textarea v-model:value="form.description" :rows="36" placeholder="BBCode 简介正文" style="font-family: monospace" />
-              <!-- §59.20: maintenanceOnly 模式下外部链接只读展示 -->
-              <div v-if="form.doubanLink || form.imdbLink || form.tmdbLink" style="margin-top: 12px">
-                <span style="color: #999; font-size: 12px; margin-right: 12px">外部链接：</span>
-                <a v-if="form.doubanLink" :href="form.doubanLink" target="_blank" style="margin-right: 8px; font-size: 12px">豆瓣</a>
+              <!-- §59.341 ③: 豆瓣链接可编辑注入（数据质量差的行用户手动补键——
+                   填写后点"重新获取简介（PTGen）"以该链接为最高优先键，成功写回 DB；
+                   影片无豆瓣条目则留空——incomplete 是客观反映） -->
+              <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center">
+                <span style="color: #999; font-size: 12px; white-space: nowrap">豆瓣链接：</span>
+                <a-input v-model:value="form.doubanLink" placeholder="https://movie.douban.com/subject/... （可手动填写补键）" style="flex: 1; font-size: 12px" allow-clear />
                 <a v-if="form.imdbLink" :href="form.imdbLink" target="_blank" style="margin-right: 8px; font-size: 12px">IMDb</a>
                 <a v-if="form.tmdbLink" :href="form.tmdbLink" target="_blank" style="font-size: 12px">TMDb</a>
               </div>
@@ -694,13 +696,15 @@ async function doRefresh(type: string) {
   }
   refreshing.value = type
   try {
-    const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: number } = {
+    const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: number; doubanLink?: string } = {
       type,
       name: selectedTorrent.value.name,
       savePath: selectedTorrent.value.save_path,
       infoHash: selectedTorrent.value.info_hash,
       siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
       clientId: selectedTorrent.value.client_id,
+      // §59.341 ③: Tab4 豆瓣链接注入（intro/poster 重获时用户键最高优先）
+      doubanLink: form.value.doubanLink || '',
     }
     if (type === 'rehost_screenshots') {
       payload.screenshots = form.value.screenshots

@@ -2740,17 +2740,25 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			zap.String("site", result.SourceSite),
 			zap.Error(err))
 		// ② ②a: 簇内其他副本的 comment 凭证逐个直达（排除已试源站；D3 校验内建）
+		// §59.341 ②（方案 a）: 获取成功但 PTGen 不可行（站方数据质量差——
+		// From S01 案 PT地带无豆瓣链接）→ 不 break 换下一凭证站。
 		for _, tgt := range clusterTargets {
 			if tgt.TorrentID == "" || tgt.SiteName == result.SourceSite {
 				continue
 			}
 			meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, tgt.SiteName, tgt.TorrentID, name)
 			if err == nil {
-				h.logger.Info("cluster comment direct hit",
+				if h.ptgenViable(fetchCtx, meta) {
+					h.logger.Info("cluster comment direct hit",
+						zap.String("hash", hash[:min(10, len(hash))]),
+						zap.String("site", tgt.SiteName),
+						zap.String("tid", tgt.TorrentID))
+					goto fetched
+				}
+				// PTGen 不可行：行已落库（保留），换下一凭证
+				h.logger.Info("cluster comment hit but ptgen not viable, trying next",
 					zap.String("hash", hash[:min(10, len(hash))]),
-					zap.String("site", tgt.SiteName),
-					zap.String("tid", tgt.TorrentID))
-				goto fetched
+					zap.String("site", tgt.SiteName))
 			}
 			triedSites = append(triedSites, tgt.SiteName)
 			if isTransientFetchErr(err) {
@@ -2812,17 +2820,23 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			zap.Error(err))
 		// §59.337: 已试站全集（层选源站+簇直达试过的）——IYUU 排除集
 		triedSites := []string{result.SourceSite}
+		// §59.341 ②（方案 a）: 同直达分支——获取成功但 PTGen 不可行换下一凭证
 		for _, tgt := range clusterTargets {
 			if tgt.TorrentID == "" || tgt.SiteName == result.SourceSite {
 				continue
 			}
 			meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, tgt.SiteName, tgt.TorrentID, name)
 			if err == nil {
-				h.logger.Info("cluster comment direct hit (after mapped-site search)",
+				if h.ptgenViable(fetchCtx, meta) {
+					h.logger.Info("cluster comment direct hit (after mapped-site search)",
+						zap.String("hash", hash[:min(10, len(hash))]),
+						zap.String("site", tgt.SiteName),
+						zap.String("tid", tgt.TorrentID))
+					break
+				}
+				h.logger.Info("cluster comment hit but ptgen not viable, trying next (search path)",
 					zap.String("hash", hash[:min(10, len(hash))]),
-					zap.String("site", tgt.SiteName),
-					zap.String("tid", tgt.TorrentID))
-				break
+					zap.String("site", tgt.SiteName))
 			}
 			triedSites = append(triedSites, tgt.SiteName)
 		}
@@ -5627,4 +5641,27 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 		return
 	}
 	Error(w, http.StatusNotFound, 40401, "任务不存在或已过期（30 分钟 TTL）")
+}
+
+// ptgenViable §59.341 ②（方案 a）: PTGen 可行性判定——获取站数据质量的
+// 隐式门（详情页有 douban/imdb 键或 title 可搜中）。簇凭证/IYUU 循环内
+// "获取成功但 PTGen 不可行"→ 不 break 换下一候选（From S01 案：PT地带
+// 获取成功但发布者未填豆瓣链接 → incomplete 陷阱）。PTGen 有缓存——同
+// 键重复判定近零成本（同资源不同站键高度趋同）。
+// h.ptgen == nil（组件未装配）时恒 true（不过滤）。
+func (h *PublishTorrentsHandler) ptgenViable(ctx context.Context, meta *model.TorrentMetadata) bool {
+	if h.ptgen == nil || meta == nil {
+		return true
+	}
+	keys := mainlineQueryKeys(meta.DoubanURL, meta.IMDbURL, meta.Title)
+	if len(keys) == 0 {
+		return false
+	}
+	for _, k := range keys {
+		r, err := h.ptgen.AnalyzePTGen(ctx, k)
+		if err == nil && r != nil && r.RawBBCode != "" {
+			return true
+		}
+	}
+	return false
 }
