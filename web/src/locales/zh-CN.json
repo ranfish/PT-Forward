@@ -397,7 +397,7 @@
     "reseedTarget": "辅种探测",
     "publishUnsupported": "未适配发布",
     "browserFallback": "浏览器兜底",
-    "browserFallbackHint": "详情页 HTTP 失败时用内置 Chromium 浏览器获取（需 Docker 镜像支持）"
+    "browserFallbackHint": "详情页 HTTP 失败时用内置 Chromium 浏览器获取"
   },
   "downloader": {
     "title": "下载器管理",

@@ -53,6 +53,9 @@ type Site struct {
 	// §59.336: 浏览器 fallback——详情页 HTTP 失败时用内置 Chromium 兜底
 	// （keepfrds 案：CF 对详情页检测严于首页/RSS，azuretls 不足，真实浏览器通过）
 	BrowserFallback bool `json:"browserFallback" gorm:"column:browser_fallback;default:false"`
+	// §59.340 C: 站点级获取 RPS（0=全局默认 0.5；keepfrds 特调 0.0667=4/min
+	// ——流控探究五阶段定案：安全 2/min/惩罚带 4/min/封锁 8/min）
+	FetchRPS float64 `json:"fetchRps" gorm:"column:fetch_rps;default:0"`
 	DetectionDetail   string `json:"detection_detail,omitempty" gorm:"size:1024"`
 
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
@@ -355,6 +358,8 @@ type SiteConfig struct {
 
 	// §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
 	BrowserFallback bool `json:"browser_fallback,omitempty"` // §59.336
+	// §59.340 C: 站点级获取 RPS（0=全局默认）
+	FetchRPS float64 `json:"fetch_rps,omitempty"` // §59.340
 
 	// §59.183: 站点级 .torrent 下载限流（次/小时；0=不限，>0=限额）
 	DownloadHourlyLimit int    `json:"download_hourly_limit,omitempty"`

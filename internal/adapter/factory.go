@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -156,4 +157,16 @@ var FrameworkDefaults = map[string]FrameworkDefault{
 		IDStrategy:   "query_param",
 		IDPattern:    "id",
 	},
+}
+
+// RegisterSiteRateLimit §59.340 C: 站点级获取 RPS 注册到全局 limiter
+// （provider.GetAdapter 一处接线；Domain 规范化去 scheme）。
+func RegisterSiteRateLimit(domain string, rps float64) {
+	d := strings.TrimPrefix(strings.TrimPrefix(domain, "https://"), "http://")
+	windowSecs := 60
+	httpclient.GlobalLimiter.SetDomainConfig(d, httpclient.DomainLimitConfig{
+		MaxReqs:       int(rps * float64(windowSecs)),
+		WindowSecs:    windowSecs,
+		MaxConcurrent: 2,
+	})
 }

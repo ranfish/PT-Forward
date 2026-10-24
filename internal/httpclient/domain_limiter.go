@@ -25,6 +25,11 @@ type domainState struct {
 	freezeReason       string
 	concurrentCh       chan struct{}
 	maxConcurrent      int
+	// §59.340 E: 时间窗连续冻结计数——成功穿插不清零（探究实验实证：
+	// 黄牌后站方放行几个请求（consecutiveFreezes 清零）再冻结——
+	// 指数退避永远爬不起来，25s 反复出现；10min 内复冻=同一波）。
+	freezeStreak int
+	lastFreezeAt time.Time
 }
 
 type DomainLimitConfig struct {
@@ -155,7 +160,7 @@ func (l *DomainRateLimiter) Freeze(domain string, duration time.Duration) {
 	l.mu.Unlock()
 
 	state.mu.Lock()
-	state.frozenUntil = time.Now().Add(duration)
+	state.frozenUntil = time.Now().Add(state.streakDuration(duration))
 	state.frozenBy = "auto"
 	state.mu.Unlock()
 }
@@ -169,9 +174,27 @@ func (l *DomainRateLimiter) FreezeWithBackoff(domain string, baseDuration time.D
 	state.consecutiveFreezes++
 	multiplier := 1 << min(state.consecutiveFreezes-1, 5)
 	actualDuration := min(baseDuration*time.Duration(multiplier), 10*time.Minute)
-	state.frozenUntil = time.Now().Add(actualDuration)
+	state.frozenUntil = time.Now().Add(state.streakDuration(actualDuration))
 	state.frozenBy = "auto_backoff"
 	state.mu.Unlock()
+}
+
+// streakDuration §59.340 E: 10min 内重复冻结（含成功穿插）→ 静默升级 3min。
+// 探究实验（s3）：黄牌（首冻）先于全面封锁 ~7.5min——25s 基数杯水车薪；
+// 成功穿插清零 consecutiveFreezes 致退避爬不起来——时间窗 streak 修复。
+// 调用方持有 state.mu。
+func (s *domainState) streakDuration(base time.Duration) time.Duration {
+	now := time.Now()
+	if now.Sub(s.lastFreezeAt) < 10*time.Minute {
+		s.freezeStreak++
+	} else {
+		s.freezeStreak = 1
+	}
+	s.lastFreezeAt = now
+	if s.freezeStreak >= 2 && base < 3*time.Minute {
+		return 3 * time.Minute
+	}
+	return base
 }
 
 func (l *DomainRateLimiter) ResetFreezeCounter(domain string) {

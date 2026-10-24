@@ -204,6 +204,12 @@ func (p *Provider) GetAdapter(ctx context.Context, domain string) (model.SiteAda
 	}
 
 	a := p.factory.Create(site.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, site), site.SkipSSLVerify, site.TLSPretend))
+	// §59.340 C: 站点级获取 RPS 注册（一处接线五链全受益——GlobalLimiter
+	// 单例全局共享；幂等重复注册无害）。keepfrds 特调 0.0667=4/min（§59.340
+	// 流控探究五阶段定案：安全 2/min/惩罚带 4/min/封锁 8/min）。
+	if site.FetchRPS > 0 {
+		adapter.RegisterSiteRateLimit(site.Domain, site.FetchRPS)
+	}
 
 	p.mu.Lock()
 	p.adapters[domain] = a
