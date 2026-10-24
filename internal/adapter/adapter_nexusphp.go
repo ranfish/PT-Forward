@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/browser"
@@ -71,10 +72,11 @@ var (
 )
 
 type NexusPHPAdapter struct {
-	doer    *HTTPDoer
-	logger  *zap.Logger
-	engine  *extract.Engine   // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
-	browser *browser.Fetcher  // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
+	doer      *HTTPDoer
+	logger    *zap.Logger
+	engine    *extract.Engine    // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
+	browser   *browser.Fetcher   // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
+	listCache keepfrdsListCache  // §59.340 B: 列表页批次缓存（page=0 同 URL 批量去重）
 }
 
 func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
@@ -197,8 +199,10 @@ func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *
 }
 
 // GetTorrentDetail §59.162 外层：keepfrds 禁转增强 merge（内层原逻辑零改动）。
+// §59.340 A: enrich 复用主链 HTML——原二次 fetchDetailsHTML(同 tid 同 URL) 是
+// 纯重复请求（keepfrds 流控流量的 1/3 浪费——§59.340 探究实验背景）。
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	detail, err := a.getTorrentDetailInner(ctx, config, torrentID)
+	detail, html, err := a.getTorrentDetailInner(ctx, config, torrentID)
 	if err != nil || detail == nil {
 		return detail, err
 	}
@@ -207,11 +211,11 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 		return nil, err
 	}
 	if strings.Contains(config.Domain, "keepfrds") {
-		a.enrichKeepfrdsTransferFlags(ctx, config, torrentID, detail)
+		a.enrichKeepfrdsTransferFlags(ctx, config, torrentID, detail, html)
 	}
 	// §59.167 憨憨：标签明示禁转（无限时态——用户权威；详情页 Tailwind 徽章）
 	if strings.Contains(config.Domain, "hhanclub") {
-		a.enrichHhanTransferFlags(ctx, config, torrentID, detail)
+		a.enrichHhanTransferFlags(ctx, config, torrentID, detail, html)
 	}
 	return detail, nil
 }
@@ -225,10 +229,18 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 //     >基本信息</div> 之间内容（该区块只含种子自身标签链接），区块内判
 //     "禁转"字符。字段区块名是页面数据结构语义（样式无关——用户结构化分析定案）。
 // 首发/转载标签不消费——禁转才是拦发布语义。
-func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
-	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
-	if err != nil {
-		return
+// §59.340 A: mainHTML 变参复用（同 keepfrds enrich——省憨憨站二次抓取）
+func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
+	var html string
+	if len(mainHTML) > 0 {
+		html = mainHTML[0]
+	}
+	if html == "" {
+		var err error
+		html, err = a.fetchDetailsHTML(ctx, config, torrentID)
+		if err != nil {
+			return
+		}
 	}
 	tagSec := reHhanTagSection.FindStringSubmatch(html)
 	if tagSec != nil && strings.Contains(tagSec[1], "禁转") {
@@ -249,10 +261,23 @@ var reHhanTagSection = regexp.MustCompile(`(?s)>标签</div>(.*?)>基本信息</
 // 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
 // 文本（种子名后标记区 [禁转] 永久 / [ 限时禁转 ] 24h——用户站点经验权威）。
 // 非侵入：塞 detail 附加字段，两态判定收口在 fetcher（extract_flags 消费）。
-func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
-	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
-	if err != nil {
-		return
+// enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
+// 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
+// 文本（种子名后标记区 [禁转] 永久 / [ 限时禁转 ] 24h——用户站点经验权威）。
+// 非侵入：塞 detail 附加字段，两态判定收口在 fetcher（extract_flags 消费）。
+// §59.340 A: mainHTML 变参——复用主链 HTML（原二次抓同 URL 纯浪费）；空则
+// 兜底自抓（独立调用方兼容）。
+func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
+	html := ""
+	if len(mainHTML) > 0 {
+		html = mainHTML[0]
+	}
+	if html == "" {
+		var err error
+		html, err = a.fetchDetailsHTML(ctx, config, torrentID)
+		if err != nil {
+			return
+		}
 	}
 	if m := reKeepfrdsAddedAt.FindStringSubmatch(html); len(m) > 1 {
 		detail.AddedAtText = strings.TrimSpace(m[1])
@@ -266,12 +291,32 @@ var reKeepfrdsAddedAt = regexp.MustCompile(`由[^<]{0,30}发布于([^<]{2,25})`)
 
 // fetchKeepfrdsListRow 抓列表页首页按 tid 定位的行原始文本（新种限时窗内必在
 // 首页——NP 默认时间倒序；老种[标记已消失]拿不到行=无标记语义，不误伤）。
+// §59.340 B: 列表页批次缓存——page=0 的 URL 对每颗种子完全相同（代码实证
+// 一字不差），批量 71 颗=71 次重复下载同一页。10min TTL 批次级缓存，
+// 每颗本地锚定自己的 tid 行（锚定失败=种子不在第一页，与现状行为等价）。
+const keepfrdsListCacheTTL = 10 * time.Minute
+
+type keepfrdsListCache struct {
+	mu      sync.Mutex
+	html    string
+	expires time.Time
+}
+
 func (a *NexusPHPAdapter) fetchKeepfrdsListRow(ctx context.Context, config *model.SiteConfig, torrentID string) string {
 	base := config.Domain
 	if !strings.HasPrefix(base, "http") {
 		base = "https://" + base
 	}
 	u := strings.TrimRight(base, "/") + "/torrents.php?page=0"
+
+	// 批次缓存命中 → 零网络本地锚定
+	a.listCache.mu.Lock()
+	cachedHTML, cachedAt := a.listCache.html, a.listCache.expires
+	a.listCache.mu.Unlock()
+	if cachedHTML != "" && time.Now().Before(cachedAt) {
+		return anchorListRow(cachedHTML, torrentID)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return ""
@@ -290,7 +335,16 @@ func (a *NexusPHPAdapter) fetchKeepfrdsListRow(ctx context.Context, config *mode
 		return ""
 	}
 	html := string(body)
-	// 定位 tid 行：details.php?id=<tid> 首现位置取行块（<tr> 边界粗切）
+	// 写入批次缓存（失败请求不缓存）
+	a.listCache.mu.Lock()
+	a.listCache.html = html
+	a.listCache.expires = time.Now().Add(keepfrdsListCacheTTL)
+	a.listCache.mu.Unlock()
+	return anchorListRow(html, torrentID)
+}
+
+// anchorListRow 从列表页 HTML 锚定 tid 行块（<tr> 边界粗切）
+func anchorListRow(html, torrentID string) string {
 	anchor := "details.php?id=" + torrentID
 	i := strings.Index(html, anchor)
 	if i < 0 {
@@ -304,24 +358,25 @@ func (a *NexusPHPAdapter) fetchKeepfrdsListRow(ctx context.Context, config *mode
 	return html[start : i+end+5]
 }
 
-func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+// §59.340 A: 返回 (detail, html, err)——html 供 enrich 复用（省同 URL 二次抓）
+func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, string, error) {
 	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	// §59.162: keepfrds 发布时间提取收口在 enrichKeepfrdsTransferFlags（单点）
 
 
 	// §56.34 OpenCD 专用提取（音乐站 DOM 与标准 NexusPHP 差异大）
 	if isOpenCDDomain(config.Domain) {
-		return extractOpenCDDetail(html), nil
+		return extractOpenCDDetail(html), html, nil
 	}
 
 	// §56.13 方案 B: 优先用 Engine 提取（更精准：goquery + 站点 hook + 标准化键映射）
 	if a.engine != nil {
 		detail, ok := a.extractWithEngine(html, config, torrentID)
 		if ok {
-			return detail, nil
+			return detail, html, nil
 		}
 		if a.logger != nil {
 			a.logger.Warn("nexusphp: engine extraction not meaningful, fallback to legacy regexp")
@@ -329,7 +384,7 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	}
 
 	// fallback: 老 regexp 提取（保留作 Engine 失败时的兜底）
-	return a.legacyExtractDetail(html), nil
+	return a.legacyExtractDetail(html), html, nil
 }
 
 // fetchDetailsHTML 负责详情页 HTTP GET，返回原始 HTML。

@@ -54,6 +54,9 @@ type SiteHTTPConfig struct {
 	// §59.333: TLS/H2 指纹伪装开关（"chrome"=azuretls Chrome spec——
 	// keepfrds 案 Ja3/H2 双层 Go 特征被 Cloudflare 识别；空=Go 原生）
 	TLSPretend string
+	// §59.340 C: 站点级获取 RPS（0=默认 0.5；>0 时注册到 GlobalLimiter
+	// ——keepfrds 特调 0.0667=4/min，流控探究定案）
+	FetchRPS float64
 }
 
 func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
@@ -63,6 +66,16 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 	if cfg.MaxIdleConnsPerHost <= 0 {
 		cfg.MaxIdleConnsPerHost = 10
 	}
+	// §59.340 C: 站点级 RPS 注册（幂等——每次构造重复设置无害）
+	if cfg.FetchRPS > 0 && cfg.Domain != "" && GlobalLimiter != nil {
+		windowSecs := 60
+		GlobalLimiter.SetDomainConfig(cfg.Domain, DomainLimitConfig{
+			MaxReqs:       int(cfg.FetchRPS * float64(windowSecs)),
+			WindowSecs:    windowSecs,
+			MaxConcurrent: 2,
+		})
+	}
+
 	if cfg.IdleConnTimeout <= 0 {
 		// §59.338: 90s→45s——CF/keepfrds 空闲连接寿命 60-120s 随机掐（29
 		// 实证空闲 120s 后复用死连接"写成功读挂起"）；45s 主动关闭空闲

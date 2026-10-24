@@ -1,6 +1,7 @@
 package api
 
 import (
+	"reflect"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -2357,6 +2358,76 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
 }
 
+// interleaveBySourceSite §59.340 D: 站点交错排序——组映射预判源站，把
+// 同一源站的颗与其它源站/无源站颗 round-robin 混排（AABABAB 形态）。
+// 泛型适配 runBatchFetch 的匿名 struct（Hash/Name 字段访问）。
+func interleaveBySourceSite[T any](detector *publish.SourceSiteDetector, ctx context.Context, items []T) []T {
+	if detector == nil || len(items) < 3 {
+		return items
+	}
+	getName := func(it any) string {
+		// 反射取 Name 字段（匿名 struct 无接口）
+		v := reflect.ValueOf(it)
+		f := v.FieldByName("Name")
+		if f.IsValid() && f.Kind() == reflect.String {
+			return f.String()
+		}
+		return ""
+	}
+	// 预判各颗源站（组映射启发式）
+	siteOf := make(map[int]string)
+	for i := range items {
+		name := getName(items[i])
+		g := publish.ExtractGroupName(name)
+		if g == "" {
+			continue
+		}
+		if s := detector.LookupGroup(ctx, g); s != "" {
+			siteOf[i] = s
+		}
+	}
+	if len(siteOf) == 0 {
+		return items
+	}
+	// 找最大簇源站（该站颗最多——交错收益最大）
+	count := map[string]int{}
+	for _, s := range siteOf {
+		count[s]++
+	}
+	mainSite := ""
+	mainN := 0
+	for s, n := range count {
+		if n > mainN {
+			mainSite, mainN = s, n
+		}
+	}
+	// 交错：主站颗队列 + 其它颗队列 round-robin
+	var mainQ, otherQ []int
+	for i := range items {
+		if siteOf[i] == mainSite {
+			mainQ = append(mainQ, i)
+		} else {
+			otherQ = append(otherQ, i)
+		}
+	}
+	out := make([]T, 0, len(items))
+	mi, oi := 0, 0
+	// 其它颗数 >= 主站颗数时主站先出（更均匀）；否则均衡分布
+	for len(out) < len(items) {
+		if mi < len(mainQ) && (oi >= len(otherQ) || len(out)%2 == 0 || len(otherQ)-oi <= len(mainQ)-mi) {
+			out = append(out, items[mainQ[mi]])
+			mi++
+		} else if oi < len(otherQ) {
+			out = append(out, items[otherQ[oi]])
+			oi++
+		} else if mi < len(mainQ) {
+			out = append(out, items[mainQ[mi]])
+			mi++
+		}
+	}
+	return out
+}
+
 func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
@@ -2380,6 +2451,14 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 			isLocal = client.IsLocal
 		}
 	}
+
+	// §59.340 D: 站点交错排序——同源站（组映射预判）颗与其它颗 round-robin
+	// 混排，稀释单站请求密度（keepfrds 流控探究：批量脉冲 31 逻辑请求触发
+	// 封锁 vs 均匀 66 次——交错让 limiter 等待与异站处理并行）。预判仅用
+	// 组映射启发式（ExtractGroupName+LookupGroup 本地 DB 毫秒级），与
+	// 层选完整逻辑可不同——排序只影响处理顺序不影响正确性。
+	items = interleaveBySourceSite(h.sourceDetector, ctx, items)
+
 	for i, item := range items {
 		h.batchFetch.mu.Lock()
 		h.batchFetch.items[i].Status = "pending"
