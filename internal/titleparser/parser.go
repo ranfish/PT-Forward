@@ -4,10 +4,10 @@ import (
 	"embed"
 	"encoding/json"
 	"sync"
-	"sync/atomic"
 	"fmt"
 	"regexp"
 	"strings"
+	"github.com/ranfish/pt-forward/internal/util"
 )
 
 var (
@@ -99,8 +99,11 @@ func ParseTitle(title string) TitleComponents {
 	// 移除音轨数 token（2Audios/3Audios 等）
 	title = reAudioTracksCleanup.ReplaceAllString(title, " ")
 	title = strings.TrimSpace(title)
-	// 制作组
-	c.ReleaseGroup = extractGroup(title)
+	// 制作组 §59.343: 收敛到 util.ExtractGroupName 单点（原 extractGroup
+	// 双实现合并——util 侧并集：£优先/词内连字符防御/dash后@剥离/
+	// isValidGroupName 为 titleparser 侧新增防御；扩展名/NBSP 前置
+	// 清理对已清理标题幂等无破坏）。
+	c.ReleaseGroup = util.ExtractGroupNameFull(title)
 	c.ReleaseGroupFull = extractGroupFull(title, c.ReleaseGroup)
 	title = removeGroupSuffix(title, c.ReleaseGroup)
 
@@ -595,57 +598,6 @@ func extractReleaseVersion(title string) string {
 	return ""
 }
 
-// groupLexicon §59.233: 组名映射资产扫描注册表（展示层 extractGroup 第一层）。
-// util 同款语义；main 启动注入 + RefreshCache 联动重建。
-var groupLexicon atomic.Pointer[regexp.Regexp]
-
-// SetGroupLexicon §59.233: 注入组名词表（alternation 编译缓存——词长降序）。
-func SetGroupLexicon(words []string) {
-	filtered := make([]string, 0, len(words))
-	for _, w := range words {
-		w = strings.TrimSpace(w)
-		if len(w) >= 2 {
-			filtered = append(filtered, regexp.QuoteMeta(w))
-		}
-	}
-	if len(filtered) == 0 {
-		groupLexicon.Store(nil)
-		return
-	}
-	for i := 0; i < len(filtered); i++ {
-		for j := i + 1; j < len(filtered); j++ {
-			if len(filtered[j]) > len(filtered[i]) {
-				filtered[i], filtered[j] = filtered[j], filtered[i]
-			}
-		}
-	}
-	re, err := regexp.Compile(`(?i)(?:^|[\s._\-￡])(` + strings.Join(filtered, "|") + `)\b`)
-	if err != nil {
-		return
-	}
-	groupLexicon.Store(re)
-}
-
-// reGroupTailSuffix §59.233: 尾部约束（同 util.reTailSuffix）。
-var reGroupTailSuffix = regexp.MustCompile(`^[\s._\-]*(\([^)]*\)|\[[^\]]*\])?[\s._\-]*$`)
-
-// matchGroupLexicon §59.233: 资产扫描（尾部约束内命中返回标题原词）。
-func matchGroupLexicon(clean string) string {
-	re := groupLexicon.Load()
-	if re == nil {
-		return ""
-	}
-	for _, loc := range re.FindAllStringSubmatchIndex(clean, -1) {
-		if loc[2] < 0 || loc[3] < 0 {
-			continue
-		}
-		if reGroupTailSuffix.MatchString(clean[loc[3]:]) {
-			return clean[loc[2]:loc[3]]
-		}
-	}
-	return ""
-}
-
 // reAtGroupTail §59.226 附八 补: 尾部 @ 组名段（"DIY@CMCT"/"@CMCT"/"SHB931@UBWEB"）。
 var reAtGroupTail = regexp.MustCompile(`(?i)(?:^|[\s.])([A-Za-z0-9_]*@[A-Za-z0-9_]+)$`)
 
@@ -716,85 +668,6 @@ func extractGroupFull(title, group string) string {
 	return group
 }
 
-func extractGroup(title string) string {
-	title = strings.TrimSpace(title)
-	// §59.226 附八 补: 无 dash 的 @ 组名段——前置剥除链（音频/分辨率 token
-	// 剥除后的清理）可能清掉 dash 残留，输入裸 "DIY@CMCT"/"@CMCT" 形态
-	// （Batman 插桩实证）。@ 是无歧义组署名锚。
-	if strings.Contains(title, "@") {
-		if m := reAtGroupTail.FindStringSubmatch(title); m != nil {
-			seg := m[1]
-			upper := strings.ToUpper(seg)
-			if strings.HasPrefix(upper, "DIY@") && len(seg) > len("DIY@")+1 {
-				return seg[len("DIY@"):] // DIY@ 伪复合剥离
-			}
-			if strings.HasPrefix(seg, "@") && len(seg) > 1 {
-				return seg[1:] // 裸 @ 残留（DIY 被前置链剥除）
-			}
-			return seg // 真复合整段（SHB931@UBits）
-		}
-	}
-	// §59.211 补: ￡ 标记优先于 dash——dash 在 S01-S02/Blu-ray 多连字符名下
-	// 产垃圾段（"克兰弗德S01-S02...Blu-ray...￡cXcY@FRDS" 曾提取
-	// "2009. . . . ￡cXcY@FRDS"）；￡ 是无歧义组署名锚（SSD 族惯例）。
-	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
-		rest := title[pIdx+len("￡"):]
-		var b strings.Builder
-		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '@' || (r >= '0' && r <= '9') {
-				b.WriteRune(r)
-			} else {
-				break
-			}
-		}
-		if b.Len() >= 2 {
-			return b.String()
-		}
-	}
-	// §59.233 第一层：映射资产扫描（非 @ 标题——@ 形态已由上方锚处理）。
-	if g := matchGroupLexicon(title); g != "" {
-		return g
-	}
-
-	idx := strings.LastIndex(title, "-")
-	// §59.97: idx>=0——前导连字符残留("-FRDS", token 剥除后)也是组段;
-	// 点分隔 ".-FRDS" 一直靠前导点占位侥幸通过, 空格分隔剥后 "-FRDS" 被拒(实锤)
-	if idx >= 0 && idx < len(title)-1 {
-		raw := strings.TrimSpace(title[idx+1:])
-		raw = stripFileExtension(raw)
-		upper := strings.ToUpper(raw)
-		if upper == "NOGROUP" || upper == "N/A" || upper == "NONE" || upper == "UNKNOWN" {
-			// 继续尝试 ￡ 分隔符
-		} else if len(raw) >= 2 && len(raw) <= 30 {
-			// §59.226 附八: DIY@ 伪复合剥离——DIY 是通用标记非组员名
-			// （区别于 SHB931@UBits 真复合整段保留），剥离后仅返回纯组名
-			if strings.HasPrefix(upper, "DIY@") && len(raw) > len("DIY@")+1 {
-				return raw[len("DIY@"):]
-			}
-			return raw
-		}
-	}
-
-	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文+@子组标记 = 完整组名）
-	// §59.179: 保留 @ 子组标记——"￡cXcY@FRDS" 取完整 "cXcY@FRDS" 而非截断到 "cXcY"
-	// （修道院 tid=2111 实证：Forrest Gump DTS￡cXcY@FRDS 重组后丢 @FRDS）
-	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
-		rest := title[pIdx+len("￡"):]
-		var b strings.Builder
-		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '@' || (r >= '0' && r <= '9') {
-				b.WriteRune(r)
-			} else {
-				break
-			}
-		}
-		if b.Len() >= 2 {
-			return b.String()
-		}
-	}
-
-	return ""
-}
 
 // stripFileExtension 剥离常见视频/容器文件扩展名。
 // 部分站点（如憨憨）的种子标题用文件名，导致 .mp4/.mkv 后缀混入 release_group。

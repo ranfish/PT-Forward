@@ -4236,8 +4236,8 @@ func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group s
 func (h *PublishTorrentsHandler) syncGroupLexicon(ctx context.Context) {
 	var words []string
 	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &words)
+	// §59.343: 组名词表单点注册（titleparser 收敛到 util——双注册废止）
 	util.SetGroupLexicon(words)
-	titleparser.SetGroupLexicon(words)
 }
 
 // effectiveSpecification §59.226 附七: 生效规格——SPEC 非空返回 SPEC；

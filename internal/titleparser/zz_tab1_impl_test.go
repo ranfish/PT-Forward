@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"github.com/ranfish/pt-forward/internal/util"
 	"testing"
 )
 
@@ -107,8 +108,8 @@ func TestRegionStripDashAnchor(t *testing.T) {
 
 // §59.233: 展示层 extractGroup v2（@ 锚原样优先+资产扫描+锚兜底）
 func TestExtractGroupLexiconLayer(t *testing.T) {
-	SetGroupLexicon([]string{"CMCT", "UBits", "UBWEB"})
-	defer SetGroupLexicon(nil)
+	util.SetGroupLexicon([]string{"CMCT", "UBits", "UBWEB"})
+	defer util.SetGroupLexicon(nil)
 
 	cases := []struct{ title, want string }{
 		// @ 真复合：整段原样（第 0 层——不依赖词表）

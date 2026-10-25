@@ -72,7 +72,19 @@ func matchGroupLexicon(clean string) string {
 	return ""
 }
 
+// ExtractGroupName 官方组版（§59.211 方案 B：@ 后段）——映射/选站/
+// 状态判定消费。完整署名（Tab1 展示/重组）用 ExtractGroupNameFull。
 func ExtractGroupName(title string) string {
+	return extractGroupName(title, false)
+}
+
+// ExtractGroupNameFull §59.343: 完整署名版（@/£ 子组整段保留——
+// §59.179 titleparser 展示语义）——Tab1/标题重组消费。
+func ExtractGroupNameFull(title string) string {
+	return extractGroupName(title, true)
+}
+
+func extractGroupName(title string, full bool) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return ""
@@ -118,6 +130,34 @@ func ExtractGroupName(title string) string {
 		break
 	}
 
+	// §59.343: £ 优先于 dash——titleparser.extractGroup 的 §59.211 补
+	// 上移合并（dash 在 S01-S02/Blu-ray 多连字符名下产垃圾段——
+	// "克兰弗德S01-S02...Blu-ray...￡cXcY@FRDS" 曾提取垃圾；£ 是无歧义
+	// 组署名锚。连续英文+@子组标记段 ≥2 字符即中）。
+	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 {
+		rest := clean[pIdx+len("￡"):]
+		var b strings.Builder
+		for _, r := range rest {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '@' || (r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			} else {
+				break
+			}
+		}
+		if b.Len() >= 2 {
+			seg := b.String()
+			// §59.343: 双出参——官方组版 @ 后段（§59.211 方案 B：映射/选站
+			// 消费"￡cXcY@FRDS"→FRDS）；完整署名版整段（§59.179：Tab1 展示/
+			// 重组忠实显示"￡cXcY@FRDS"全段）。
+			if !full {
+				if at := strings.LastIndex(seg, "@"); at >= 0 && at < len(seg)-1 {
+					return seg[at+1:]
+				}
+			}
+			return seg
+		}
+	}
+
 	// §59.233 第一层：映射资产扫描（尾部约束内命中返回标题原词）。
 	// @ 形态标题跳过（既有 @ 后段=官方组规则优先——§59.211；@ 是最强
 	// 无歧义锚不依赖词表，DIY@ 通用前缀由后段规则天然剥离）。
@@ -136,7 +176,9 @@ func ExtractGroupName(title string) string {
 	// （ray/dl/hd/ma/x 等）。仅前段命中曾误杀 "DTS-CMCT" 形态（DTS 片段为
 	// DTS-HD 而设，后随组名时实为音频+组分隔——永安镇故事集案：组名提取
 	// 失败→恢复链源站优先阶段整段跳过→未能从不可说恢复）。
-	if lastDash > 0 {
+	// §59.343: lastDash >= 0——前导连字符残留（"-FRDS"，titleparser 清理链
+	// 剥除复合音频 token "DTS-HD MA" 后的形态）也是组段（§59.97 同款语义）。
+	if lastDash >= 0 {
 		fragStart := strings.LastIndexAny(clean[:lastDash], " ._")
 		frag := strings.ToLower(clean[fragStart+1 : lastDash])
 		afterTok := clean[lastDash+1:]
@@ -152,10 +194,18 @@ func ExtractGroupName(title string) string {
 			}
 		}
 	}
-	if lastDash > 0 && lastDash < len(clean)-1 {
+	if lastDash >= 0 && lastDash < len(clean)-1 {
 		group := strings.TrimSpace(clean[lastDash+1:])
-		if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
-			group = group[atIdx+1:]
+		// §59.343: dash 段 DIY@ 伪复合剥离（两版一致语义——DIY 是通用标记
+		// 非组员；"-DIY@CMCT" 形态 dash 紧邻 @ 前置 @ 段正则不匹配落此处）
+		if strings.HasPrefix(strings.ToUpper(group), "DIY@") && len(group) > len("DIY@")+1 {
+			return group[len("DIY@"):]
+		}
+		// §59.343: 官方组版 @ 后段（§59.211 方案 B）；完整署名版保留整段
+		if !full {
+			if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
+				group = group[atIdx+1:]
+			}
 		}
 		group = stripTrailingNonASCII(strings.TrimSpace(group))
 		upper := strings.ToUpper(group)
