@@ -2755,10 +2755,14 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 						zap.String("tid", tgt.TorrentID))
 					goto fetched
 				}
-				// PTGen 不可行：行已落库（保留），换下一凭证
+				// PTGen 不可行：行已落库（保留），换下一凭证。
+				// §59.341 回归审核修复：err 必须置非 nil——否则循环耗尽后
+				// err==nil 挡住 IYUU/搜索降级链（if err != nil 全跳过），
+				// 差数据行直接成终态（比修复前更早终止）。
 				h.logger.Info("cluster comment hit but ptgen not viable, trying next",
 					zap.String("hash", hash[:min(10, len(hash))]),
 					zap.String("site", tgt.SiteName))
+				err = fmt.Errorf("ptgen not viable on %s (data quality fallback)", tgt.SiteName)
 			}
 			triedSites = append(triedSites, tgt.SiteName)
 			if isTransientFetchErr(err) {
@@ -2837,6 +2841,8 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 				h.logger.Info("cluster comment hit but ptgen not viable, trying next (search path)",
 					zap.String("hash", hash[:min(10, len(hash))]),
 					zap.String("site", tgt.SiteName))
+				// §59.341 回归审核修复：同直达分支——err 置非 nil 让 IYUU 降级链继续
+				err = fmt.Errorf("ptgen not viable on %s (data quality fallback)", tgt.SiteName)
 			}
 			triedSites = append(triedSites, tgt.SiteName)
 		}
