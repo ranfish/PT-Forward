@@ -799,12 +799,26 @@ func extractGroup(title string) string {
 // stripFileExtension 剥离常见视频/容器文件扩展名。
 // 部分站点（如憨憨）的种子标题用文件名，导致 .mp4/.mkv 后缀混入 release_group。
 func stripFileExtension(s string) string {
-	exts := []string{".mp4", ".mkv", ".avi", ".iso", ".m2ts", ".ts", ".mov", ".flv", ".wmv", ".m4v", ".mpg", ".mpeg", ".vob", ".wtv"}
+	// §59.342 附: .torrent 补入（同 util/ptname.go——syncer 快照名是
+	// .torrent 文件名，dash 后段 "FRDS.torrent" 不剥则组名带尾巴）
+	exts := []string{".mp4", ".mkv", ".avi", ".iso", ".m2ts", ".ts", ".mov", ".flv", ".wmv", ".m4v", ".mpg", ".mpeg", ".vob", ".wtv", ".torrent"}
 	lower := strings.ToLower(s)
 	for _, ext := range exts {
 		if strings.HasSuffix(lower, ext) {
-			return s[:len(s)-len(ext)]
+			s = s[:len(s)-len(ext)]
+			break
 		}
+	}
+	// §59.342 附: 尾部噪声词 " torrent" 剥离（DB title 空格形态
+	// "…mUHD-FRDS torrent"——dash 后段 "FRDS torrent" 脏组名，
+	// 教皇的驱魔人 Tab1 制作组实锤）
+	for {
+		lower = strings.ToLower(s)
+		if strings.HasSuffix(lower, " torrent") {
+			s = strings.TrimRight(s[:len(s)-len(" torrent")], " ")
+			continue
+		}
+		break
 	}
 	return s
 }
