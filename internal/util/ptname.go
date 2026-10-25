@@ -79,7 +79,9 @@ func ExtractGroupName(title string) string {
 	}
 
 	clean := title
-	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv"} {
+	// §59.342: .torrent 补入——syncer 快照名是 .torrent 文件名（教皇的驱魔人
+	// 案：尾部 "FRDS.torrent" 词表/dash 全 miss → 空组名 → no_mapping 误标）
+	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv", ".torrent"} {
 		if strings.HasSuffix(strings.ToLower(clean), ext) {
 			clean = clean[:len(clean)-len(ext)]
 			break
@@ -102,6 +104,18 @@ func ExtractGroupName(title string) string {
 			break
 		}
 		clean = strings.TrimRight(trimmed[:open], " ")
+	}
+	// §59.342: 尾部噪声词 "torrent" 剥离——站方标题/清洗链的 ".torrent" 剥点
+	// 留词形态（DB title "…mUHD-FRDS torrent"——dash 提取得 "FRDS torrent"
+	// 脏组名词表 miss）。循环剥净（防御多连）。
+	for {
+		trimmed := strings.TrimRight(clean, " ")
+		lower := strings.ToLower(trimmed)
+		if strings.HasSuffix(lower, " torrent") {
+			clean = trimmed[:len(trimmed)-len(" torrent")]
+			continue
+		}
+		break
 	}
 
 	// §59.233 第一层：映射资产扫描（尾部约束内命中返回标题原词）。
