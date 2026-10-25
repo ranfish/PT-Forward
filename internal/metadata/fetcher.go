@@ -164,8 +164,8 @@ func (f *Fetcher) FetchFromSiteNoFallback(ctx context.Context, infoHash, siteNam
 // （老 FetchAndStore 内嵌私有版抢跑问题已摘除直达链；本方法供调用方显式编排）。
 // §59.337: excludeSites 变参化——排除"本次已试站全集"（层选源站+簇直达
 // 试过的站），避免重复直达已失败站烧预算（原单站排除盲区）。
-func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites ...string) (*model.TorrentMetadata, error) {
-	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSites...)
+func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites []string, sourceLocalMI ...string) (*model.TorrentMetadata, error) {
+	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSites, sourceLocalMI...)
 	if meta == nil {
 		// §59.330 P4 补丁：exhausted 携带最后候选错误链——批量瞬态分类
 		// （isTransientFetchErr）依赖错误串判定，链尾裸 hash 丢失上游
@@ -186,19 +186,28 @@ func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash string, exclud
 	return meta, nil
 }
 
-func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error) {
+// FetchAndStore 反查 tid 后从站点采集。
+// sourceLocalMI §59.348 C 互斥门：非空=本地已判定非原盘（isLocal && !isDisc
+// && MI 分析成功 三合一）——detail.BDInfo 拒收（infohash 同一性：本地文件
+// 结构=种子结构，本地判定否决源站声明）。空=远程/未知，采集照收（§59.319
+// 附四远程原盘场景零破坏）。
+func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string, sourceLocalMI ...string) (*model.TorrentMetadata, error) {
 	if infoHash == "" || siteName == "" || torrentID == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_id are required")
 	}
 
-	meta, err := f.fetchFromSite(ctx, infoHash, siteName, torrentID, "rss_detail")
+	fetchLocalMI := ""
+	if len(sourceLocalMI) > 0 {
+		fetchLocalMI = sourceLocalMI[0]
+	}
+	meta, err := f.fetchFromSite(ctx, infoHash, siteName, torrentID, "rss_detail", fetchLocalMI)
 	if err != nil {
 		f.logger.Debug("primary site fetch failed, trying IYUU fallback",
 			zap.String("site", siteName),
 			zap.String("info_hash", infoHash),
 			zap.Error(err))
 
-		meta = f.fetchWithIYUUFallback(ctx, infoHash, siteName)
+		meta = f.fetchWithIYUUFallback(ctx, infoHash, []string{siteName}, fetchLocalMI)
 		if meta == nil {
 			return nil, fmt.Errorf("all fetch attempts failed: primary=%w", err)
 		}
@@ -347,7 +356,8 @@ func (f *Fetcher) resolveAudioConflict(ctx context.Context, adapter model.SiteAd
 	return reseed.ResolveAudioConflict(candidates, sourceLocalMI, candidateMI)
 }
 
-func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrentID, fetchSource string) (*model.TorrentMetadata, error) {
+// fetchLocalMI §59.348 C 互斥门信号（见 FetchAndStore 文档）。
+func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrentID, fetchSource string, fetchLocalMI ...string) (*model.TorrentMetadata, error) {
 	if f.siteProvider == nil {
 		return nil, fmt.Errorf("site provider not configured")
 	}
@@ -403,7 +413,11 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 		engineMeta.ExtractorName = detail.EngineExtractorName
 	}
 
-	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta)
+	buildLocalMI := ""
+	if len(fetchLocalMI) > 0 {
+		buildLocalMI = fetchLocalMI[0]
+	}
+	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta, buildLocalMI)
 	meta.FetchSource = fetchSource
 	return meta, nil
 }
@@ -517,7 +531,12 @@ func fillDetailFromTitle(detail *model.TorrentDetail) {
 
 // fetchWithIYUUFallback §59.337: excludeSites 变参——读本地 coverage 缓存
 // （confirmed_has + tid 非空，confidence DESC，限 5 候选）逐站直达。
-func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, excludeSites ...string) *model.TorrentMetadata {
+// localMIOpt §59.348 C 互斥门信号透传（见 FetchAndStore 文档）。
+func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, excludeSites []string, localMIOpt ...string) *model.TorrentMetadata {
+	localMI := ""
+	if len(localMIOpt) > 0 {
+		localMI = localMIOpt[0]
+	}
 	var caches []model.SiteCoverageCache
 	q := f.db.WithContext(ctx).
 		Where("info_hash = ? AND status = ? AND torrent_id != ''",
@@ -538,7 +557,7 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 			zap.String("torrent_id", c.TorrentID),
 			zap.String("info_hash", infoHash))
 
-		meta, err := f.fetchFromSite(ctx, infoHash, c.SiteName, c.TorrentID, "iyuu_cache")
+		meta, err := f.fetchFromSite(ctx, infoHash, c.SiteName, c.TorrentID, "iyuu_cache", localMI)
 		if err != nil {
 			lastErr = err
 			f.logger.Debug("IYUU fallback site failed",
@@ -560,7 +579,8 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 	return nil
 }
 
-func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta) *model.TorrentMetadata {
+// localMI §59.348 C 互斥门：非空=本地已判定非原盘——detail.BDInfo 拒收。
+func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta, localMI string) *model.TorrentMetadata {
 	now := time.Now()
 	meta := &model.TorrentMetadata{
 		InfoHash:          infoHash,
@@ -622,12 +642,23 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 	//   列，不落 SourceMediaInfo（否则同文本双列冗余）
 	// 统一过 FormatBDInfoReport（源站形态带 [code]——与本地扫描同形态）。
 	// 远程原盘经此 is_disc=true（前端 BDInfo 框/文案/发布链全对齐）。
+	// §59.348 C 互斥门：localMI 非空=本地已判定非原盘（isLocal&&!isDisc&&
+	// MI 分析成功三合一）——infohash 同一性（本地文件结构=种子结构）背书，
+	// 源站 BDInfo 拒收（水手服案：压制种详情页制作声明伪 BDInfo 占列翻转
+	// is_disc）。空=远程/未知，采集照收（远程原盘场景零破坏）。
 	if detail.BDInfo != "" {
-		meta.BDInfo = titleparser.FormatBDInfoReport(detail.BDInfo)
+		if localMI == "" {
+			meta.BDInfo = titleparser.FormatBDInfoReport(detail.BDInfo)
+		} else {
+			f.logger.Info("source bdinfo rejected by local disc check",
+				zap.String("site", siteName),
+				zap.String("info_hash", infoHash),
+				zap.Int("bdinfo_bytes", len(detail.BDInfo)))
+		}
 	}
 	if detail.MediaInfo != "" {
 		if extract.IsLikelyBDInfoText(detail.MediaInfo) {
-			if meta.BDInfo == "" {
+			if meta.BDInfo == "" && localMI == "" {
 				meta.BDInfo = titleparser.FormatBDInfoReport(detail.MediaInfo)
 			}
 		} else {

@@ -23,7 +23,26 @@ Format                       : DTS`
 const sampleBDInfo = `DISC INFO:
 
 Disc Title: MOVIE_BD
+Disc Label: MOVIE.2020.COMPLETE.BLURAY-GRP
 Disc Size: 25,000,000,000 bytes
+Protection: AACS
+BDInfo: 0.7.5.6
+
+PLAYLIST REPORT:
+
+Name: 00000.MPLS
+Length: 1:26:21.217
+Total Bitrate: 29.04 Mbps
+
+VIDEO:
+
+Codec: MPEG-4 AVC
+Bitrate: 24480 kbps
+
+AUDIO:
+
+Codec: DTS-HD Master Audio
+Language: English
 
 FILES:
 01: M2TS 12345
@@ -60,8 +79,18 @@ func TestIsLikelyBDInfoText(t *testing.T) {
 		want bool
 	}{
 		{"standard bdinfo", sampleBDInfo, true},
-		{"disc info keyword", "DISC INFO\nsomething", true},
-		{"quick summary keyword", "QUICK SUMMARY\n...", true},
+		// §59.348 v2 三重门实录锚：
+		// 水手服案伪候选（制作组声明段——弱词 CHAPTERS: 旧版单命中伪纳）
+		{"sailor suit statement (230B)", "Chapters:\n- JPN includes named chapters in Japanese. extracted the names and translated them into English, included both languages, and aligned the chapter markers to I/B-frames\n中文字幕基于Remux自带（999hk999@zimuku）制作，感谢原作者！\n感谢以上所有素材提供者！", false},
+		// 织梦简报形态（Disc Title: 直接开头无大段头——锚=专属字段）
+		{"quick summary digest form (dreamhd)", "Disc Title: 131313\nDisc Label: 13-13-13.-.Day.of.the.Demons.2013.Uncut.Dual.Complete.BluRay-MAMA\nDisc Size: 19,099,284,525 bytes\nProtection: AACS\nPlaylist: 01001.MPLS\nSize: 18,805,800,960 bytes\nLength: 1:26:21.217\nTotal Bitrate: 29.04 Mbps\nVideo: MPEG-4 AVC Video / 24480 kbps / 1080p / 23.976 fps / 16:9\nAudio: German / DTS-HD Master Audio / 5.1 / 48 kHz / 1452 kbps\nAudio: English / DTS-HD Master Audio / 5.1 / 48 kHz / 1524 kbps", true},
+		// Remux 来源说明引用片段（有大段头词但字段行 <3——①门挡不住②门挡）
+		{"remux source excerpt (few fields)", "DISC INFO:\nDisc Title: Some Movie\n来自某原盘", false},
+		// 长度门（锚+字段够但物理过短）
+		{"too short", "DISC INFO:\nDisc Title: X\nDisc Label: Y\nDisc Size: Z", false},
+		// 旧版 keyword 形态在新版下：仅弱词不再判真
+		{"disc info keyword alone", "DISC INFO\nsomething", false},
+		{"quick summary keyword alone", "QUICK SUMMARY\n...", false},
 		{"plain text", "普通文本", false},
 		{"empty", "", false},
 	}

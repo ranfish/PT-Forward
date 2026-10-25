@@ -48,11 +48,11 @@ type CoverageServiceProvider interface {
 
 type MetadataFetcherProvider interface {
 	GetMetadata(ctx context.Context, infoHash, siteName string) (*model.TorrentMetadata, bool)
-	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)
+	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string, sourceLocalMI ...string) (*model.TorrentMetadata, error)
 	FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64, sourceLocalMI ...string) (*model.TorrentMetadata, error)
 	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) // §59.61 D3
 	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)         // §59.65 直取
-	FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites ...string) (*model.TorrentMetadata, error)                      // §59.65 IYUU 末位兜底（§59.337 变参排除集）
+	FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites []string, sourceLocalMI ...string) (*model.TorrentMetadata, error) // §59.65 IYUU 末位兜底（§59.337 变参排除集；§59.348 切片化+互斥门信号）
 }
 
 type PublishPipeline interface {
