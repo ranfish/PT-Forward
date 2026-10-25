@@ -2774,7 +2774,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			h.logger.Info("cluster comments exhausted, trying IYUU coverage direct",
 				zap.String("hash", hash[:min(10, len(hash))]),
 				zap.Strings("tried_sites", triedSites))
-			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites...)
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites, localMI)
 			if err == nil {
 				h.logger.Info("IYUU coverage direct hit",
 					zap.String("hash", hash[:min(10, len(hash))]),
@@ -2851,7 +2851,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 				zap.String("hash", hash[:min(10, len(hash))]),
 				zap.Strings("tried_sites", triedSites),
 				zap.Error(err))
-			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites...)
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites, localMI)
 		}
 	}
 	if err != nil {

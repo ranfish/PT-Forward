@@ -19,9 +19,18 @@ var (
 	mediaInfoWeakKeywords = []string{
 		"MEDIAINFO", "FORMAT", "BIT RATE", "LANGUAGE", "UNIQUE ID", "OVERALL BIT RATE",
 	}
-	bdInfoKeywords = []string{
-		"DISC INFO", "PLAYLIST REPORT", "QUICK SUMMARY", "FILES:", "CHAPTERS:", "DISC SIZE",
+	// §59.348 v2 专属锚：BDInfo 工具输出特征（跨两形态统一——完整报告有
+	// DISC INFO:/PLAYLIST REPORT: 大段头；QUICK SUMMARY 简报形态 Disc Title:
+	// 直接开头无大段头——织梦 13/13/13 实测）。声明/简介文本不会出现。
+	bdInfoAnchorKeywords = []string{
+		"DISC TITLE", "DISC LABEL", "DISC INFO", "PLAYLIST REPORT", "QUICK SUMMARY",
 	}
+	// §59.348 v2 字段行正则：BDInfo 标准字段行首带冒号形态（含值），
+	// 段结构计数用。CHAPTERS 刻意排除（最弱特征——水手服案伪命中词）。
+	bdInfoFieldLineRe = regexp.MustCompile(`(?im)^\s*(DISC INFO|PLAYLIST REPORT|QUICK SUMMARY|DISC TITLE|DISC LABEL|DISC SIZE|PROTECTION|PLAYLIST|LENGTH|TOTAL BITRATE|VIDEO|AUDIO|SUBTITLES|FILES)\s*:`)
+	// §59.348 v2 长度门：BDInfo 物理上不可能过短（简报形态实测 ~700B，
+	// 完整报告数 KB；水手服伪候选 230B）。
+	bdInfoMinBytes = 200
 
 	// bdInfoSubtitlesCutRe BDInfo SUBTITLES → FILES 段截断（v0.0.254 从 audiences 提取器通用化）。
 	// Audiences 等站的 BDInfo 中 SUBTITLES 到 FILES 之间是字幕文件列表（非 BDInfo 正文），需移除。
@@ -155,17 +164,40 @@ func isLikelyMediaInfoText(text string) bool {
 	return false
 }
 
-// IsLikelyBDInfoText 判断文本是否为合法 BDInfo（单关键字命中即可）。
+// IsLikelyBDInfoText 判断文本是否为合法 BDInfo。
 // §59.319 附四公共化：fetcher 归位路径判定 detail.MediaInfo 是否实为
-// BDInfo 文本（站方原盘常把 BDInfo 贴 mediainpo 字段/描述）。
+// BDInfo 文本（站方原盘常把 BDInfo 贴 mediainfo 字段/描述）。
+// §59.348 v2 三重门（水手服案——弱词单命中伪纳声明文本）：
+//  ① 专属字段锚必需：Disc Title/Disc Label（两形态统一）或大段头
+//     （DISC INFO/PLAYLIST REPORT/QUICK SUMMARY）——声明/简介不出现
+//  ② 字段行结构计数 ≥3（工具输出的标准字段序列）
+//  ③ 长度 ≥200B（物理下限）
+//
+// 边界（§59.348 落盘记录）：Remux 种详情页贴源盘 BDInfo 片段（真文本）
+// 本判定无法拒（文本为真）——本地场景由 fetcher C 互斥门拦截
+// （localMI 非空=本地已判非原盘）；远程 Remux 零案例挂 P2 观察。
 func IsLikelyBDInfoText(text string) bool {
 	upper := strings.ToUpper(text)
-	for _, kw := range bdInfoKeywords {
+	// ① 专属锚（任一命中即过此门）
+	hasAnchor := false
+	for _, kw := range bdInfoAnchorKeywords {
 		if strings.Contains(upper, kw) {
-			return true
+			hasAnchor = true
+			break
 		}
 	}
-	return false
+	if !hasAnchor {
+		return false
+	}
+	// ② 字段行结构计数（≥3 = 工具标准输出序列）
+	if len(bdInfoFieldLineRe.FindAllString(text, -1)) < 3 {
+		return false
+	}
+	// ③ 长度门
+	if len(text) < bdInfoMinBytes {
+		return false
+	}
+	return true
 }
 
 // trimMediaInfoLeadingNoise 从 MediaInfo 文本中去除前缀污染。
