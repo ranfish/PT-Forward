@@ -333,7 +333,9 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 		zap.String("torrent_id", match.TorrentID),
 		zap.String("matched_title", match.Title))
 
-	return f.FetchAndStore(ctx, infoHash, siteName, match.TorrentID)
+	// §59.348 C 互斥门透传：BySearch 的 localMI 信号续传直达链
+	// （回归审核抓漏——单测直测 buildMetadata 未覆盖链路透传）。
+	return f.FetchAndStore(ctx, infoHash, siteName, match.TorrentID, localMI)
 }
 
 // resolveAudioConflict §59.36 修订: 音频冲突候选 MI 仲裁。
