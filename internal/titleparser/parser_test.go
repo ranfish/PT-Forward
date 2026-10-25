@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"github.com/ranfish/pt-forward/internal/util"
 	"strings"
 	"testing"
 )
@@ -124,7 +125,7 @@ func TestParseTitle_Empty(t *testing.T) {
 }
 
 func TestExtractGroup_NoGroup(t *testing.T) {
-	g := extractGroup("Some.Title.Without.Group")
+	g := util.ExtractGroupNameFull("Some.Title.Without.Group")
 	if g != "" {
 		t.Errorf("extractGroup = %q, want empty", g)
 	}
@@ -170,9 +171,9 @@ func TestExtractGroup_FileExtension(t *testing.T) {
 		{"Movie.2020.1080p.AAC-CMCT", "CMCT"},
 	}
 	for _, tt := range tests {
-		got := extractGroup(tt.title)
+		got := util.ExtractGroupNameFull(tt.title)
 		if got != tt.want {
-			t.Errorf("extractGroup(%q) = %q, want %q", tt.title, got, tt.want)
+			t.Errorf("util.ExtractGroupNameFull(%q) = %q, want %q", tt.title, got, tt.want)
 		}
 	}
 }
@@ -337,8 +338,8 @@ func TestExtractGroupPoundWithSubgroup(t *testing.T) {
 		{"NoGroup Marker", ""},
 	}
 	for _, c := range cases {
-		if got := extractGroup(c.in); got != c.want {
-			t.Errorf("extractGroup(%q) = %q, want %q", c.in, got, c.want)
+		if got := util.ExtractGroupNameFull(c.in); got != c.want {
+			t.Errorf("util.ExtractGroupNameFull(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

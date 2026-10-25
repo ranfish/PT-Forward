@@ -257,7 +257,8 @@ func main() {
 				Model(&model.ReleaseGroupMapping{}).
 				Pluck("group_name", &words)
 			util.SetGroupLexicon(words)
-			titleparser.SetGroupLexicon(words)
+			// §59.343: 组名词表单点（titleparser 收敛到 util——双注册废止）
+	util.SetGroupLexicon(words)
 		}
 		loadAndSyncGroupLexicon()
 
