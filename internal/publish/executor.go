@@ -808,9 +808,13 @@ func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *
 	// 中文字幕是叠加属性（英语原声+中字=最常见原声中字版，正交）→
 	// 不排斥。注入条件=英语证据在场 ∧ 无 chinese_audio ∧ 无
 	// cantonese_audio（附五全拦→全放的精细回归：只拦音轨放行字幕）。
+	// §59.350（站方规则收紧——243 全检 61 簇冲突+用户实测审核脚本
+	// 原文推翻附七字幕正交实证）：中文字幕同样排斥——"英语标签仅在
+	// 既没有国语、粤语音轨，也没有中文字幕时才能勾选"。语义回归
+	// auto=False 条件标签本义：英语=纯英文无中文内容专版标记（生肉版）。
 	for _, t := range merged {
-		if t == "chinese_audio" || t == "cantonese_audio" {
-			return "" // 国/粤语音轨在场——版本互斥，禁英语（规则 1）
+		if t == "chinese_audio" || t == "cantonese_audio" || t == "chinese_subtitle" {
+			return "" // 国/粤语音轨或中文字幕在场——站方规则禁勾英语（§59.350）
 		}
 	}
 	hasEnglish := false

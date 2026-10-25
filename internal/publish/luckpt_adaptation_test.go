@@ -118,9 +118,11 @@ func TestLuckptEnglishTagValue(t *testing.T) {
 	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{"lucky_english_audio"}); v != "22" {
 		t.Errorf("[lucky_english_audio] got %q", v)
 	}
-	// ④ 有中字仍注入（§59.326 附七规则 3：字幕正交——机器实证造雨人 passed）
-	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_subtitle"}); v != "22" {
-		t.Errorf("[有中字·附七] got %q", v)
+	// ④ 有中字禁注入（§59.350 站方规则收紧：中文字幕同样排斥——
+	// "英语标签仅在既没有国语、粤语音轨，也没有中文字幕时才能勾选"
+	// ——附七"字幕正交"实证已被推翻）
+	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_subtitle"}); v != "" {
+		t.Errorf("[有中字·§59.350 应禁] got %q", v)
 	}
 	// ④b 国语音轨在场禁英语（附七规则 1：音轨版本互斥）
 	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_audio"}); v != "" {
