@@ -575,7 +575,12 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	// §59.345: 手动触发脱离请求生命周期——原 WithTimeout(ctx,...) 继承
+	// handler 的 r.Context()，响应返回即 cancel → goroutine 里首个 site
+	// 查询 err=context canceled 被 "site not found" 误报（243 实测 rows:0
+	// 而 cron 链同时正常——同步 API 触发从未真正生效过，历史"成功"是 cron
+	// 兜底假象）。§59.51 长任务脱离 HTTP 生命周期教训同族。
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
