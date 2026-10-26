@@ -1350,7 +1350,10 @@
     "cleanupPtgenCacheDays": "PTGen Cache Retention (days)",
     "cleanupSeedingArchiveDays": "Seeding Archive Retention (days)",
     "cleanupAuditLogDays": "Audit Log Retention (days)",
-    "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)"
+    "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)",
+    "githubToken": "GitHub Token (Update Check)",
+    "githubTokenPlaceholder": "Leave empty to keep current; enter new token to save",
+    "githubTokenHint": "Optional. OTA update checks hit the GitHub API — unauthenticated limit is 60 req/h/IP (shared proxy exit is easily throttled). With a token (classic, zero scope is fine — public read-only) the limit is 5000 req/h per token."
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",

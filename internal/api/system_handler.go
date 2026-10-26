@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
@@ -31,6 +32,12 @@ type SystemHandler struct {
 	// main 接线（批量获取/发布活跃态），防 os.Exit 腰斩在跑批次（pt29 部署
 	// 重启杀批量获取同型事故的 OTA 版）。
 	busyChecker func() string
+
+	// checkUpdateCache §59.354: 检查更新结果内存缓存（10 分钟——多环境
+	// 频繁轮询不再每次打 GitHub API；仅缓存终态成功响应，错误即时重试）
+	checkCacheMu sync.Mutex
+	checkCache   map[string]interface{}
+	checkCacheAt time.Time
 }
 
 func NewSystemHandler(version string, db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *SystemHandler {
