@@ -58,18 +58,18 @@ var stScriptPairs = map[string]string{
 }
 
 // arbitrateSTScript §59.349: ST 词形与媒介铁证冲突仲裁。
-// 压制铁证（hasReencodeMark——x264/x265 CLI 编码器标记真原盘恒无）
-// ∧连字符族 → 降格驼峰（Zhizn I Sudba 案：keepfrds 标题习惯连字符表
-// "源自蓝盘"不区分语境，压制种输出原盘专属 token 违规——与媒介判定
-// 铁证冲突）；原盘铁证（FromBDInfo——QUICK SUMMARY 锚=BDInfo 报告
-// 仅原盘存在）∧驼峰族 → 升格连字符（对称完备——同一规则两方向，
+// 压制铁证（§59.349 标题 x264/x265 CLI 词 OR §59.352 p.MIEncoded——
+// MI Writing library/General 段重编码器词表，IsEncode 服役多年的现成
+// 判据：重获归一标题（HEVC 形态）无 CLI 词时 MI 铁证兜底——卡洛斯案）
+// ∧连字符族 → 降格驼峰；原盘铁证（FromBDInfo——QUICK SUMMARY 锚=BDInfo
+// 报告仅原盘存在）∧驼峰族 → 升格连字符（对称完备——同一规则两方向，
 // §59.342 附修一漏一教训；非新场景预实施）。
 // 无铁证 → 不干预（证据缺席时输出层忠实提取——防误伤根门）。
 func arbitrateSTScript(p *TechProfile) {
 	if p == nil || p.SourceType == "" {
 		return
 	}
-	if hasReencodeMark(*p) {
+	if hasReencodeMark(*p) || p.MIEncoded {
 		if camel, ok := stScriptPairs[p.SourceType]; ok {
 			p.SourceType = camel
 		}
