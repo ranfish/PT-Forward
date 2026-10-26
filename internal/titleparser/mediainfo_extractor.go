@@ -79,17 +79,14 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 			result.HDR = hdrFromMI(s.fields["hdr format"])
 			// §59.151: Writing library 存在 = 重编码铁证（x265 等编码器写入痕迹）——
 			// IsEncode MI 驱动的唯一判据（165/166 语料实证；spec/标题循环依赖废除）
-			// §59.235 P3: BDAV 容器门——专业蓝光制作管线合法使用 x264（授权压制
-			// 输出 AVC 流装 BDAV——小厂/修复版蓝光常见）。Format=BDAV + Menu ID =
-			// 原盘结构铁证（压制种=MKV/MP4 容器；Remux 亦 MKV）——容器形态优先于
-			// 编码器痕迹，此语境 x264=制作管线非民间重编码（PERFUME OF THE LADY
-			// IN BLACK 1974 案：BDAV+AVC High@L4.1+x264 core148+DTS-HD MA 双无损
-			// 音轨+原盘体积目录——站方 Blu-ray 连字符标注与文件事实一致）。
+			// §59.235 P3 BDAV 容器门 §59.352 附下线：豁免保护场景已被
+			// FromBDInfo 优先级（本地 BDInfo 扫描=结构级铁证）+本地互斥
+			// （原盘 isDisc→MI 恒空，BDAV MI 不进本判定）接管归零——
+			// 单文件 m2ts 压制种（BDAV+x264）判压制本就正确。
 			// 附三十二: 叠加不覆盖——General 段词表铁证（ShanaEncoder 等）
 			// 与 Video 段 writing library 铁证任一命中即 Encoded
 			result.Encoded = result.Encoded ||
-				(strings.TrimSpace(s.fields["writing library"]) != "" &&
-					!strings.EqualFold(strings.TrimSpace(containerFormat), "BDAV"))
+				(strings.TrimSpace(s.fields["writing library"]) != "")
 			break
 		}
 	}

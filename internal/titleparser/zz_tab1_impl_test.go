@@ -138,13 +138,14 @@ func TestComposeMediumDedup(t *testing.T) {
 	}
 }
 
-// §59.235 P3: BDAV 容器门——原盘 AVC 流的 x264 制作管线痕迹不判 Encode
+// §59.352 附: BDAV 容器门下线——原盘保护职责移交 FromBDInfo 优先级+本地互斥
 func TestIsEncodeBDAVContainerGate(t *testing.T) {
-	// BDAV 原盘：x264 Writing library 存在但容器=原盘铁证——不判 Encode
-	// （直接测 ExtractMediaInfo 层的 Encoded 产出——双态样本）
+	// §59.352 附语义更新：本地 BDAV MI 进本判定=单文件 m2ts 种（本地原盘
+	// isDisc 互斥 MI 恒空不进此层；原盘保护由 FromBDInfo 结构级铁证接管）
+	// ——x264 writing library=压制痕迹，判 Encode 正确。
 	bdavMI := "General\nFormat           : BDAV\nMenu ID          : 1 (0x1)\n\nVideo\nFormat           : AVC\nWriting library  : x264 core 148\nWidth            : 1920 pixels\n"
-	if mi := ExtractMediaInfo(bdavMI); mi.Encoded {
-		t.Errorf("BDAV 容器门失效：原盘 x264 制作管线被误判 Encode")
+	if mi := ExtractMediaInfo(bdavMI); !mi.Encoded {
+		t.Errorf("§59.352 附：BDAV+x264 writing library 应判 Encode（容器门已下线）")
 	}
 	if mi := ExtractMediaInfo(bdavMI); mi.VideoCodec != "AVC" {
 		t.Errorf("BDAV 样本 VideoCodec 应解析出 AVC，got %q（样本构造校验）", mi.VideoCodec)
@@ -153,5 +154,12 @@ func TestIsEncodeBDAVContainerGate(t *testing.T) {
 	mkvMI := "General\nFormat           : Matroska\n\nVideo\nFormat           : HEVC\nWriting library  : x265\nWidth            : 1920 pixels\n"
 	if mi := ExtractMediaInfo(mkvMI); !mi.Encoded {
 		t.Errorf("MKV x265 铁证应判 Encode")
+	}
+	// 原盘真保护锚（§59.352 附证据等级）：BDInfo 扫描在场 → FromBDInfo
+	// 优先升格——BDAV 痕迹不翻转原盘词形
+	p := BuildTechProfile("Movie 2012 1080p BluRay AVC-GROUP",
+		"DISC INFO:\n\nDisc Title: X\nQUICK SUMMARY:\nVideo: AVC\n", "", "", "", "")
+	if p.SourceType != "Blu-ray" {
+		t.Errorf("FromBDInfo 优先级：原盘驼峰应升格连字符，got %q", p.SourceType)
 	}
 }
