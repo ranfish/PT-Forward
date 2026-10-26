@@ -31,6 +31,12 @@ func TestArbitrateSTScript(t *testing.T) {
 		{"disc x hyphen unchanged", "Movie 2012 1080p Blu-ray AVC-GROUP", bdinfoMI, "Blu-ray"},
 		// 根门：无铁证 → 不干预（连字符保持——证据缺席忠实提取）
 		{"no evidence x hyphen unchanged", "Movie 2012 1080p Blu-ray AVC-GROUP", "", "Blu-ray"},
+		// §59.352 MI 铁证兜底：重获归一标题（HEVC 无 CLI 词）+ ShanaEncoder
+		// General 段词表 → MIEncoded=true → 降格（卡洛斯实录锚）
+		{"mi reencoder x hyphen -> camel (Carlos case)",
+			"Carlos,Rey Emperador S01 2015 1080p Blu-ray HEVC DDP 5.1 2Audios-cXcY@FRDS",
+			"General\nComplete name : x.mkv\nFormat : Matroska\nWriting application : mkvmerge\nWriting library : libebml v1.3.1 + libmatroska v1.4.2 / ShanaEncoder\n\nVideo\nFormat : HEVC",
+			"BluRay"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
