@@ -80,11 +80,18 @@ type TorrentMetadata struct {
 func (TorrentMetadata) TableName() string { return "torrent_metadata" }
 
 // SortMetasAuthoritative §59.171: 同名多行确定性排序——权威行（非 cluster 传播
-// 副本）优先 → updated_at 新 → id 小。消除无序查询的"抽签"（PT31 MI 红叉实锤：
-// 列表 item 的 hash 挂着 mi=14741 的源行，selectSourceMeta 却选中 cluster 空行
-// ——SELECT 无 ORDER BY 时 SQLite 走 info_hash 索引序，"第一行"由哈希字母序决定）。
-// fetch_source 是判别字段：传播会复制 torrent_id，"有 tid"不可判别（243 实证
-// 46 行同 tid）；cluster=传播副本，非 cluster（rss_detail/analyze/空）=直获权威。
+// 副本）优先 → 完备度高 → updated_at 新 → id 小。消除无序查询的"抽签"（PT31 MI
+// 红叉实锤：列表 item 的 hash 挂着 mi=14741 的源行，selectSourceMeta 却选中
+// cluster 空行——SELECT 无 ORDER BY 时 SQLite 走 info_hash 索引序，"第一行"由
+// 哈希字母序决定）。fetch_source 是判别字段：传播会复制 torrent_id，"有 tid"
+// 不可判别（243 实证 46 行同 tid）；cluster=传播副本，非 cluster
+// （rss_detail/analyze/空）=直获权威。
+// §59.351 完备度键（族③案：初学者/坏血）：簇传播统一 bump updated_at（毫秒级
+// 同值平手常态）→ id ASC 决胜=先插入者恒赢=早获取的残行（壹吧/修道院站采集
+// 产物少：category 空/poster 空/截图空/简介空）恒当选——同簇明明有全行
+// （幸运/织梦行）。修复：平级时按关键字段完备度（category/poster/screenshots/
+// description/MI 非空计数）优先——updated_at 被传播污染，完备度才是数据质量
+// 真信号；全残/全全时行为不变（零误伤——updated_at/id 决胜语义保序）。
 func SortMetasAuthoritative(metas []TorrentMetadata) {
 	sort.SliceStable(metas, func(i, j int) bool {
 		aAuth := metas[i].FetchSource != "cluster"
@@ -92,9 +99,36 @@ func SortMetasAuthoritative(metas []TorrentMetadata) {
 		if aAuth != bAuth {
 			return aAuth
 		}
+		ai, bi := metaCompleteness(metas[i]), metaCompleteness(metas[j])
+		if ai != bi {
+			return ai > bi
+		}
 		if !metas[i].UpdatedAt.Equal(metas[j].UpdatedAt) {
 			return metas[i].UpdatedAt.After(metas[j].UpdatedAt)
 		}
 		return metas[i].ID < metas[j].ID
 	})
+}
+
+// metaCompleteness §59.351: 关键字段完备度计数（0-5）——category/
+// poster/screenshots/description/媒体信息（media_info 或 bd_info 任一）。
+// 残行（部分站采集产物少）与全行的区分信号。
+func metaCompleteness(m TorrentMetadata) int {
+	n := 0
+	if m.Category != "" {
+		n++
+	}
+	if m.Poster != "" {
+		n++
+	}
+	if m.Screenshots != "" && m.Screenshots != "[]" {
+		n++
+	}
+	if m.Description != "" {
+		n++
+	}
+	if m.MediaInfo != "" || m.BDInfo != "" {
+		n++
+	}
+	return n
 }
