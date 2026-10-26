@@ -58,29 +58,30 @@ var stScriptPairs = map[string]string{
 }
 
 // arbitrateSTScript §59.349: ST 词形与媒介铁证冲突仲裁。
-// 压制铁证（§59.349 标题 x264/x265 CLI 词 OR §59.352 p.MIEncoded——
-// MI Writing library/General 段重编码器词表，IsEncode 服役多年的现成
-// 判据：重获归一标题（HEVC 形态）无 CLI 词时 MI 铁证兜底——卡洛斯案）
-// ∧连字符族 → 降格驼峰；原盘铁证（FromBDInfo——QUICK SUMMARY 锚=BDInfo
-// 报告仅原盘存在）∧驼峰族 → 升格连字符（对称完备——同一规则两方向，
-// §59.342 附修一漏一教训；非新场景预实施）。
+// §59.352 附 证据等级重排：FromBDInfo（本地 BDInfo 扫描=结构级铁证，
+// 发布链必然 isLocal 必被扫描）优先升格 → MIEncoded/标题 CLI 词
+// （应用级压制痕迹）其次降格。BDAV 容器豁免随之下线（§59.235 P3
+// 残留层——保护场景已被 FromBDInfo 优先级+本地互斥机制接管归零）。
 // 无铁证 → 不干预（证据缺席时输出层忠实提取——防误伤根门）。
 func arbitrateSTScript(p *TechProfile) {
 	if p == nil || p.SourceType == "" {
 		return
 	}
-	if hasReencodeMark(*p) || p.MIEncoded {
-		if camel, ok := stScriptPairs[p.SourceType]; ok {
-			p.SourceType = camel
-		}
-		return
-	}
+	// ① 结构级铁证优先：本地 BDInfo 扫描在场=原盘——升格连字符
 	if p.FromBDInfo {
 		for hyphen, camel := range stScriptPairs {
 			if p.SourceType == camel {
 				p.SourceType = hyphen
 				return
 			}
+		}
+		return
+	}
+	// ② 应用级压制痕迹（§59.349 标题 CLI 词 OR §59.352 MIEncoded——
+	// MI Writing library/General 段重编码器词表，IsEncode 服役判据）
+	if hasReencodeMark(*p) || p.MIEncoded {
+		if camel, ok := stScriptPairs[p.SourceType]; ok {
+			p.SourceType = camel
 		}
 	}
 }
