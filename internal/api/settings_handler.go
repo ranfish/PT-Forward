@@ -135,8 +135,15 @@ func (h *SettingsHandler) handleGet(w http.ResponseWriter, r *http.Request, key 
 	})
 }
 
+// writeOnlySettingKeys §59.354: 只写键——禁读（防回显泄露）但允许 UI 写入
+// （用户自配置凭证：写入走 PUT，读取永不返回——已配置态前端占位提示）。
+// 与 sensitiveSettingKeys（禁读+禁改——jwt 等系统管理键）区分。
+var writeOnlySettingKeys = map[string]bool{
+	"github_token": true,
+}
+
 func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key string) {
-	if isSensitiveSettingKey(key) {
+	if isSensitiveSettingKey(key) && !writeOnlySettingKeys[key] {
 		Error(w, http.StatusForbidden, 16003, "该设置项禁止修改")
 		return
 	}
