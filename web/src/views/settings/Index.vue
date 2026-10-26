@@ -9,6 +9,13 @@
           <a-switch v-model:checked="form.otaUseProxy" />
           <span style="margin-left: 8px; color: #999; font-size: 12px">{{ t('settings.otaUseProxyHint') }}</span>
         </a-form-item>
+        <a-form-item :label="t('settings.githubToken')">
+          <a-input-password
+            v-model:value="form.githubToken"
+            :placeholder="t('settings.githubTokenPlaceholder')"
+          />
+          <span style="margin-left: 0; color: #999; font-size: 12px; display: block; margin-top: 4px">{{ t('settings.githubTokenHint') }}</span>
+        </a-form-item>
         <a-form-item :label="t('settings.socksProxy')">
           <a-input v-model:value="form.socksProxy" :placeholder="t('settings.socksProxyPlaceholder')" />
         </a-form-item>
@@ -198,6 +205,7 @@ const restoring = ref(false)
 const form = reactive({
   httpProxy: '',
   otaUseProxy: false,
+  githubToken: '',
   socksProxy: '',
   cookieCloudUrl: '',
   cookieCloudUuid: '',
@@ -283,6 +291,8 @@ async function saveSettings() {
     const entries: [string, string][] = [
       ['httpProxy', form.httpProxy],
       ['otaUseProxy', String(form.otaUseProxy)],
+      // §59.354: GitHub Token 敏感禁读——留空=保持已配置（不覆盖清空），输入新值才写
+      ...(form.githubToken.trim() ? [['github_token', form.githubToken.trim()]] as [string, string][] : []),
       ['socksProxy', form.socksProxy],
       ['cookieCloudUrl', form.cookieCloudUrl],
       ['cookieCloudUuid', form.cookieCloudUuid],

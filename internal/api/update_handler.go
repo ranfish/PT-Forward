@@ -72,11 +72,28 @@ type githubRelease struct {
 }
 
 func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	// §59.354: 检查结果内存缓存 10 分钟——多环境频繁轮询/重复进页面
+	// 不再每次打 API（未认证 60 次/h/IP 配额挤占主因；认证后亦降低无谓消耗）
+	h.checkCacheMu.Lock()
+	if h.checkCache != nil && time.Since(h.checkCacheAt) < 10*time.Minute {
+		cached := h.checkCache
+		h.checkCacheMu.Unlock()
+		Success(w, cached)
+		return
+	}
+	h.checkCacheMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
+	// §59.354: 用户自配置 GitHub Token（settings github_token，默认空——
+	// 系统零内置；认证请求按 Token 计 5000 次/h 与源 IP 无关——代理出口
+	// 未认证配额耗尽不影响认证请求）
+	if tok, err := setting.NewRepository(h.db).Get(ctx, "github_token"); err == nil && tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 
 	// §59.280: otaUseProxy 开关——ON=强制代理（直连挂起不报错的网络下
 	// "直连优先失败回退"永不回退——fnos 案）；OFF=纯直连（隐性代理回退
@@ -145,13 +162,18 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	}
 
 	hasUpdate := release.TagName != h.version
-	Success(w, map[string]interface{}{
+	// §59.354: 终态成功响应写缓存（10 分钟内重复检查直接复用）
+	respMap := map[string]interface{}{
 		"has_update":      hasUpdate,
 		"current_version": h.version,
 		"latest_version":  release.TagName,
 		"release_notes":   release.Body,
 		"download_url":    downloadURL,
-	})
+	}
+	h.checkCacheMu.Lock()
+	h.checkCache, h.checkCacheAt = respMap, time.Now()
+	h.checkCacheMu.Unlock()
+	Success(w, respMap)
 }
 
 func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {

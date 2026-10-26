@@ -14,6 +14,9 @@ import (
 var sensitiveSettingKeys = map[string]bool{
 	"jwt_signing_key": true,
 	"refresh_tokens":  true,
+	// §59.354: OTA GitHub Token——用户身份凭证禁读回显（GET/列表均不返回；
+	// 前端已配置态占位提示不回显值）
+	"github_token": true,
 }
 
 func isSensitiveSettingKey(key string) bool {

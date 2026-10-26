@@ -1327,7 +1327,10 @@
     "cleanupPtgenCacheDays": "PTGen 缓存保留天数",
     "cleanupSeedingArchiveDays": "做种归档保留天数",
     "cleanupAuditLogDays": "审计日志保留天数",
-    "cleanupTorrentTrafficDays": "流量快照保留天数"
+    "cleanupTorrentTrafficDays": "流量快照保留天数",
+    "githubToken": "GitHub Token（更新检查）",
+    "githubTokenPlaceholder": "留空保持现状；填入新 Token 保存后生效",
+    "githubTokenHint": "可选。OTA 检查更新走 GitHub API——未认证限流 60 次/小时/IP（共享代理出口易被限）。配置 Token（classic 零 scope 即可，公开只读）后按 Token 计 5000 次/小时。"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",
