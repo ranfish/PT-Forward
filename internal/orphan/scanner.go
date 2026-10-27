@@ -142,7 +142,73 @@ func (s *Scanner) scan(ctx context.Context) (*ScanResult, error) {
 		zap.Int("configured_paths", len(s.scanConfigs)),
 		zap.Int("skipped_paths", len(skippedPaths)))
 
+	// §59.359: 跨目录做种标记——读记录表（恢复链 infohash 仲裁持久化）
+	// + 清理失效记录
+	s.markCrossSeeded(allOrphans, clientByPath)
+
 	return &ScanResult{Orphans: allOrphans, SkippedPaths: skippedPaths}, nil
+}
+
+// markCrossSeeded §59.359: 孤儿列表接记录表标记——(orphan_path,
+// client_uid ∈ ClientUIDs) 命中的 Entry 标 CrossSeeded + SeededPaths
+// （做种路径供用户核对防同名巧合误导）。顺带清理失效记录：成功参与
+// 本次扫描的 client（拿到 maindata）中，orphan_path 已不在孤儿列表
+// （数据已删）→ 删记录防膨胀。查询失败时跳过清理（避免孤儿列表不完整
+// 场景误删有效记录）。
+func (s *Scanner) markCrossSeeded(orphans []Entry, scannedClients map[uint]map[string][]string) {
+	if s.db == nil || len(scannedClients) == 0 {
+		return
+	}
+
+	scannedUIDs := make([]uint, 0, len(scannedClients))
+	for uid := range scannedClients {
+		scannedUIDs = append(scannedUIDs, uid)
+	}
+
+	paths := make([]string, 0, len(orphans))
+	for i := range orphans {
+		paths = append(paths, orphans[i].Path)
+	}
+
+	if len(paths) > 0 {
+		var records []model.OrphanCrossSeedRecord
+		if err := s.db.Where("orphan_path IN ?", paths).Find(&records).Error; err != nil {
+			s.logger.Debug("orphan scan: cross-seed records query failed", zap.Error(err))
+			return
+		}
+		byPath := make(map[string][]model.OrphanCrossSeedRecord)
+		for _, rec := range records {
+			byPath[rec.OrphanPath] = append(byPath[rec.OrphanPath], rec)
+		}
+		for i := range orphans {
+			for _, rec := range byPath[orphans[i].Path] {
+				if containsUint(orphans[i].ClientUIDs, rec.ClientUID) {
+					orphans[i].CrossSeeded = true
+					orphans[i].SeededPaths = append(orphans[i].SeededPaths, rec.SeededPath)
+				}
+			}
+		}
+		// 清理：参与扫描的 client 中 orphan_path 已不在当前孤儿列表
+		if err := s.db.Where("client_uid IN ? AND orphan_path NOT IN ?", scannedUIDs, paths).
+			Delete(&model.OrphanCrossSeedRecord{}).Error; err != nil {
+			s.logger.Debug("orphan scan: stale cross-seed records cleanup failed", zap.Error(err))
+		}
+	} else {
+		// 无孤儿=该 client 名下记录全部失效（数据已删光）
+		if err := s.db.Where("client_uid IN ?", scannedUIDs).
+			Delete(&model.OrphanCrossSeedRecord{}).Error; err != nil {
+			s.logger.Debug("orphan scan: stale cross-seed records cleanup failed", zap.Error(err))
+		}
+	}
+}
+
+func containsUint(list []uint, v uint) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 var skipSuffixes = []string{".!qb", ".parts", ".tmp"}
