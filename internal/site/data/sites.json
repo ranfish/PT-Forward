@@ -27544,7 +27544,9 @@
       "groups": [
         "FRDS",
         "Yumi@FRDS",
-        "cXcY@FRDS"
+        "cXcY@FRDS",
+        "GREENOTEA",
+        "GREENOTEA@FRDS"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
