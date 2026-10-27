@@ -207,6 +207,22 @@ func main() {
 	auditLogger.Start(ctx)
 	audit.SetDefault(auditLogger)
 
+	// §59.233/§59.360 附: 组名映射资产词表注入（ExtractGroupName v2 资产
+	// 扫描层；词表=release_group_mappings 全词条）。§59.343: 单点注册
+	// （titleparser 收敛到 util——双注册废止）。
+	// §59.360 附: 定义置于 seed goroutine 之前——seed 补行后必须再刷
+	//（启动竞态修复：本闭包同步执行跑在异步 seed 完成前，首次 OTA 环境
+	// 表里还没新词条 → 词表缓存缺 → 提取层 miss → Tab1 制作组 "—"，
+	// 且获取链不触发刷新则失明直到重启；pt31 英雄本色 GREENOTEA 案）。
+	loadAndSyncGroupLexicon := func() {
+		var words []string
+		db.WithContext(context.Background()).
+			Model(&model.ReleaseGroupMapping{}).
+			Pluck("group_name", &words)
+		util.SetGroupLexicon(words)
+	}
+	loadAndSyncGroupLexicon()
+
 	go func() {
 		if err := site.SeedSites(db); err != nil {
 			log.Warn("site seed warning", zap.Error(err))
@@ -226,7 +242,13 @@ func main() {
 		if err := site.SeedGroupMappings(db); err != nil {
 			log.Warn("group mapping seed warning", zap.Error(err))
 		}
-		log.Info("site seed completed")
+		// §59.360 附: seed 补行后刷新词表（消启动竞态——见闭包注释）
+		loadAndSyncGroupLexicon()
+		log.Info("site seed completed", zap.Int("group_lexicon_words", func() int {
+			var words []string
+			db.Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &words)
+			return len(words)
+		}()))
 	}()
 
 	var allSites []model.Site
@@ -248,19 +270,6 @@ func main() {
 			}
 		}
 		log.Info("domain rate limiter initialized from site configs", zap.Int("sites", len(allSites)))
-
-		// §59.233: 组名映射资产词表注入（ExtractGroupName v2 资产扫描层——
-		// util 识别层 + titleparser 展示层双注册；词表=release_group_mappings 全词条）。
-		loadAndSyncGroupLexicon := func() {
-			var words []string
-			db.WithContext(context.Background()).
-				Model(&model.ReleaseGroupMapping{}).
-				Pluck("group_name", &words)
-			util.SetGroupLexicon(words)
-			// §59.343: 组名词表单点（titleparser 收敛到 util——双注册废止）
-	util.SetGroupLexicon(words)
-		}
-		loadAndSyncGroupLexicon()
 
 		// §59.187 ①: 组名同族 resolver 注入——验证层组名反驳经 release_group_mappings
 		// 判同族豁免（UBbits/UBits 同映射优堡官方等拼写变体；仅反驳路径触发，罕见路径）
