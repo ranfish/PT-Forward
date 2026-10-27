@@ -238,6 +238,27 @@ func extractGroupName(title string, full bool) string {
 		}
 	}
 
+	// §59.360 续: 空格尾段 @ 复合回退——合集种子站方标题空格连接组署名
+	// 形态（"…2Audios GREENOTEA@FRDS"——pt31 Top138 英雄本色案：无 dash
+	// 无 £，词表扫描层被 @ 跳过（§59.233 @ 锚域）+ dash/£ 锚全 miss →
+	// 空组名 Tab1 "—"）。@ 是无歧义组署名锚（§59.233 第 0 层语义），
+	// 尾段含 @ 且两侧各 ≥2 字符即组段；DIY@ 通用前缀剥离与 dash 分支
+	// 两版一致（DIY 非组员完整署名也剥）。
+	if sp := strings.LastIndexAny(clean, " \t"); sp >= 0 && sp < len(clean)-1 {
+		seg := clean[sp+1:]
+		if at := strings.LastIndex(seg, "@"); at >= 2 && at < len(seg)-1 {
+			if strings.HasPrefix(strings.ToUpper(seg), "DIY@") && len(seg) > len("DIY@")+1 {
+				seg = seg[len("DIY@"):]
+			} else if !full {
+				seg = seg[at+1:]
+			}
+			seg = stripTrailingNonASCII(strings.TrimSpace(seg))
+			if len(seg) >= 2 && len(seg) <= 30 && isValidGroupName(seg) {
+				return seg
+			}
+		}
+	}
+
 	return ""
 }
 
