@@ -12,7 +12,7 @@ import (
 
 var (
 	// §59.98: 范围/复合形态——S01-S03(跨季)/S01E03-E05/S01+S02 组合
-	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,3}(?:[-~]E?\d{1,3})?)?(?:[-+]S\d{1,2}(?:E\d{1,3})?)*\b`)
+	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,4}(?:[-~]E?\d{1,4})?)?(?:[-+]S\d{1,2}(?:E\d{1,4})?)*\b`)
 	reYearToken     = regexp.MustCompile(`[\s.(]((?:19|20)\d{2})([\s.)]|$)`)
 	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1440p|1080p|1080i|720p|480p)\b`)
 	reBDRipToken    = regexp.MustCompile(`(?i)\bBD[-\s]?RIP\b`)
