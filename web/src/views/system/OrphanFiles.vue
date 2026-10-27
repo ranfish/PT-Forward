@@ -100,6 +100,7 @@
           <template v-if="column.key === 'status'">
             <a-tag v-if="record._status === 'searching'" color="processing">搜索中 {{ record._elapsed || 0 }}s</a-tag>
             <a-tag v-else-if="record._status === 'found'" color="success">已恢复</a-tag>
+            <a-tag v-else-if="record._status === 'elsewhere'" color="warning">已在其它目录做种</a-tag>
             <a-tag v-else-if="record._status === 'notfound'" color="default">未找到</a-tag>
             <a-tag v-else-if="record._status === 'error'" color="error">失败</a-tag>
             <span v-else style="color:#999">-</span>
@@ -204,6 +205,8 @@ interface OrphanEntry {
   client_uids: number[]
   save_path: string
   detected_at: string
+  cross_seeded?: boolean // §59.359: 已在其它目录做种（infohash 仲裁记录命中）
+  seeded_paths?: string[] // 做种条目路径（供核对）
   _status?: string
   _selectedClient?: number
   _elapsed?: number
@@ -261,7 +264,7 @@ const columns = [
   { title: t('orphan.columnType'), key: 'type', width: 80 },
   { title: t('orphan.columnSize'), key: 'size', width: 100 },
   { title: t('orphan.columnClient'), key: 'client', width: 130 },
-  { title: t('orphan.columnStatus'), key: 'status', width: 100 },
+  { title: t('orphan.columnStatus'), key: 'status', width: 140 },
   { title: t('common.action'), key: 'action', width: 180 },
 ]
 
@@ -276,7 +279,12 @@ async function fetchOrphans() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_uids?.[0] }))
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({
+        ...o,
+        _selectedClient: o.client_uids?.[0],
+        // §59.359: 记录表命中（已在其它目录做种）——扫描载入即提示
+        _status: o.cross_seeded ? 'elsewhere' : undefined
+      }))
       if (data.data.scanned_at) {
         scannedAt.value = new Date(data.data.scanned_at)
       }
@@ -326,7 +334,12 @@ async function scan() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_uids?.[0] }))
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({
+        ...o,
+        _selectedClient: o.client_uids?.[0],
+        // §59.359: 记录表命中（已在其它目录做种）——扫描载入即提示
+        _status: o.cross_seeded ? 'elsewhere' : undefined
+      }))
       scannedAt.value = new Date(data.data.scanned_at)
       // §59.314: 跳过路径警示——客户端不可达时曾静默 count:0 误导"无孤儿"
       const skipped: string[] = data.data.skipped_paths || []
@@ -407,7 +420,7 @@ async function recoverOrphan(
   path: string,
   clientID?: number,
   onProgress?: (elapsedSec: number) => void
-): Promise<{ found: boolean; site: string; message: string }> {
+): Promise<{ found: boolean; site: string; message: string; crossSeeded: boolean }> {
   const startTime = Date.now()
   const timer = onProgress ? setInterval(() => {
     onProgress(Math.floor((Date.now() - startTime) / 1000))
@@ -422,7 +435,7 @@ async function recoverOrphan(
     })
     const data = await resp.json()
     if (data.code !== 0) {
-      return { found: false, site: '', message: data.message || 'failed' }
+      return { found: false, site: '', message: data.message || 'failed', crossSeeded: false }
     }
     const taskID = data.data.task_id
     for (let i = 0; i < 100; i++) {
@@ -433,12 +446,12 @@ async function recoverOrphan(
         if (d.code === 0 && d.data) {
           const msg = d.data.message || ''
           if (msg !== 'searching...' && msg !== '') {
-            return { found: !!d.data.found, site: d.data.site_name || '', message: msg }
+            return { found: !!d.data.found, site: d.data.site_name || '', message: msg, crossSeeded: !!d.data.cross_seeded }
           }
         }
       } catch { /* ignore */ }
     }
-    return { found: false, site: '', message: '恢复超时（5分钟），请重试' }
+    return { found: false, site: '', message: '恢复超时（5分钟），请重试', crossSeeded: false }
   } finally {
     if (timer) clearInterval(timer)
   }
@@ -458,6 +471,10 @@ async function recover(orphan: OrphanEntry) {
       orphan._status = 'found'
       message.success(t('orphan.recoverSuccess') + ': ' + result.site)
       setTimeout(() => fetchOrphans(), 2000)
+    } else if (result.crossSeeded) {
+      // §59.359: 已在其它目录做种（infohash 仲裁）——冗余副本，删否用户定
+      orphan._status = 'elsewhere'
+      message.warning(result.message)
     } else {
       orphan._status = 'notfound'
       message.warning(result.message || t('orphan.recoverFailed'))
@@ -504,6 +521,9 @@ async function batchRecover() {
         if (result.found) {
           orphan._status = 'found'
           batchStats.value.found++
+        } else if (result.crossSeeded) {
+          orphan._status = 'elsewhere'
+          batchStats.value.notFound++
         } else {
           orphan._status = 'notfound'
           batchStats.value.notFound++

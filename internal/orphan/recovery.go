@@ -2,6 +2,7 @@ package orphan
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"fmt"
 	"os"
@@ -208,6 +209,15 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID u
 				zap.String("torrent_id", torrentID),
 				zap.Error(err))
 			result.Found = false
+			// §59.359: 跨目录做种仲裁命中——如实提示（含做种路径+冗余
+			// 处置由用户决定），不再吞错假成功。记录已落表，下次扫描
+			// 该孤儿直接展示"已在其它目录做种"。
+			var xerr *CrossSeedError
+			if errors.As(err, &xerr) {
+				result.CrossSeeded = true
+				result.Message = xerr.Error()
+				return result
+			}
 			result.Message = fmt.Sprintf("recovery failed: %v", err)
 			return result
 		}
@@ -1036,6 +1046,89 @@ func (r *Recovery) getCategoryAndTags(siteName string) (string, []string) {
 	return category, tags
 }
 
+// CrossSeedError §59.359: 孤儿数据对应的种子已在下载器其它目录做种
+// （infohash 仲裁命中）——此目录为冗余副本，无法建立做种条目
+// （tr/qb 同 hash 单条目限制）。是否删除冗余由用户决定。
+type CrossSeedError struct {
+	InfoHash   string
+	SeededPath string
+}
+
+func (e *CrossSeedError) Error() string {
+	return fmt.Sprintf("种子已在下载器其它目录做种（%s），此目录为冗余副本，是否删除由您决定", e.SeededPath)
+}
+
+// precheckCrossSeed §59.359: 跨目录做种预查——下载器 infohash 仲裁。
+// torrentData 在手本地算 hash（毫秒级）→ 查目标下载器已有条目：
+// 已有 + SavePath（Clean 归一化）≠ 孤儿数据路径 → 短路（不 Add 不触发
+// already-exist 吞错假成功）：落记录表 + 返回 CrossSeedError。
+// 已有 + SavePath == 孤儿路径（重复恢复之前成功过的）→ 不短路，走正常
+// Add（§59.203 already-exist 幂等语义保留）。算不出 hash/查不到下载器
+// 不拦截——正常流程兜底。
+func (r *Recovery) precheckCrossSeed(ctx context.Context, torrentData []byte, orphan *Entry, clientUID uint, savePath string) *CrossSeedError {
+	fp, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil || fp.InfoHash == "" {
+		return nil
+	}
+	return r.crossSeedCheck(ctx, fp.InfoHash, orphan, clientUID, savePath)
+}
+
+// crossSeedCheck §59.359: 比对层——按 infohash 查目标下载器已有条目。
+// 已有 + SavePath（Clean 归一化）≠ 孤儿数据路径 → 落记录+返回仲裁错误；
+// 已有 + SavePath == 孤儿路径（重复恢复之前成功过的）→ 不短路，走正常
+// Add（§59.203 already-exist 幂等语义保留）。查不到下载器不拦截——
+// 正常流程兜底。
+func (r *Recovery) crossSeedCheck(ctx context.Context, infoHash string, orphan *Entry, clientUID uint, savePath string) *CrossSeedError {
+	client, err := r.clientProvider.Get(clientUID)
+	if err != nil {
+		return nil
+	}
+	ti, err := client.GetTorrentByHash(ctx, infoHash)
+	if err != nil || ti == nil || ti.Removed {
+		return nil
+	}
+	if filepath.Clean(ti.SavePath) == filepath.Clean(savePath) {
+		return nil // 同路径已有条目=重复恢复，幂等走正常 Add
+	}
+	r.recordCrossSeed(clientUID, orphan.Path, infoHash, ti.SavePath, ti.Name)
+	return &CrossSeedError{InfoHash: infoHash, SeededPath: ti.SavePath}
+}
+
+// recordCrossSeed §59.359: 仲裁结果落表（Upsert 幂等——同孤儿重复
+// 预查命中只更新不重复建行）。失败仅记日志不影响短路流程。
+func (r *Recovery) recordCrossSeed(clientUID uint, orphanPath, infoHash, seededPath, torrentName string) {
+	if r.db == nil || orphanPath == "" {
+		return
+	}
+	rec := model.OrphanCrossSeedRecord{
+		ClientUID:   clientUID,
+		OrphanPath:  orphanPath,
+		InfoHash:    infoHash,
+		SeededPath:  seededPath,
+		TorrentName: torrentName,
+	}
+	if err := r.db.Where("client_uid = ? AND orphan_path = ?", clientUID, orphanPath).
+		Assign(map[string]interface{}{
+			"info_hash":    infoHash,
+			"seeded_path":  seededPath,
+			"torrent_name": torrentName,
+		}).
+		FirstOrCreate(&rec).Error; err != nil {
+		r.logger.Warn("orphan cross-seed record upsert failed",
+			zap.String("orphan_path", orphanPath),
+			zap.Error(err))
+		return
+	}
+	hashShort := infoHash
+	if len(hashShort) > 10 {
+		hashShort = hashShort[:10]
+	}
+	r.logger.Info("orphan cross-seed detected",
+		zap.String("orphan_path", orphanPath),
+		zap.String("info_hash", hashShort),
+		zap.String("seeded_path", seededPath))
+}
+
 func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, clientUID uint, torrentData []byte, savePath, category string, tags []string) error {
 	client, err := r.clientProvider.Get(clientUID)
 	if err != nil {
@@ -1116,6 +1209,12 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 		err := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientUID, sourceSize, sourceName)
 		if err == nil {
 			return site, nil
+		}
+		// §59.359: 跨目录做种短路——同 hash 已在下载器其它目录，换站
+		// 下载的还是同 hash 种子，fallback 链继续无意义。立即透传。
+		var xerr *CrossSeedError
+		if errors.As(err, &xerr) {
+			return "", err
 		}
 		lastErr = fmt.Errorf("site=%s tid=%s: %w", site, tid, err)
 		r.logger.Warn("orphan recovery: download attempt failed",
@@ -1239,6 +1338,13 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		if !orphan.IsDir {
 			savePath = filepath.Dir(orphan.Path)
 		}
+	}
+
+	// §59.359: 跨目录做种预查——下载器 infohash 仲裁（单点覆盖全部
+	// 调用方：主链/直达链/cuhash 重试/同站扩展）。命中即短路，不触发
+	// Add 的 already-exist 吞错假成功。
+	if xerr := r.precheckCrossSeed(ctx, torrentData, orphan, clientUID, savePath); xerr != nil {
+		return xerr
 	}
 
 	category, tags := r.getCategoryAndTags(siteName)
