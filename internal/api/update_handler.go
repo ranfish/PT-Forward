@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -267,7 +268,18 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+// downloadAndReplace §59.358: OTA 单飞互斥——并发竞态修复（99 案：
+// 双 goroutine 同写 .pt-forward.new → ETXTBSY+no such file 交错失败）。
+// atomic CAS 门防重复触发；临时文件 pid 后缀进程内唯一。
+var otaInProgress atomic.Bool
+
 func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
+	// §59.358: 单飞门——已有更新进行中直接拒绝（前端超时重试/双击常态）
+	if !otaInProgress.CompareAndSwap(false, true) {
+		return fmt.Errorf("OTA update already in progress")
+	}
+	defer otaInProgress.Store(false)
+
 	// Get current executable path
 	exePath, err := os.Executable()
 	if err != nil {
@@ -276,8 +288,9 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 	exePath, _ = filepath.EvalSymlinks(exePath)
 	exeDir := filepath.Dir(exePath)
 
-	// Download to temp file in same directory (for atomic rename)
-	tmpPath := filepath.Join(exeDir, ".pt-forward.new")
+	// §59.358: pid 后缀唯一路径——同进程双 goroutine 不再同写一个
+	// 临时文件（text file busy 根因）；完成后 rename 到目标时自动消后缀
+	tmpPath := filepath.Join(exeDir, fmt.Sprintf(".pt-forward.new.%d", os.Getpid()))
 	h.logger.Info("OTA: downloading", zap.String("url", downloadURL), zap.String("dest", tmpPath))
 
 	dlCtx, dlCancel := context.WithTimeout(context.Background(), 5*time.Minute)
