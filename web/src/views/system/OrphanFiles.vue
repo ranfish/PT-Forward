@@ -158,8 +158,8 @@
       </a-statistic>
       <div style="margin-top:16px;max-height:300px;overflow-y:auto">
         <div v-for="r in batchResults" :key="r.path" style="margin-bottom:4px;font-size:12px">
-          <a-tag :color="r.found ? 'success' : 'default'" style="font-size:11px">
-            {{ r.found ? '✅' : '❌' }}
+          <a-tag :color="r.found ? 'success' : (r.crossSeeded ? 'warning' : 'default')" style="font-size:11px">
+            {{ r.found ? '✅' : (r.crossSeeded ? '⚠️' : '❌') }}
           </a-tag>
           <span style="font-family:monospace">{{ r.name }}</span>
           <span v-if="r.site" style="color:#52c41a;margin-left:8px">{{ r.site }}</span>
@@ -216,6 +216,7 @@ interface BatchResult {
   path: string
   name: string
   found: boolean
+  crossSeeded?: boolean
   site?: string
   message?: string
 }
@@ -515,6 +516,7 @@ async function batchRecover() {
           path: orphan.path,
           name: orphan.name,
           found: result.found,
+          crossSeeded: result.crossSeeded, // §59.359: 跨目录做种≠失败——批量结果行 ⚠️ 区分
           site: result.site,
           message: result.message
         })
