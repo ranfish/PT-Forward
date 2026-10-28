@@ -187,18 +187,32 @@ func (h *PublishTorrentsHandler) clusterHasBDInfo(ctx context.Context, clientUID
 // （BDInfo 报告经 ExtractMediaInfo 格式分流自动解析；簇同名同 title
 // 算一次写全簇）。
 func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, report string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	hashes := h.clusterHashes(ctx, task.ClientUID, task.SavePath, task.Name)
 	if err != nil {
 		h.logger.Warn("bdinfo scan done with error",
 			zap.String("name", task.Name), zap.Error(err))
+		// §59.361 A: 失败落记录（簇级）——列表三态判定（失败≠扫描中），
+		// 防推断式 disc_scan_pending 永转蓝圈骗用户（pt29 案：失败 24h+
+		// 仍显示扫描中）
+		if len(hashes) > 0 {
+			now := time.Now()
+			if uerr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash IN ?", hashes).
+				Updates(map[string]interface{}{
+					"bd_scan_failed_at": now,
+					"bd_scan_error":     err.Error(),
+				}).Error; uerr != nil {
+				h.logger.Warn("bdinfo scan failure record write failed",
+					zap.String("name", task.Name), zap.Error(uerr))
+			}
+		}
 		return
 	}
 	if report == "" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	hashes := h.clusterHashes(ctx, task.ClientUID, task.SavePath, task.Name)
 	if len(hashes) == 0 {
 		h.logger.Warn("bdinfo scan done but cluster empty", zap.String("name", task.Name))
 		return
@@ -208,6 +222,9 @@ func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, r
 		"bd_info":           report,
 		"media_info":        "", // §59.319 D8: 原盘伪 MI（单 m2ts BDAV）清除
 		"media_info_source": "",
+		// §59.361 A: 成功清失败记录
+		"bd_scan_failed_at": nil,
+		"bd_scan_error":     "",
 	}
 
 	// 规格列重算：代表行取 title/DOM 源（簇行同名同标题——一次计算全簇复用）
@@ -442,6 +459,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/backfill") && r.Method == http.MethodPost:
 		h.handleBDInfoBackfill(w, r)
+	case strings.HasSuffix(path, "/publish/bdinfo/rescan") && r.Method == http.MethodPost:
+		h.handleBDInfoRescan(w, r) // §59.361 A: 单颗重扫（失败态入口）
 	case strings.HasSuffix(path, "/publish/bdinfo/queue") && r.Method == http.MethodGet:
 		h.handleBDInfoQueueStatus(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/execute") && r.Method == http.MethodPost:
@@ -2681,6 +2700,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			if h.bdinfoQueue != nil && !h.clusterHasBDInfo(ctx, clientUID, savePath, name) {
 				h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
 					ClientUID: clientUID, SavePath: savePath, Name: name, DiscPath: discPath,
+					Size: size, // §59.361 B: 超时自适应
 				})
 			}
 		}
@@ -3624,8 +3644,19 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			// 补扫期间用户可见"视频文件分析中"而非误以为系统停摆）。is_disc
 			// false+disc_scan_pending true 并存是常态（is_disc 以 bd_info 落库
 			// 为准，扫描完成前两者同时可见）
-			item["disc_scan_pending"] = meta.BDInfo == "" && h.bdinfoScanner != nil &&
+			// §59.361 A: 三态修正——有失败记录的是"失败"非"扫描中"（pt29 案：
+			// 30min 超时失败 24h+ 后蓝圈仍永转——推断值不反映任务真实状态）；
+			// pending 仅在无失败记录时为真（未扫/扫描中——精确区分需查队列，
+			// 列表频查队列成本高，失败态与扫描中的界分已覆盖本案痛点）。
+			discOnDisk := h.bdinfoScanner != nil &&
 				h.bdinfoScanner.DetectDiscPath(snap.SavePath, snap.Name) != ""
+			item["disc_scan_failed"] = meta.BDScanFailedAt != nil && meta.BDInfo == ""
+			item["disc_scan_error"] = meta.BDScanError
+			if meta.BDScanFailedAt != nil {
+				item["disc_scan_failed_at"] = meta.BDScanFailedAt
+			}
+			item["disc_scan_pending"] = meta.BDInfo == "" && discOnDisk &&
+				meta.BDScanFailedAt == nil
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
@@ -5180,12 +5211,16 @@ func (h *PublishTorrentsHandler) handleBDInfoBackfill(w http.ResponseWriter, r *
 		return
 	}
 
-	// 簇枚举：distinct (save_path, name)
-	type clusterRow struct{ SavePath, Name string }
+	// 簇枚举：distinct (save_path, name) + max(size)（§59.361 B: 簇内最大快照
+	// size 供超时自适应——同簇同数据取代表值）
+	type clusterRow struct {
+		SavePath, Name string
+		MaxSize        int64
+	}
 	var clusters []clusterRow
 	if err := h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
 		Where("client_uid = ? AND is_hidden = 0", req.ClientUID).
-		Distinct().Select("save_path, name").Find(&clusters).Error; err != nil {
+		Distinct().Select("save_path, name, max(size) as max_size").Find(&clusters).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "簇枚举失败: "+err.Error())
 		return
 	}
@@ -5216,6 +5251,7 @@ func (h *PublishTorrentsHandler) handleBDInfoBackfill(w http.ResponseWriter, r *
 		}
 		if h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
 			ClientUID: req.ClientUID, SavePath: c.SavePath, Name: c.Name, DiscPath: discPath,
+			Size: c.MaxSize, // §59.361 B: 超时自适应
 		}) {
 			result["enqueued"] = result["enqueued"].(int) + 1
 			enqNames = append(enqNames, c.Name)
@@ -5228,6 +5264,62 @@ func (h *PublishTorrentsHandler) handleBDInfoBackfill(w http.ResponseWriter, r *
 		zap.Int("clusters", len(clusters)),
 		zap.Int("enqueued", result["enqueued"].(int)))
 	Success(w, result)
+}
+
+// handleBDInfoRescan §59.361 A: 单颗重扫——失败态行的手动入口（清失败
+// 记录+重新入队；预算自适应 §59.361 B）。pt29 案：30min 超时失败后
+// 无重试无入口，失败态永挂。
+func (h *PublishTorrentsHandler) handleBDInfoRescan(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClientUID uint   `json:"clientId"`
+		SavePath  string `json:"savePath"`
+		Name      string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
+		req.ClientUID == 0 || req.SavePath == "" || req.Name == "" {
+		Error(w, http.StatusBadRequest, 40001, "clientId/savePath/name 必填")
+		return
+	}
+	if h.bdinfoQueue == nil || h.bdinfoScanner == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "BDInfo 扫描队列未配置")
+		return
+	}
+	discPath := h.bdinfoScanner.DetectDiscPath(req.SavePath, req.Name)
+	if discPath == "" {
+		Error(w, http.StatusBadRequest, 40001, "磁盘未检测到原盘结构（BDMV/ISO）")
+		return
+	}
+	// 簇内已有产物=无需重扫
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if h.clusterHasBDInfo(ctx, req.ClientUID, req.SavePath, req.Name) {
+		Success(w, map[string]interface{}{"enqueued": false, "reason": "簇内已有 BDInfo"})
+		return
+	}
+	// 快照 size（超时自适应）+ 清失败记录（重新进入扫描中）
+	var size int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_uid = ? AND save_path = ? AND name = ?", req.ClientUID, req.SavePath, req.Name).
+		Select("COALESCE(MAX(size),0)").Scan(&size)
+	hashes := h.clusterHashes(ctx, req.ClientUID, req.SavePath, req.Name)
+	if len(hashes) > 0 {
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash IN ?", hashes).
+			Updates(map[string]interface{}{
+				"bd_scan_failed_at": nil,
+				"bd_scan_error":     "",
+			}).Error; err != nil {
+			h.logger.Warn("bdinfo rescan clear-failed failed",
+				zap.String("name", req.Name), zap.Error(err))
+		}
+	}
+	ok := h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
+		ClientUID: req.ClientUID, SavePath: req.SavePath, Name: req.Name,
+		DiscPath: discPath, Size: size,
+	})
+	h.logger.Info("bdinfo rescan requested",
+		zap.String("name", req.Name), zap.Bool("enqueued", ok))
+	Success(w, map[string]interface{}{"enqueued": ok})
 }
 
 // handleBDInfoQueueStatus §59.319 P3/D6：扫描队列状态（running/pending——

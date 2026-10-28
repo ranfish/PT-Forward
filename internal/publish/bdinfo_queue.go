@@ -15,6 +15,9 @@ type BDInfoScanTask struct {
 	SavePath  string
 	Name      string
 	DiscPath  string // 磁盘门检测到的盘根路径（BDMV 父目录或 .iso 文件）
+	// §59.361 B: 种子大小（快照 size）——超时自适应预算输入
+	// （max(30min, size÷6MB/s×1.3)——pt29 NAS 6-8MB/s 实测下界）。
+	Size int64
 }
 
 func (t BDInfoScanTask) key() string {
@@ -152,8 +155,17 @@ func (q *BDInfoScanQueue) runOne(task BDInfoScanTask) {
 		}
 	}()
 	// 脱离调用方 ctx（批量获取=Background/单条=HTTP 请求均不适配 5-11min 长任务）
-	// + 30min 上限（90G 慢盘余量；新版库 ctx 取消真实生效——P0 对拍同源）
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	// §59.361 B: 超时自适应——max(30min 基数, size÷6MB/s×1.3)。
+	// 本地快盘基线 5-11min（243）不受影响（size 小预算≈基数）；NAS 慢盘
+	// （pt29 实测 6-8MB/s）44GB≈159min——30min 硬编码在数学上必超时。
+	budget := 30 * time.Minute
+	if task.Size > 0 {
+		need := time.Duration(float64(task.Size) / 6e6 * 1.3 * float64(time.Second))
+		if need > budget {
+			budget = need
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 
 	start := time.Now()

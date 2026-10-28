@@ -58,6 +58,10 @@ type TorrentMetadata struct {
 	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
 	Statement string `json:"statement" gorm:"type:text"` // §59.20: 源站官组声明（仅"获取数据"时写入）
 	BDInfo    string `json:"bdinfo" gorm:"type:text"`     // §59.20: 蓝光原盘 BDInfo（BDMV/M2TS）
+	// §59.361 A: 扫描失败记录——onDone 失败写（簇级）/成功清/重扫入队清；
+	// 列表三态判定（扫描中/失败/未扫）防"扫描中"永转蓝圈骗用户
+	BDScanFailedAt *time.Time `json:"bd_scan_failed_at,omitempty"`
+	BDScanError    string     `json:"bd_scan_error" gorm:"type:text"`
 
 	// §59.19 TechProfile 平铺字段（从 MergedJSON 提取，种子配置页展示/筛选用）
 	Category      string `json:"category" gorm:"size:20;default:''"`       // movie/tv_series/music/animation/...
