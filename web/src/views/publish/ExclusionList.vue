@@ -185,7 +185,13 @@
           row-key="id"
           size="small"
           :pagination="{ pageSize: 50, showSizeChanger: false }"
-        />
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'domain'">
+              {{ maskDomain(record.domain) }}
+            </template>
+          </template>
+        </a-table>
       </a-tab-pane>
     </a-tabs>
   </div>
@@ -199,7 +205,7 @@ import { PlusOutlined } from '@ant-design/icons-vue'
 import { exclusionsApi, complianceApi } from '@/api/exclusions'
 import { publishTorrentsApi } from '@/api/publish'
 import type { ExclusionRule, ComplianceRule } from '@/api/exclusions'
-import { formatTime } from '@/utils/format'
+import { formatTime, maskDomain } from '@/utils/format'
 
 const { t } = useI18n()
 const activeTab = ref('exclusions')

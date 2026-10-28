@@ -73,6 +73,7 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
+import { maskDomain } from '@/utils/format'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { httpclientApi } from '@/api/httpclient'
 
@@ -148,13 +149,6 @@ function fetchData() {
 function onTabChange(key: string) {
   if (key === 'freeze' && freezeStatuses.value.length === 0) fetchFreezeStatuses()
   if (key === 'circuit' && circuitStatuses.value.length === 0) fetchCircuitStatuses()
-}
-
-// §59.364: 前端渲染层脱敏（用户定案——数据流不动操作回传真 domain，
-// 纯展示打码防截屏泄露；API 有 JWT 认证无需后端脱敏）
-function maskDomain(domain: string): string {
-  const idx = domain.lastIndexOf('.')
-  return idx > 0 ? '***' + domain.slice(idx) : '***'
 }
 
 async function handleUnfreeze(domain: string) {
