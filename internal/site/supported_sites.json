@@ -781,12 +781,12 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
-  "www.hddolby.com": {
-    "domain": "www.hddolby.com",
+  "www.uhddolby.com": {
+    "domain": "www.uhddolby.com",
     "name_cn": "不可杜",
     "framework": "nexusphp",
     "auth_type": "cookie",
-    "cookiecloud_domain": "www.hddolby.com",
+    "cookiecloud_domain": "www.uhddolby.com",
     "download_url_template": "download.php?id={id}&rsskey={rsskey}",
     "rss_key_label": "RSS Key",
     "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
