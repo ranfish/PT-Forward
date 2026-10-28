@@ -772,16 +772,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
-  "www.52movie.top": {
-    "domain": "www.52movie.top",
-    "name_cn": "我爱电影",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "www.52movie.top",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified",
-    "special_notes": "无上传权限，仅辅种"
-  },
   "www.agsvpt.com": {
     "domain": "www.agsvpt.com",
     "name_cn": "末日",
@@ -896,15 +886,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "blocked",
     "special_notes": "奥申 - 空页面"
-  },
-  "www.ptlao.top": {
-    "domain": "www.ptlao.top",
-    "name_cn": "忘年桥",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "www.ptlao.top",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
   },
   "www.pttime.org": {
     "domain": "www.pttime.org",
