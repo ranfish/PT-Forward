@@ -20,6 +20,9 @@
           size="small"
         >
           <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'domain'">
+              {{ maskDomain(record.domain) }}
+            </template>
             <template v-if="column.key === 'frozen'">
               <a-badge :status="record.frozen ? 'error' : 'success'" :text="record.frozen ? t('httpclient.frozen') : t('httpclient.normal')" />
             </template>
@@ -46,6 +49,9 @@
           size="small"
         >
           <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'domain'">
+              {{ maskDomain(record.domain) }}
+            </template>
             <template v-if="column.key === 'state'">
               <a-tag :color="record.state === 'closed' ? 'green' : record.state === 'open' ? 'red' : 'orange'">
                 {{ record.state === 'closed' ? t('httpclient.closed') : record.state === 'open' ? t('httpclient.open') : t('httpclient.halfOpen') }}
@@ -144,10 +150,17 @@ function onTabChange(key: string) {
   if (key === 'circuit' && circuitStatuses.value.length === 0) fetchCircuitStatuses()
 }
 
+// §59.364: 前端渲染层脱敏（用户定案——数据流不动操作回传真 domain，
+// 纯展示打码防截屏泄露；API 有 JWT 认证无需后端脱敏）
+function maskDomain(domain: string): string {
+  const idx = domain.lastIndexOf('.')
+  return idx > 0 ? '***' + domain.slice(idx) : '***'
+}
+
 async function handleUnfreeze(domain: string) {
   try {
     await httpclientApi.unfreezeDomain(domain)
-    message.success(t('httpclient.domainUnfrozen', { domain }))
+    message.success(t('httpclient.domainUnfrozen', { domain: maskDomain(domain) }))
     fetchFreezeStatuses()
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
@@ -157,7 +170,7 @@ async function handleUnfreeze(domain: string) {
 async function handleResetCircuit(domain: string) {
   try {
     await httpclientApi.resetCircuit(domain)
-    message.success(t('httpclient.circuitReset', { domain }))
+    message.success(t('httpclient.circuitReset', { domain: maskDomain(domain) }))
     fetchCircuitStatuses()
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
