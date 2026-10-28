@@ -280,9 +280,17 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 					break
 				}
 				if h.bdinfoQueue != nil {
+					// §59.361 B: 快照查 size 供超时自适应（req 无 size 字段）
+					var snapshotSize int64
+					if req.InfoHash != "" {
+						h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+							Where("hash = ? AND client_uid = ?", req.InfoHash, req.ClientUID).
+							Pluck("size", &snapshotSize)
+					}
 					h.bdinfoQueue.Enqueue(publish.BDInfoScanTask{
 						ClientUID: req.ClientUID, SavePath: req.SavePath,
 						Name: req.Name, DiscPath: discPath,
+						Size: snapshotSize, // §59.361 B: 超时自适应
 					})
 					result["bdinfo_queued"] = true
 				}

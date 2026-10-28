@@ -135,6 +135,10 @@
               观察期 {{ record.cleanup_in_days }}天
             </a-tag>
           </a-tooltip>
+          <!-- §59.361 A: 扫描失败态——红 tag 带原因时间（非"扫描中"永转蓝圈） -->
+          <a-tooltip v-else-if="record.disc_scan_failed" :title="`扫描失败：${record.disc_scan_error || '未知原因'}（${record.disc_scan_failed_at ? new Date(record.disc_scan_failed_at).toLocaleString() : ''}）——可重扫`">
+            <a-tag color="error" size="small">扫描失败</a-tag>
+          </a-tooltip>
           <!-- §59.319 附十八: 原盘扫描中提示——bd_info 落库前 5-11 分钟窗口 -->
           <a-tooltip v-else-if="record.disc_scan_pending" title="正在扫描蓝光原盘（BDInfo 分析中，约 5-11 分钟）">
             <a-tag color="processing" size="small">
@@ -199,6 +203,15 @@
               @click="clearSingle(record)"
             >
               清除
+            </a-button>
+            <a-button
+              v-if="record.disc_scan_failed"
+              size="small"
+              type="link"
+              :loading="rescanSet.has(record.hash)"
+              @click="rescanBDInfo(record)"
+            >
+              重扫
             </a-button>
             <a-button
               v-if="canEdit(record.status)"
@@ -502,6 +515,26 @@ function onEditSuccess() {
 
 const fetchingSet = ref<Set<string>>(new Set())
 const clearingSet = ref<Set<string>>(new Set())
+// §59.361 A: 单颗重扫（失败态行入口）
+const rescanSet = ref<Set<string>>(new Set())
+
+async function rescanBDInfo(item: SeedListItem) {
+  rescanSet.value.add(item.hash)
+  try {
+    const r = await seedConfigApi.rescanBDInfo(item.client_id, item.save_path, item.name)
+    const d = r.data?.data
+    if (d?.enqueued) {
+      message.success('已重新入队扫描（NAS 慢盘大容量原盘可能需 1-3 小时）')
+    } else {
+      message.info(d?.reason || '无需重扫')
+    }
+    await fetchList()
+  } catch (e: any) {
+    message.error('重扫失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    rescanSet.value.delete(item.hash)
+  }
+}
 
 async function fetchSingle(item: SeedListItem) {
   fetchingSet.value.add(item.hash)

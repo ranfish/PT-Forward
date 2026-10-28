@@ -120,6 +120,9 @@ export interface SeedListItem {
   has_mediainfo?: boolean
   is_disc?: boolean
   disc_scan_pending?: boolean
+  disc_scan_failed?: boolean // §59.361 A: 扫描失败（带原因时间——非"扫描中"）
+  disc_scan_error?: string
+  disc_scan_failed_at?: string
   has_description?: boolean
   has_screenshots?: boolean
   fetched_at?: string
@@ -199,6 +202,10 @@ export const seedConfigApi = {
   },
   listSeeds(params: { client_id?: number; save_path?: string; status?: string; search?: string; ready?: string; publish_state?: string; target_site?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
+  },
+  // §59.361 A: 单颗重扫（失败态行入口——清失败记录+重新入队）
+  rescanBDInfo(clientId: number, savePath: string, name: string) {
+    return client.post<ApiResponse<{ enqueued: boolean; reason?: string }>>('/publish/bdinfo/rescan', { clientId, savePath, name })
   },
   uniquePaths() {
     return client.get<ApiResponse<{ clients: Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }> }>>('/publish/seeds/unique-paths')
