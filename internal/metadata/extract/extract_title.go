@@ -40,6 +40,15 @@ func (p *PublicExtractor) extractTitle(doc *goquery.Document, fallbackTitle stri
 		if s.Length() == 0 {
 			continue
 		}
+		// §59.366: #top 元素语义校验——标准 NP 站 #top 是 h1 自身（锚点），
+		// 深度站（dstudio.me）把 id="top" 放在外层 header（容器）——容器
+		// .Text() 会拼接标题+促销 span+副题（"Title [50%]中文副题/" 污染）。
+		// 非标题标签则跳过继续回退链（深度站落到 h1 干净值）。
+		if sel == "#top" || sel == "h1#top" {
+			if !isHeadingNode(s) {
+				continue
+			}
+		}
 		title := strings.TrimSpace(s.Text())
 		title = whitespaceCollapse.ReplaceAllString(title, " ")
 		title = titleToolIDSuffixRe.ReplaceAllString(title, "")
@@ -53,4 +62,17 @@ func (p *PublicExtractor) extractTitle(doc *goquery.Document, fallbackTitle stri
 		}
 	}
 	return fallbackTitle
+}
+
+// isHeadingNode §59.366: selection 的节点是否标题标签（h1/h2/h3）。
+func isHeadingNode(s *goquery.Selection) bool {
+	if s.Length() == 0 {
+		return false
+	}
+	node := s.Get(0)
+	if node.Type != 1 { // element
+		return false
+	}
+	name := strings.ToLower(node.Data)
+	return name == "h1" || name == "h2" || name == "h3"
 }

@@ -376,6 +376,7 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	if a.engine != nil {
 		detail, ok := a.extractWithEngine(html, config, torrentID)
 		if ok {
+			a.fillMediaFromRawBlock(html, detail)
 			return detail, html, nil
 		}
 		if a.logger != nil {
@@ -384,7 +385,84 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	}
 
 	// fallback: 老 regexp 提取（保留作 Engine 失败时的兜底）
-	return a.legacyExtractDetail(html), html, nil
+	detail := a.legacyExtractDetail(html)
+	a.fillMediaFromRawBlock(html, detail)
+	return detail, html, nil
+}
+
+// fillMediaFromRawBlock §59.366: 结构化字段区 MI/BDInfo 补取——
+// 深度站（dstudio.me）等 NP 站把 BDInfo 放在字段区（rowhead
+// "MediaInfo/BDInfo" 的 rowfollow 内 nexus-media-info-raw div 的
+// <pre>，锚 DISC INFO:），不在 kdescr 简介区——Description 通道提不到。
+// 条件：双空才补（已有值不覆盖——简介区优先）；IsLikelyBDInfoText
+// 判型填 BDInfo（原盘站主形态），否则按 MI 判据填 MediaInfo。
+func (a *NexusPHPAdapter) fillMediaFromRawBlock(html string, detail *model.TorrentDetail) {
+	if detail.MediaInfo != "" || detail.BDInfo != "" {
+		return
+	}
+	loc := strings.Index(html, `class="nexus-media-info-raw"`)
+	if loc < 0 {
+		return
+	}
+	rest := html[loc:]
+	preStart := strings.Index(rest, "<pre")
+	if preStart < 0 {
+		return
+	}
+	preEnd := strings.Index(rest[preStart:], "</pre>")
+	if preEnd < 0 {
+		return
+	}
+	raw := rest[preStart:preStart+preEnd]
+	// 剥 HTML 标签取纯文本（<pre> 内可能嵌 font/b 等）
+	text := stripTagsForPre(raw)
+	text = htmlEntityDecode(text)
+	if len(text) < 100 {
+		return
+	}
+	if isLikelyBDInfoReport(text) {
+		detail.BDInfo = text
+	} else if isLikelyMIRawText(text) {
+		detail.MediaInfo = text
+	}
+}
+
+// isLikelyBDInfoReport §59.366: BDInfo 报告形态锚（DISC INFO:/PLAYLIST
+// REPORT:——nexus-media-info-raw 容器的原始 BDInfo 报告头）。
+func isLikelyBDInfoReport(text string) bool {
+	head := text
+	if len(head) > 300 {
+		head = head[:300]
+	}
+	return strings.Contains(head, "DISC INFO:") ||
+		strings.Contains(head, "PLAYLIST REPORT:") ||
+		strings.Contains(head, "VIDEO:")
+}
+
+func isLikelyMIRawText(text string) bool {
+	return strings.Contains(text, "General") && strings.Contains(text, "Video")
+}
+
+// stripTagsForPre 剥 <pre> 块内的 HTML 标签（保留纯文本）。
+func stripTagsForPre(s string) string {
+	var b strings.Builder
+	inTag := false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+		case !inTag:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func htmlEntityDecode(s string) string {
+	r := strings.NewReplacer("&nbsp;", " ", "&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&#39;", "'")
+	return r.Replace(s)
 }
 
 // fetchDetailsHTML 负责详情页 HTTP GET，返回原始 HTML。
