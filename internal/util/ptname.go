@@ -238,13 +238,15 @@ func extractGroupName(title string, full bool) string {
 		}
 	}
 
-	// §59.360 续: 空格尾段 @ 复合回退——合集种子站方标题空格连接组署名
-	// 形态（"…2Audios GREENOTEA@FRDS"——pt31 Top138 英雄本色案：无 dash
-	// 无 £，词表扫描层被 @ 跳过（§59.233 @ 锚域）+ dash/£ 锚全 miss →
-	// 空组名 Tab1 "—"）。@ 是无歧义组署名锚（§59.233 第 0 层语义），
-	// 尾段含 @ 且两侧各 ≥2 字符即组段；DIY@ 通用前缀剥离与 dash 分支
-	// 两版一致（DIY 非组员完整署名也剥）。
-	if sp := strings.LastIndexAny(clean, " \t"); sp >= 0 && sp < len(clean)-1 {
+	// §59.360 续二: 尾 token @ 复合统一层——分隔符泛化（用户架构视角：
+	// "点是分隔符，token 才是本质"——同一个 @ 复合 token 在 dash/空格/
+	// 点/£ 四种分隔符下应同结果；v0.0.1196 的"空格尾段"是分隔符特例
+	// 补丁，点形态（快照名/种子名——孤儿恢复链输入形态）实锤 miss）。
+	// 尾 token = 最后一个分隔符（./_/空格/tab/dash/£）之后到结尾；
+	// 含 @ 且两侧各 ≥2 字符即组段（@ 无歧义锚零误伤——普通标题词
+	// 不含 @；尾 token 无 @ 不触发，裸名走词表扫描层统一管）。
+	// DIY@ 通用前缀剥离与 dash 分支两版一致（DIY 非组员完整署名也剥）。
+	if sp := strings.LastIndexAny(clean, " ._\t-￡"); sp >= 0 && sp < len(clean)-1 {
 		seg := clean[sp+1:]
 		if at := strings.LastIndex(seg, "@"); at >= 2 && at < len(seg)-1 {
 			if strings.HasPrefix(strings.ToUpper(seg), "DIY@") && len(seg) > len("DIY@")+1 {

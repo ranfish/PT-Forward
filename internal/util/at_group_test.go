@@ -21,20 +21,29 @@ func TestExtractGroupNamePoundSignature(t *testing.T) {
 	}
 }
 
-// TestSpaceTailAtGroup §59.360 续: 空格尾段 @ 复合回退——合集种子站方
-// 标题空格连接组署名形态（pt31 Top138 英雄本色案：DB title
-// "…2Audios GREENOTEA@FRDS" 无 dash 无 £，词表层被 @ 跳过+dash/£ 锚
-// 全 miss → 空组名 Tab1 "—"）。@ 是无歧义组署名锚，尾段含 @ 即组段。
+// TestSpaceTailAtGroup §59.360 续二: 尾 token @ 复合统一层——分隔符泛化
+// （用户架构视角："点是分隔符，token 才是本质"——同一 @ 复合 token 在
+// dash/空格/点/£ 四种分隔符下应同结果；v0.0.1196 空格特例补丁的点形态
+// 实锤 miss）。尾 token = 最后分隔符（./_/空格/tab/dash/£）之后段，
+// 含 @ 即组段；无 @ 不触发（裸名走词表扫描层统一管）。
 func TestSpaceTailAtGroup(t *testing.T) {
 	cases := []struct {
 		name, title, wantFull, wantOfficial string
 	}{
-		// 本案：空格尾段 @ 复合——full 整段/官方后段
+		// 本案：空格分隔 @ 复合——full 整段/官方后段
 		{"本案空格@复合", "A Better Tomorrow 1986 REMASTERED Bluray 1080p x265 AAC(5.1) 2Audios GREENOTEA@FRDS", "GREENOTEA@FRDS", "FRDS"},
+		// 分隔符统一：点形态（快照名/种子名——孤儿恢复链输入形态）
+		{"点形态@复合", "Top138.英雄本色.A.Better.Tomorrow.1986.2Audios.GREENOTEA@FRDS", "GREENOTEA@FRDS", "FRDS"},
+		// 分隔符统一：dash 形态（SHB931 案 UB 惯例同款）
+		{"dash形态@复合", "Amaran 2024 1080P NF WEB-DL AV1 DDP5.1 5Audio-GREENOTEA@FRDS", "GREENOTEA@FRDS", "FRDS"},
+		// 分隔符统一：£ 形态（SSD 惯例——£ 锚分支先接，统一层双保险）
+		{"£形态@复合", "克兰弗德.S01.Blu-ray.￡GREENOTEA@FRDS", "GREENOTEA@FRDS", "FRDS"},
 		// DIY@ 通用前缀剥离（dash 分支两版一致语义）
 		{"空格尾段DIY@", "Some Movie 2020 1080p DIY@CMCT", "CMCT", "CMCT"},
 		// 不误伤：普通标题尾词无 @
 		{"尾词无@", "Some Movie 2020 1080p BluRay x265", "", ""},
+		// 不误伤：词内连字符结尾无 @（统一层只在含 @ 时动作）
+		{"词内连字符无@", "Some Movie 2020 1080p Blu-ray", "", ""},
 		// 不触发：@ 在非尾段
 		{"@非尾段", "foo@bar Some Movie 2020", "", ""},
 	}
