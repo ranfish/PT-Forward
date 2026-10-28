@@ -5,7 +5,7 @@
 | 项目 | 内容 |
 |------|------|
 | 站点名称 | 不可杜|
-| 站点地址 | https://www.hddolby.com |
+| 站点地址 | https://www.uhddolby.com（§59.365 域名迁移：原 www.hddolby.com，2026-10-28）|
 | 论坛地址 | https://forums.orcinusorca.org |
 | Wiki 地址 | https://wiki.orcinusorca.org |
 | 站点框架 | NexusPHP |
@@ -38,10 +38,16 @@
 
 注意：HDDolby 使用 **TMDb 链接**（非 IMDb），且为**必填项**。无 `url`（IMDb链接）、`pt_gen`（PTGen）、`nfo`（NFO文件）字段。
 
-**Tracker Announce URLs**（3 个）：
-1. `https://t.hddolby.com/announce.php`
-2. `t.ptdream.net/announce.php`
-3. `t.orcinusorca.org/announce.php`
+**Tracker Announce URLs**（§59.365 域名迁移后统一为新域）：
+1. `https://www.uhddolby.com/announce.php`（现行唯一）
+2. ~~`https://t.hddolby.com/announce.php`~~（旧域废弃）
+3. ~~`t.ptdream.net/announce.php`~~（旧域废弃）
+4. ~~`t.orcinusorca.org/announce.php`~~（旧域废弃）
+
+> **§59.365 勘误**：sites.json 曾误录 `tracker.azusa.wiki` 为本站 tracker
+> ——实证为梓澪站（azusa.wiki，未适配站）的 tracker（370 行快照 comment
+> 全为 Azusa 标记），2026-07-22 tracker 采集阶段误归属，已删除。azusa
+> 站维持不接入，其种子保持 unknown 归属。
 
 ### 1.2 质量选择字段
 

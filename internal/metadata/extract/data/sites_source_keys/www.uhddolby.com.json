@@ -1,29 +1,29 @@
 {
-  "domain": "www.hddolby.com",
+  "domain": "www.uhddolby.com",
   "site_code": "hddolby",
   "site_name": "HDDolby",
   "source_keys": {
-    "type": "类型",
-    "medium": "媒介",
-    "video_codec": "编码",
-    "audio_codec": "音频编码",
-    "resolution": "分辨率",
-    "team": "制作组",
-    "tags[]": "标签"
+    "type": "\u7c7b\u578b",
+    "medium": "\u5a92\u4ecb",
+    "video_codec": "\u7f16\u7801",
+    "audio_codec": "\u97f3\u9891\u7f16\u7801",
+    "resolution": "\u5206\u8fa8\u7387",
+    "team": "\u5236\u4f5c\u7ec4",
+    "tags[]": "\u6807\u7b7e"
   },
   "standard_keys": {
     "type": {
-      "Movies电影": "category.movie",
-      "TV Series电视剧": "category.tv_series",
-      "TV Shows综艺": "category.tv_shows",
-      "Documentaries纪录片": "category.documentaries",
-      "Animations动漫": "category.animation",
+      "Movies\u7535\u5f71": "category.movie",
+      "TV Series\u7535\u89c6\u5267": "category.tv_series",
+      "TV Shows\u7efc\u827a": "category.tv_shows",
+      "Documentaries\u7eaa\u5f55\u7247": "category.documentaries",
+      "Animations\u52a8\u6f2b": "category.animation",
       "Music Videos": "category.mv",
-      "Sports体育": "category.sports",
-      "HQ Audio音乐": "category.music",
-      "Games游戏": "category.game",
-      "Study学习": "category.study",
-      "Others其他": "category.other"
+      "Sports\u4f53\u80b2": "category.sports",
+      "HQ Audio\u97f3\u4e50": "category.music",
+      "Games\u6e38\u620f": "category.game",
+      "Study\u5b66\u4e60": "category.study",
+      "Others\u5176\u4ed6": "category.other"
     },
     "medium": {
       "UHD": "medium.uhd_bluray",
@@ -97,22 +97,22 @@
       "Other": "team.other"
     },
     "tag": {
-      "国语": "tag.国语",
-      "粤语": "tag.粤语",
-      "日语": "tag.日语",
-      "韩语": "tag.韩语",
-      "特效": "tag.特效",
-      "中字": "tag.中字",
-      "连载": "tag.连载",
-      "完结": "tag.完结",
+      "\u56fd\u8bed": "tag.\u56fd\u8bed",
+      "\u7ca4\u8bed": "tag.\u7ca4\u8bed",
+      "\u65e5\u8bed": "tag.\u65e5\u8bed",
+      "\u97e9\u8bed": "tag.\u97e9\u8bed",
+      "\u7279\u6548": "tag.\u7279\u6548",
+      "\u4e2d\u5b57": "tag.\u4e2d\u5b57",
+      "\u8fde\u8f7d": "tag.\u8fde\u8f7d",
+      "\u5b8c\u7ed3": "tag.\u5b8c\u7ed3",
       "DIY": "tag.DIY",
-      "DOLBY VISION": "tag.杜比",
+      "DOLBY VISION": "tag.\u675c\u6bd4",
       "HDR10": "tag.HDR",
       "HDR10+": "tag.HDR10+",
       "HLG": "tag.HLG",
-      "HDR Vivid": "tag.菁彩HDR",
-      "高码率": "tag.高码率",
-      "高帧率": "tag.高帧率"
+      "HDR Vivid": "tag.\u83c1\u5f69HDR",
+      "\u9ad8\u7801\u7387": "tag.\u9ad8\u7801\u7387",
+      "\u9ad8\u5e27\u7387": "tag.\u9ad8\u5e27\u7387"
     }
   },
   "form_fields": {
@@ -216,22 +216,22 @@
       "default": "8"
     },
     "tag": {
-      "tag.国语": "gy",
-      "tag.粤语": "yy",
-      "tag.日语": "ja",
-      "tag.韩语": "ko",
-      "tag.特效": "tx",
-      "tag.中字": "zz",
-      "tag.连载": "lz",
-      "tag.完结": "wj",
+      "tag.\u56fd\u8bed": "gy",
+      "tag.\u7ca4\u8bed": "yy",
+      "tag.\u65e5\u8bed": "ja",
+      "tag.\u97e9\u8bed": "ko",
+      "tag.\u7279\u6548": "tx",
+      "tag.\u4e2d\u5b57": "zz",
+      "tag.\u8fde\u8f7d": "lz",
+      "tag.\u5b8c\u7ed3": "wj",
       "tag.DIY": "diy",
-      "tag.杜比": "db",
+      "tag.\u675c\u6bd4": "db",
       "tag.HDR": "hdr10",
       "tag.HDR10+": "hdrm",
       "tag.hlg": "hlg",
-      "tag.菁彩HDR": "hdrv",
-      "tag.高码率": "hq",
-      "tag.高帧率": "hfr"
+      "tag.\u83c1\u5f69HDR": "hdrv",
+      "tag.\u9ad8\u7801\u7387": "hq",
+      "tag.\u9ad8\u5e27\u7387": "hfr"
     }
   }
 }
