@@ -573,15 +573,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
-  "pt.ying.us.kg": {
-    "domain": "pt.ying.us.kg",
-    "name_cn": "樱花",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "pt.ying.us.kg",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
-  },
   "ptcafe.club": {
     "domain": "ptcafe.club",
     "name_cn": "咖啡",
@@ -655,15 +646,6 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptzone.xyz",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
-  },
-  "raingfh.top": {
-    "domain": "raingfh.top",
-    "name_cn": "雨",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "raingfh.top",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
