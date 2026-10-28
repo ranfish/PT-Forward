@@ -63,6 +63,28 @@ func findSizeInRows(doc *goquery.Document) string {
 			}
 		}
 	})
+	if found != "" {
+		return found
+	}
+	// §59.366: NP 新版 details-meta 结构（深度站 dstudio.me 实证）——
+	// <div class="details-meta__item"><span class="details-meta__label">大小：</span>
+	// <strong class="details-meta__value">46.26 GB</strong></div>
+	doc.Find("span.details-meta__label").Each(func(_ int, label *goquery.Selection) {
+		if found != "" {
+			return
+		}
+		text := label.Text()
+		for _, kw := range keywords {
+			if strings.Contains(text, kw) || containsInsensitive(text, kw) {
+				// 同 item 容器内的 value（label 的兄弟 strong）
+				value := label.SiblingsFiltered("strong.details-meta__value")
+				if value.Length() > 0 {
+					found = strings.TrimSpace(value.Text())
+					return
+				}
+			}
+		}
+	})
 	return found
 }
 
