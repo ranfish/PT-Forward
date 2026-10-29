@@ -72,6 +72,23 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
+// newGitHubAPIRequest §59.367 附四: GitHub API 请求构造单点——URL+Accept+
+// 用户自配置 token（settings github_token，默认空——系统零内置；认证请求
+// 按 Token 计 5000 次/h 与源 IP 无关，代理出口未认证配额 60 次/h 耗尽不
+// 影响认证请求）。§59.354 曾在 handleCheckUpdate 单点注入、handleUpdate
+// 副本漏注（"修一漏一"双副本漂移）——收敛单点后凭证注入物理上只有一份。
+func (h *SystemHandler) newGitHubAPIRequest(ctx context.Context) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if tok, err := setting.NewRepository(h.db).Get(ctx, "github_token"); err == nil && tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+	return req, nil
+}
+
 func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
 	// §59.354: 检查结果内存缓存 10 分钟——多环境频繁轮询/重复进页面
 	// 不再每次打 API（未认证 60 次/h/IP 配额挤占主因；认证后亦降低无谓消耗）
@@ -87,13 +104,10 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	// §59.354: 用户自配置 GitHub Token（settings github_token，默认空——
-	// 系统零内置；认证请求按 Token 计 5000 次/h 与源 IP 无关——代理出口
-	// 未认证配额耗尽不影响认证请求）
-	if tok, err := setting.NewRepository(h.db).Get(ctx, "github_token"); err == nil && tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
+	req, err := h.newGitHubAPIRequest(ctx)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50002, "构造请求失败")
+		return
 	}
 
 	// §59.280: otaUseProxy 开关——ON=强制代理（直连挂起不报错的网络下
@@ -181,15 +195,12 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Step 1: Fetch latest release info
-	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	// §59.367 附四: 同 handleCheckUpdate 注入用户自配置 GitHub Token——
-	// §59.354 修一漏一（checkUpdate 有 token/update 链漏注），代理出口
-	// 未认证配额 60 次/h 耗尽时 POST /update 403（"检查到新版本但更新
-	// 不了"双链分叉指纹）。
-	if tok, err := setting.NewRepository(h.db).Get(ctx, "github_token"); err == nil && tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
+	// Step 1: Fetch latest release info（§59.367 附四: 请求构造走单点
+	// newGitHubAPIRequest——token 注入物理上一份，双副本漂移根治）
+	req, err := h.newGitHubAPIRequest(ctx)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50002, "构造请求失败")
+		return
 	}
 
 	// §59.280: 同 check——开关统一走 newHTTPClientWithProxy
