@@ -376,9 +376,14 @@ func (p *Provider) DetectFramework(ctx context.Context, domain string) (*model.D
 	}, nil
 }
 
-func (p *Provider) InvalidateAdapter(domain string) {
+// InvalidateAdapter §59.367 附二: 站点配置变更后失效 adapter 缓存。
+// 缓存键可能是站名（RSS detect 链 GetAdapter(siteName)）或域名（其它链
+// GetAdapter(domain)）——同站双副本，调用方传 name+domain 双键全删。
+func (p *Provider) InvalidateAdapter(keys ...string) {
 	p.mu.Lock()
-	delete(p.adapters, domain)
+	for _, k := range keys {
+		delete(p.adapters, k)
+	}
 	p.mu.Unlock()
 }
 

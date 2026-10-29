@@ -15,6 +15,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/pusher"
+	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -369,7 +370,7 @@ func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRu
 	result := &DryRunResult{}
 
 	for _, url := range sub.URLs {
-		feed, err := e.fetcher.FetchWithProxy(ctx, url, site.ProxyURL, site.SkipSSLVerify, site.TLSPretend)
+		feed, err := e.fetcher.FetchWithProxy(ctx, url, sitepkg.ResolveSiteProxy(e.db, ctx, &site), site.SkipSSLVerify, site.TLSPretend)
 		if err != nil {
 			return nil, fmt.Errorf("fetch RSS: %w", err)
 		}
@@ -716,7 +717,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		}
 
 		if events == nil {
-			feed, err := e.fetcher.FetchWithProxy(ctx, url, site.ProxyURL, site.SkipSSLVerify, site.TLSPretend)
+			feed, err := e.fetcher.FetchWithProxy(ctx, url, sitepkg.ResolveSiteProxy(e.db, ctx, &site), site.SkipSSLVerify, site.TLSPretend)
 			if err != nil {
 				errMsg := err.Error()
 				if strings.Contains(errMsg, "非 XML 内容") || strings.Contains(errMsg, "请求间隔") {

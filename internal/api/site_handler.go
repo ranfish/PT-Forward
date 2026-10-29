@@ -37,6 +37,9 @@ type SourceDetectorHook interface {
 type SiteProvider interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
+	// InvalidateAdapter §59.367 附二: 站点配置变更后失效 adapter 缓存
+	// （doer 构造参数 proxy/skip_ssl/tls_pretend 持旧值问题）。
+	InvalidateAdapter(keys ...string)
 }
 
 func (h *SiteHandler) SetProvider(p SiteProvider) {
@@ -1024,6 +1027,14 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
+
+	// §59.367 附二: 站点配置变更后失效 adapter 缓存——proxy/skip_ssl/
+	// tls_pretend 等 doer 构造参数在缓存 adapter 里持有旧值，不失效则
+	// 配置变更需重启才生效（§59.333 附同款）。双键失效：GetAdapter 的
+	// 缓存键可能是站名（RSS detect 链）或域名（其它链）——同站双副本。
+	if h.provider != nil {
+		h.provider.InvalidateAdapter(s.Name, s.Domain)
+	}
 
 	h.logger.Info("site updated", zap.String("name", s.Name))
 	auditLog(r, "site", "update", "site", fmt.Sprintf("%d", id), s.Name, "success")

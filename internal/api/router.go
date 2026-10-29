@@ -269,6 +269,7 @@ func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
 func (rt *Router) SetSiteProvider(p interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
+	InvalidateAdapter(keys ...string)
 }) {
 	rt.siteHandler.SetProvider(p)
 }
