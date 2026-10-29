@@ -590,7 +590,13 @@
     "clearSeenConfirm": "确定清除 {count} 条已见记录？",
     "clearSeenDone": "已清除 {count} 条，等待下轮抓取",
     "torrentId": "种子ID",
-    "freeStatus": "免费"
+    "freeStatus": "免费",
+    "healthStatus": "状态",
+    "failRounds": "订阅失败 {count} 轮",
+    "failReason": "失败原因：{reason}",
+    "firstFailAt": "首败：{time}",
+    "pausedLabel": "已暂停",
+    "pausedHint": "订阅已暂停——轮次与失败统计暂停记录"
   },
   "seeding": {
     "activeTorrents": "活跃种子",
@@ -1336,7 +1342,9 @@
     "githubTokenClearConfirmTitle": "清除 GitHub Token？",
     "githubTokenClearConfirmBody": "清除后 OTA 更新走 GitHub 未认证配额（60 次/小时，共享代理出口易被限流）。",
     "githubTokenCleared": "GitHub Token 已清除",
-    "githubTokenClearFailed": "清除失败"
+    "githubTokenClearFailed": "清除失败",
+    "rssFailAlertThreshold": "订阅停摆告警阈值（轮）",
+    "rssFailAlertThresholdHint": "连续失败 ≥N 轮时订阅列表状态列变红（1~N-1 橙色）"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",

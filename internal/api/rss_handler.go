@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/middleware"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/rss"
 	"go.uber.org/zap"
@@ -227,6 +228,15 @@ type rssResponse struct {
 
 	Conditions []model.RuleCondition `json:"conditions,omitempty"`
 
+	// §59.368: 停摆可观测——连续失败轮数（fetch_log 反向统计：失败轮=
+	// status=error OR 检测全败；遇健康轮断）。前端判色：0 正常/1~N-1 橙/
+	// ≥N 红（N=failAlertThreshold）；paused 前端覆盖显示"已暂停"。
+	ConsecutiveFailures int        `json:"consecutiveFailures"`
+	FailCapped          bool       `json:"failCapped"`
+	LastFailReason      string     `json:"lastFailReason,omitempty"`
+	FirstFailAt         *time.Time `json:"firstFailAt,omitempty"`
+	FailAlertThreshold  int        `json:"failAlertThreshold"`
+
 	RecentFetches []fetchHistoryEntry `json:"recentFetches,omitempty"`
 }
 
@@ -424,9 +434,15 @@ func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		Offset(offset(page, size)).Limit(size).
 		Find(&subs)
 
+	threshold := h.failAlertThreshold(r.Context())
+
 	items := make([]rssResponse, 0, len(subs))
 	for i := range subs {
-		items = append(items, h.toResponse(&subs[i]))
+		resp := h.toResponse(&subs[i])
+		resp.FailAlertThreshold = threshold
+		resp.ConsecutiveFailures, resp.FailCapped, resp.LastFailReason, resp.FirstFailAt =
+			h.computeSubHealth(r.Context(), subs[i].ID)
+		items = append(items, resp)
 	}
 
 	Success(w, PaginatedResult{
@@ -435,6 +451,55 @@ func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		Page:  page,
 		Size:  size,
 	})
+}
+
+// failAlertThreshold §59.368: 停摆告警阈值（settings rss_fail_alert_threshold，
+// 默认 5；读取时默认——不预写键）。
+func (h *RSSHandler) failAlertThreshold(ctx context.Context) int {
+	if v, err := setting.NewRepository(h.db).Get(ctx, "rss_fail_alert_threshold"); err == nil && v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil && n > 0 {
+			return n
+		}
+	}
+	return 5
+}
+
+// computeSubHealth §59.368: 订阅连续失败轮数——fetch_log 反向统计（上限
+// 50 轮，超限 capped；遇健康轮断）。失败轮两类：① status=error（拉取
+// 失败）② ok 且 detect 全败（隐性停摆——fail-closed 静默零获取）。
+func (h *RSSHandler) computeSubHealth(ctx context.Context, subID uint) (failures int, capped bool, lastReason string, firstFailAt *time.Time) {
+	var logs []model.RSSFetchLog
+	if err := h.db.WithContext(ctx).
+		Where("subscription_id = ?", fmt.Sprintf("%d", subID)).
+		Order("id DESC").Limit(50).
+		Find(&logs).Error; err != nil {
+		return 0, false, "", nil
+	}
+	for i, l := range logs {
+		failed := l.Status == "error" ||
+			(l.Status == "ok" && l.DetectCount > 0 && l.DetectFailures == l.DetectCount)
+		if !failed {
+			break
+		}
+		failures++
+		if i == 0 {
+			if l.Status == "error" {
+				msg := l.ErrorMsg
+				if len(msg) > 80 {
+					msg = msg[:80]
+				}
+				lastReason = "fetch: " + msg
+			} else {
+				lastReason = fmt.Sprintf("detect: %d/%d", l.DetectFailures, l.DetectCount)
+			}
+		}
+		t := l.CreatedAt
+		firstFailAt = &t
+	}
+	if failures == 50 && len(logs) == 50 {
+		capped = true // 50 条全失败——实际连续数 ≥50
+	}
+	return failures, capped, lastReason, firstFailAt
 }
 
 func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {

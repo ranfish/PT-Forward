@@ -163,6 +163,11 @@
             <a-form-item :label="t('settings.cleanupTorrentTrafficDays')">
               <a-input-number v-model:value="form.cleanupTorrentTrafficDays" :min="7" style="width: 100%" />
             </a-form-item>
+            <!-- §59.368: 订阅停摆告警阈值——连续失败 N 轮状态列变红 -->
+            <a-form-item :label="t('settings.rssFailAlertThreshold')">
+              <a-input-number v-model:value="form.rssFailAlertThreshold" :min="1" :max="50" style="width: 120px" />
+              <span style="margin-left: 8px; color: #999; font-size: 12px">{{ t('settings.rssFailAlertThresholdHint') }}</span>
+            </a-form-item>
           </a-col>
         </a-row>
 
@@ -239,6 +244,7 @@ const form = reactive({
   cleanupSeedingArchiveDays: 90,
   cleanupAuditLogDays: 90,
   cleanupTorrentTrafficDays: 30,
+  rssFailAlertThreshold: 5,
 })
 
 async function fetchSettings() {
@@ -270,6 +276,7 @@ async function fetchSettings() {
       websocketEnabled: data.websocketEnabled !== 'false',
       loginLockoutEnabled: data.login_lockout_enabled === 'true',
       loginMaxRetries: parseInt(data.login_max_retries) || 5,
+      rssFailAlertThreshold: parseInt(data.rss_fail_alert_threshold) || 5,
       loginLockoutMin: parseInt(data.login_lockout_min) || 5,
       rateLimitEnabled: data.rate_limit_enabled === 'true',
       rateLimitGlobal: parseInt(data.rate_limit_global) || 600,
@@ -354,6 +361,8 @@ async function saveSettings() {
       ['data_cleanup_seeding_archive_days', String(form.cleanupSeedingArchiveDays)],
       ['data_cleanup_audit_log_days', String(form.cleanupAuditLogDays)],
       ['torrent_traffic_retention_days', String(form.cleanupTorrentTrafficDays)],
+      // §59.368: 订阅停摆告警阈值（默认 5——后端读取时同默认）
+      ['rss_fail_alert_threshold', String(form.rssFailAlertThreshold)],
     ]
     for (const [key, value] of entries) {
       await settingsApi.update(key, { value })

@@ -731,7 +731,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 						zap.String("url", url),
 						zap.Error(err))
 				}
-				e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", errMsg)
+				e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", errMsg, 0, 0)
 				continue
 			}
 			events = e.fetcher.ParseItems(feed, sub, &site)
@@ -750,6 +750,8 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			index int
 		}
 		var detectItems []detectItem
+		// §59.368: 本轮 detect 统计（apiMode/无条目时 0/0——健康语义）
+		detectCount, detectFailTotal := 0, 0
 
 		for i, event := range events {
 			isSeen, seenErr := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID, uintToString(sub.ID))
@@ -799,6 +801,9 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			sem := make(chan struct{}, maxConcurrentDetect)
 			var wg sync.WaitGroup
 			var slowCount int64
+			// §59.368: detect 失败计数——落 fetch_log 供订阅状态列反向统计
+			//（隐性停摆信号：fetch ok 但 detect 全败 → fail-closed 静默零获取）
+			var detectFailures int64
 
 			for _, item := range detectItems {
 				wg.Add(1)
@@ -807,7 +812,9 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					defer wg.Done()
 					defer func() { <-sem }()
 					t0 := time.Now()
-					e.detectHRAndDiscount(ctx, it.event, site.Domain)
+					if !e.detectHRAndDiscount(ctx, it.event, site.Domain) {
+						atomic.AddInt64(&detectFailures, 1)
+					}
 					if dur := time.Since(t0); dur > 2*time.Second {
 						atomic.AddInt64(&slowCount, 1)
 						e.logger.Warn("detectHRAndDiscount slow",
@@ -818,6 +825,8 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}(item)
 			}
 			wg.Wait()
+			detectCount = len(detectItems)
+			detectFailTotal = int(atomic.LoadInt64(&detectFailures))
 
 			if slowCount > 0 {
 				e.logger.Info("detectHRAndDiscount batch summary",
@@ -1081,11 +1090,11 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				zap.String("subscription", sub.Name),
 				zap.Int("total", len(events)))
 		}
-		e.saveFetchLog(ctx, sub.ID, len(events), newCount, len(torrentEvents), "ok", "")
+		e.saveFetchLog(ctx, sub.ID, len(events), newCount, len(torrentEvents), "ok", "", detectCount, detectFailTotal)
 	}
 }
 
-func (e *Engine) saveFetchLog(ctx context.Context, subID uint, total, newCount, dispatched int, status, errMsg string) {
+func (e *Engine) saveFetchLog(ctx context.Context, subID uint, total, newCount, dispatched int, status, errMsg string, detectCount, detectFailures int) {
 	log := &model.RSSFetchLog{
 		SubscriptionID: fmt.Sprintf("%d", subID),
 		Total:          total,
@@ -1093,6 +1102,8 @@ func (e *Engine) saveFetchLog(ctx context.Context, subID uint, total, newCount, 
 		Dispatched:     dispatched,
 		Status:         status,
 		ErrorMsg:       errMsg,
+		DetectCount:    detectCount,
+		DetectFailures: detectFailures,
 	}
 	if err := e.db.WithContext(ctx).Create(log).Error; err != nil {
 		e.logger.Debug("save fetch log failed", zap.Error(err))

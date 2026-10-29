@@ -588,7 +588,13 @@
     "clearSeenConfirm": "Clear {count} seen records?",
     "clearSeenDone": "Cleared {count}, waiting for next fetch",
     "torrentId": "Torrent ID",
-    "freeStatus": "Free"
+    "freeStatus": "Free",
+    "healthStatus": "Status",
+    "failRounds": "Failing {count} rounds",
+    "failReason": "Reason: {reason}",
+    "firstFailAt": "Since: {time}",
+    "pausedLabel": "Paused",
+    "pausedHint": "Subscription paused — rounds and failure stats are paused"
   },
   "seeding": {
     "activeTorrents": "Active Torrents",
@@ -1355,11 +1361,13 @@
     "githubTokenPlaceholder": "Leave empty to keep current; enter new token to save",
     "githubTokenHint": "Optional. OTA update checks hit the GitHub API — unauthenticated limit is 60 req/h/IP (shared proxy exit is easily throttled). With a token (classic, zero scope is fine — public read-only) the limit is 5000 req/h per token.",
     "githubTokenConfigured": "Configured: {masked} (save untouched = keep; clear + save = remove; type new value = overwrite)",
-"githubTokenClear": "Clear",
-"githubTokenClearConfirmTitle": "Clear GitHub Token?",
-"githubTokenClearConfirmBody": "After clearing, OTA updates use GitHub unauthenticated quota (60 req/h — shared proxy exits get throttled easily).",
-"githubTokenCleared": "GitHub Token cleared",
-"githubTokenClearFailed": "Clear failed"
+    "githubTokenClear": "Clear",
+    "githubTokenClearConfirmTitle": "Clear GitHub Token?",
+    "githubTokenClearConfirmBody": "After clearing, OTA updates use GitHub unauthenticated quota (60 req/h — shared proxy exits get throttled easily).",
+    "githubTokenCleared": "GitHub Token cleared",
+    "githubTokenClearFailed": "Clear failed",
+    "rssFailAlertThreshold": "Subscription stall alert threshold (rounds)",
+    "rssFailAlertThresholdHint": "Status column turns red after N consecutive failed rounds (orange for 1~N-1)"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",

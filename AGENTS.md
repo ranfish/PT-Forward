@@ -95,6 +95,8 @@
 
 **核心规则**：在已使用 camelCase 的专用 struct（如 `updateSiteRequest`、`siteResponse`、`downloaderResponse`）中新增字段时，**必须用 camelCase**，否则前端反序列化失败。
 
+**settings 表键名（§59.368 定案）**：新键一律 **snake_case**（Go 常量 `setting.Key*` 惯例）；camel 遗留清单锁定（`httpProxy`/`otaUseProxy`/`socksProxy`/`cookieCloudUrl`/`cookieCloudUuid`/`cookieCloudPassword`/`websocketEnabled`——§55-56 前端直传时代产物）——**仅在因功能触碰时顺路迁移，禁止新增 camel 键**。
+
 ## 环境信息
 
 - **Go**：`/home/incast/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）

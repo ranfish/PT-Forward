@@ -243,6 +243,10 @@ type RSSFetchLog struct {
 	Dispatched     int       `json:"dispatched" gorm:"default:0"`
 	Status         string    `json:"status" gorm:"size:20;not null;default:'ok'"`
 	ErrorMsg       string    `json:"error_msg" gorm:"size:500"`
+	// §59.368: detect 停摆可观测——本轮 detect 尝试数（API 模式=0）与失败数；
+	// 失败轮判定= status=error OR (ok AND detect_count>0 AND 全败)。
+	DetectCount    int       `json:"detect_count" gorm:"default:0"`
+	DetectFailures int       `json:"detect_failures" gorm:"default:0"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
