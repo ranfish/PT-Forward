@@ -405,6 +405,16 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 		}
 	}
 
+	// §59.369 附二: 深度站限转标签语义（rules.php 权威："限转标签种子发布
+	// 72h 内严禁转载任何站"）——NoTransferUntil=详情页发布绝对时间+72h；
+	// 72h 后的定向三站永久禁由 pipeline 名单拦（消费层两态完整语义）。
+	if strings.Contains(siteCfg.Domain, "dstudio") {
+		if containsFlag(detail.Flags, "限转") && detail.PublishedAt != nil {
+			until := detail.PublishedAt.Add(72 * time.Hour)
+			detail.NoTransferUntil = &until
+		}
+	}
+
 	// §56.13 方案 B: adapter 内部已用 Engine 提取（如 NexusPHPAdapter）。
 	// fetcher 不再调 Engine，仅做 titleparser 补全（fallback，针对 Engine 没提取到的字段）。
 	fillDetailFromTitle(detail)
