@@ -26,5 +26,21 @@ func (p *PublicExtractor) extractTags(doc *goquery.Document) []string {
 		tags = append(tags, text)
 	})
 
+	// §59.369 附二: NP 新版前端形态——结构化字段区"标签"的
+	// <span class="torrent-content-tag">（深度站 dstudio.me 实证：
+	// 官方/限转/原生等；详情页无侧栏标签云、筛选器在列表页不进本
+	// 提取——无标签云误伤面）。
+	doc.Find(`span[class*="torrent-content-tag"]`).Each(func(_ int, s *goquery.Selection) {
+		text := strings.TrimSpace(s.Text())
+		if text == "" {
+			return
+		}
+		if _, ok := seen[text]; ok {
+			return
+		}
+		seen[text] = struct{}{}
+		tags = append(tags, text)
+	})
+
 	return tags
 }

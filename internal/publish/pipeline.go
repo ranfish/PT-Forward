@@ -655,8 +655,8 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 	}
 
 	// 2. flags 检查（来自 torrent_metadata）
-	if p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite) {
-		return false, "源站 flags 标记禁转/独占（torrent_metadata），跳过发布"
+	if blocked, reason := p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite, targetSite); blocked {
+		return false, reason
 	}
 
 	// 3. declaration_filter 检查（flags 不可用时兜底）
@@ -697,28 +697,49 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 	return true, ""
 }
 
-func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteName string) bool {
+func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteName, targetSite string) (bool, string) {
 	if infoHash == "" {
-		return false
+		return false, ""
 	}
 	var meta model.TorrentMetadata
 	if err := p.db.WithContext(ctx).
 		Where("info_hash = ?", infoHash).
 		Order("updated_at DESC").
 		First(&meta).Error; err != nil {
-		return false
+		return false, ""
 	}
 	if meta.Flags == "" {
-		return false
+		return false, ""
 	}
 	var flags []string
 	if err := json.Unmarshal([]byte(meta.Flags), &flags); err != nil {
-		return false
+		return false, ""
 	}
 	// §59.162: 限时禁转两态——now<until 才拦（24h 窗到期自动放行）
 	if containsStr(flags, "限时禁转") {
 		if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
-			return true
+			return true, "源站 flags 标记限时禁转（窗口内），跳过发布"
+		}
+	}
+	// §59.369 附二: 站规定向禁转两态（深度站 rules.php 首例）——
+	// "限转"标签语义：① 发布 72h 内禁一切 ② 72h 后永久禁定向名单站。
+	// 窗判定用 torrent_metadata 首见时间近似（官种 RSS 即时抓首见≈发布，
+	// 误差小；老种首采低估窗=放行偏宽可接受——方案 A 用户确认）。
+	if containsStr(flags, "限转") {
+		// 72h 全站窗语义仅限名单映射站（深度站 rules.php 定义）——
+		// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
+		if _, ok := siteDirectedNoTransferTargets[siteName]; ok {
+			for _, t := range siteDirectedNoTransferTargets[siteName] {
+				if t == targetSite {
+					return true, fmt.Sprintf("源站 %s 限转规则永久禁转至 %s（站规定向名单），跳过发布", siteName, targetSite)
+				}
+			}
+			// NoTransferUntil 精确窗（fetcher 站分支落 PublishedAt+72h；
+			// 缺失（提取失败/老数据）不拦：名单已拦三站，缺失时无限保守拦
+			// = 老种永久误拦，放行语义更正确。
+			if meta.NoTransferUntil != nil && meta.NoTransferUntil.After(time.Now()) {
+				return true, fmt.Sprintf("源站 %s 限转标签 72h 发布窗口内（至 %s），跳过发布", siteName, meta.NoTransferUntil.Format("01-02 15:04"))
+			}
 		}
 	}
 	forbiddenFlags := map[string]bool{
@@ -728,10 +749,18 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	}
 	for _, f := range flags {
 		if forbiddenFlags[f] {
-			return true
+			return true, "源站 flags 标记禁转/独占（torrent_metadata），跳过发布"
 		}
 	}
-	return false
+	return false, ""
+}
+
+// siteDirectedNoTransferTargets §59.369 附二: 站规定向禁转名单单点——
+// 源站"限转"标签解除后仍永久禁转的目标站（规则页权威定义）。
+// 深度站 rules.php 首例："限转解除后，此类资源仍然禁转至 PTT、Rousi、
+// HDhome"（PTT=时间/Rousi=肉丝/HDhome=家园）。第二站出现再配置化。
+var siteDirectedNoTransferTargets = map[string][]string{
+	"深度": {"时间", "肉丝", "家园"},
 }
 
 // HardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改。

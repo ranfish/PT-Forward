@@ -62,7 +62,8 @@ var (
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
 	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
-	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
+	// §59.369 附二: torrent-content-tag 前缀（深度站 NP 新版前端标签形态）
+	reNexusTag            = regexp.MustCompile(`class="(?:tag|torrent-content-tag)[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg     = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
 	reBBCodeHTMLImg = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
@@ -377,6 +378,7 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 		detail, ok := a.extractWithEngine(html, config, torrentID)
 		if ok {
 			a.fillMediaFromRawBlock(html, detail)
+			a.fillPublishedAt(html, detail)
 			return detail, html, nil
 		}
 		if a.logger != nil {
@@ -387,7 +389,30 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	// fallback: 老 regexp 提取（保留作 Engine 失败时的兜底）
 	detail := a.legacyExtractDetail(html)
 	a.fillMediaFromRawBlock(html, detail)
+	a.fillPublishedAt(html, detail)
 	return detail, html, nil
+}
+
+// rePublishedAtTitle §59.369 附二: NP 新版 details-inline-time 的发布时间
+// 绝对戳——"发布于<span title='2026-10-29 19:35:30'>4时6分钟前</span>"
+// （相对文本是展示态，title 才是精确源——深度站实证；比 keepfrds 相对
+// 时间解析（ParseRelativeAge）更优，形态不变不受站方展示措辞影响）。
+var rePublishedAtTitle = regexp.MustCompile(`发布于<span[^>]*title="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"`)
+
+// fillPublishedAt §59.369 附二: 详情页发布时间提取（已有值不覆盖）。
+func (a *NexusPHPAdapter) fillPublishedAt(html string, detail *model.TorrentDetail) {
+	if detail == nil || detail.PublishedAt != nil {
+		return
+	}
+	m := rePublishedAtTitle.FindStringSubmatch(html)
+	if len(m) < 2 {
+		return
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", m[1], time.Local)
+	if err != nil {
+		return
+	}
+	detail.PublishedAt = &t
 }
 
 // fillMediaFromRawBlock §59.366: 结构化字段区 MI/BDInfo 补取——

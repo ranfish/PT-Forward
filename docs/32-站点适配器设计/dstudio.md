@@ -51,3 +51,40 @@
 - **代理是硬需求**（直连 25s 截断不可用）——各环境站点配置需设 proxy_url
 - CookieCloud 域匹配：dstudio.me
 - 全站官种——发布链无该站表单（is_target=false），仅做源站转发
+
+## 五、禁转规则（§59.369 附二，rules.php 权威）
+
+### 规则原文
+
+> 带有限转标签的种子，发布72小时之内严禁将其转载至任何其他PT站点或公开网络。
+> 限转解除后，此类资源仍然禁转至 PTT、Rousi、HDhome。
+
+**站名映射**：PTT=时间、Rousi=肉丝、HDhome=家园
+
+### 两态语义模型
+
+| 态 | 规则 | 系统实现 |
+|---|---|---|
+| 发布 72h 内 | 严禁转载至任何站 | NoTransferUntil = PublishedAt+72h（pipeline 窗内拦）|
+| 72h 后（限转解除） | 永久禁转至 时间/肉丝/家园 | siteDirectedNoTransferTargets 名单（pipeline 目标命中拦）|
+
+### 标记载体与采集
+
+- **标签**：结构化字段区 rowhead"标签"→ rowfollow 内
+  `<span class="torrent-content-tag">官方/限转/原生/国语/中字</span>`
+- **采集链**：extractTags span 分支（§59.369 附二）→ extractFlags
+  tags 并入 → "限转"关键词命中 → Flags=["限转"]
+- **发布时间**：`发布于<span title='绝对时间'>相对文本</span>`——
+  title 属性即精确时间戳（fillPublishedAt 提取）
+- **列表页注意**：tag_id=1 筛选器的"限转"是站方标签体系入口，
+  非种子行内标记（§59.167 筛选器陷阱同款区分）
+
+### 实证（tid=5073 后会无期）
+
+```
+probe 生产同栈：Tags=[原生 官方 限转 国语 中字] | Flags=[限转]
+             | PublishedAt=2026-10-29 19:35（title 绝对时间）
+消费三态锚：名单内拦（时间/肉丝/家园 无论窗）/ 窗内拦（名单外 72h 内）
+          / 窗外放行（名单外 72h 后）/ until 缺失放行（名单已拦+缺失
+          不无限保守=老种防永久误拦）
+```

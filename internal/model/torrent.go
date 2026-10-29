@@ -11,6 +11,10 @@ type TorrentDetail struct {
 	AddedAtText string     `json:"added_at_text,omitempty"`
 	// §59.162: 限时禁转让渡截止（判定收口 fetcher——buildMetadata 传递落库）
 	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
+	// §59.369 附二: 详情页发布时间（绝对）——NP 新版 details-inline-time 的
+	// title 属性（"发布于<span title='2026-10-29 19:35:30'>4时6分钟前</span>"，
+	// 深度站实证）；限转 72h 窗等站规判定消费。
+	PublishedAt *time.Time `json:"published_at,omitempty"`
 	Subtitle     string     `json:"subtitle"`
 	Description  string     `json:"description"`
 	Category     string     `json:"category"`
