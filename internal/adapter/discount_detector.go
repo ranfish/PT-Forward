@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -85,10 +86,33 @@ func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig)
 
 func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	targetHTML := html
+	h1Scope := ""
 	if m := h1Re.FindStringSubmatch(html); len(m) > 1 {
-		targetHTML = m[1]
+		h1Scope = m[1]
+		targetHTML = h1Scope
 	}
 	result := DetectDiscountFromHTML(targetHTML, cfg)
+	// freeEndAt 解析范围：随折扣命中的扫描范围走（h1 或紧邻兄弟）。
+	endScope := targetHTML
+	if result.Level == model.DiscountNone {
+		// §59.367: h1 内 miss → 扩扫 h1 紧邻兄弟元素。NP 新版 details-*
+		// 前端（深度站 dstudio.me 实证）把促销标记放 h1 兄弟节点
+		// （details-title-statuses div：`<font class='free'>免费</font>` +
+		// 剩余时间）——h1 内文干净，class 规则（'free'/'halfdown'）齐备
+		// 但范围扫不到 → 全判 NONE → RSS 免费订阅零获取。
+		// 防误伤双门（相似种子区的促销标记不得误判本种——
+		// IgnoresSimilarTorrents/TTG 测试锚定的场景）：
+		//   ① 只扫紧邻兄弟（NextAdjacent）——相似区在 h2/远表不扫；
+		//   ② 长度门 2000B——促销标记区物理上小，大块相似表跳过。
+		// 标准 NP 促销在 h1 内首轮命中不进本分支零行为变化。
+		if sibling := h1PromotionSiblingScope(html); sibling != "" {
+			siblingResult := DetectDiscountFromHTML(sibling, cfg)
+			if siblingResult.Level != model.DiscountNone {
+				result = siblingResult
+				endScope = sibling
+			}
+		}
+	}
 	if result.Level == model.DiscountNone {
 		// Fallback: scan full HTML for image-based markers (e.g. TTG /pic/ico_free.gif)
 		// which live outside the h1 element.
@@ -97,11 +121,35 @@ func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetection
 	if result.Level != model.DiscountNone {
 		// Parse discount expiry only when a discount was detected, otherwise
 		// we'd pick up unrelated <span title="..."> attributes.
-		if t, ok := parseFreeEndAt(targetHTML); ok {
+		if t, ok := parseFreeEndAt(endScope); ok {
 			result.FreeEndAt = &t
 		}
 	}
 	return result
+}
+
+// h1PromotionSiblingScope §59.367: 提取第一个 h1 紧邻兄弟元素（NextAdjacent）
+// 的 outer HTML——NP 新版前端的促销标记区（details-title-statuses）。
+// 双防御：无兄弟/兄弟超 2000B（相似种子大表形态）/解析失败均返回空串
+// （调用方跳过扩展分支）。
+func h1PromotionSiblingScope(html string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return ""
+	}
+	h1 := doc.Find("h1").First()
+	if h1.Length() == 0 {
+		return ""
+	}
+	next := h1.Next()
+	if next.Length() == 0 {
+		return ""
+	}
+	out, err := goquery.OuterHtml(next)
+	if err != nil || len(out) == 0 || len(out) > 2000 {
+		return ""
+	}
+	return out
 }
 
 // parseFreeEndAt extracts the discount end timestamp from "剩余时间：<span title=...>"
