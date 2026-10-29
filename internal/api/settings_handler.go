@@ -118,6 +118,10 @@ func (h *SettingsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 // maskSensitiveValue §59.367 附六: 凭证脱敏——前 4+****+末 4；
 // 短值（≤8）全 ****（防短值碎片泄露）。
+// 值域假设（§59.368 摸底定案不修）：writeOnly 键为凭证类，值域 ASCII
+// （GitHub token = ghp_/gho_/ghu_ 等 + 36 位 [A-Za-z0-9]）——字节切分=
+// 字符切分。若未来 writeOnly 键值域含非 ASCII（中文/emoji），须改
+// []rune 切分（字节切会产生破碎 UTF-8 序列显示乱码）。
 func maskSensitiveValue(v string) string {
 	if len(v) <= 8 {
 		return strings.Repeat("*", 8)
