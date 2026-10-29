@@ -1353,7 +1353,13 @@
     "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)",
     "githubToken": "GitHub Token (Update Check)",
     "githubTokenPlaceholder": "Leave empty to keep current; enter new token to save",
-    "githubTokenHint": "Optional. OTA update checks hit the GitHub API — unauthenticated limit is 60 req/h/IP (shared proxy exit is easily throttled). With a token (classic, zero scope is fine — public read-only) the limit is 5000 req/h per token."
+    "githubTokenHint": "Optional. OTA update checks hit the GitHub API — unauthenticated limit is 60 req/h/IP (shared proxy exit is easily throttled). With a token (classic, zero scope is fine — public read-only) the limit is 5000 req/h per token.",
+    "githubTokenConfigured": "Configured: {masked} (save untouched = keep; clear + save = remove; type new value = overwrite)",
+"githubTokenClear": "Clear",
+"githubTokenClearConfirmTitle": "Clear GitHub Token?",
+"githubTokenClearConfirmBody": "After clearing, OTA updates use GitHub unauthenticated quota (60 req/h — shared proxy exits get throttled easily).",
+"githubTokenCleared": "GitHub Token cleared",
+"githubTokenClearFailed": "Clear failed"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",

@@ -14,6 +14,10 @@
             v-model:value="form.githubToken"
             :placeholder="t('settings.githubTokenPlaceholder')"
           />
+          <span v-if="githubTokenMasked" style="margin-left: 0; color: #999; font-size: 12px; display: block; margin-top: 4px">
+            {{ t('settings.githubTokenConfigured', { masked: githubTokenMasked }) }}
+            <a style="margin-left: 6px" @click="clearGithubToken">{{ t('settings.githubTokenClear') }}</a>
+          </span>
           <span style="margin-left: 0; color: #999; font-size: 12px; display: block; margin-top: 4px">{{ t('settings.githubTokenHint') }}</span>
         </a-form-item>
         <a-form-item :label="t('settings.socksProxy')">
@@ -186,7 +190,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api/settings'
 import { switchAutoSave } from '@/utils/switch-auto-save'
@@ -199,6 +203,8 @@ function saveBoolSetting(key: string, value: boolean) {
 }
 
 const saving = ref(false)
+// §59.367 附六: GitHub Token 已配置态脱敏回显（后端 github_token_masked）
+const githubTokenMasked = ref('')
 const backingUp = ref(false)
 const restoring = ref(false)
 
@@ -249,6 +255,11 @@ async function fetchSettings() {
     } else if (raw && typeof raw === 'object') {
       Object.assign(data, raw)
     }
+    githubTokenMasked.value = data.github_token_masked || ''
+    // §59.367 附六: 脱敏值作为表单初始值（哨兵）——不动+保存=保持（提交值
+    // ==哨兵跳过）；选中删除+保存=清除（空→DELETE）；输入新值+保存=覆盖。
+    // 哨兵安全：脱敏串含 ****，真 token（ghp_[A-Za-z0-9]{36}）不含 *。
+    form.githubToken = githubTokenMasked.value
     Object.assign(form, {
       httpProxy: data.httpProxy || '',
       otaUseProxy: data.otaUseProxy === 'true',
@@ -285,14 +296,37 @@ async function fetchSettings() {
   }
 }
 
+// §59.367 附六: 清除 GitHub Token——显式 DELETE（与"留空提交=不修改"分离，防误清）
+async function clearGithubToken() {
+  try {
+    await Modal.confirm({
+      title: t('settings.githubTokenClearConfirmTitle'),
+      content: t('settings.githubTokenClearConfirmBody'),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okType: 'danger',
+    })
+  } catch {
+    return
+  }
+  try {
+    await settingsApi.remove('github_token')
+    message.success(t('settings.githubTokenCleared'))
+    form.githubToken = ''
+    await fetchSettings()
+  } catch {
+    message.error(t('settings.githubTokenClearFailed'))
+  }
+}
+
 async function saveSettings() {
   saving.value = true
   try {
     const entries: [string, string][] = [
       ['httpProxy', form.httpProxy],
       ['otaUseProxy', String(form.otaUseProxy)],
-      // §59.354: GitHub Token 敏感禁读——留空=保持已配置（不覆盖清空），输入新值才写
-      ...(form.githubToken.trim() ? [['github_token', form.githubToken.trim()]] as [string, string][] : []),
+      // §59.367 附六: github_token 三态语义单独处理（见 saveSettings 内
+      // githubToken 分支——哨兵保持/空清除/新值覆盖），不进批量 entries。
       ['socksProxy', form.socksProxy],
       ['cookieCloudUrl', form.cookieCloudUrl],
       ['cookieCloudUuid', form.cookieCloudUuid],
@@ -324,7 +358,21 @@ async function saveSettings() {
     for (const [key, value] of entries) {
       await settingsApi.update(key, { value })
     }
+    // §59.367 附六: github_token 三态——脱敏哨兵=保持不动（跳过）｜空=清除
+    //（DELETE——"选中删除+保存"路径）｜其它=新值覆盖。哨兵含 **** 与真
+    // token（字母数字）字符集不相交，输入值不可能撞哨兵。
+    const tok = form.githubToken.trim()
+    if (githubTokenMasked.value && tok !== githubTokenMasked.value) {
+      if (tok) {
+        await settingsApi.update('github_token', { value: tok })
+      } else {
+        await settingsApi.remove('github_token')
+      }
+    }
     message.success(t('settings.settingsSaved'))
+    if (githubTokenMasked.value && tok !== githubTokenMasked.value) {
+      await fetchSettings()
+    }
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

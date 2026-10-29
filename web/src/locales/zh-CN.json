@@ -1330,7 +1330,13 @@
     "cleanupTorrentTrafficDays": "流量快照保留天数",
     "githubToken": "GitHub Token（更新检查）",
     "githubTokenPlaceholder": "留空保持现状；填入新 Token 保存后生效",
-    "githubTokenHint": "可选。OTA 检查更新走 GitHub API——让更新更稳定。"
+    "githubTokenHint": "可选。OTA 检查更新走 GitHub API——让更新更稳定。",
+    "githubTokenConfigured": "当前已配置：{masked}（不动保存=保持；清空保存=清除；输入新值保存=覆盖）",
+    "githubTokenClear": "清除",
+    "githubTokenClearConfirmTitle": "清除 GitHub Token？",
+    "githubTokenClearConfirmBody": "清除后 OTA 更新走 GitHub 未认证配额（60 次/小时，共享代理出口易被限流）。",
+    "githubTokenCleared": "GitHub Token 已清除",
+    "githubTokenClearFailed": "清除失败"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",
