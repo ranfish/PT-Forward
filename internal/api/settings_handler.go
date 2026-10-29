@@ -101,6 +101,12 @@ func (h *SettingsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 	for k := range settings {
 		if isSensitiveSettingKey(k) {
+			// §59.367 附六: writeOnly 键（用户自配置凭证）附脱敏回显
+			// （ghp_****a1b2——不可重建真值零泄露）——真值仍禁读；
+			// 非 writeOnly 的 sensitive（jwt 类系统键）彻底不出现。
+			if writeOnlySettingKeys[k] && settings[k] != "" {
+				settings[k+"_masked"] = maskSensitiveValue(settings[k])
+			}
 			delete(settings, k)
 		}
 	}
@@ -108,6 +114,15 @@ func (h *SettingsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	Success(w, map[string]interface{}{
 		"items": settings,
 	})
+}
+
+// maskSensitiveValue §59.367 附六: 凭证脱敏——前 4+****+末 4；
+// 短值（≤8）全 ****（防短值碎片泄露）。
+func maskSensitiveValue(v string) string {
+	if len(v) <= 8 {
+		return strings.Repeat("*", 8)
+	}
+	return v[:4] + "****" + v[len(v)-4:]
 }
 
 // restartRequiredKeys §59.255: 启动快照注入类 Key（改完需重启——前端提示）
@@ -180,7 +195,10 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 }
 
 func (h *SettingsHandler) handleDelete(w http.ResponseWriter, r *http.Request, key string) {
-	if isSensitiveSettingKey(key) {
+	// §59.367 附六: sensitive 且非 writeOnly（jwt 类系统键）禁删；
+	// writeOnly 键（github_token 等用户自配置凭证）放行——清除路径
+	//（此前 sensitive 一律拒删致 writeOnly 键无清除操作路径）。
+	if isSensitiveSettingKey(key) && !writeOnlySettingKeys[key] {
 		Error(w, http.StatusForbidden, 16003, "该设置项禁止删除")
 		return
 	}
