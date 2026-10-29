@@ -26,6 +26,20 @@
       @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'health'">
+          <a-tooltip v-if="record.paused" :title="t('subscription.pausedHint')">
+            <a-tag>{{ t('subscription.pausedLabel') }}</a-tag>
+          </a-tooltip>
+          <a-tooltip
+            v-else-if="record.consecutiveFailures > 0"
+            :title="healthTooltip(record)"
+          >
+            <span :style="{ color: record.consecutiveFailures >= record.failAlertThreshold ? '#f5222d' : '#fa8c16', fontWeight: 500 }">
+              {{ t('subscription.failRounds', { count: record.failCapped ? '50+' : record.consecutiveFailures }) }}
+            </span>
+          </a-tooltip>
+          <span v-else style="color: #999">✓</span>
+        </template>
         <template v-if="column.key === 'enabled'">
           <a-switch :checked="!record.paused" @change="toggleSubscription(record)" />
         </template>
@@ -259,6 +273,9 @@ const columns = [
   { title: t('common.name'), dataIndex: 'name', key: 'name' },
   { title: t('common.site'), dataIndex: 'siteName', key: 'siteName' },
   { title: t('subscription.cronExpression'), dataIndex: 'cron', key: 'cron', width: 140 },
+  // §59.368: 停摆可观测——连续失败轮数三态（灰✓正常/橙 <N/红 ≥N）；
+  // paused 覆盖显示"已暂停"
+  { title: t('subscription.healthStatus'), key: 'health', width: 120, align: 'center' as const },
   { title: t('common.enable'), key: 'enabled', width: 80, align: 'center' as const },
   { title: t('common.actions'), key: 'actions', width: 220 },
 ]
@@ -356,6 +373,16 @@ async function handleDelete(id: number) {
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   }
+}
+
+// §59.368: 停摆 tooltip——只显示失败数（拉取失败带 error 摘要/检测停带 N/M）
+// +首败时间
+function healthTooltip(record: Record<string, unknown>): string {
+  const reason = String(record.lastFailReason ?? '')
+  const first = record.firstFailAt ? String(record.firstFailAt).replace('T', ' ').slice(0, 16) : ''
+  const lines: string[] = [t('subscription.failReason', { reason: reason || '-' })]
+  if (first) lines.push(t('subscription.firstFailAt', { time: first }))
+  return lines.join('\n')
 }
 
 async function toggleSubscription(record: SubscriptionItem) {
