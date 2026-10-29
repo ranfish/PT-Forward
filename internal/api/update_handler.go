@@ -184,6 +184,13 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	// Step 1: Fetch latest release info
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
+	// §59.367 附四: 同 handleCheckUpdate 注入用户自配置 GitHub Token——
+	// §59.354 修一漏一（checkUpdate 有 token/update 链漏注），代理出口
+	// 未认证配额 60 次/h 耗尽时 POST /update 403（"检查到新版本但更新
+	// 不了"双链分叉指纹）。
+	if tok, err := setting.NewRepository(h.db).Get(ctx, "github_token"); err == nil && tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 
 	// §59.280: 同 check——开关统一走 newHTTPClientWithProxy
 	resp, err := h.newHTTPClientWithProxy(10 * time.Second).Do(req)
