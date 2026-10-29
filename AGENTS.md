@@ -95,6 +95,12 @@
 
 **核心规则**：在已使用 camelCase 的专用 struct（如 `updateSiteRequest`、`siteResponse`、`downloaderResponse`）中新增字段时，**必须用 camelCase**，否则前端反序列化失败。
 
+## 站点角色术语定义（§59.369 权威）
+
+- **站点**=系统内置全集；**源站**=必须有官组（/sites"作为源站"✓，亚型：纯官组/混合）；**目标站**=官组可选（/sites"作为目标站"✓，无官组=转载站）；源站/目标站可交叉
+- **源站适配=站点适配的自然结果**（能正确采集+有官组 ⟹ 即好），不独立工程；**目标站适配=发布适配**（一站一指令+长期维护）——未适配的站目标站开关用户不可开（§59.318 publish_supported 门槛即此语义）
+- 纯官组/混合不数据区分（区分点=目标站门槛自然收敛）
+
 **settings 表键名（§59.368 定案）**：新键一律 **snake_case**（Go 常量 `setting.Key*` 惯例）；camel 遗留清单锁定（`httpProxy`/`otaUseProxy`/`socksProxy`/`cookieCloudUrl`/`cookieCloudUuid`/`cookieCloudPassword`/`websocketEnabled`——§55-56 前端直传时代产物）——**仅在因功能触碰时顺路迁移，禁止新增 camel 键**。
 
 ## 环境信息
