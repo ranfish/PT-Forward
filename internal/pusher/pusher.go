@@ -2,6 +2,7 @@ package pusher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -191,6 +192,11 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 			break
 		}
 		if i == len(dlBackoffs)-1 {
+			// §59.374 回归修复：err==nil 且空数据时 %w wrap nil 会产出
+			// "%!w(<nil>)" 脏消息——synthetic error 兜底
+			if err == nil {
+				err = errors.New("empty torrent data")
+			}
 			result.Error = fmt.Errorf("download torrent: %w (已自动重推 3 次)", err)
 			return result
 		}
