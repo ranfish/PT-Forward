@@ -44,7 +44,9 @@ export const publishApi = {
 
   // §59.374 B2: 批量补推（加种失败集——幂等：下载器自动校验）
   batchRepush(ids: number[]) {
-    return client.post<ApiResponse<{ requested: number; matched: number; pushed: number; failed: number }>>('/publish/seeds/batch-repush', { ids })
+    // per-request 放大：批量长任务（并发 2×N 条×重试链）超全局 30s——
+    // 后端 Background 预算 30min，此处对齐拿汇总响应
+    return client.post<ApiResponse<{ requested: number; matched: number; pushed: number; failed: number }>>('/publish/seeds/batch-repush', { ids }, { timeout: 600000 })
   },
 }
 

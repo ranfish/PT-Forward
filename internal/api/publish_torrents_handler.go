@@ -5781,6 +5781,10 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 		Error(w, http.StatusBadRequest, 40001, "单次最多 100 条")
 		return
 	}
+	if h.executor == nil {
+		Error(w, http.StatusServiceUnavailable, 50301, "执行器未初始化")
+		return
+	}
 
 	var records []model.PublishResultRecord
 	if err := h.db.WithContext(r.Context()).
@@ -5799,14 +5803,28 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 	sem := make(chan struct{}, 2)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	// §59.374 回归修复：Background 独立预算（对齐 execute-batch 既有模式）——
+	// r.Context() 随客户端断开 cancel（axios 30s 超时 vs 100 条×重试链最坏
+	// 远超），会中途砍灭全部补推（§59.345 同族）；Background 保证落库完成。
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer bgCancel()
 	for i, rec := range records {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(idx int, rec model.PublishResultRecord) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			// panic recover 对齐 execute-batch：单条 panic 不击穿进程
+			defer func() {
+				if rec2 := recover(); rec2 != nil {
+					mu.Lock()
+					outcomes[idx] = repushOutcome{ID: rec.ID, Status: "failed",
+						Error: fmt.Sprintf("panic: %v", rec2)}
+					mu.Unlock()
+				}
+			}()
 			out := repushOutcome{ID: rec.ID, Status: "failed"}
-			res := h.executor.Execute(r.Context(), publish.ExecuteInput{
+			res := h.executor.Execute(bgCtx, publish.ExecuteInput{
 				InfoHash:      rec.SourceInfoHash,
 				TargetSite:    rec.TargetSite,
 				TorrentID:     rec.TorrentID,
