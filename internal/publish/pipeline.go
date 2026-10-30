@@ -565,7 +565,13 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 	var total int64
 	q := p.db.WithContext(ctx).Model(&model.PublishResultRecord{})
 	if status != "" {
-		q = q.Where("status = ?", status)
+		if status == "seed_failed" {
+			// §59.374 B2: 加种失败筛选——跨状态子集（seed_error 非空
+			// 且未加种成功——uploaded 状态专属形态）
+			q = q.Where("seed_error != '' AND seeded = 0")
+		} else {
+			q = q.Where("status = ?", status)
+		}
 	}
 	if targetSite != "" {
 		q = q.Where("target_site = ?", targetSite)

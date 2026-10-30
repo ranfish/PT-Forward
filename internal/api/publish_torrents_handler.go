@@ -467,6 +467,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleExecutePublish(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/execute-batch") && r.Method == http.MethodPost:
 		h.handleExecutePublishBatch(w, r)
+	case strings.HasSuffix(path, "/publish/results/batch-repush") && r.Method == http.MethodPost:
+		h.handleBatchRepush(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/execute-site-batch") && r.Method == http.MethodPost:
 		h.handleExecuteSiteBatch(w, r)
@@ -5762,4 +5764,83 @@ func (h *PublishTorrentsHandler) ptgenViable(ctx context.Context, meta *model.To
 		}
 	}
 	return false
+}
+
+// handleBatchRepush §59.374 B2: 批量补推——按记录行原配置重放 PushOnly
+// （ids → 查记录 → executor.PushOnly 并发限 2 → 汇总）。幂等安全
+// （下载器自动校验——§59.374 B1 同理）。
+func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.IDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "ids 必填")
+		return
+	}
+	if len(req.IDs) > 100 {
+		Error(w, http.StatusBadRequest, 40001, "单次最多 100 条")
+		return
+	}
+
+	var records []model.PublishResultRecord
+	if err := h.db.WithContext(r.Context()).
+		Where("id IN ? AND seed_error != '' AND seeded = 0", req.IDs).
+		Find(&records).Error; err != nil || len(records) == 0 {
+		Error(w, http.StatusNotFound, 40400, "无可补推记录（需为加种失败态）")
+		return
+	}
+
+	type repushOutcome struct {
+		ID     uint   `json:"id"`
+		Status string `json:"status"` // pushed / failed
+		Error  string `json:"error,omitempty"`
+	}
+	outcomes := make([]repushOutcome, len(records))
+	sem := make(chan struct{}, 2)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for i, rec := range records {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, rec model.PublishResultRecord) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			out := repushOutcome{ID: rec.ID, Status: "failed"}
+			res := h.executor.Execute(r.Context(), publish.ExecuteInput{
+				InfoHash:      rec.SourceInfoHash,
+				TargetSite:    rec.TargetSite,
+				TorrentID:     rec.TorrentID,
+				PushOnly:      true,
+				PushClientID:  rec.DownloaderID,
+				PushSavePath:  rec.SavePath,
+			})
+			if res != nil && res.Status == "pushed" {
+				out.Status = "pushed"
+			} else if res != nil {
+				out.Error = res.Message
+			}
+			mu.Lock()
+			outcomes[idx] = out
+			mu.Unlock()
+		}(i, rec)
+	}
+	wg.Wait()
+
+	pushed := 0
+	for _, o := range outcomes {
+		if o.Status == "pushed" {
+			pushed++
+		}
+	}
+	h.logger.Info("batch repush done",
+		zap.Int("requested", len(req.IDs)),
+		zap.Int("matched", len(records)),
+		zap.Int("pushed", pushed))
+	Success(w, map[string]interface{}{
+		"requested": len(req.IDs),
+		"matched":   len(records),
+		"pushed":    pushed,
+		"failed":    len(records) - pushed,
+		"outcomes":  outcomes,
+	})
 }

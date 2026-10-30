@@ -169,12 +169,36 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		}
 	}
 
-	dlCtx, dlCancel := context.WithTimeout(ctx, 30*time.Second)
-	torrentData, err := adapter.DownloadTorrent(dlCtx, siteCfg, req.TorrentID)
-	dlCancel()
-	if err != nil || len(torrentData) == 0 {
-		result.Error = fmt.Errorf("download torrent: %w", err)
-		return result
+	// §59.374 B1: 下载 .torrent 自动重推 3 次（退避 2/5/10s 总 17s）——
+	// 网络类瞬态超时自愈（243 龙之家直连慢 11% 间歇超时案）；幂等安全
+	// （下载器自动校验）。Skip 类不进本段（语义不变）。
+	var torrentData []byte
+	err = nil
+	dlBackoffs := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}
+	for i, backoff := range dlBackoffs {
+		if backoff > 0 {
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				result.Error = fmt.Errorf("download torrent (retry %d): ctx canceled: %w", i, ctx.Err())
+				return result
+			}
+		}
+		dlCtx, dlCancel := context.WithTimeout(ctx, 30*time.Second)
+		torrentData, err = adapter.DownloadTorrent(dlCtx, siteCfg, req.TorrentID)
+		dlCancel()
+		if err == nil && len(torrentData) > 0 {
+			break
+		}
+		if i == len(dlBackoffs)-1 {
+			result.Error = fmt.Errorf("download torrent: %w (已自动重推 3 次)", err)
+			return result
+		}
+		p.logger.Warn("push: download torrent retry",
+			zap.String("site", req.SiteName),
+			zap.String("torrent_id", req.TorrentID),
+			zap.Int("attempt", i+1), zap.Duration("next_backoff", dlBackoffs[i+1]),
+			zap.Error(err))
 	}
 	// §59.159 四轮定案（用户）：加种 id 唯一来源=发布成功页 302 权威——下载源
 	// 正确即无需校验（body fallback 已删，52394 误推源头不存在了）。
@@ -204,10 +228,32 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		opts.DownloadLimit = req.DownloadLimitKB * 1024
 	}
 
-	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
-	if err != nil {
-		result.Error = fmt.Errorf("add from file: %w", err)
-		return result
+	// §59.374 B1: 加种自动重推 3 次（下载器瞬态错自愈——幂等：重复种
+	// 下载器自动校验拒绝，无副作用）
+	var addResult *model.AddResult
+	err = nil
+	addBackoffs := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}
+	for i, backoff := range addBackoffs {
+		if backoff > 0 {
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				result.Error = fmt.Errorf("add from file (retry %d): ctx canceled: %w", i, ctx.Err())
+				return result
+			}
+		}
+		addResult, err = dlClient.AddFromFile(ctx, torrentData, opts)
+		if err == nil {
+			break
+		}
+		if i == len(addBackoffs)-1 {
+			result.Error = fmt.Errorf("add from file: %w (已自动重推 3 次)", err)
+			return result
+		}
+		p.logger.Warn("push: add from file retry",
+			zap.Uint("client_uid", req.ClientUID),
+			zap.Int("attempt", i+1), zap.Duration("next_backoff", addBackoffs[i+1]),
+			zap.Error(err))
 	}
 
 	if addResult != nil && addResult.InfoHash != "" && addResult.InfoHash != req.InfoHash {
