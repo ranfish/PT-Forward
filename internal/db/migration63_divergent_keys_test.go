@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 // TestFormConfigDivergentKeysPaired §59.376: canonical 分叉族双键断言
@@ -18,11 +20,9 @@ import (
 // 已知分叉族：category.documentary/documentaries（dict canonical 基准
 // 与 extended 值域分叉的对——新分叉族出现时补入 divergentFamilies）。
 func TestFormConfigDivergentKeysPaired(t *testing.T) {
-	divergentFamilies := [][]string{
-		{"category.documentary", "category.documentaries"},
-		// §59.377: 五二 406 松查发现第二对（dict=mv / extended=music_video）
-		{"category.mv", "category.music_video"},
-	}
+	// §59.378: 引用生产常量（publish.CanonicalDivergentFamilies 同源——
+	// 分叉族新对只在生产常量补，测试自动覆盖防漂移）
+	divergentFamilies := model.CanonicalDivergentFamilies
 	stdKeysArrRe := regexp.MustCompile(`"standard_keys":\s*\[(.*?)\]`)
 	keyRe := regexp.MustCompile(`"([^"]+)"`)
 

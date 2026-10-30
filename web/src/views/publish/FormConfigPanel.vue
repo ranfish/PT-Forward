@@ -196,7 +196,7 @@ const mergedSummary = computed(() => {
 })
 
 function kindLabel(k: string) {
-  return { changed: '改版/错位', added: '新增', removed: '删除' }[k] ?? k
+  return { changed: '改版/错位', added: '新增', removed: '删除', renamed: '文案微调' }[k] ?? k
 }
 </script>
 
@@ -218,10 +218,12 @@ function kindLabel(k: string) {
 .diff-card th, .diff-card td { border: 1px solid #eee; padding: 4px 8px; text-align: left; }
 .diff-card td small { color: #888; display: block; }
 tr.changed td { background: #fff8e1; }
+tr.renamed td { background: #f3f9ff; }
 tr.added td { background: #e8f5e9; }
 tr.removed td { background: #fbe9e7; }
 .kind { font-weight: 600; }
 .kind.changed { color: #f57f17; }
+.kind.renamed { color: #1565c0; }
 .kind.added { color: #2e7d32; }
 .kind.removed { color: #c62828; }
 .warn { color: #f57f17; }

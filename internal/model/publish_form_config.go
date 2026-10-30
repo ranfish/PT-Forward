@@ -54,6 +54,17 @@ const (
 )
 
 // FormValueMapping 单个下拉/checkbox 选项的三方绑定。
+// CanonicalDivergentFamilies §59.378: canonical 双体系形态分叉族
+// （dict 真源键 vs extended 值域键——同义两形态并存）。发布消费 meta 列
+// 产出 dict 侧——Diff 松查产物若仅命中 extended 侧补 dict 侧成双键
+// （§59.376/§59.377 家族）。新分叉族发现时补入本清单（测试锚
+// TestFormConfigDivergentKeysPaired 引用同源防漂移；放 model 因
+// publish↔db 测试引用会 import cycle）。
+var CanonicalDivergentFamilies = [][]string{
+	{"category.documentary", "category.documentaries"},
+	{"category.mv", "category.music_video"},
+}
+
 type FormValueMapping struct {
 	// Label 站方显示名（HTML option 文本）
 	Label string `json:"label"`

@@ -144,10 +144,12 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
-	if err := dbpkg.RunMigrations(db, log); err != nil {
-		log.Error("failed to run data migrations", zap.Error(err))
-		os.Exit(1) //nolint:gocritic
-	}
+	// §59.378: RunMigrations 移至 seed goroutine 内（SeedSites 之后）——
+	// 新装链交付缺口修复：原序 AutoMigrate→RunMigrations（sites 空表）→seed
+	// 异步建行——sites 表数据类 migration（发布配置 27/33/42/60/61/64/65 等）
+	// 全部 miss 却被记录已执行（永不重跑）→ 新装环境 publish_form_config
+	// 永远空（用户只能 Diff 工具松查次优接入）。挪至 seed 后：新装链站行
+	// 先建→migration 命中精配；老环境已执行全跳过（幂等无感）。
 
 	if err := initEncryption(cfg, *configPath, db, log); err != nil {
 		log.Error("failed to init encryption", zap.Error(err))
@@ -241,6 +243,13 @@ func main() {
 		}
 		if err := site.SeedGroupMappings(db); err != nil {
 			log.Warn("group mapping seed warning", zap.Error(err))
+		}
+		// §59.378: data migrations 在 seed 建行之后执行（新装链 sites 表
+		// 数据类 migration 依赖站行存在——详见启动序列注释）。失败=致命
+		// （与原 L147 语义一致——配置资产交付不完整不可降级运行）。
+		if err := dbpkg.RunMigrations(db, log); err != nil {
+			log.Error("failed to run data migrations", zap.Error(err))
+			os.Exit(1) //nolint:gocritic
 		}
 		// §59.360 附: seed 补行后刷新词表（消启动竞态——见闭包注释）
 		loadAndSyncGroupLexicon()
