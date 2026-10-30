@@ -20,6 +20,8 @@ import (
 func TestFormConfigDivergentKeysPaired(t *testing.T) {
 	divergentFamilies := [][]string{
 		{"category.documentary", "category.documentaries"},
+		// §59.377: 五二 406 松查发现第二对（dict=mv / extended=music_video）
+		{"category.mv", "category.music_video"},
 	}
 	stdKeysArrRe := regexp.MustCompile(`"standard_keys":\s*\[(.*?)\]`)
 	keyRe := regexp.MustCompile(`"([^"]+)"`)
