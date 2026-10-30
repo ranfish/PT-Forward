@@ -41,6 +41,11 @@ export const publishApi = {
   deleteResult(id: number) {
     return client.delete<ApiResponse<{ deleted: number }>>(`/publish/results/${id}`)
   },
+
+  // §59.374 B2: 批量补推（加种失败集——幂等：下载器自动校验）
+  batchRepush(ids: number[]) {
+    return client.post<ApiResponse<{ requested: number; matched: number; pushed: number; failed: number }>>('/publish/results/batch-repush', { ids })
+  },
 }
 
 export const publishTorrentsApi = {

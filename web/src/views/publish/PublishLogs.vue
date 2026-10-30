@@ -23,6 +23,8 @@
           <a-select-option value="publishing">发布中</a-select-option>
           <a-select-option value="exists">已存在</a-select-option>
           <a-select-option value="edited">已编辑</a-select-option>
+          <!-- §59.374 B2: 加种失败筛选（跨状态子集——seed_error 非空未加种） -->
+          <a-select-option value="seed_failed">加种失败</a-select-option>
         </a-select>
         <a-select
           v-model:value="triggerFilter"
@@ -38,6 +40,12 @@
         </a-select>
         <a-range-picker v-model:value="dateRange" @change="onFilterChange" />
         <a-button @click="fetchData"><ReloadOutlined /></a-button>
+        <!-- §59.374 B2: 批量补推（加种失败选中集——幂等：下载器自动校验） -->
+        <a-popconfirm :title="`确定批量补推 ${selectedRowKeys.length} 条？`" @confirm="batchRepush">
+          <a-badge :count="selectedRowKeys.length" :offset="[6, 0]">
+            <a-button :disabled="selectedRowKeys.length === 0" :loading="batchRepushing">批量补推</a-button>
+          </a-badge>
+        </a-popconfirm>
         <a-button :disabled="tableData.length === 0" @click="exportCSV"><DownloadOutlined /> CSV</a-button>
         <a-switch
           v-model:checked="autoRefresh"
@@ -53,6 +61,7 @@
       :data-source="tableData"
       :loading="loading"
       :pagination="pagination"
+      :row-selection="{ selectedRowKeys, onChange: onSelectionChange, getCheckboxProps: checkboxProps }"
       row-key="id"
       :scroll="{ x: 1770 }"
       size="small"
@@ -231,7 +240,37 @@ const columns = [
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollRefreshing = false
 
-const repushing = ref<number | null>(null)
+const repushing = ref<number | null>(null)  // 单颗补推 loading 键
+// §59.374 B2: 多选批量补推——仅加种失败行可选（seed_error 非空未 seeded）
+const selectedRowKeys = ref<number[]>([])
+const batchRepushing = ref<boolean | undefined>(undefined)
+function checkboxProps(record: Record<string, unknown>): { disabled: boolean } {
+  return { disabled: !(record.seed_error && !record.seeded) }
+}
+function onSelectionChange(keys: (number | string)[]) {
+  selectedRowKeys.value = keys.map(Number)
+}
+async function batchRepush() {
+  if (selectedRowKeys.value.length === 0) return
+  batchRepushing.value = true
+  try {
+    const res = await publishApi.batchRepush(selectedRowKeys.value)
+    const d = res.data?.data
+    if (d) {
+      if (d.pushed > 0) {
+        message.success(`批量补推：${d.pushed} 成功 / ${d.failed} 失败`)
+      } else {
+        message.warning(`批量补推全部失败（${d.failed} 条）`)
+      }
+      selectedRowKeys.value = []
+      await fetchData(true)
+    }
+  } catch (e) {
+    message.error(String(e))
+  } finally {
+    batchRepushing.value = undefined
+  }
+}
 
 // 补推条件：有站上种子 ID + 未真正推送（uploaded/pushed_existing/failed）+ 源 hash 可定位资源
 function canRepush(r: { torrent_id?: string; status?: string; seeded?: boolean; downloader_id?: string; save_path?: string }): boolean {
