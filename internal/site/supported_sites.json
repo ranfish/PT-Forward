@@ -770,7 +770,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "www.dragonhd.xyz",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "www.haidan.cc": {
     "domain": "www.haidan.cc",
