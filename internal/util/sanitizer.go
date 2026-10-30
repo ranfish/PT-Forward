@@ -61,6 +61,15 @@ func (s *SanitizerCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *za
 // 可见性；禁转词族入词表直剥（封闭稳定集——四词数十年不变，非促销量词开放变体域）
 var siteOpMarkerTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*\[(?:中性种子|免费|free|2x|促销|普通|hot|经典|限免|密封|seeding|leeching|禁转|谢绝转载|严禁转载|禁止转载|\d+(?:[Xx×]\s*\d+)?\s*%)[^\]]*\])+\s*$`)
 
+// emptyShellTailRe §59.375: 尾部空壳括号族——跨站传播退化残留。
+// keepfrds FRDS 官种副标题带 "[中性种子(NL)]"（<font class='nl'> 真文本），
+// 转载到壹吧/包子/阿玲等站时标记文本丢失（纯文本复制丢 font/标记图片化），
+// 页面只剩空壳 "[]"——rss_detail 链采集 .Text() 忠实拿到壳（提取链无 bug），
+// 族一词表形态只匹配有内容标记，空壳不命中 → 原样入库（121 行实证）。
+// 仅防御空壳：内容为纯空白（含 NBSP）的四种括号形态；有内容一律不碰。
+// 尾部锚定与族一语义一致（中间括号不剥——防误伤内容性标题）。
+var emptyShellTailRe = regexp.MustCompile(`([\s\x{00a0}]*(?:\[[\s\x{00a0}]*\]|【[\s\x{00a0}]*】|\([\s\x{00a0}]*\)|（[\s\x{00a0}]*）))+\s*$`)
+
 // StripSiteOperationMarkers 剥除标题/副标题尾部的站点运营标记（§59.64 副标题侧同族）。
 // §59.136 提升公共方法至 util（metadata 采集层与 db migration 清存量同一实现——
 // metadata→reseed→db 依赖环, 不能放 metadata）。迭代处理多标记混排。
@@ -159,6 +168,9 @@ func StripSiteOperationMarkers(s string) string {
 		ns = strings.TrimSpace(siteStateTailRe.ReplaceAllString(ns, ""))
 		// 族三（裸文本时间尾段）
 		ns = strings.TrimSpace(siteTimeTailRe.ReplaceAllString(ns, ""))
+		// 族一b（§59.375）: 尾部空壳括号——跨站传播退化残留（词表族先剥
+		// 有内容标记，空壳随之清；迭代循环保证混排多轮收敛）
+		ns = strings.TrimSpace(emptyShellTailRe.ReplaceAllString(ns, ""))
 		// 族四（组名锚——纯标注序列整体剥）
 		ns = strings.TrimSpace(stripGroupAnnotatedTail(ns))
 		// 族五（§59.284 锚后全剥兜底——新造标注词免疫的根治层）
