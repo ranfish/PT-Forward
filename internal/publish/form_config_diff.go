@@ -24,6 +24,27 @@ import (
 	"html"
 )
 
+// pairDivergentKeys 松查键分叉族校验：含 extended 侧键而缺 dict 侧键时
+// 前插补齐（单向——发布消费恒 dict 侧，多键任一命中无害）。
+func pairDivergentKeys(keys []string) []string {
+	for _, fam := range model.CanonicalDivergentFamilies {
+		dictKey, extKey := fam[0], fam[1]
+		hasDict, hasExt := false, false
+		for _, k := range keys {
+			if k == dictKey {
+				hasDict = true
+			}
+			if k == extKey {
+				hasExt = true
+			}
+		}
+		if hasExt && !hasDict {
+			return append([]string{dictKey}, keys...)
+		}
+	}
+	return keys
+}
+
 // htmlDomainRules 字段名 → 逻辑域识别规则（NexusPHP 家族实测形态——§59.149）。
 var htmlDomainRules = []struct {
 	prefix string // name 精确或前缀
@@ -334,40 +355,59 @@ func MergeDraftWithCurrent(current, draft *model.PublishFormConfig) (*model.Publ
 		}
 	}
 
-	// 值级 diff：按 label 对齐
+	// 值级 diff：两级对齐（§59.378）
+	// 第一级 label 精确对齐（原语义）；第二级 value 对齐（label miss 时——
+	// 站方文案微调场景：keys/Auto 跟 value 走，kind="renamed" 轻信号）。
+	// 三重保护：精配多键不塌缩 / label-only 特化继承（防松查乱挂键改变
+	// 行为）/ 文案变化与真增删区分（removed 两级收紧——不再误报对）。
 	for domain, draftVals := range draft.ValueMappings {
 		curVals := indexByLabel(current.ValueMappings[domain])
+		curByValue := indexByValue(current.ValueMappings[domain])
 		mergedVals := make([]model.FormValueMapping, 0, len(draftVals))
+		draftValueSeen := map[string]bool{}
 		for _, dv := range draftVals {
 			if cv, ok := curVals[dv.Label]; ok {
-				// 继承语义
+				// 第一级：label 精确命中
 				inherited := model.FormValueMapping{Label: dv.Label, Value: dv.Value, StandardKeys: cv.StandardKeys, Auto: cv.Auto}
 				mergedVals = append(mergedVals, inherited)
-				kind := "matched"
-				if cv.Value != dv.Value {
-					kind = "changed" // 语义错位信号：label 同 value 异（首版适配审计）
+				draftValueSeen[dv.Value] = true
+				if cv.Value == dv.Value {
+					continue // matched——匹配项不进 diff（噪音抑制）
 				}
-				if kind == "matched" {
-					continue // 匹配项不进 diff（基线校准噪音抑制）
-				}
+				diffs = append(diffs, FormConfigDiffItem{ // changed：label 同 value 异（语义错位信号）
+					Domain: domain, Kind: "changed", Label: dv.Label,
+					CurrentValue: cv.Value, DraftValue: dv.Value,
+					CurrentKeys: cv.StandardKeys,
+				})
+			} else if cv, ok := curByValue[dv.Value]; ok {
+				// 第二级：value 命中（站方 label 文案微调）——keys/Auto 继承
+				inherited := model.FormValueMapping{Label: dv.Label, Value: dv.Value, StandardKeys: cv.StandardKeys, Auto: cv.Auto}
+				mergedVals = append(mergedVals, inherited)
+				draftValueSeen[dv.Value] = true
 				diffs = append(diffs, FormConfigDiffItem{
-					Domain: domain, Kind: kind, Label: dv.Label,
+					Domain: domain, Kind: "renamed", Label: cv.Label + " → " + dv.Label,
 					CurrentValue: cv.Value, DraftValue: dv.Value,
 					CurrentKeys: cv.StandardKeys,
 				})
 			} else {
-				// 新增选项（待标注——standard_keys 空）
-				mergedVals = append(mergedVals, dv)
+				// 真 新增选项：draft 松查 keys 过分叉族校验（extended 侧
+				// 单键自动补 dict 侧双键——§59.376/§59.377 家族）
+				added := dv
+				added.StandardKeys = pairDivergentKeys(dv.StandardKeys)
+				mergedVals = append(mergedVals, added)
+				draftValueSeen[dv.Value] = true
 				diffs = append(diffs, FormConfigDiffItem{
 					Domain: domain, Kind: "added", Label: dv.Label, DraftValue: dv.Value,
 				})
 			}
 		}
 		merged.ValueMappings[domain] = mergedVals
-		// 现配置有而草稿无的 label（站方删除选项）
+		// 现配置有而草稿 label+value 均无（站方真删除——两级收紧：同 value
+		// 不同 label 不再误报 removed+added 对——五二 8 条转录不全实证形态）
 		draftIdx := indexByLabel(draftVals)
 		for _, cv := range current.ValueMappings[domain] {
-			if _, ok := draftIdx[cv.Label]; !ok {
+			_, labelHit := draftIdx[cv.Label]
+			if !labelHit && !draftValueSeen[cv.Value] {
 				diffs = append(diffs, FormConfigDiffItem{
 					Domain: domain, Kind: "removed", Label: cv.Label, CurrentValue: cv.Value,
 					CurrentKeys: cv.StandardKeys, AutoFalse: cv.Auto != nil && !*cv.Auto,
@@ -376,6 +416,18 @@ func MergeDraftWithCurrent(current, draft *model.PublishFormConfig) (*model.Publ
 		}
 	}
 	return merged, diffs
+}
+
+// indexByValue §59.378: 按 value 建索引（两级对齐第二级——同 value 不同
+// label 时 keys 继承；首见优先防站方重复值干扰）。
+func indexByValue(vals []model.FormValueMapping) map[string]model.FormValueMapping {
+	m := make(map[string]model.FormValueMapping, len(vals))
+	for _, v := range vals {
+		if _, dup := m[v.Value]; !dup {
+			m[v.Value] = v
+		}
+	}
+	return m
 }
 
 func indexByLabel(vals []model.FormValueMapping) map[string]model.FormValueMapping {
