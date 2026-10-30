@@ -467,7 +467,7 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleExecutePublish(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/execute-batch") && r.Method == http.MethodPost:
 		h.handleExecutePublishBatch(w, r)
-	case strings.HasSuffix(path, "/publish/results/batch-repush") && r.Method == http.MethodPost:
+	case strings.HasSuffix(path, "/publish/seeds/batch-repush") && r.Method == http.MethodPost:
 		h.handleBatchRepush(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/execute-site-batch") && r.Method == http.MethodPost:
