@@ -81,7 +81,12 @@ func (h *FormConfigHandler) handleParse(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 		return
 	}
-	draft := publish.ParsePublishFormHTML(req.HTML)
+	current := model.ParseFormConfig(site.PublishFormConfig)
+	currentFields := map[string]string{}
+	if current != nil {
+		currentFields = current.FormFields
+	}
+	draft := publish.ParsePublishFormHTML(req.HTML, currentFields)
 	if draft == nil {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "HTML 无可识别发布表单（select/tags checkbox 均未命中）"})
 		return

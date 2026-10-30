@@ -38,7 +38,7 @@ func TestParsePublishFormHTML_ViewSourceWrapped(t *testing.T) {
 	escaped := strings.ReplaceAll(strings.ReplaceAll(inner, "<", "&lt;"), ">", "&gt;")
 	wrapped := `<html><body><table><tr><td class="line-number" value="1"></td><td class="line-content"><span class="html-tag">` + escaped + `</span></td></tr></table></body></html>`
 
-	draft := ParsePublishFormHTML(wrapped)
+	draft := ParsePublishFormHTML(wrapped, nil)
 	if draft == nil {
 		t.Fatal("包装页解析返回 nil（422 复现）")
 	}

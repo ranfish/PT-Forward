@@ -26,7 +26,7 @@ func TestParsePublishFormHTMLDualTypeZones(t *testing.T) {
 		<option value="23">WEB-DL</option>
 	</select>
 	</form></body></html>`
-	draft := ParsePublishFormHTML(html)
+	draft := ParsePublishFormHTML(html, nil)
 	if draft == nil {
 		t.Fatal("应解析出表单")
 	}
@@ -54,7 +54,7 @@ func TestParsePublishFormHTMLSingleType(t *testing.T) {
 		<option value="401">电影</option>
 		<option value="402">电视剧</option>
 	</select>`
-	draft := ParsePublishFormHTML(html)
+	draft := ParsePublishFormHTML(html, nil)
 	if draft == nil || len(draft.ValueMappings["type"]) != 2 {
 		t.Fatalf("标准单 type 解析异常: %v", draft)
 	}

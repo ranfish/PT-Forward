@@ -69,7 +69,16 @@ func unwrapViewSourceSave(src string) string {
 	return src
 }
 
-func ParsePublishFormHTML(html string) *model.PublishFormConfig {
+// ParsePublishFormHTML 解析发布页 HTML → 配置草稿。
+// currentFields（可选，nil=纯标准启发）：现行配置的 form_fields——
+// §59.373 尊重配置槽位映射：已适配站（壹吧四槽媒介体系等 NP 变体）
+// 的槽位特化以适配定案为权威，diff 只检值域漂移不产生槽位特化噪声
+// （壹吧 medium→source_sel[4] 曾产生 13 条连锁假 diff）。
+// 兼容性三保证：①current 名=标准启发名的站（幸运/修道院/龙之家）
+// 匹配路径同结果零变化；②nil 走现状；③current 名在页面消失（站方
+// 真改名）→ current 匹配不到 → fallback 标准启发 → diff 报字段名改版
+// （真实改版检测路径保留）。
+func ParsePublishFormHTML(html string, currentFields map[string]string) *model.PublishFormConfig {
 	if strings.TrimSpace(html) == "" {
 		return nil
 	}
@@ -88,6 +97,16 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 	}
 	seenDomains := map[string]bool{}
 
+	// §59.373: current 反查表（字段名 → 域）——select/文本域识别的
+	// 第一优先级。仅含"页面仍存在该字段名"的提示（消失的留标准启发
+	// 抓新名保改版检测）。
+	currentNameToDomain := map[string]string{}
+	for domain, name := range currentFields {
+		if name != "" {
+			currentNameToDomain[name] = domain
+		}
+	}
+
 	// 下拉族：select → option 列表
 	doc.Find("select").Each(func(_ int, sel *goquery.Selection) {
 		name, ok := sel.Attr("name")
@@ -95,6 +114,12 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 			return
 		}
 		domain := domainOfField(name)
+		// §59.373: current 配置字段名优先——已适配站槽位特化权威
+		// （壹吧 medium 域配置 source_sel[4]：该 select 先匹配收录，
+		// 标准 medium_sel[4] 后到被 seenDomains 守卫跳过——§59.372）。
+		if cd, isCurrent := currentNameToDomain[name]; isCurrent {
+			domain = cd
+		}
 		if domain == "" {
 			return
 		}
@@ -186,7 +211,7 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 	// 文本域存在性（名称记录——供 diff 检测改版）
 	// §59.159: pt_gen/dburl/uplver 必须收录——否则 HTML diff 误判"整域消失"，
 	// 确认落库即丢配置（migration 30 注册的域与解析器对齐）
-	for field, domain := range map[string]string{
+	textFieldDomains := map[string]string{
 		"small_descr":    model.FieldDomainSmallDescr,
 		"cnname":         model.FieldDomainCNName, // §59.164: 修道院独立中文名字段
 		"url":            model.FieldDomainIMDBURL,
@@ -194,7 +219,26 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 		"technical_info": model.FieldDomainTechInfo,
 		"pt_gen":         model.FieldDomainPTGen,
 		"dburl":          model.FieldDomainDoubanURL,
-	} {
+	}
+	// §59.373: current 配置的文本域字段名优先（壹吧简介 name=b——
+	// 标准表无 b 恒 miss 致假"字段名改版"）；current 名页面存在才用。
+	textDomainSet := map[string]bool{}
+	for _, d := range textFieldDomains {
+		textDomainSet[d] = true
+	}
+	for domain, name := range currentFields {
+		if name == "" || !textDomainSet[domain] {
+			continue
+		}
+		if doc.Find("input[name='"+name+"'], textarea[name='"+name+"']").Length() > 0 {
+			draft.FormFields[domain] = name
+			seenDomains[domain] = true
+		}
+	}
+	for field, domain := range textFieldDomains {
+		if seenDomains[domain] {
+			continue // current 已收录（特化名）——标准名不再覆盖
+		}
 		if doc.Find("input[name='"+field+"'], textarea[name='"+field+"']").Length() > 0 {
 			draft.FormFields[domain] = field
 		}
