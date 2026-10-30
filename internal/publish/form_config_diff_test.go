@@ -69,7 +69,7 @@ func currentLuckCfg() *model.PublishFormConfig {
 }
 
 func TestParsePublishFormHTML(t *testing.T) {
-	draft := ParsePublishFormHTML(luckHTML)
+	draft := ParsePublishFormHTML(luckHTML, nil)
 	if draft == nil {
 		t.Fatal("应解析出草稿")
 	}
@@ -107,17 +107,17 @@ func TestParsePublishFormHTML(t *testing.T) {
 		t.Error("草稿不应含 HTML 原文")
 	}
 	// 空/垃圾 HTML
-	if ParsePublishFormHTML("") != nil {
+	if ParsePublishFormHTML("", nil) != nil {
 		t.Error("空 HTML 应返回 nil")
 	}
-	if ParsePublishFormHTML("<div>no form</div>") != nil {
+	if ParsePublishFormHTML("<div>no form</div>", nil) != nil {
 		t.Error("无表单 HTML 应返回 nil")
 	}
 }
 
 func TestMergeDraftWithCurrent(t *testing.T) {
 	current := currentLuckCfg()
-	draft := ParsePublishFormHTML(luckHTML)
+	draft := ParsePublishFormHTML(luckHTML, nil)
 	merged, diffs := MergeDraftWithCurrent(current, draft)
 
 	// ① 继承：电影→401 应继承 category.movie
@@ -180,7 +180,7 @@ func TestParseStandardKeysEnrich(t *testing.T) {
 	<select name="team_sel[4]"><option value="25">FRDS</option></select>
 	<select name="medium_sel[4]"><option value="7">Encode</option></select>
 	</form>`
-	draft := ParsePublishFormHTML(html)
+	draft := ParsePublishFormHTML(html, nil)
 	lookup := func(domain, wantCode string) {
 		t.Helper()
 		for _, m := range draft.ValueMappings[domain] {

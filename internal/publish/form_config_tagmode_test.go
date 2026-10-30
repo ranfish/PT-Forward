@@ -15,7 +15,7 @@ func TestParsePublishFormHTML_TagMode(t *testing.T) {
 	<input type="checkbox" name="tags[4][]" value="6">中字
 	<textarea name="descr"></textarea>
 	</form></body></html>`
-	cfg := ParsePublishFormHTML(html)
+	cfg := ParsePublishFormHTML(html, nil)
 	if cfg == nil {
 		t.Fatal("draft nil")
 	}
