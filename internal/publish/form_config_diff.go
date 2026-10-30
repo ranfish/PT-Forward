@@ -135,6 +135,7 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 			return
 		}
 		opts := []model.FormValueMapping{}
+		seenOptLabels := map[string]bool{} // §59.377: 同 label 双值去重（五二 H.265 1/14、APE 2/5 站方原始重复——label 对齐二次匹配假 changed）
 		sel.Find("option").Each(func(_ int, opt *goquery.Selection) {
 			v, _ := opt.Attr("value")
 			label := strings.TrimSpace(opt.Text())
@@ -142,6 +143,10 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 				return // 占位项（NP 家族 value=0 惯例——语言无关；§59.157 繁体「請選擇一項」漏过滤教训：
 				// 占位判定不得依赖文案子串，简/繁/英占位词各异）
 			}
+			if seenOptLabels[label] {
+				return // 站方原始重复值（同 label 多 value 语义相同）——首见保留
+			}
+			seenOptLabels[label] = true
 			m := model.FormValueMapping{Label: label, Value: v}
 			// §59.164: 词条补 StandardKeys（label→standard key 宽松反查）——
 			// parse 产物缺此键则 executor lookupByStdKey 反查全空 → 五域全丢
