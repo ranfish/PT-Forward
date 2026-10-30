@@ -25,7 +25,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "52pt.site",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "api.m-team.cc": {
     "domain": "api.m-team.cc",
