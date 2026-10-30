@@ -98,6 +98,17 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 		if domain == "" {
 			return
 		}
+		// §59.372: 双区互斥站（壹吧 type×2——id=browsecat 种子区在前/
+		// specialcat 成人区禁发布在后）——同 name 后匹配直接赋值会覆盖
+		// 种子区（specialcat 16 项成人分类冒充表单现状→Diff 大量假
+		// added/removed——用户上传 HTML Diff 实证）。双防：special 跳过
+		// + 已收录域跳过（首见=种子区，HTML 顺序发布页先普通区）。
+		if id, hasID := sel.Attr("id"); hasID && strings.Contains(id, "special") {
+			return
+		}
+		if seenDomains[domain] {
+			return
+		}
 		opts := []model.FormValueMapping{}
 		sel.Find("option").Each(func(_ int, opt *goquery.Selection) {
 			v, _ := opt.Attr("value")
