@@ -665,3 +665,32 @@
 20. **转载禁止夹带私货**：不得更改内容影响辅种，违者警告/Ban
 
 *数据来源: upload.php (65943 字节) + rules.php (45244 字节) + wiki.crabpt.vip 发布规则/标题命名 (2026-05-04)*
+
+---
+
+## 适配记录（v0.0.1244 §59.394）
+
+### 发布适配完成（Phase 1+2——★formdiff 门禁首次拦截实战）
+
+- **form_config**：migration79 分发+migration80 刷正（七槽 127 项——
+  type 10/medium 11/codec 8/audiocodec 20/standard 5/team 31/tags 37）。
+- **★formdiff 门禁首次拦截**（§59.389 投资回报实证）：首跑 28 条差异
+  ——python 裸对说全一致（label/value 全对）→定性=工具问题：
+  - 5 条 changed：站方重复值条目（FRDS 7/28、ZmWeb 16/31、WiKi
+    4/26、QHstudIo 34/24、DTS-HD 15/22）——draft 解析同 label 去重
+    （首见保留）vs 配置双条目→结构性错位；**配置只留首值**
+    （migration80 刷正——79 已执行幂等不再重写）
+  - 23 条 added：tags[6][] 特别区标签混入——§59.388 模式过滤只挂
+    select，checkbox 前缀匹配吃进 [6]；**过滤扩展到 input**+正则
+    修正（checkbox 中间形态 tags[N][] vs select 尾部 xxx[N]）+
+    测试锚
+- **裸对盲区实证**：python 裸对只对照配置已有条目——draft 多余
+  条目（[6] 标签）裸对看不见；同栈 Diff 是唯一能抓"解析器多吃"
+  的防线。
+- 槽位：medium→source_sel 第三站+H/X 合并 codec（压制联动零区分
+  站方语义——两形态同项）+H.266/VVC 独有双键+standard 无 SD miss
+  落空+processing_sel 产区槽不配（非必填+独立槽零案例）+413 短剧
+  第三站+tags 37 项全库最多无首发✓。
+- **DryRun 双形态**：404/6/3/2/4/1+401/5/3/**7 FRDS 首值直中**/
+  17 DTS-HD MA/4——全绿。
+- 遗留：首颗真实发布。
