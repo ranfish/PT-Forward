@@ -517,3 +517,31 @@ func mapTeam(sourceTeam string) int {
 
 *数据来源: upload.php HTML + rules.php + 论坛帖子 topicid=30 (2026-04-22)*
 *文档更新: 2026-04-22*
+
+---
+
+## 适配记录（v0.0.1231 §59.383）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration69 分发（七槽 71 项）。
+- **DryRun 双形态终验**（§59.380 附三跨环境法）：
+  - WEB-DL 原生种（财神源 Daughter Of The Light 纪录片）：dry_run_ok
+    全槽——type=404 纪录片双键/medium_sel=10 WEB-DL/codec=6 H.265/
+    audio=6 AAC/standard=5 2160p/team=5 Other
+  - 压制种（FRDS x265 MI 铁证）：dry_run_ok 全槽——type=401 电影/
+    medium_sel=7 Encode（独立项）/codec=6 H.265（无 X26x 选项——压制
+    联动零触发=站方语义正确）/**audio=11 DTS-HDMA:X 7.1（组合双键
+    [dts_hd_ma,dtsx] 顺序精确优先首验）/team=8 FRDS（18 组表直中——
+    外站组映射非兜底首例）**/standard=5 2160p
+- **关键映射决策**：
+  - medium_sel 12 项**全 canonical 配置**（首个零 label-only 媒介站）：
+    MiniBD→medium.minibd（§59.325 精确键先例）/HD DVD/DVDR/Track/Other
+  - audiocodec 无 DDP 项（§4.7）——DDP 并入 DD/AC3 [dd,ac3,ddp] 三键；
+    DTS-HDMA:X 7.1(11) 组合双键在 DTS-HDMA(12) 前（数组顺序精确优先）
+  - standard 5 项：r1440p/r4320p/resolution.other miss 落空（站方无
+    对应选项——lookupByStdKey nil 不填可接受）
+  - tags 首发 label-only（铁律）+HDR 10/Dolby Vision label-only
+  - 标题禁止中文（§4.1）——发布链 v1.05 英文重组天然合规
+- 遗留：实时比对+首颗真实发布（§59.382 教训——验证前先确认 cookie
+  时序，用 tools/decrypt-cookie 而非手写探针）。
