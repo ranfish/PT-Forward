@@ -496,3 +496,48 @@ PT-Gen 字段支持 4 种来源（imdb/douban/bangumi/indienova），适配器�
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-22*
+
+---
+
+## 适配记录（v0.0.1236 §59.387）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration73 分发（七槽 91 项——type 16/medium 17/
+  codec 10/audiocodec 22/standard 7/team 5/tags 14）。
+- **实时 HTML 为源**（upload.php 64.7KB 代理抓取——直连超时；凭证
+  841B 有效）——§59.384 附教训再实证：
+  - **sites.json 4 月资产 value 级错误**：Encode=18 非 17（17 缺失
+    跳号处错读——比 label 漂移更严重，提交值错误）
+  - 三处 label 漂移：codec 10 站方原文 **"Othe"**（拼写截断——
+    文档/sites.json 双双被"好心修正"）；type 406 "音乐、视频"/
+    405 "动画、动漫"（顿号全形态）
+  - tags 15 濒危 实时新增（sites.json 13 项无）
+- **槽位特化**：
+  - 无 url/imdb、无 technical_info 字段（实证）；pt_gen 4 源+uplver
+  - category 16 项全配（游戏 410/电子书 411/软件 412/教育 413/
+    演唱会 414/戏剧 415/有声读物 416→category.audiobook——canonical
+    全在）
+  - medium 17 项全库最多：**压制按分辨率三维**（UHD 压制 7/1080P/i
+    压制 8/720P 压制 9 label-only——medium.encode→18 通用兜底；
+    站方预检若要求按分辨率选压制项，首颗真实发布暴露后做
+    resolution×medium 联动 §59.380 同款挂账）；MiniSD(10) 独有键
+  - codec H/X 并存——**§59.380 压制联动第五站**（DryRun 压制种
+    codec=4 X265 实证）；AV1(9)
+  - audiocodec 22 项：**DDP/DD+(15)/Dolby Digital/DD(16)/AC3(17)
+    三项分立**（多数站合并——库非各自单键 ddp/dd/ac3）；DTS X(10)
+    独立=dtsx；OGG 双值（5/21 站方真重复——5 配键 21 label-only
+    防一键两值）；TTA(22)=audio.tta/MPEG(23)=audio.mpeg
+  - standard 7 项乱序（8K(5) 在 4K(6) 前）
+  - team 5 项极简（HDS/CHD/MySiLU/WiKi/Other）全 label-only——
+    FRDS 不在表 Other 兜底正确
+  - tags：**英语(8)=tag.english_audio 配键**（幸运站同款语义
+    §59.326 附三——有英语证据即提交）+首发 label-only 铁律+濒危(15)
+    label-only+禁转/国语/中字/DIY/完结配键
+- **DryRun 双形态终验**（§59.380 附三法）：
+  - WEB-DL 原生：404 纪录双键/11 WEB-DL/3 H.265/HEVC/18 AAC/
+    6 4K/5 Other——全槽 ✓
+  - 压制种（FRDS x265）：401/**18 Encode（通用兜底）**/**4 X265
+    联动第五站**/11 DTS-HDMA/6 4K/5 Other——全槽 ✓
+- 遗留：首颗真实发布（重点观察：压制种 medium=18 Encode 站方是否
+  接受——若预检要求按分辨率选 7/8/9 则实施 resolution×medium 联动）。
