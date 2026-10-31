@@ -724,3 +724,16 @@ customFields["custom_fields[5][1][]"] = "允许转载"
   - team 官组保护（§9.5 非本站组禁 WS 标识）+tags 官组标签
     label-only 防自动勾触雷（财神官种案同款防护）
 - 遗留：实时比对（tools/decrypt-cookie 先行）+首颗真实发布。
+
+### 实时比对终验+label 刷正（2026-10-31，用户 HTML 56.6KB）
+
+- **Diff 6 条全 renamed（value 全一致）——站方零改版**。根因=docs/32
+  映射汇总 4 月分析时人为规范化（非站方原文逐字抄录）：①audiocodec
+  缩写 DDP/DDP Atmos vs 站方全称 Dolby Digital Plus/Dolby Digital
+  Plus Dolby Atmos ②type 括号归一 vs 站方混合形态"左半角(右全角）"
+  ③Animation films vs 站方拼写错误 "flims"（文档被好心修正）。
+- migration71 刷正（merged=站方原始 label+keys 完整继承——422
+  animation/25 ddp/26 ddp_atmos 键验证）。
+- **教训（§59.384 附）**：配置生成 label 源=站方 HTML 原文（文档
+  仅语义参考——文档转录的规范化/修正/缩写都会制造假差异）；§59.378
+  两级对齐 renamed 轻信号在"配置刚生成"场景同样关键。
