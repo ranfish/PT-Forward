@@ -561,3 +561,30 @@ upload.php 有 `isoday` 复选框（value="yes"），用于标记 0day 资源。
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
+
+---
+
+## 适配记录（v0.0.1241 §59.391）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线）
+
+- **form_config**：migration76 分发（type 27/codec 10/standard 6）+
+  **产区×类型双维分类特化**（executor sjtuRegionCategoryValue——
+  §59.380 codec 联动同款跨槽特化先例）。
+- **产区映射用户定案**：PTGen Region 首值归类（Tab1"作品信息-产地"
+  同源——§59.151 regionLabelsOfMeta 消费先例）：陆/港/澳/台→华语
+  且**大陆 vs 港台细分**（剧集/综艺站方粒度）；**日韩独立**（综艺）；
+  其余亚洲→亚洲；再其余欧美兜底；无产区证据→欧美 fallback 预览
+  可手改。产区类 11 项 label-only（防 lookupByStdKey 撞错）+非产区
+  站/非产区类回退通用链零变化（typeMappingOf 统一入口）。
+- **13 态测试锚**+formdiff 同栈 Diff 0 条+DryRun 四形态实战：
+  - 港产 Aces Go Places IV（Region=["中国香港"]）→**401 华语电影** ✓
+  - Pressure 2026（Region=["英国 / 法国 / 美国"]复合——首值英国）→
+    402 欧美 ✓
+  - 欧美无产区电影→402 兜底 ✓；纪录片→406 通用链 ✓
+- **实时 HTML 字段形态**：站方无引号属性（name=douban_url）——
+  豆瓣字段名 douban_url（非 dburl）；isoday 0DAY 标记转发不勾不配。
+- **站规注记**（发布预览人工规避）：**禁 HEVC 1080p/720p（仅 4K
+  允许）+禁 10bit H.264**；黑名单组 PRLxXunlei/ZJM/ZYM/Mp4Ba/DNL/
+  WOFEI/EVO；候选制（Elite User 以下需候选区）。
+- 遗留：首颗真实发布（规避 HEVC 1080p/10bit 形态）。
