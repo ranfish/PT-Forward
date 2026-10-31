@@ -584,7 +584,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "ptcafe.club",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "ptchdbits.co": {
     "domain": "ptchdbits.co",
