@@ -388,6 +388,19 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			applied = append(applied, v)
 		}
 	}
+	// §59.400: 财神题材标签注入（喜剧——◎类别行同源消费）
+	if v := csptGenreTagValue(cfg, in.TargetSite, meta); v != "" {
+		dup := false
+		for _, a := range applied {
+			if a == v {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			applied = append(applied, v)
+		}
+	}
 
 	// ⑥ 描述组装——纯本地资产消费（§59.159 白名单：替代 renderDescription
 	// [queryPTGen 在线/rehostPoster 图床转存双违规]；零网络依赖）
@@ -404,6 +417,19 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: value})
 	})
 	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
+		dup := false
+		for _, kv := range tagArrayFields {
+			if kv.Value == v {
+				dup = true
+				break
+			}
+		}
+		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
+			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
+		}
+	}
+	// §59.400: 财神题材标签注入（喜剧）——上传真相源同构
+	if v := csptGenreTagValue(cfg, in.TargetSite, meta); v != "" {
 		dup := false
 		for _, kv := range tagArrayFields {
 			if kv.Value == v {
@@ -844,6 +870,34 @@ func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
 		if m.Label == "英语" {
 			return m.Value
+		}
+	}
+	return ""
+}
+
+// csptGenreTagValue §59.400: 财神题材标签站规——description ◎类　　别
+// 行含"喜剧"→注入财神"喜剧"标签（Label 直配——label-only 无
+// standard_keys 例外路径，luckptEnglishTagValue 站规注入同款先例）。
+// 缩小人生案（243 财神种审报"标签与简介类别不一致(喜剧)"）：喜剧是
+// PTGen 题材细分（category 列只存大类 movie、canonical 无 tag.comedy
+// 键——fetch 推断永不产出）；站方审种脚本用简介◎类别行校验——发布
+// 同源消费（确定性正则提取非语义推断，§59.319 附二十七"只消费不
+// 推断"合规）。儿童(24)题材标签零案例不预改（按需生长纪律）。
+// 正则注：类/别间是全角空格（U+3000）——Go \s 只匹配 ASCII 空白，
+// 字符类显式含　。
+var reGenreLine = regexp.MustCompile(`◎类[　\s]*别[　\s]*([^\n]+)`)
+
+func csptGenreTagValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) string {
+	if siteName != "财神" || cfg == nil || meta == nil || meta.Description == "" {
+		return ""
+	}
+	m := reGenreLine.FindStringSubmatch(meta.Description)
+	if len(m) < 2 || !strings.Contains(m[1], "喜剧") {
+		return ""
+	}
+	for _, t := range cfg.ValueMappings[model.FieldDomainTags] {
+		if t.Label == "喜剧" {
+			return t.Value
 		}
 	}
 	return ""
