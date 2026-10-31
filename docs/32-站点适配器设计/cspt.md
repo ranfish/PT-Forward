@@ -1287,3 +1287,30 @@ ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
 - CS 无词形硬规则；Music(411) 需含 `kHz`+`bit`
 - **媒介标题检测分支**：web-dl|webdl|webrip|web-rip→WEB-DL；remux→Remux；blu-ray|bluray 且无 uhd/264/265→Blu-ray；hdtv→HDTV；encode|264|265→Encode；uhd→UHD Blu-ray；dvd/cd/track→对应；兜底 Other
 - **分辨率独有 2K/1440p 档**（1440p/1440i，ID=11）
+
+---
+
+## 适配记录（v0.0.1229 §59.381）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration67 分发（七槽 77 项——HTML 表单值权威 §6.x）。
+- **DryRun 双形态终验**（§59.380 附三跨环境验证法：243 meta 只读+29 借壳）：
+  - WEB-DL 原生种（财神源站 Daughter Of The Light 纪录片）：
+    dry_run_ok 全槽——type=404（**纪录片双键首次实测命中**）/
+    source_sel=11 WEB-DL/codec=2 H.265/audio=9 AAC（修正值实测）/
+    standard=7 4K（乱序值实测）/team=18 CSWEB（源站组回环）/副标题/
+    pt_gen/url/MI 全填
+  - 压制种（FRDS x265 MI 铁证）：codec=2 H.265（**财神无 X26x 选项——
+    §59.380 联动自然零触发=站方语义正确**）/source_sel=10 Encode
+    （独立项）/team=5 Other（外站组兜底）/type=401/standard=7
+- **关键映射决策**：
+  - HTML 值乱序/跳号全用表单值（媒介 7-16/AV1=6/2K=10——油猴值忽略）
+  - audiocodec 自校修正：FLAC=22/Other=23 无 OGG（首版抄错——
+    Python 全槽文档对照自校抓出，§59.369"术语歧义期数据标记沉淀"同族
+    防线：生成后全槽对照而非抽检）
+  - tags 首发+**官种 label-only**（站方双向校验错误级：官种必选/非官种
+    不可选——外站组转发恒非官种配键恐自动勾触雷）
+  - 分叉族双键即防（404+406）
+- **实时比对受阻**：29 财神 cookie 失效（登录墙）——五二/百川降级先例，
+  遗留用户侧 HTML 比对+首颗真实发布。
