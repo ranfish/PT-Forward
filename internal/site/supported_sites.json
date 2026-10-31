@@ -415,7 +415,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.0ff.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "pt.aling.de": {
     "domain": "pt.aling.de",
