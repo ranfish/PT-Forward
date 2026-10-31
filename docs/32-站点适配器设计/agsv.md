@@ -1251,3 +1251,34 @@ H&R = Hit and Run，即下载完资源后在规定时间内没有完成最少做
 - **Music(411) 标题**：必须含 `kHz`（采样频率）与 `bit`（比特率）字样
 - **媒介标题检测分支**：web-dl|webdl→WEB-DL；remux→Remux；blu-ray|bluray 且无编码词（HEVC/AVC/VC-1/MPEG-2/4）→Encode；webrip|web-rip|dvdrip|bdrip→Encode；hdtv→HDTV；含 uhd→UHD Blu-ray；其余 blu-ray→Blu-ray
 - AGSV 无 4K→2160p、AC3→DD 等词形硬规则（比青蛙/织梦宽松）
+
+---
+
+## 适配记录（v0.0.1246 §59.396）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线双零发版）
+
+- **form_config**：migration82 分发（七槽 81 项——type 12/medium 10/
+  codec 6/audiocodec 16/standard 6/team 11/tags 20）。
+- **sites.json 4 月资产严重过期**（双源教训最重案例）：全槽值集全变
+  ——type 旧分类（410 Cartoon/411 Ebook/412 Study）→新（405 Anime/
+  406 MV/419 Playlet）、medium 1-10→11/1/3/7/10/13、codec AV1=5→12、
+  audio/standard/team/tags 值集全变。文档（后期抓取）与实时一致
+  ——**文档+实时双源可覆盖 4 月资产完全失效场景**。
+- **双区域互斥站**（browsecat mode=4 综合区+specialcat mode=5 学习
+  区——[5] 槽 2 个由 §59.388 模式互斥过滤自动跳过——先站投资复利）。
+- **槽位特化**：type 419 短剧=short_drama 第五站+406 MV(演唱)双键+
+  415 E-Book=ebook+408 Audio=category.audio；**无 Misc**（other
+  miss 落空）；medium 10 项**全 canonical**（第二个零 label-only
+  媒介站——大青虫后）；codec 无 X26x 联动零触发；audiocodec DD/DDP
+  分立+DTS-HD MA/DTS:X/TrueHD Atmos 独立+M4A/ALAC 配键；standard
+  乱序 p/i 合并后缀形态齐全（480p/720p/1080p/4K/8K 全带 p/i 后缀）
+  +480p→resolution.sd（SD 级语义）；team AGSV 系官组+方舟三组
+  （Hares/BeiTai/RL）+GodDramas/CatEDU/Pack 全 label-only（FRDS
+  不在表 Other 兜底）；**审种脚本黑名单 27 组**（fgt/hao4k/mp4ba/
+  rarbg 等）发布预览人工规避；tags 20 项首发铁律+六键配（美剧/
+  韩剧/超分/补帧/方舟等 label-only）。
+- **验证**：python 裸对 81 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿（WEB-DL 原生 404/10/6/6/5/22；
+  压制种 401/7/6/**8 DTS-HD MA 直配**/5/22 Other 兜底）。
+- 遗留：首颗真实发布（黑名单 27 组标题检查+大包>1T 标注站方规则）。
