@@ -300,6 +300,8 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		"technical_info": model.FieldDomainTechInfo,
 		"pt_gen":         model.FieldDomainPTGen,
 		"dburl":          model.FieldDomainDoubanURL,
+		"imdbid":         model.FieldDomainIMDbID,   // §59.399: 学校站编号形态（仅收 tt4154756）
+		"doubanid":       model.FieldDomainDoubanID, // §59.399: 学校站编号形态（仅收纯数字）
 	}
 	// §59.373: current 配置的文本域字段名优先（壹吧简介 name=b——
 	// 标准表无 b 恒 miss 致假"字段名改版"）；current 名页面存在才用。
