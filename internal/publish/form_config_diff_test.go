@@ -279,6 +279,9 @@ func TestParsePublishFormHTMLSpanTagsCurrentHint(t *testing.T) {
 	if len(tags) != 3 || tags[0].Value != "1" || tags[2].Value != "6" {
 		t.Fatalf("current 提示应识别 span[] 3 项, got %v", tags)
 	}
+	if tags[0].Label != "禁转" || tags[2].Label != "中字" {
+		t.Fatalf("裸文本后邻形态 label 应提取（§59.398 形态4）, got %v", tags)
+	}
 	if draft.FormFields[model.FieldDomainTags] != "span[]" {
 		t.Fatalf("字段名应为 span[], got %q", draft.FormFields[model.FieldDomainTags])
 	}
