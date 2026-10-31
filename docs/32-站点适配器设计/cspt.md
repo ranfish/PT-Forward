@@ -1326,3 +1326,5 @@ ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
   修正值）。
 - migration68 刷正（§59.375 五二 merged 流程+人工校正短剧键/Ai 去键）。
 - 4 月文档（2026-04）与现状差异仅此 2 项新增。
+
+> **勘误（§59.382）**：本页"29 财神 cookie 失效登录墙"——验证发生在用户推送新 cookie 前（时序差）；推送后实测登录态有效。
