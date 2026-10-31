@@ -748,3 +748,40 @@ Farmm 区分 H.265/HEVC/X265/HEVC 和 H.264/AVC/X264，适配器需根据标题�
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
+
+---
+
+## 适配记录（v0.0.1251 §59.401）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线双零发版）
+
+- **form_config**：migration87 分发（七槽 83 项——type 14/medium 16/
+  codec 14/audiocodec 19/standard 8/team 2/tags 10）。实时 HTML 与
+  4 月资产**全槽零漂移**（第九个零漂移站；audio label "TrueHD
+  Atmos\t" 站方原文带 tab 尾——strip 后一致）。
+- **双区域互斥**（种子区 mode=4+特别区儿童内容 mode=5——[5] 五槽
+  +tags[5][] 8 项由 §59.388 模式过滤自动跳过，四站复利；特别区
+  418-424 大部分"待定"+416/425 同 label"picture books"站方数据
+  原样——不配无影响）。
+- **槽位特化**：type 406 MV 双键+407 HQ Audio=lossless_music+427
+  Education+412 book=ebook+410 Resources/409 待定 label-only；
+  medium 16 项**全 canonical**（第三个零 label-only 媒介站——
+  UHDTV/IPTV/SACD/3D Blu-ray 全配）；codec **H/X 分立+HEVC 独立**
+  （X264/X265 label-only=§59.380 压制联动通道第六站；HEVC(5) 与
+  H.265/HEVC(1) 语义重叠站方未区分——label-only 保守不猜；
+  MVC/ProRes/VP8/9 配键）；audiocodec 19 项 DTS 六级+DSD/PCM/
+  OPUS+AC3 三键+HDMA:X 7.1 label-only（咖啡先例）；standard 8 项
+  全配键 **p/i 分立双值**（1080P(3)/1080I(5) 独立）；team 2 项
+  label-only（FFWEB 官组全库最少之一）；tags 10 项 **HDR 四键泛
+  家族**（财神 §59.400 同款）+3D/连载=ongoing+首发铁律+短剧
+  label-only。
+- **source_sel=产区槽不配**（咖啡先例——同名异义第二例：source_sel
+  在此站=地区非媒介）+processing_sel=教育年级槽不配（影视无关）。
+- 字段：url/pt_gen/technical_info/nfo/uplver——字段最全站之一。
+- **验证**：python 裸对 83 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿——**两项先期投资同时复利**：
+  ①压制种 codec=3 **X265（§59.380 联动第六站自动生效——label
+  精确匹配 CLI 词）**+Encode(6) ②tags=[中字,**HDR**]（§59.400
+  泛 HDR 四键复利）；WEB-DL 原生 codec=1 H.265 不联动=站方语义
+  正确+403 纪录双键+DTS-HD|MA 六级直配。
+- 遗留：首颗真实发布。
