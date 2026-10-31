@@ -533,3 +533,34 @@ SoulVoice 有两套完全不同的发布模式，通过 `type` 选择切换：
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-22*
 *数据来源：rules.php (8113字节) + upload.php (1710字节) + 论坛#5220 种子信息填写规范与指导 (5199字节)*
+
+---
+
+## 适配记录（v0.0.1237 §59.388）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration74 分发（六槽 38 项——type 9/medium 5/
+  codec 3/standard 4/team 5/tags 12）。
+- **双模式站**（影视 mode=4 browsecat + 阅听 mode=8 specialcat
+  互斥——壹吧 §59.371 同款 disableother JS）。sites.json 4 月资产
+  把阅听槽混录（category 2 项=阅听 type/audio_codec=电子书格式/
+  processing_sel=书籍体裁/source_sel=语言——后覆盖陷阱 §59.372
+  同型）；**影视模式 type 9 项齐全**（实时 browsecat select 实证）。
+- **媒介粗粒度站方实态对齐**（details 页三证）：WEB-DL 种=Other
+  (254950)/UHD REMUX 种=Other(254779)/BluRay x264 压制种=Encode
+  (254784)——webdl/webrip/bluray/uhd_bluray/remux/uhd_remux/
+  other **七键归 12**（多键一值无冲突）；MiniBD(4) 精确键。
+  sites.json 的 Blu-ray(1) 实时 HTML 无此值（站方删或 4 月错录
+  ——实时为准不配）。
+- 槽位特化：type 407 教学=category.education（库非 413 同键）；
+  codec 3 项无 X26x（§59.380 联动零触发=站方语义）；standard 4 项
+  720p/SD miss 落空可接受；team 5 项极简 **FRDS(3) 在表**；tags 12
+  项首发 label-only+完结(8)=tag.complete+HDR/杜比/HLG/特效/原创/
+  应求 label-only；有 url/pt_gen/uplver（比库非全）。
+- **DryRun 双形态终验**（§59.380 附三法）：
+  - WEB-DL 原生：404 纪录双键/**12 Other（站方实态对齐）**/2
+    H.265/3 2160P/5 Other——全槽 ✓
+  - 压制种（FRDS x265）：401/7 Encode/2 H.265（无 X26x 不联动
+    正确）/3 2160P/**3 FRDS 外站组直中**——全槽 ✓
+- 遗留：首颗真实发布。
