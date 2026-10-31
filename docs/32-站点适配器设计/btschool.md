@@ -379,3 +379,20 @@
   5/12）+标签链全通实证（国语/中字→5/6 站方 value；span[] 走
   §59.269 checkbox_span 推断）。
 - 遗留：首颗真实发布（imdbid/doubanid 编号是否审核必填观察）。
+
+### 附：IMDb/豆瓣编号字段配键兑现（v0.0.1249 §59.399）
+
+用户定案方案 A：学校站 imdbid/doubanid 仅收编号（站方特别要求）——
+新双域 `imdb_id`/`douban_id` 从完整 URL 提取尾部编号投递
+（`https://www.imdb.com/title/tt4154756/` → `tt4154756`；
+`https://movie.douban.com/subject/24773958/` → `24773958`）。
+
+- 与 imdb_url/dburl 完整链接域并存——域语义=站方要什么形态配什么域
+  （南洋 dburl 完整链接 vs 学校 douban_id 编号）。
+- extractIMDbID（tt[0-9]+ 无歧义锚——纯编号天然兼容）/
+  extractDoubanID（subject/ 路径锚+纯数字直出兼容 Tab4 用户手输）；
+  miss 返回空 setForm skip 不填（站方非必填不阻断）。
+- migration85 补 form_fields 双键（JSON 读改写幂等）。
+- DryRun 实证：imdbid='tt4154756' / doubanid='24773958' ✓。
+- 附：textFieldDomains 补双域（formdiff 假"整域消失"同族第三案——
+  新域上线必须同步解析器域表）。
