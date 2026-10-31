@@ -2,8 +2,12 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
@@ -64,5 +68,70 @@ func TestNewGitHubAPIRequestTokenInjection(t *testing.T) {
 	req3, _ := h.newGitHubAPIRequest(ctx)
 	if got := req3.Header.Get("Authorization"); got != "" {
 		t.Fatalf("空 token 不应注入，got %q", got)
+	}
+}
+
+// §59.386: fresh=1 绕过检查缓存行为锚。背景：v0.0.1234 发布后 6 分钟内
+// 全环境"发现不了更新"——发布前 ~10 分钟的成功检查缓存了旧 latest，
+// ota.sh 以 current==latest 短路跳过更新。三态锚：
+// ① 缓存有效时普通请求命中缓存（不打网络）② fresh=1 绕缓存拿实时值
+// ③ fresh 成功后回写缓存（后续普通请求吃到新值）。
+func TestCheckUpdateFreshBypassesCache(t *testing.T) {
+	h, _ := newUpdateTestHandler(t)
+
+	// 假 GitHub：返回固定 release（v0.0.2000 + amd64 资产）
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"tag_name":"v0.0.2000","prerelease":false,` +
+			`"assets":[{"name":"pt-forward-linux-amd64","browser_download_url":"http://example.com/b"}]}`))
+	}))
+	defer srv.Close()
+	orig := githubAPI
+	githubAPI = srv.URL
+	defer func() { githubAPI = orig }()
+
+	// 预填缓存（假旧值 v9.9.9-陈旧——模拟发布前写入）
+	h.checkCacheMu.Lock()
+	h.checkCache = map[string]interface{}{
+		"has_update": false, "current_version": h.version,
+		"latest_version": "v9.9.9-stale", "download_url": "http://example.com/old",
+	}
+	h.checkCacheAt = time.Now()
+	h.checkCacheMu.Unlock()
+
+	// ① 普通请求 → 命中缓存旧值
+	w1 := httptest.NewRecorder()
+	h.handleCheckUpdate(w1, httptest.NewRequest("GET", "/check-update", nil))
+	var r1 map[string]interface{}
+	if err := json.Unmarshal(w1.Body.Bytes(), &r1); err != nil {
+		t.Fatal(err)
+	}
+	if got := r1["data"].(map[string]interface{})["latest_version"]; got != "v9.9.9-stale" {
+		t.Fatalf("① 普通请求应命中缓存旧值，got %v", got)
+	}
+
+	// ② fresh=1 → 绕缓存拿实时值
+	w2 := httptest.NewRecorder()
+	h.handleCheckUpdate(w2, httptest.NewRequest("GET", "/check-update?fresh=1", nil))
+	var r2 map[string]interface{}
+	if err := json.Unmarshal(w2.Body.Bytes(), &r2); err != nil {
+		t.Fatal(err)
+	}
+	if got := r2["data"].(map[string]interface{})["latest_version"]; got != "v0.0.2000" {
+		t.Fatalf("② fresh 请求应返回实时值，got %v", got)
+	}
+	if got := r2["data"].(map[string]interface{})["has_update"]; got != true {
+		t.Fatalf("② 实时值应判 has_update=true，got %v", got)
+	}
+
+	// ③ fresh 后缓存已回写 → 普通请求返回新值
+	w3 := httptest.NewRecorder()
+	h.handleCheckUpdate(w3, httptest.NewRequest("GET", "/check-update", nil))
+	var r3 map[string]interface{}
+	if err := json.Unmarshal(w3.Body.Bytes(), &r3); err != nil {
+		t.Fatal(err)
+	}
+	if got := r3["data"].(map[string]interface{})["latest_version"]; got != "v0.0.2000" {
+		t.Fatalf("③ fresh 后缓存应回写新值，got %v", got)
 	}
 }

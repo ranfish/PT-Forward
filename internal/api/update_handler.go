@@ -22,7 +22,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const githubAPI = "https://api.github.com/repos/ranfish/PT-Forward/releases/latest"
+// var 而非 const：测试注入 httptest 假 GitHub（§59.386 fresh 缓存锚）。
+var githubAPI = "https://api.github.com/repos/ranfish/PT-Forward/releases/latest"
 
 func (h *SystemHandler) getProxyFromSettings() string {
 	repo := setting.NewRepository(h.db)
@@ -92,8 +93,13 @@ func (h *SystemHandler) newGitHubAPIRequest(ctx context.Context) (*http.Request,
 func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
 	// §59.354: 检查结果内存缓存 10 分钟——多环境频繁轮询/重复进页面
 	// 不再每次打 API（未认证 60 次/h/IP 配额挤占主因；认证后亦降低无谓消耗）
+	// §59.386: fresh=1 跳过缓存——批量 OTA 脚本场景（缓存值是决策输入：
+	// current==latest 直接短路跳过更新，10 分钟窗内新发布的版本被旧缓存
+	// 掩蔽——v0.0.1234 发布后 6 分钟全环境"发现不了更新"实证）。网页/前端
+	// 不带参数保持缓存（防轮询配额挤占原意不变）；fresh 成功后照常回写缓存。
+	fresh := r.URL.Query().Get("fresh") == "1"
 	h.checkCacheMu.Lock()
-	if h.checkCache != nil && time.Since(h.checkCacheAt) < 10*time.Minute {
+	if !fresh && h.checkCache != nil && time.Since(h.checkCacheAt) < 10*time.Minute {
 		cached := h.checkCache
 		h.checkCacheMu.Unlock()
 		Success(w, cached)
