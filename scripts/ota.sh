@@ -42,8 +42,10 @@ login() {
 }
 
 get_version() {
+  # §59.386: fresh=1 绕过检查缓存——批量 OTA 的缓存值是决策输入
+  # （current==latest 短路跳过），10 分钟窗内新发布版本会被旧缓存掩蔽。
   curl -s -m 10 -H "Authorization: Bearer $2" \
-    "http://$1:$PORT/api/v1/system/check-update" 2>/dev/null | \
+    "http://$1:$PORT/api/v1/system/check-update?fresh=1" 2>/dev/null | \
     python3 -c "
 import sys,json
 d=json.load(sys.stdin)['data']
