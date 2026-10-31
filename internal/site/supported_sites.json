@@ -899,7 +899,8 @@
     "cookiecloud_domain": "qingwapt.com",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": "CookieCloud 域名 qingwapt.com"
+    "special_notes": "CookieCloud 域名 qingwapt.com",
+    "publish_supported": true
   },
   "www.tangpt.top": {
     "domain": "www.tangpt.top",
