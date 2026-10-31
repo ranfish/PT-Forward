@@ -258,3 +258,44 @@ func TestParsePublishFormHTMLModeExclusiveCheckbox(t *testing.T) {
 		t.Fatalf("字段名应为 tags[4][]（主模式），got %q", draft.FormFields[model.FieldDomainTags])
 	}
 }
+
+// §59.398: tags 域 current 提示——学校站标签字段名 span[]（非标准
+// tags 前缀，全库唯一）。三保证锚：①current 提示命中 span[] ②无
+// current 走标准启发照旧 miss（真改名 diff 可报）③标准 tags 前缀站
+// 行为零变化（current 名=标准名同路径）。
+func TestParsePublishFormHTMLSpanTagsCurrentHint(t *testing.T) {
+	html := `<form action="takeupload.php">
+	<select name="medium_sel"><option value="7">Encode</option></select>
+	<input type="checkbox" name="span[]" value="1">禁转
+	<input type="checkbox" name="span[]" value="2">首发
+	<input type="checkbox" name="span[]" value="6">中字
+	</form>`
+	// ① current 提示：tags=span[] → 识别 3 项+字段名 span[]
+	draft := ParsePublishFormHTML(html, map[string]string{"medium": "medium_sel", "tags": "span[]"})
+	if draft == nil {
+		t.Fatal("解析 nil")
+	}
+	tags := draft.ValueMappings[model.FieldDomainTags]
+	if len(tags) != 3 || tags[0].Value != "1" || tags[2].Value != "6" {
+		t.Fatalf("current 提示应识别 span[] 3 项, got %v", tags)
+	}
+	if draft.FormFields[model.FieldDomainTags] != "span[]" {
+		t.Fatalf("字段名应为 span[], got %q", draft.FormFields[model.FieldDomainTags])
+	}
+	if draft.TagConfig == nil || draft.TagConfig.Mode != model.TagModeCheckboxSpan {
+		t.Fatalf("span[] 数组形态应派生 checkbox_span 模式, got %+v", draft.TagConfig)
+	}
+	// ② 无 current 提示（nil）：标准启发照旧 miss——真改名 diff 可报
+	draft2 := ParsePublishFormHTML(html, nil)
+	if _, ok := draft2.ValueMappings[model.FieldDomainTags]; ok {
+		t.Fatal("无 current 提示时 span[] 不应被标准启发识别")
+	}
+	// ③ 标准 tags 前缀站 + current 名=标准名：同路径零变化
+	htmlStd := `<form action="takeupload.php">
+	<input type="checkbox" name="tags[4][]" value="1">禁转
+	</form>`
+	draft3 := ParsePublishFormHTML(htmlStd, map[string]string{"tags": "tags[4][]"})
+	if len(draft3.ValueMappings[model.FieldDomainTags]) != 1 {
+		t.Fatal("标准 tags 前缀站行为应零变化")
+	}
+}
