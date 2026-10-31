@@ -697,3 +697,30 @@ customFields["custom_fields[5][1][]"] = "允许转载"
 
 *数据来源: upload.php HTML (55968 chars) + rules.php (10825 chars) (2026-04-22)*
 *文档创建: 2026-04-16 | 更新: 2026-04-22*
+
+---
+
+## 适配记录（v0.0.1232 §59.384）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration70 分发（七槽 99 项——type 13/medium 14/
+  codec 9/audiocodec 20/standard 6/team 16/tags 21）。
+- **DryRun 双形态终验**（§59.380 附三法）：
+  - WEB-DL 原生种：410 纪录片双键/21 WEB-DL/9 H265/HEVC/19 AAC/
+    5 4K——全槽 ✓（原生不联动正确）
+  - 压制种（FRDS x265 铁证）：401 电影/15 Encode/**7 x265——§59.380
+    压制联动第三站自动生效**（小写 label 精确匹配——站方编码器名语义
+    正确）/8 DTS-HDMA/5 4K/**7 FRDS 外站组直中**——全槽 ✓
+- **关键映射决策**：
+  - 分集/合集双分类主配合集/电影形态（v1.05 整季语义+站方"单季打包
+    后禁发单集"）——tv_series 414/tv_shows 403/animation 422 优先；
+    分集场景预览手调+SeasonEpisode 联动挂账（零案例不预实施）
+  - 编码标准名/编码器名=百川同款——§59.380 联动受益（无新代码）
+  - medium 14 项值从 10 起：DIY 特化 label-only（不含中字的 DIY 禁
+    发布 §9.3）；WEB-DL(21)/Webrip(25) 独立选项精确单配
+  - audiocodec 三态独立：DDP(25)/DDP Atmos(26)/TrueHD Atmos(10)
+  - 无 uplver（§9.9 站方无匿名字段）
+  - team 官组保护（§9.5 非本站组禁 WS 标识）+tags 官组标签
+    label-only 防自动勾触雷（财神官种案同款防护）
+- 遗留：实时比对（tools/decrypt-cookie 先行）+首颗真实发布。
