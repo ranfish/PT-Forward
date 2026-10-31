@@ -336,3 +336,46 @@
 8. **游戏类需候选**：非上传员用户发布游戏必须先候选
 9. **IMDb/豆瓣仅填编号**：不同于其他站填URL，学校只填编号部分
 10. **无PT-Gen**：无PT-Gen一键获取简介功能
+
+---
+
+## 适配记录（v0.0.1248 §59.398）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线双零发版）
+
+- **form_config**：migration84 分发（七槽 58 项——type 11/medium 9/
+  codec 6/audiocodec 9/standard 5/team 12/tags 6）。实时 HTML 与
+  4 月资产全槽零漂移（第八个零漂移站）；**tags 资产缺口实时补全**
+  （sites.json tags=None——青蛙站同款，span[] 6 项实时捕获）；
+  NP 标准裸字段名（五二同款）单模式站。
+- **槽位特化**：type 11 项**非标准值集**（电影=405 非 401！连续剧
+  =406/综艺=412/软件=404/资料=402=category.education/游戏=411/
+  音乐=409/体育=410/其他=415）+408 纪录双键；medium 乱序+
+  Blu-ray(1)/Blu-rayUHD(12) 分立两键+DVDRip 精确键（站方无 DVDR
+  原盘项）；codec 6 项合并命名（压制联动 label 精确匹配不触发=
+  站方合并项语义——车站同款）；audiocodec DTS-HD/DTS(3) 合并项
+  承接家族四键 [dts,dts_hd_ma,dts_hd_hr,dtsx]+AC3(10) 承接三键
+  （车站同款）；standard 5 项与车站同构值集不同（4K=5/1080p/i=1）；
+  team 12 项 label-only：**六外站官组 WiKi/HDChina/HDB_iNT/
+  M-team/CMCT/Ourbits**（车站首例的六倍扩展——label 直配自动
+  命中）+BTSCHOOL/Zone/BtsHD/BtsTV/BtsPAD 官组站规非管理组禁选。
+- **tags 字段名 span[]（非标准 tags[]——全库唯一）**：6 项；禁转/
+  国语/中字配键+首发/自制 label-only+**官方(3) 绝不配键**（财神
+  官种案同款雷区——站方双向校验，外站组转发恒非官方）。
+- **imdbid/doubanid 编号字段不配**（站方仅收编号 tt4154756/纯数字
+  ——发布链 imdb_url 域填完整 URL 语义不匹配；非必填字段；挂账
+  首颗发布观察站方审核是否要求编号——若要求需编号提取功能另案）；
+  无 pt_gen/url/technical_info。标题只能英文/数字/拼音禁中文
+  （v1.05 英文重组天然合规——大青虫同款）。
+- **工具两处改进沉淀**（formdiff 首次对学校站报差异的定性=工具
+  问题——裸对 52 项全一致）：①§59.373 current 提示扩展到 tags
+  域（span[] 非标准前缀识别——isTagName 单点三保证同构）②
+  checkboxLabel 形态4（input 裸文本后邻——goquery Next() 只走
+  元素节点须下到 *html.Node NextSibling）。测试锚
+  TestParsePublishFormHTMLSpanTagsCurrentHint。
+- **验证**：python 裸对 52 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （工具修复后双零）+DryRun 双形态全绿（WEB-DL 原生 408/10/10/6/
+  5/12；压制种 **405 非标值集**/7 Encode/3 DTS-HD/DTS 四键承接/
+  5/12）+标签链全通实证（国语/中字→5/6 站方 value；span[] 走
+  §59.269 checkbox_span 推断）。
+- 遗留：首颗真实发布（imdbid/doubanid 编号是否审核必填观察）。
