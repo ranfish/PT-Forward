@@ -1314,3 +1314,15 @@ ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
   - 分叉族双键即防（404+406）
 - **实时比对受阻**：29 财神 cookie 失效（登录墙）——五二/百川降级先例，
   遗留用户侧 HTML 比对+首颗真实发布。
+
+### 实时比对终验+刷正（2026-10-31，用户 HTML 84.2KB）
+
+- **Diff 仅 2 条 added（真改版）**：type 新增 **短剧(418)**（文档记载
+  短剧仅在油猴脚本不在表单——站方已入表单；migration68 配
+  category.short_drama canonical 键）+tags 新增 **Ai(25)**（AI 生成
+  内容标记——label-only 防松查乱挂）。
+- **其余七槽逐值零漂移**：乱序值全对（媒介 7-16/AV1=6/2K=10/
+  AAC=9/FLAC=22）——migration67 配置正确性实时实证（含 audiocodec
+  修正值）。
+- migration68 刷正（§59.375 五二 merged 流程+人工校正短剧键/Ai 去键）。
+- 4 月文档（2026-04）与现状差异仅此 2 项新增。
