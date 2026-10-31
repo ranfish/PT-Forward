@@ -515,3 +515,31 @@ H.264(1) vs X264(13)、H.265(10) vs X265(14)：
 *分析时间：2026-04-16*
 *最后更新：2026-04-22*
 *数据来源：https://wiki.hitpt.com/zh/classics/Specification + https://www.hitpt.com/rules.php + https://www.hitpt.com/upload.php*
+
+---
+
+## 适配记录（v0.0.1227 §59.380）
+
+### 发布适配完成（Phase 1+2）
+
+- **form_config**：migration66 分发（七槽 76 项）。
+- **DryRun 终验**（29 借壳样本）：dry_run_ok 八槽全映射（type=405 动画/
+  source_sel[4]=9 Web 槽位特化映射正确/codec=10 H.265/audio=6 AAC/
+  standard=5 4K/team=4 其他兜底/副标题/IMDb/PTGen/technical_info MI）。
+- **关键映射决策**：
+  - 双区互斥（browsecat/specialcat）：影视发布落种子区——§59.372 双防
+    已护 Diff/解析工具
+  - medium→source_sel[4]（壹吧槽位特化先例）；**百川无 Encode 项特化**：
+    BDrip(2) 承接 [bdrip, encode]（压制种主归 BD 压制）
+  - codec：H.264(1)/H.265(10) 标准形态配键；X264/X265 CLI 词 label-only
+  - audiocodec DTS 六级细分全配（HDMA:X 7.1 组合形态双键防御——实际被
+    15/18 顺序拦截，19 为文档性配置）
+  - tags 首发(2) **label-only 不配键**（转存发布禁勾首发铁律）；禁转/
+    国语/中字/粤语/DIY 配键
+  - 分叉族双键即防：413 纪录片 + 415 MV
+- **实时比对受阻**：29 抓取 CF 严拒 403（直连/代理/azuretls chrome 指纹
+  全拒——比 keepfrds 严，cf_clearance 疑绑 IP）——§59.377 五二降级先例
+  （双源资产生成+DryRun 先行）。遗留：用户侧浏览器提供上传页 HTML 比对
+  或凭证恢复后首颗真实发布。
+- FreshInstall 测试自动覆盖（§59.379 机制首次为新增站服役——百川配置
+  交付进 CI 断言）。
