@@ -541,3 +541,18 @@ PT-Gen 字段支持 4 种来源（imdb/douban/bangumi/indienova），适配器�
     联动第五站**/11 DTS-HDMA/6 4K/5 Other——全槽 ✓
 - 遗留：首颗真实发布（重点观察：压制种 medium=18 Encode 站方是否
   接受——若预检要求按分辨率选 7/8/9 则实施 resolution×medium 联动）。
+
+### 243 三档压制种 DryRun 验证（v0.0.1236 OTA 后，2026-10-31）
+
+- **243 库内压制种分布**（resolution×medium 联动数据备查）：1080p
+  2676 颗 / 4K 2064 颗 / 720p 30 颗——若站方拒 18 需做联动，主战场
+  =1080P/i 压制(8)+UHD 压制(7)。
+- 三档各一颗 DryRun（243 真实 meta，全绿）：
+  - 4K（UHD x265 TrueHD7）：401/18 Encode/4 X265/8 TrueHD Atmos/6 4K
+  - 1080p（BluRay x265）：401/18 Encode/4 X265/1 FLAC/1 1080p
+  - 720p（BluRay x264 AC3）：401/18 Encode/**2 X264——§59.380 联动
+    X264 形态首实证**（此前五站 DryRun 均为 X265）/16 Dolby
+    Digital/DD（AC3 音轨 meta→audio.dd 键落 16——三分立下按 meta
+    键走，语义同物）/3 720p
+- DryRun 层验证完毕：**站方是否接受 18 Encode 仍需首颗真实发布**
+  （DryRun 是组装层终点——站方预检校验不在验证范围）。
