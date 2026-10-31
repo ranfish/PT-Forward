@@ -75,7 +75,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "carpt.net",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "cc.mypt.cc": {
     "domain": "cc.mypt.cc",
