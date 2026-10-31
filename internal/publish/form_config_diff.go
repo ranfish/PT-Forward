@@ -15,13 +15,15 @@
 package publish
 
 import (
-	"github.com/ranfish/pt-forward/internal/metadata/extract"
+	"html"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
-	"html"
 )
 
 // pairDivergentKeys 松查键分叉族校验：含 extended 侧键而缺 dict 侧键时
@@ -118,6 +120,26 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 	}
 	seenDomains := map[string]bool{}
 
+	// §59.388: 模式互斥控件过滤——主模式锚=配置字段名后缀众数
+	// （聆音 form_fields 全 [4] 后缀→主模式 4；裸名站（五二）无后缀
+	// →不过滤零变化）。控件 name 后缀 [N]≠主模式即跳过（聆音阅听
+	// mode=8 槽 audiocodec_sel[8] 是电子书格式 select——域启发命中
+	// audiocodec 域产生 5 条假 added：PDF/MOBI/EPUB/AZW3/Other，
+	// 用户 243 Diff 实证+29 同栈复现）。壹吧 specialcat 是同 name
+	// 双 type（无后缀）不受此过滤影响（special id 判别继续兜底）。
+	mainMode := 0
+	modeCounts := map[int]int{}
+	for _, name := range currentFields {
+		if m := fieldNameModeSuffix(name); m > 0 {
+			modeCounts[m]++
+		}
+	}
+	for m, c := range modeCounts {
+		if c > modeCounts[mainMode] {
+			mainMode = m
+		}
+	}
+
 	// §59.373: current 反查表（字段名 → 域）——select/文本域识别的
 	// 第一优先级。仅含"页面仍存在该字段名"的提示（消失的留标准启发
 	// 抓新名保改版检测）。
@@ -133,6 +155,12 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		name, ok := sel.Attr("name")
 		if !ok || name == "" {
 			return
+		}
+		// §59.388: 非主模式控件跳过（聆音 audiocodec_sel[8] 阅听槽）
+		if mainMode > 0 {
+			if m := fieldNameModeSuffix(name); m > 0 && m != mainMode {
+				return
+			}
 		}
 		domain := domainOfField(name)
 		// §59.373: current 配置字段名优先——已适配站槽位特化权威
@@ -449,3 +477,20 @@ var domainToCategory = map[string]string{
 	model.FieldDomainTeam:       "team",
 	model.FieldDomainTags:       "tag",
 }
+
+// fieldNameModeSuffix §59.388: 提取字段名的模式后缀（"audiocodec_sel[8]"→8；
+// 裸名/无数字后缀返回 0）。NP 模式互斥站的控件名带 [N] 后缀指示归属
+// 模式（data-mode='4' 影视 / 8 阅听等）。
+func fieldNameModeSuffix(name string) int {
+	m := reFieldNameMode.FindStringSubmatch(name)
+	if m == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+var reFieldNameMode = regexp.MustCompile(`\[(\d+)\]$`)
