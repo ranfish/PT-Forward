@@ -520,3 +520,38 @@ func mapMedium(sourceMedium string) int {
 
 *数据来源: upload.php HTML + rules.php HTML (2026-04-22)*
 *文档更新: 2026-04-22*
+
+---
+
+## 适配记录（v0.0.1247 §59.397）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线双零发版）
+
+- **form_config**：migration83 分发（七槽 43 项——type 7/medium 9/
+  codec 6/audiocodec 10/standard 5/team 5/tags 6）。实时 HTML 与
+  4 月资产**全槽零漂移**（第七个零漂移站）；文档"audiocodec 11 个"
+  为含占位 0 计数——实际 10 项（资产正确）。
+- **单模式站**（type 仅 1 个，无 [5] 槽）；NexusPHP 老版 XHTML
+  框架。
+- **槽位特化**：type 7 项极简（无体育/短剧/MV）；medium 乱序+
+  **Blu-ray(7) 与 Blu-rayUHD(8) 分立两键**（与大青虫分立同款——
+  与织梦/浦园归并形态相反）+WEB 承接 webrip+DVDRip 精确键（站方
+  无 DVDR 原盘项）；codec 6 项**合并命名**（H.264/AVC/x264 一项
+  含 CLI 词——label 非 x264 精确形态压制联动不触发 ✓ 站方语义
+  本就是合并项）+无 AV1+Xvid 配键；audiocodec 10 项 **DTS-HD/DTS
+  合并项承接 DTS 家族四键**（[dts,dts_hd_ma,dts_hd_hr,dtsx]——
+  大青虫 AC3 承接三键同款）+AC3 承接三键+mp3/wav label 照抄站方
+  小写原文；standard 5 项极简（4K_UHD/1080p/i 双键/720p/i 单键
+  （r720i 无键）/SD/resolution.other）；team 5 项 label-only——
+  **站方表单含它站官组 WiKi/CMCT/M-team**（team 域 EqualFold
+  label 直配自动命中 ✓——外站官组种子正确选组）+CarPT 站规"非
+  管理组禁选"（label-only 转载永不选）；tags 6 项（全库最少之
+  一）首发铁律+禁转/国语/中字/DIY 配键+HDR label-only 惯例；
+  值 3 跳过（站方历史遗留）。
+- **字段**：url（IMDb 真字段 data-pt-gen——url×2 第二个是编辑器
+  按钮，浦园/末日同款）+pt_gen+nfo+uplver；**无 technical_info**
+  （MediaInfo 写简介——文档实证）。
+- **验证**：python 裸对 43 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿（WEB-DL 原生 404/2/2/7/1/5；
+  压制种 401/1 Encode/**2 DTS-HD/DTS 四键承接命中**/1/5 Other）。
+- 遗留：首颗真实发布。
