@@ -256,6 +256,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// pt_gen 值=豆瓣链接；FormFields 未配站点自然跳过）
 	setForm(model.FieldDomainPTGen, meta.DoubanURL)
 	setForm(model.FieldDomainDoubanURL, meta.DoubanURL)
+	// §59.399: 编号形态字段（学校站 imdbid/doubanid 仅收编号 tt4154756/24773958——
+	// 站方特别要求）——从完整 URL 提取尾部编号；URL 空/形态不匹配不填（站方
+	// 非必填不阻断）；DB 值已是纯编号形态直出兼容（Tab4 用户手输 §59.341）。
+	// 与 imdb_url/dburl 完整链接域并存——域语义=站方要什么形态配什么域。
+	setForm(model.FieldDomainIMDbID, extractIMDbID(meta.IMDbURL))
+	setForm(model.FieldDomainDoubanID, extractDoubanID(meta.DoubanURL))
 
 	// §59.166 A 层同源化：表单四域（standard/codec/audiocodec/medium）改消费
 	// BuildTechProfile（标题+MI+DOM 三源合并——种配页重组器同款，MI 纠错终态），
@@ -1268,6 +1274,39 @@ func parseScreenshotsCol(s string) []string {
 // 取最长连续中文段（含·间隔与内部空格）；无中文返回空（字段不投递）。
 var chineseTitleRe = regexp.MustCompile(`\p{Han}+(?:[\s·・]\p{Han}+)*`)
 
+// §59.399: IMDb/豆瓣编号提取（学校站 imdbid/doubanid 编号形态字段）。
+// IMDb ID=tt+数字（URL 任意位置匹配——尾部锚定不必要，tt 前缀即无歧义锚）；
+// 豆瓣 ID=subject/ 后数字（路径锚定防误匹配非条目页）。DB 值已是纯编号
+// 形态（Tab4 用户手输 §59.341）直出兼容；形态不匹配返回空串（setForm
+// skip 不填——站方非必填不阻断）。
+var reIMDbID = regexp.MustCompile(`tt[0-9]+`)
+var reDoubanID = regexp.MustCompile(`subject/([0-9]+)`)
+
+func extractIMDbID(url string) string {
+	url = strings.TrimSpace(url)
+	if m := reIMDbID.FindString(url); m != "" {
+		return m
+	}
+	return ""
+}
+
+func extractDoubanID(url string) string {
+	url = strings.TrimSpace(url)
+	if m := reDoubanID.FindStringSubmatch(url); len(m) > 1 {
+		return m[1]
+	}
+	// 纯数字直出（用户手输纯编号形态——无 URL 壳）
+	if url != "" {
+		for _, r := range url {
+			if r < '0' || r > '9' {
+				return ""
+			}
+		}
+		return url
+	}
+	return ""
+}
+
 func chineseTitleOf(title string) string {
 	best := ""
 	for _, seg := range chineseTitleRe.FindAllString(title, -1) {
@@ -1358,6 +1397,7 @@ func buildFormLabels(cfg *model.PublishFormConfig, form map[string]string) map[s
 		model.FieldDomainSmallDescr: "副标题", model.FieldDomainDescription: "简介",
 		model.FieldDomainTechInfo: "技术信息", model.FieldDomainIMDBURL: "IMDb",
 		model.FieldDomainPTGen: "豆瓣链接", model.FieldDomainDoubanURL: "豆瓣链接",
+		model.FieldDomainIMDbID: "IMDb编号", model.FieldDomainDoubanID: "豆瓣编号",
 		model.FieldDomainCNName: "中文名", model.FieldDomainUplver: "匿名发布",
 	}
 	// 字段名 → 域名（FormFields 反查）
