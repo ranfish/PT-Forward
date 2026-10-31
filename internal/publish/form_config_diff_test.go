@@ -197,3 +197,40 @@ func TestParseStandardKeysEnrich(t *testing.T) {
 	lookup("team", "team.frds")
 	lookup("medium", "medium.encode")
 }
+
+// §59.388: 模式互斥控件过滤锚——聆音双模式站（mode=4 影视+mode=8 阅听）
+// 阅听槽 audiocodec_sel[8]（电子书格式 PDF/MOBI/EPUB/AZW3）被域启发
+// 认成 audiocodec 域 → 5 条假 added（用户 243 Diff 实证）。三断言：
+// ① [8] 槽不进 draft ② [4] 槽正常收录 ③ 裸名站（无后缀配置）不过滤。
+func TestParsePublishFormHTMLModeExclusiveSelects(t *testing.T) {
+	html := `<form action="takeupload.php">
+	<select name="type" id="browsecat" data-mode='4'><option value="401">电影</option></select>
+	<select name="type" id="specialcat" data-mode='8'><option value="499">有声书</option></select>
+	<select name="medium_sel[4]" data-mode="medium_4"><option value="7">Encode</option></select>
+	<select name="audiocodec_sel[8]" data-mode="audiocodec_8"><option value="2">EPUB</option><option value="18">PDF</option></select>
+	</form>`
+
+	// ① 聆音形态：配置 [4] 后缀 → 主模式 4 → [8] 槽跳过
+	fields := map[string]string{"type": "type", "medium": "medium_sel[4]", "team": "team_sel[4]"}
+	draft := ParsePublishFormHTML(html, fields)
+	if draft == nil {
+		t.Fatal("解析 nil")
+	}
+	if _, has := draft.ValueMappings[model.FieldDomainAudiocodec]; has {
+		t.Fatalf("① [8] 阅听槽不应进 draft（audiocodec 域被收录=%v）", draft.ValueMappings[model.FieldDomainAudiocodec])
+	}
+	if got := draft.ValueMappings[model.FieldDomainMedium]; len(got) != 1 || got[0].Value != "7" {
+		t.Fatalf("② [4] 主模式槽应正常收录，got %v", got)
+	}
+
+	// ③ 裸名站（五二形态——配置无后缀）→ 不过滤（audiocodec_sel[8]
+	// 若被域启发收录是既有行为，零变化保证）
+	bare := map[string]string{"type": "type", "medium": "medium_sel"}
+	draft2 := ParsePublishFormHTML(html, bare)
+	if draft2 == nil {
+		t.Fatal("③ 裸名站解析 nil")
+	}
+	if _, has := draft2.ValueMappings[model.FieldDomainMedium]; !has {
+		t.Fatal("③ 裸名站 medium_sel[4] 应收录（无主模式不过滤）")
+	}
+}
