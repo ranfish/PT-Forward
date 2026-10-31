@@ -375,3 +375,28 @@
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
 *数据来源：rules.php + upload.php + forums.php?topicid=20&topicid=30*
+
+---
+
+## 适配记录（v0.0.1240 §59.390）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线首次完整实战）
+
+- **form_config**：migration75 分发（type 11 项+六字段——全库最极简）。
+- **实时 HTML 实证两处文档漂移**（§59.384 附 label+value 双源=实时）：
+  - 文档 §1.2 称"无 uplver"——**实时有**（配置含 uplver+anonymous:true）
+  - **prohibit_transfer 新字段**（禁转声明 checkbox——转发种不勾不配）
+- **★formdiff 同栈 Diff 门禁首次实战**（§59.389 新流水线）：
+  python 裸对①+formdiff.sh 同栈②**双零**——发版前闭环（旧流程需
+  用户 OTA 后生产 Diff 验证）。
+- **DryRun 双形态**：WEB-DL 原生 406 纪录双键/压制种 401 电影——
+  副标题/简介/IMDb url/豆瓣 dburl 五字段全映射 ✓（dburl=
+  FieldDomainDoubanURL §59.159 PTNexus 同款）。
+- **站规发布策略注记**（无媒介槽无法自动过滤——发布预览人工规避）：
+  - **禁搬运蓝光原盘（含 DIY）及 REMUX**（未经允许需论坛报备）
+  - WEB-DL 限制：不接受 WEB-DL 压制/DIY；欧美仅国外流媒体源；
+    有 1080p 不收 720p
+  - 电影/纪录不执行 dupe（多家重编码友好）；码率下限
+    720p≥4000kbps/1080p≥8000kbps
+- 遗留：首颗真实发布（注意规避原盘/REMUX 形态——选压制/WEB-DL
+  原生种）。
