@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
 // §59.268: codec 域 miss 折叠——修道院真实映射形态（仅标准名选项）
@@ -35,7 +36,9 @@ func TestCodecMappingOf_Fallback(t *testing.T) {
 		{"VC-1", "VC-1"},    // 原命中不回归
 	}
 	for _, tc := range cases {
-		m := e.codecMappingOf(cfg, tc.codec)
+		// §59.380 签名改 TechProfile——原盘形态（无 encode 信号）保持旧行为语义
+		tp := titleparser.TechProfile{VideoCodec: tc.codec}
+		m := e.codecMappingOf(cfg, tp)
 		if m == nil {
 			t.Errorf("[%s] 映射 nil，want %s", tc.codec, tc.wantLabel)
 			continue
@@ -54,10 +57,10 @@ func TestCodecMappingOf_Fallback(t *testing.T) {
 		lean = append(lean, m)
 	}
 	cfgLean.ValueMappings[model.FieldDomainCodec] = lean
-	if m := e.codecMappingOf(cfgLean, "AV1"); m != nil {
+	if m := e.codecMappingOf(cfgLean, titleparser.TechProfile{VideoCodec: "AV1"}); m != nil {
 		t.Errorf("[AV1 无 Other 选项] 应维持 nil，got %s", m.Label)
 	}
-	if m := e.codecMappingOf(cfgLean, "x264"); m != nil {
+	if m := e.codecMappingOf(cfgLean, titleparser.TechProfile{VideoCodec: "x264"}); m != nil {
 		t.Errorf("[x264 无 H.264 选项] 应维持 nil，got %s", m.Label)
 	}
 }

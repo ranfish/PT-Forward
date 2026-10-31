@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
 // §59.273: Other 兜底三域（幸运 Other 无 standard_key 形态）
@@ -38,7 +39,7 @@ func TestOtherFallback_ThreeDomains(t *testing.T) {
 		t.Errorf("[audio AAC] got %v", m)
 	}
 	// codec AV1 → Other（无键形态）
-	if m := e.codecMappingOf(cfg, "AV1"); m == nil || m.Label != "Other" {
+	if m := e.codecMappingOf(cfg, titleparser.TechProfile{VideoCodec: "AV1"}); m == nil || m.Label != "Other" {
 		t.Errorf("[codec AV1] got %v", m)
 	}
 	// team 无匹配组 → Other
