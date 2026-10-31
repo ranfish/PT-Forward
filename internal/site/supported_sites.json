@@ -773,7 +773,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "www.agsvpt.com",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "www.dragonhd.xyz": {
     "domain": "www.dragonhd.xyz",
