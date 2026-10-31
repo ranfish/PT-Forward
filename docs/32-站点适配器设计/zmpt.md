@@ -1445,3 +1445,31 @@ srt / ssa / ass / cue / zip / rar
 - 年份（19xx/20xx）必须存在，且位于版本词（PROPER/REPACK/READ.NFO/RERIP）之前。
 - 视频编码标准词表（整词匹配）：x264/x265/H.264/H.265/AVC/HEVC/VC-1/AVS2/AVS3/AV1/AVS+（H265/H264/MPEG-2 为非标准表，可匹配但属非常用形）。
 - 标题禁中文/全角字符。
+
+---
+
+## 适配记录（v0.0.1245 §59.395）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线）
+
+- **form_config**：migration81 分发（六槽 61 项——type 11/medium 10/
+  audiocodec 10/standard 6/team 8/tags 16）。实时 HTML 与 4 月资产
+  **全槽零漂移**（第六个零漂移站）。
+- **文档漂移一处**（双源教训）：文档 §246 称有 url（IMDb）字段——
+  实时控件**无 url**（IMDb 走 pt_gen/简介）→ form_fields 不配。
+- **custom_fields[4][1..3]**=歌手/专辑/年份（音乐类专用——文档只载
+  [1] 歌手，[2][3] 实时新增；发布链无此域不配）。
+- **槽位特化**：type 402 电视剧需完结/分集标签（站方审核脚本结构
+  校验——分集/完结互斥）；422 纪录双键+427 短剧=short_drama 第四站；
+  无 MV 分类；medium 乱序+"其他资料"(12)≈medium.other；standard
+  **乱序非标准排序**（480p=7/720p=8/1080p=1——文档权威警告）+
+  1080p/i 合并双键+480p 无 canonical miss 落空；audiocodec 10 项
+  **音乐向**（无 DDP/TrueHD/DTS 细分——AC3 承接 [ac3,dd,ddp] 三键
+  （大青虫/南洋同款）+压制种 DTS-HD MA→Other 兜底=音乐向站语义
+  正确）；team Zm 系官组保护 label-only（FRDS 不在表 Other 兜底）；
+  tags 16 项首发铁律+禁转/国语/粤语/中字/DIY/完结配键。
+- **验证**：python 裸对 61 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿（WEB-DL 原生 422/10/5/6/5；
+  压制种 401/7/5/**7 Other（DTS-HD MA 音乐向站正确兜底）**/5）。
+- 遗留：首颗真实发布（电视剧种注意完结/分集标签站方结构校验——
+  发布预览人工确认）。
