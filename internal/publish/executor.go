@@ -284,7 +284,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
-		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp.VideoCodec)},
+		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp)},
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
 		{model.FieldDomainMedium, e.mediumMappingOf(cfg, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
@@ -861,19 +861,59 @@ func (e *PublishExecutor) lookupOtherOption(cfg *model.PublishFormConfig, domain
 // 修道院 224/288 未选案实证：x264×216+x265×6+AV1×2，BluRay/WEB-DL x264 通杀）。
 // 无对应标准的新编码（AV1/VVC/AVS2）→ Other 兜底（站方无 Other 选项时维持
 // nil 不强填）。
-func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, videoCodec string) *model.FormValueMapping {
-	stdKey := extract.LookupStandardKey("video_codec", videoCodec)
-	if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey); m != nil {
-		return m
-	}
-	if folded := titleparser.FoldStandardKey("video_codec", stdKey); folded != stdKey {
-		if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, folded); m != nil {
-			return m
+// §59.380 百川案定案（用户）：压制形态联动——媒介判定 encode 且站点表单
+// 提供 CLI 压制形态选项（百川 §5.2 站方语义：原盘/Remux→H.26x、压制/
+// Encode→X26x）时优先 CLI 选项。媒介判定单源 mediumStdKeyOf（防双实现）。
+// 通用语义：站方提供 X26x 选项=站方有此区分维度（NP 惯例），压制种选
+// CLI 形态更贴站方；无该选项的站（龙之家/壹吧）行为零变化。
+func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+	stdKey := extract.LookupStandardKey("video_codec", tp.VideoCodec)
+	m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey)
+	if m == nil {
+		// 折叠路径（x264/x265 CLI 形态键→H 标准键——§59.268 归标准）
+		if folded := titleparser.FoldStandardKey("video_codec", stdKey); folded != stdKey {
+			m = e.lookupByStdKey(cfg, model.FieldDomainCodec, folded)
 		}
 	}
-	// §59.273: Other 兜底改 Label 判定（幸运 codec Other 无 standard_key——
-	// 键查在无键站落空，Opus 类未选音频案同族）
-	return e.lookupOtherOption(cfg, model.FieldDomainCodec)
+	if m == nil {
+		// §59.273: Other 兜底改 Label 判定（幸运 codec Other 无 standard_key——
+		// 键查在无键站落空，Opus 类未选音频案同族）
+		return e.lookupOtherOption(cfg, model.FieldDomainCodec)
+	}
+	// §59.380: 压制形态联动（两命中路径统一——直查/折叠都过）——encode
+	// 媒介 + 站点有 CLI 形态选项优先（百川 §5.2 站方语义）
+	if mediumStdKeyOf(tp, "") == "medium.encode" {
+		if cli := lookupCLIVariant(cfg, stdKey); cli != nil {
+			return cli
+		}
+	}
+	return m
+}
+
+// lookupCLIVariant §59.380: 视频编码 CLI 压制形态选项查找（百川 §5.2
+// 站方语义——压制种选 X26x）。label 精确匹配（大小写两形态）；仅
+// video.h264/video.h265 有 CLI 惯例变体（AV1/VVC 无）。
+func lookupCLIVariant(cfg *model.PublishFormConfig, stdKey string) *model.FormValueMapping {
+	variants := map[string][]string{
+		"video.h264": {"X264", "x264"},
+		"video.h265": {"X265", "x265"},
+		// CLI 原始键形态（LookupStandardKey 对 x265 可能产出独立键——
+		// 折叠前直查即命中的站走此形态）
+		"video.x264": {"X264", "x264"},
+		"video.x265": {"X265", "x265"},
+	}
+	labels, ok := variants[stdKey]
+	if !ok {
+		return nil
+	}
+	for i, m := range cfg.ValueMappings[model.FieldDomainCodec] {
+		for _, l := range labels {
+			if m.Label == l {
+				return &cfg.ValueMappings[model.FieldDomainCodec][i]
+			}
+		}
+	}
+	return nil
 }
 
 // audioMappingOf §59.166 A 层：TechProfile 源音频映射。
@@ -934,6 +974,8 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 		// 标错、MI 痕迹证 WEBRip，重组已归 WEBRip，媒介跟 Encode 而非 WEB-DL）
 		stdKey = "medium.encode"
 	}
+	// §59.380: stdKey 推导抽单源（codec 压制形态联动复用——防双实现漂移）
+	stdKey = mediumStdKeyOf(tp, stdKey)
 	// §59.325: MinBD 特例优先——有 MiniBD 精确选项的站点映 medium.minibd，
 	// miss 时 fallback 原链（无该选项的站点走 Encode/原盘原语义）
 	if hasMinBDToken(tp.RawTitle) {
@@ -941,17 +983,21 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 			return m
 		}
 	}
-	if stdKey == "" {
-		// §59.166 回归补：IsEncode 铁证（老 mediumMapping 原有——tp 同源化时丢失
-		// 致 BluRay 1080p x265 压制误判 Blu-ray 原碟；titleparser.IsEncode 含
-		// MI Writing library 铁证+碟源+编码族二维 §59.151）
-		if titleparser.IsEncode(tp) {
-			stdKey = "medium.encode"
-		} else {
-			stdKey = extract.LookupStandardKey("medium", tp.SourceType)
-		}
-	}
 	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
+}
+
+// mediumStdKeyOf §59.380: 媒介 canonical 键推导单源（mediumMappingOf 主链
+// 与 codec 压制形态联动共用）。preset 非空（规格优先路径）直接返回；
+// 空则 IsEncode 铁证（§59.166 回归补：MI Writing library+碟源+编码族
+// 二维 §59.151）→ encode；否则 SourceType 归一。
+func mediumStdKeyOf(tp titleparser.TechProfile, preset string) string {
+	if preset != "" {
+		return preset
+	}
+	if titleparser.IsEncode(tp) {
+		return "medium.encode"
+	}
+	return extract.LookupStandardKey("medium", tp.SourceType)
 }
 
 // mediumMapping 媒介域（二维规则 §59.150：规格优先，Encode 判定 IsEncode 铁证 §59.151）。
