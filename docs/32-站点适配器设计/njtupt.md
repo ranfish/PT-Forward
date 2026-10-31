@@ -339,3 +339,26 @@ upload.php 用户信息区显示 `认领: [0/2000]`，每用户最多认领 **20
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
+
+---
+
+## 适配记录（v0.0.1242 §59.392）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线第三次完整实战）
+
+- **form_config**：migration77 分发（type 12/medium 7/codec 6/
+  standard 5/tags 8）。实时 HTML 与 sites.json 4 月资产**全槽零
+  漂移**（咖啡后第五个零漂移站）。
+- 字段全齐：url（IMDb）+pt_gen（五来源）+technical_info+uplver
+  ——url×2 中第二个是 BBCode 编辑器按钮（type=button）非表单字段。
+- **槽位特化**：type 406 演出=category.concert（库非/咖啡后第三站
+  复用）；404 纪录双键；415 资料 label-only（canonical 无 materials
+  类键）；medium 7 项**值乱序**（9,8,5,7,6,2,10——财神同款用实时
+  值）+Blu-ray(9) 归并 [bluray,uhd_bluray]+Remux(8) 归并
+  [remux,uhd_remux]（站方无独立 UHD 项）；codec 6 项无 X26x 联动
+  零触发+AV1 配键；tags 首发/官方（财神官种案防触雷）/自购/应求/
+  保种 label-only+禁转/国语/中字配键。
+- **验证**：python 裸对 38 项=实时 HTML 逐字 ✓+formdiff 同栈
+  Diff 0 条（双零发版）+DryRun 双形态全绿（WEB-DL 原生 404 双键/
+  5 WEB-DL/3 H.265；压制种 401/7 Encode/3 H.265 不联动=站方语义）。
+- 遗留：首颗真实发布。
