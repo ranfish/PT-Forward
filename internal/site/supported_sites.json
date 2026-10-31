@@ -541,7 +541,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.sjtu.edu.cn",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "pt.soulvoice.club": {
     "domain": "pt.soulvoice.club",

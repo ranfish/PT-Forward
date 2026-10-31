@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -246,4 +247,59 @@ func contains(tags []string, target string) bool {
 		}
 	}
 	return false
+}
+
+// §59.391: 葡萄产区×类型双维分类映射锚——用户定案粒度（陆/港/澳/台
+// →华语且大陆 vs 港台细分；日韩独立（综艺）；其余亚洲→亚洲；再其余
+// 欧美兜底；首值优先；无产区证据→欧美 fallback 预览可手改）。
+func TestSjtuRegionCategoryValue(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainType: {
+			{Label: "华语电影", Value: "401"}, {Label: "欧美电影", Value: "402"},
+			{Label: "亚洲电影", Value: "403"}, {Label: "港台电视剧", Value: "407"},
+			{Label: "亚洲电视剧", Value: "408"}, {Label: "大陆电视剧", Value: "409"},
+			{Label: "欧美电视剧", Value: "410"}, {Label: "大陆综艺节目", Value: "411"},
+			{Label: "港台综艺节目", Value: "412"}, {Label: "欧美综艺节目", Value: "413"},
+			{Label: "日韩综艺节目", Value: "414"},
+		},
+	}}
+	ptgen := func(regions ...string) string {
+		b, _ := json.Marshal(map[string]interface{}{"region": regions})
+		return string(b)
+	}
+	cases := []struct {
+		name     string
+		category string
+		ptgen    string
+		want     string
+	}{
+		{"华语电影(大陆)", "category.movie", ptgen("中国大陆"), "401"},
+		{"华语电影(港)", "category.movie", ptgen("中国香港"), "401"},
+		{"亚洲电影(日本)", "category.movie", ptgen("日本"), "403"},
+		{"欧美电影(美)", "category.movie", ptgen("美国"), "402"},
+		{"无产区电影→欧美兜底", "category.movie", "", "402"},
+		{"大陆剧", "category.tv_series", ptgen("中国大陆"), "409"},
+		{"港台剧", "category.tv_series", ptgen("中国台湾"), "407"},
+		{"韩剧→亚洲电视剧", "category.tv_series", ptgen("韩国"), "408"},
+		{"美剧无产区→欧美兜底", "category.tv_series", "", "410"},
+		{"日韩综艺", "category.tv_shows", ptgen("日本"), "414"},
+		{"大陆综艺", "category.tv_shows", ptgen("中国大陆"), "411"},
+		{"复合产区首值优先(大陆/香港→大陆剧)", "category.tv_series", ptgen("中国大陆", "美国"), "409"},
+		{"首值miss全数组兜底(美国/泰国→亚洲电影)", "category.movie", ptgen("美国", "泰国"), "403"},
+	}
+	for _, c := range cases {
+		meta := &model.TorrentMetadata{Category: c.category, PTGenSourceJSON: c.ptgen}
+		got := sjtuRegionCategoryValue(cfg, "葡萄", meta)
+		if got == nil || got.Value != c.want {
+			t.Errorf("%s: want %s got %+v", c.name, c.want, got)
+		}
+	}
+	// 非产区类→nil（回退通用链）
+	if v := sjtuRegionCategoryValue(cfg, "葡萄", &model.TorrentMetadata{Category: "category.animation"}); v != nil {
+		t.Errorf("动画类应回退通用链 got %+v", v)
+	}
+	// 非葡萄站→nil
+	if v := sjtuRegionCategoryValue(cfg, "龙之家", &model.TorrentMetadata{Category: "category.movie"}); v != nil {
+		t.Errorf("非葡萄站应回退 got %+v", v)
+	}
 }

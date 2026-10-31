@@ -282,7 +282,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return fail("failed", "标题重组失败：标题不可解析且 PTGen 无英文名——重新获取数据后再发布")
 	}
 	jobs := []domainJob{
-		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
+		{model.FieldDomainType, e.typeMappingOf(cfg, in.TargetSite, meta)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
 		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp)},
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
@@ -1521,4 +1521,144 @@ func (e *PublishExecutor) mergePTGenSource(ctx context.Context, tp *titleparser.
 		}
 		e.logger.Info(msg, fields...)
 	})
+}
+
+// typeMappingOf §59.391: type 槽映射统一入口（产区站特化+通用链）。
+// 葡萄产区×类型双维分类（站方 type 27 项——电影按产区三分/剧集四分/
+// 综艺四分）无法用 form_config 单键单值表达——产区类 label-only（防
+// lookupByStdKey 撞错），本入口按 PTGen 产区现算（§59.380 codec 联动
+// 同款跨槽特化先例）；非产区站/非产区类回退通用链零变化。
+func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	if v := sjtuRegionCategoryValue(cfg, siteName, meta); v != nil {
+		return v
+	}
+	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// regionClass 产区归类（§59.391 用户定案规则）：
+// 陆/港/澳/台→华语（细分大陆 vs 港台——葡萄剧集/综艺站方粒度）；
+// 日韩独立（综艺站方粒度）；其余亚洲国→亚洲其它；再其余→欧美兜底。
+type regionClass int
+
+const (
+	regionNone regionClass = iota
+	regionMainland
+	regionHKTW
+	regionJapanKorea
+	regionAsianOther
+	regionWestern
+)
+
+var (
+	regionMainlandWords = []string{"中国大陆", "大陆"}
+	regionHKTWWords     = []string{"中国香港", "中国台湾", "中国澳门", "香港", "台湾", "澳门"}
+	regionJapanKoreaWr  = []string{"日本", "韩国", "日韩"}
+	regionAsianOtherWr  = []string{"印度", "泰国", "越南", "新加坡", "马来西亚", "印度尼西亚",
+		"印尼", "菲律宾", "缅甸", "柬埔寨", "尼泊尔", "斯里兰卡", "巴基斯坦", "孟加拉国",
+		"孟加拉", "哈萨克斯坦", "乌兹别克斯坦", "伊朗", "土耳其", "以色列", "阿联酋",
+		"沙特", "蒙古", "亚洲"}
+)
+
+// classifyRegionWords 产区归类（元素级 contains——PTGen Region 元素可能
+// 本身是"中国大陆 / 中国香港"复合串，splitBySlash 已拆但保守 contains）。
+func classifyRegionWords(regions []string) regionClass {
+	for _, r := range regions {
+		if containsAnyWord(r, regionMainlandWords) {
+			return regionMainland
+		}
+		if containsAnyWord(r, regionHKTWWords) {
+			return regionHKTW
+		}
+		if containsAnyWord(r, regionJapanKoreaWr) {
+			return regionJapanKorea
+		}
+		if containsAnyWord(r, regionAsianOtherWr) {
+			return regionAsianOther
+		}
+	}
+	return regionNone
+}
+
+func containsAnyWord(s string, words []string) bool {
+	for _, w := range words {
+		if strings.Contains(s, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// sjtuRegionCategoryValue §59.391: 葡萄产区×类型映射。产区数据源=
+// meta.PTGenSourceJSON→src.Region（Tab1"作品信息-产地"同源——
+// §59.151 regionLabelsOfMeta 幸运判据消费先例）。**首值优先**
+// （Region[0]=豆瓣展示的主产地序——复合产区二义消解，用户定案）；
+// 首值 miss 再扫全数组；无产区证据 fallback 欧美（402/410/413——
+// 资源主形态，预览可手改）。
+func sjtuRegionCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	if siteName != "葡萄" || cfg == nil || meta == nil {
+		return nil
+	}
+	var regions []string
+	if meta.PTGenSourceJSON != "" {
+		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+			regions = src.Region
+		}
+	}
+	cls := regionNone
+	if len(regions) > 0 {
+		if c := classifyRegionWords(regions[:1]); c != regionNone { // 首值优先
+			cls = c
+		} else {
+			cls = classifyRegionWords(regions) // 全数组兜底
+		}
+	}
+	if cls == regionNone {
+		cls = regionWestern // 无产区证据→欧美兜底
+	}
+	var want string
+	switch meta.Category {
+	case "category.movie":
+		// 华语(401)/亚洲(403)/欧美(402)——日韩并入亚洲（电影无日韩项）
+		switch cls {
+		case regionMainland, regionHKTW:
+			want = "401"
+		case regionJapanKorea, regionAsianOther:
+			want = "403"
+		default:
+			want = "402"
+		}
+	case "category.tv_series":
+		// 港台(407)/亚洲(408)/大陆(409)/欧美(410)四分
+		switch cls {
+		case regionMainland:
+			want = "409"
+		case regionHKTW:
+			want = "407"
+		case regionJapanKorea, regionAsianOther:
+			want = "408"
+		default:
+			want = "410"
+		}
+	case "category.tv_shows":
+		// 大陆(411)/港台(412)/欧美(413)/日韩(414)四分——其它亚洲归欧美
+		// （站方无"亚洲综艺"项）
+		switch cls {
+		case regionMainland:
+			want = "411"
+		case regionHKTW:
+			want = "412"
+		case regionJapanKorea:
+			want = "414"
+		default:
+			want = "413"
+		}
+	default:
+		return nil // 非产区类（动画/纪录/MV/体育…）→通用链
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == want {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
 }
