@@ -220,10 +220,26 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 	// §59.394: 模式互斥过滤扩展到 input——蟹黄堡 tags[4][] 与
 	// tags[6][] 并存（双区互斥站），前缀匹配吃进 [6] 特别区标签
 	// 23 条假 added（formdiff 门禁发版前抓到）。
+	// §59.398: current 提示扩展到 tags 域——学校站标签字段名
+	// span[]（非标准 tags 前缀——全库唯一），标准启发恒 miss 致
+	// formdiff 假"整域消失"；current 字段名精确匹配兜底（§59.373
+	// 三保证同构：tags 前缀命中的站匹配路径同结果零变化/current
+	// 缺失走标准启发/current 名页面消失 fallback 标准启发照旧
+	// miss → diff 可报改版）。
+	currentTagName := ""
+	if currentFields != nil {
+		currentTagName = currentFields[model.FieldDomainTags]
+	}
+	isTagName := func(name string) bool {
+		if strings.HasPrefix(name, "tags") {
+			return true
+		}
+		return currentTagName != "" && name == currentTagName
+	}
 	tags := []model.FormValueMapping{}
 	doc.Find("input[type='checkbox']").Each(func(_ int, cb *goquery.Selection) {
 		name, _ := cb.Attr("name")
-		if !strings.HasPrefix(name, "tags") {
+		if !isTagName(name) {
 			return
 		}
 		if mainMode > 0 {
@@ -250,7 +266,7 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		fieldName := ""
 		doc.Find("input[type='checkbox']").EachWithBreak(func(_ int, cb *goquery.Selection) bool {
 			n, _ := cb.Attr("name")
-			if strings.HasPrefix(n, "tags") {
+			if isTagName(n) {
 				if m := fieldNameModeSuffix(n); m == 0 || m == mainMode || mainMode == 0 {
 					fieldName = n
 					return false
