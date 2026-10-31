@@ -2185,3 +2185,28 @@ Saki S01-S03 BluRay 1080p / 720p Hi10P x264 FLAC 2.0-VCB-Studio
 | 音频 | FLAC→FLAC；LPCM→LPCM；DDP/DD+/E-AC3→DDP/E-AC3；DD/AC3→DD/AC3；hra→DTS-HD HRA；truehd+atmos→TrueHD Atmos；dts-hd→DTS-HD MA；dts:x/dts-x/dtsx→DTS:X；truehd→TrueHD；DTS→DTS；AAC/USAC→AAC；ape→APE；wav→WAV；mp3→MP3；m4a→M4A；OPUS→OPUS；AV3A→AV3A |
 | 分辨率 | 1080p→1080p；1080i→1080i；720p/720i→720p；` SD `→SD；8k/4320p/4320i→8K；4k/2160p/2160i/uhd→4K |
 | 完结/分集 | complete→完结；`s\d+e\d+`/`ep\d+`→分集；单独 `Sxx`（无 E）或多季 `Sxx-`→完结/合集形态 |
+
+---
+
+## 适配记录（v0.0.1243 §59.393）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线第四次完整实战）
+
+- **form_config**：migration78 分发（七槽 76 项——type 10/medium 11/
+  codec 8/audiocodec 18/standard 8/team 5/tags 16）。
+- **sites.json 4 月资产缺口实时补全**：tags 16 项完全未捕获+
+  standard 乱序值（8K=6/4K=7/1440p=8 在 1080p 前）——实时 HTML
+  为源（§59.384 附双源教训）。
+- **槽位特化**：medium→source_sel[4]（财神 §59.381 同款槽位特化
+  第二站）；type 412 短剧=category.short_drama（财神键第二站
+  复用）；codec 无 X26x 联动零触发；audiocodec DTS:X(9) 独立+
+  HRA(21)=dts_hd_hr+DD/AC3(15) 与 DDP(16) 分立+M4A/OPUS 配键
+  +AV3A label-only；standard 首个 2K/1440p 项站（全分辨率覆盖）；
+  team FROG/FROGE/FROGWeb/CatEDU 官组保护 label-only（FRDS 不在
+  表 Other 兜底）；tags 无首发项✓+禁转/国语/粤语/中字/DIY/完结
+  配键+VCB-Studio/儿童片/LGBTQ+/特效字幕/系列合集/原生原盘/
+  Remux/杜比视界/HDR10+/HDR label-only。
+- **验证**：python 裸对 86 项=实时 HTML 逐字 ✓+formdiff 同栈
+  0 条（双零发版）+DryRun 双形态全绿（WEB-DL 原生 404/7 WEB-DL
+  槽位特化正确/17 AAC；压制种 401/10 Encode/10 DTS-HD MA 不联动）。
+- 遗留：首颗真实发布。
