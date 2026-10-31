@@ -1328,3 +1328,30 @@ ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
 - 4 月文档（2026-04）与现状差异仅此 2 项新增。
 
 > **勘误（§59.382）**：本页"29 财神 cookie 失效登录墙"——验证发生在用户推送新 cookie 前（时序差）；推送后实测登录态有效。
+
+### 附：HDR 标签配键+喜剧题材标签注入（v0.0.1250 §59.400）
+
+缩小人生案（243 财神种审两报错，用户指认 Tab1 有数据发布未消费）：
+①"MediaInfo 检测到 HDR信息(HDR10)请选择HDR标签"——243 实证 tags
+列**已产出 hdr10**（fetch 推断链完整）+syncHDRTagFromProfile §59.322
+补位机制在——唯一断点=财神 HDR(7) label-only 无 standard_keys →
+applier 丢弃不勾。修复=migration86 配四键
+[tag.hdr10,tag.hdr10_plus,tag.hdr_vivid,tag.hlg]（站方泛 HDR 语义
+家族承接；DV 不并入——财神有独立"杜比(11)"标签，DV 种站方要求
+未知零案例不预改）。
+②"标签与简介类别不一致(喜剧)"——喜剧是 PTGen 题材细分（category
+列只存大类 movie、canonical 无 tag.comedy 键——fetch 推断永不
+产出）；数据在 description ◎类　　别行（"剧情 / 喜剧 / 科幻"——
+Tab1 类型显示源）。修复=csptGenreTagValue 站方特化注入
+（description ◎类别行含喜剧→财神"喜剧"标签 label 直配——
+luckptEnglishTagValue 站规注入 §59.277 同款先例；确定性正则提取
+非语义推断，§59.319 附二十七只消费不推断合规）；双出口挂载
+（applied+tagArrayFields §59.309 同构）。儿童(24)题材标签零案例
+不预改。
+
+**正则坑**：◎类/别之间是全角空格（U+3000）——Go `\s` 只匹配
+ASCII 空白恒 miss，字符类显式含　（测试先行抓出）。
+
+**验证**：243 只读抄取真实行借壳 DryRun——tags_labels=[HDR,中字,
+喜剧] 双报错全闭环+select 槽六项全对；测试锚五态+48 包全绿。
+两修复零 fetch 链改动——存量种子立即受益（发布时消费）。
