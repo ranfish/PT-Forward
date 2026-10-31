@@ -45,8 +45,10 @@ const (
 	FieldDomainTags        = "tags"
 	FieldDomainSmallDescr  = "small_descr"
 	FieldDomainIMDBURL     = "imdb_url"
+	FieldDomainIMDbID      = "imdb_id"   // §59.399: IMDb 编号形态（学校站 imdbid=tt4154756——URL 尾部编号提取）
 	FieldDomainPTGen       = "pt_gen"   // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
 	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
+	FieldDomainDoubanID    = "douban_id" // §59.399: 豆瓣编号形态（学校站 doubanid=24773958——subject/ 尾部编号提取）
 	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
 	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
