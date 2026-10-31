@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	xhtml "golang.org/x/net/html"
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -357,6 +358,16 @@ func checkboxLabel(cb *goquery.Selection) string {
 	// 形态3: <span>文本</span><input> 前邻
 	if p := cb.Prev(); p.Is("span, label") {
 		return strings.TrimSpace(p.Text())
+	}
+	// 形态4: §59.398 <input>裸文本后邻（学校站 span[] 形态——label
+	// 无任何标签包裹，直接文本节点；goquery Next() 只走元素节点，
+	// 须下到底层 *html.Node 取 NextSibling 文本）
+	if len(cb.Nodes) > 0 {
+		if n := cb.Nodes[0].NextSibling; n != nil && n.Type == xhtml.TextNode {
+			if t := strings.TrimSpace(n.Data); t != "" {
+				return t
+			}
+		}
 	}
 	return ""
 }
