@@ -217,11 +217,19 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 	})
 
 	// tags checkbox 族：input[type=checkbox][name^=tags]
+	// §59.394: 模式互斥过滤扩展到 input——蟹黄堡 tags[4][] 与
+	// tags[6][] 并存（双区互斥站），前缀匹配吃进 [6] 特别区标签
+	// 23 条假 added（formdiff 门禁发版前抓到）。
 	tags := []model.FormValueMapping{}
 	doc.Find("input[type='checkbox']").Each(func(_ int, cb *goquery.Selection) {
 		name, _ := cb.Attr("name")
 		if !strings.HasPrefix(name, "tags") {
 			return
+		}
+		if mainMode > 0 {
+			if m := fieldNameModeSuffix(name); m > 0 && m != mainMode {
+				return
+			}
 		}
 		v, _ := cb.Attr("value")
 		if v == "" {
@@ -243,8 +251,10 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		doc.Find("input[type='checkbox']").EachWithBreak(func(_ int, cb *goquery.Selection) bool {
 			n, _ := cb.Attr("name")
 			if strings.HasPrefix(n, "tags") {
-				fieldName = n
-				return false
+				if m := fieldNameModeSuffix(n); m == 0 || m == mainMode || mainMode == 0 {
+					fieldName = n
+					return false
+				}
 			}
 			return true
 		})
@@ -493,4 +503,6 @@ func fieldNameModeSuffix(name string) int {
 	return n
 }
 
-var reFieldNameMode = regexp.MustCompile(`\[(\d+)\]$`)
+// §59.394: 两种形态——select 尾部 "medium_sel[4]" 与 checkbox 中间
+// "tags[6][]"（尾部还有 []）——取第一个数字括号。
+var reFieldNameMode = regexp.MustCompile(`\[(\d+)\]`)

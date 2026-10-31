@@ -234,3 +234,27 @@ func TestParsePublishFormHTMLModeExclusiveSelects(t *testing.T) {
 		t.Fatal("③ 裸名站 medium_sel[4] 应收录（无主模式不过滤）")
 	}
 }
+
+// §59.394: 模式互斥过滤扩展到 input 锚——蟹黄堡双区站 tags[4][] 与
+// tags[6][] 并存，前缀匹配吃进 [6] 特别区标签（23 条假 added——
+// formdiff 门禁发版前抓到）。
+func TestParsePublishFormHTMLModeExclusiveCheckbox(t *testing.T) {
+	html := `<form action="takeupload.php">
+	<select name="medium_sel[4]"><option value="7">Encode</option></select>
+	<input type="checkbox" name="tags[4][]" value="1">禁转
+	<input type="checkbox" name="tags[6][]" value="53">历史军事
+	<input type="checkbox" name="tags[6][]" value="54">轻小说
+	</form>`
+	fields := map[string]string{"medium": "medium_sel[4]", "tags": "tags[4][]"}
+	draft := ParsePublishFormHTML(html, fields)
+	if draft == nil {
+		t.Fatal("解析 nil")
+	}
+	tags := draft.ValueMappings[model.FieldDomainTags]
+	if len(tags) != 1 || tags[0].Value != "1" {
+		t.Fatalf("[6] 特别区标签应被过滤，got %v", tags)
+	}
+	if draft.FormFields[model.FieldDomainTags] != "tags[4][]" {
+		t.Fatalf("字段名应为 tags[4][]（主模式），got %q", draft.FormFields[model.FieldDomainTags])
+	}
+}
