@@ -1293,3 +1293,46 @@ HDKylin 的 dupe 规则有 **共存原则**（与标准 NexusPHP 重要差异）
 
 - HDK 无词形硬规则；cat=411（软件，ID 错位残留）需含 `kHz`+`bit`
 - **媒介标题检测实际生效分支仅**：`webdl`（无连字符）→WEB-DL；`remux`→Remux；`webrip`/`web-rip`/`dvdrip`/`bdrip`→Encode；其余（原盘/UHD/WEB-DL 带连字符/HDTV）检测不出 → 免比对
+
+### 附：发布适配记录（v0.0.1276 §59.422）
+
+- **form_config**：migration106 分发（七槽 83 项——type 14/medium 10/
+  codec 7/audiocodec 18/standard 7/team 9/tags 18）。实时 HTML
+  （56.8KB 代理）vs 4 月资产**完全失效第二例**（末日式——七槽值集
+  全变无一幸存：type 409→420 新值集/medium 1-10→24-34/codec 合并
+  MPEG/source 1-18→14-35/team 全换 HDK 系）；本文档（后期抓取）
+  与实时基本一致+tags 16→18（实时多 零魔(13)/麒麟火(17)——麒麟火
+  为审核脚本"麒麟火标签"规则项）+4 K(11) 带空格。
+- **槽位映射**：type 404 Record Education=[documentary,documentaries]
+  双键+**421 Playlet 短剧第十二站**+406 Music Videos 三键第十站+
+  419 Study=[education]+411 software/412 Game/413 Ebook/409 Misc/
+  420 TV Shows 全配；processing_sel=**年份槽第五种语义**（NP 同名
+  字段五变：地区×2/文件格式/年份/年份）不配——慕雪阁定案；source_sel
+  =产区槽 18 项（全库最细之一）不配（咖啡定案）；medium 10 值
+  24-34：**UHD Blu-ray(24)/Blu-ray(25) 分立各单键**+DVD(原盘)=
+  [dvd,dvdr] 双键+REMUX=[remux,uhd_remux] 双键归并+WEB-DL 承接
+  webrip；codec 7 合并命名零联动（MPEG-2/MPEG-4=[mpeg2,mpeg4]
+  双键合并命名站首配）；standard 7 i/p 合并形态（8K/4K/2K+1080
+  双键+480p=[sd]+Other）；**audiocodec 18 项全配键第四例**（TrueHD
+  Atmos 双键+DTS 四级细分+DTS:X+M4A/MPEG/Opus+DD/AC3 双键+DDP
+  分立）。
+- team 9 label-only：HDK 系官组（HDK/HDKWeb/HDKGame）+Kylin/
+  RedLeaves/CatEDU/GodDramas/StarfallWeb+Other(5) 兜底（FRDS 不在
+  表）；**审核脚本黑名单 23 组**发布预览人工规避。
+- **tags 18 配键 9**：**英字=[english_subtitle] 第三站**+**特效字幕=
+  special_effects_subs 第二站**+**DV=[dolby_vision] 第十站**+**HDR
+  四键泛家族第十三站**+禁转=restricted+DIY/国语/中字/完结/分集；
+  **官种(3) 绝不配键**（审核脚本非官种禁选错误级+HDK 标题判官种
+  双向校验——财神雷区同款）+首发(2) 铁律+驻站/Blu-ray/LIVE现场/
+  4 K（带空格零产出）/零魔/麒麟火 label-only。
+- 字段：url+pt_gen+technical_info+uplver；nfo 不配（13城教训）；
+  pos_state 促销字段不配（GTK 同款）。
+- **验证**：裸对全槽（421 前导空格对齐解析器 strip 口径——13城
+  ADWeb 同款修正）+formdiff 同栈 0 条（双零）+DryRun 双形态全绿
+  （WEB-DL 纪录：404 Record Education+WEB-DL=31+AAC+Other 兜底；
+  压制 FRDS：401+Encode=29+DTS-HD MA 直配+**tags=[中字,英字,DV,
+  HDR] 四标命中——英字+DV+HDR 三新键**）。
+- **站规发布预览人工把关**：黑名单 23 组+官种/驻站标签规则矩阵
+  （HDK 官种→官方+麒麟火必选/GodDramas 驻站→麒麟火必选/非官种
+  禁选官方）+审核脚本 20+ 校验规则+标题规范。
+- 遗留：首颗真实发布。
