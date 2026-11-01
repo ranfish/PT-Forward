@@ -403,3 +403,34 @@ GTK 发布页内置了 PT-Gen 获取按钮（`btn-get-pt-gen`），支持从 IMD
 *最后更新：2026-04-22*
 *数据来源：https://pt.gtkpw.xyz/upload.php 发布页面 HTML 分析*
 
+
+---
+
+## 适配记录（v0.0.1252 §59.402）
+
+### 发布适配完成（Phase 1+2——§59.389 新流水线双零发版）
+
+- **form_config**：migration88 分发（六槽 55 项——type 12/medium 11/
+  codec 8/standard 6/team 11/tags 7）。实时 HTML 与 4 月资产全槽
+  一致；**tags 资产缺口实时补全**（sites.json 6 项→实时 7 项：
+  官方(3) 新增——青蛙/学校同款缺口形态）。
+- **无 audiocodec_sel 槽**（音频编码站方真无——南洋极简形态的
+  一部分；form_fields 不配该域）；无 processing_sel。
+- **槽位特化**：type 12 项（实时乱序排列 412 前 401 后——值对照
+  不受影响）：406 MV 双键+408 HQ Audio=lossless_music+411 Music
+  Album=category.music+410 Book=ebook+412 Education；medium 11 项
+  **全 canonical**（第四个零 label-only 媒介站）；codec 8 项全配
+  （H.264 合并 x264 命名——无 X26x 联动零触发=站方合并语义）+
+  AV1/VP9；standard 6 项 **p/i 分立双值**（1080p(1)/1080i(2)
+  独立——农场同款）；team 11 项 label-only：**FRDS(9) 在表**
+  （大青虫/冬樱/聆音同款）+外站官组 HDS/CHD/MySiLU/WiKi/CMCT/
+  MARK/MTeam/PTHome/beAst（车站/学校先例复利）；tags 7 项 HDR→
+  四键泛家族（财神/农场同款第三站）+禁转/国语/中字/DIY 配键+
+  **首发/官方 label-only**（官方绝不配键——财神官种案雷区）。
+- 字段：url（data-pt-gen）+pt_gen+nfo+technical_info+uplver 全齐；
+  price/pos_state/pos_state_until 促销字段不配（站方默认值）。
+- **验证**：python 裸对 55 项=实时 HTML 逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿——**FRDS 直中（第四站：压制种
+  team=9 label 直配）+HDR 四键复利（tags=[中字,HDR]）**；WEB-DL
+  原生 codec=6 H.265 不联动=站方合并语义+404 纪录双键。
+- 遗留：首颗真实发布。
