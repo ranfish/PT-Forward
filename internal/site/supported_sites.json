@@ -508,6 +508,8 @@
     "cookiecloud_domain": "pt.lajidui.top",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+ ,
+    "publish_supported": true
   },
   "pt.luckpt.de": {
     "domain": "pt.luckpt.de",
