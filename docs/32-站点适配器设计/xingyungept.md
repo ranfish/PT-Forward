@@ -334,3 +334,41 @@
 11. **认领上限 10000**
 12. **导航栏 HSWEB（回声PT）入口**：跨站关联
 13. **货币名称"星焱"**：非标准魔力值名称
+
+### 附：发布适配记录（v0.0.1271 §59.418）
+
+- **form_config**：migration102 分发（七槽 84 项——type 10/medium 10/
+  codec 6/audiocodec 18/standard 6/team 12/tags 22）。实时 HTML
+  （47.9KB 直连）vs 本文档两处漂移（实时为准）：①**tags 24→22 项**
+  （站方已删 完结(11)/分集(10)——complete/ongoing 键 miss 落空，
+  配键 13 非文档口径 15）②**实时无 uplver**（本文称有"匿名发布"——
+  控件实证无，不配）。其余全槽一致（WEB-DL 值 4 乱序等）。
+- **槽位映射**：type 406 MV 三键第九站+408 音频双键+410 短剧第十一
+  站+404 双键全配；medium **UHD 独立分立**（躺平同款）+**DVD(6)
+  单项宽语义=[dvd,dvdr] 双键承接**（站方允许 DVDR/DVDISO/DVDRip）
+  +Remux 双键+WEB-DL 承接 webrip；codec 6 全配键（合并命名零联动）；
+  standard i/p 合并形态（1080 双键+480=[sd]+Other）；
+  **audiocodec 18 项全配键（躺平后第二例零 label-only）**：TrueHD
+  Atmos=[atmos,truehd_atmos]+DTS:X=[dtsx]+AV3V=[av3v]+**ALAC=
+  [alac]**+DD/AC3 双键+全独立。
+- **tags 22 配键 13（dict 长尾键丰收站——四键首配）**：**特效字幕=
+  special_effects_subs 首配**（"特效字幕"明确字幕语义——藏宝阁/
+  慕雪阁"特效字慕"错别字歧义未配对照）+**超分=upscale 首配**（超分
+  =upscale 中文——站方特色标 AI 超分修复版）+**高帧率=
+  high_frame_rate 首配**（原生高刷——与补帧后处理分立：补帧
+  label-only）+**高码率=high_bitrate 首配**（三月漏配教训本站配）
+  +英字第二站+大包第二站+杜比视界第七站+HDR 四键泛家族第十一站+
+  禁转/DIY/国语/中字/粤语；首发铁律 label-only+驻站/去头尾广告
+  纯净版/补帧/特效/应求/美剧/韩剧/原生（original_audio/disc 二义）
+  8 项 label-only。
+- team 12 label-only：StarfallWeb 官组+Pure@StarfallWeb @子组+rain/
+  rainweb/NatureWeb/Starfall 站组系+AGSVWEB+HDS/CHD/MySiLU/WiKi+
+  Other(5) 兜底。
+- 字段：url+pt_gen+technical_info；nfo 不配+无 uplver（漂移）。
+- **验证**：裸对全槽+formdiff 同栈 0 条（双零）+DryRun 双形态全绿
+  （WEB-DL 纪录：404+**WEB-DL 乱序值 4 正确**+AAC+Other 兜底；压制
+  FRDS：401+Encode+**DTS-HD MA 全细分直配**+**tags=[中字,英字,杜比
+  视界,HDR,高码率] 五标命中——高码率长尾键首配实战生效**）。
+- **站规发布预览人工把关**（躺平系同款）：<100MB 禁+upscale 禁+
+  RMVB 禁+游戏候选制+RAR 禁+Dupe 媒介优先级+断种豁免+<5.1 有损禁。
+- 遗留：首颗真实发布。
