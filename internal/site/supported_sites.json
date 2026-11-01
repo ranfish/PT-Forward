@@ -7,6 +7,8 @@
     "cookiecloud_domain": "13city.org",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+ ,
+    "publish_supported": true
   },
   "1ptba.com": {
     "domain": "1ptba.com",
