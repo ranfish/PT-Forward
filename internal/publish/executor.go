@@ -1727,7 +1727,32 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := hdareaCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
+	if v := cbgCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// cbgCategoryValue §59.411: 藏宝阁（cangbao.ge）type 槽动画/动漫分立
+// 特化（typeMappingOf 第三站）。站方 404 动画（单集语义——电影/单集
+// OVA）与 405 动漫（多集语义）分立且**双向规则校验**（动画分类检出
+// 多集信号→站方错误/动漫分类无多集信号→站方错误）——form_config 单键
+// 单值不可表达，404 配 animation 键仅覆盖单集形态，多集形态由本特化
+// 分发：SeasonEpisode 非空（S01/E 多集信号）→ 405 动漫；空 → 404
+// 动画（通用链兜底）。非藏宝阁/非动画类回退通用链零变化。
+func cbgCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "藏宝阁" || cfg == nil || meta == nil {
+		return nil
+	}
+	if meta.Category != "category.animation" || tp.SeasonEpisode == "" {
+		return nil // 单集动画走通用链（404 配 animation 键兜底）
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == "405" {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
 }
 
 // hdareaCategoryValue §59.405: 好大（hdarea.club）type 槽媒介细分特化

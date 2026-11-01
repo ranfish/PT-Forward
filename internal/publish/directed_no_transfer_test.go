@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -324,5 +325,34 @@ func TestPreflightCompliance(t *testing.T) {
 		t.Fatal("compliance 规则命中应拦")
 	} else if !strings.Contains(reason, "系统禁转") {
 		t.Fatalf("文案缺系统禁转标识: %s", reason)
+	}
+}
+
+// §59.411: 藏宝阁动画/动漫分立特化——SeasonEpisode 多集信号分发三态。
+func TestCbgCategoryValue(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainType: {
+			{Label: "动画", Value: "404", StandardKeys: []string{"category.animation"}},
+			{Label: "动漫", Value: "405"},
+		},
+	}}
+	// ① 动画+多集信号（SeasonEpisode 非空）→ 405 动漫
+	tp := titleparser.TechProfile{SeasonEpisode: "S01"}
+	v := cbgCategoryValue(cfg, "藏宝阁", &model.TorrentMetadata{Category: "category.animation"}, tp)
+	if v == nil || v.Value != "405" {
+		t.Fatalf("动画多集应特化分发 405 动漫，got %v", v)
+	}
+	// ② 动画+单集（无 SeasonEpisode）→ nil（回退通用链 404 兜底）
+	tp2 := titleparser.TechProfile{}
+	if v := cbgCategoryValue(cfg, "藏宝阁", &model.TorrentMetadata{Category: "category.animation"}, tp2); v != nil {
+		t.Fatalf("动画单集应回退通用链（404 配键兜底），got %v", v)
+	}
+	// ③ 非动画类 → nil（特化零介入）
+	if v := cbgCategoryValue(cfg, "藏宝阁", &model.TorrentMetadata{Category: "category.movie"}, tp); v != nil {
+		t.Fatal("非动画类不走特化")
+	}
+	// ④ 非藏宝阁 → nil
+	if v := cbgCategoryValue(cfg, "好大", &model.TorrentMetadata{Category: "category.animation"}, tp); v != nil {
+		t.Fatal("非藏宝阁不走特化")
 	}
 }
