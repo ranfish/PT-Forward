@@ -761,7 +761,8 @@
     "cookiecloud_domain": "ubits.club",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": "仅源站"
+    "special_notes": "仅源站",
+    "publish_supported": true
   },
   "wintersakura.net": {
     "domain": "wintersakura.net",
