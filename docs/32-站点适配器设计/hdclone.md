@@ -421,3 +421,26 @@ HDClone 是目前分析过的 NexusPHP 站点中字段最精简的之一：
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-22*
+
+### 附：发布适配记录（v0.0.1258 §59.408）
+
+- **form_config**：migration92 分发（六槽 50 项——type 9/medium 10/
+  codec 6/standard 6/team 14/tags 5）。实时 HTML 与 4 月资产全槽
+  一致；[4] 后缀标准形态；单模式站。
+- **两处文档漂移**：①uplver 实时存在（文档称无——配 anonymous）
+  ②offers 候选字段文档有实时无。**无 audiocodec_sel 槽**（站方
+  真无——GTK 同款第二站）；无 pt_gen/nfo/source_sel/processing_sel。
+- **槽位特化**：type **409 Playlet=short_drama 第六站**+**410 MV/
+  演唱会三键承接 [mv,music_video,concert]**（MV 与演唱会站方合并
+  ——三键归一首例）+408 Music=[music,lossless_music] 双键+407
+  Othes（慎选）；medium 10 项**全 canonical**（第五个零 label-only
+  媒介站）；codec 6 项合并命名+**AV1 配键**（站方前卫）无 Xvid/
+  MPEG-4；standard 6 项乱序（4320p/8K=6 首位）1080p/i 合并双键+
+  SD+Othes；team 14 项 label-only：**FRDS(6) 在表直中第五站**+
+  外站十三组（M-Team/CHD/BeiTai/WiKi/AGSV/TLF/CMCT/beAst/HDSky/
+  HDHome/TTG/UBits/PTer）——**无 Other 项**（组名 miss→nil 不填
+  预览人工）；tags 5 项（无首发✓）四键配+**HDR 四键泛家族第五站**。
+- **验证**：裸对 50 项逐字 ✓+formdiff 同栈 0 条（双零发版）+DryRun
+  双形态全绿（**FRDS 直中 team=6+HDR 复利+medium 乱序 WEB-DL=6
+  正确**；WEB-DL 原生种无组名 team 不填=无 Other 正确语义）。
+- 遗留：首颗真实发布。
