@@ -961,10 +961,16 @@ func csptGenreTagValue(cfg *model.PublishFormConfig, siteName string, meta *mode
 // lookupOtherOption §59.273: 域内 Other 选项兜底（Label 判定——站方 Other
 // 普遍无 standard_key，键查必落空；幸运 audio/codec/team 三域 Other 全无键
 // 实证，修道院 codec Other 有键属例外。Label 兼容 Other/其它/其他。
+// §59.417 前缀变体增强：站方 Other 项带后缀（我的PT "Other/转载"）——
+// 精确匹配 miss 后 HasPrefix("other") 兜底扫描（通用增强未来站自动生效）。
 func (e *PublishExecutor) lookupOtherOption(cfg *model.PublishFormConfig, domain string) *model.FormValueMapping {
 	for i, m := range cfg.ValueMappings[domain] {
-		switch strings.ToLower(m.Label) {
+		lower := strings.ToLower(m.Label)
+		switch lower {
 		case "other", "其它", "其他":
+			return &cfg.ValueMappings[domain][i]
+		}
+		if strings.HasPrefix(lower, "other") {
 			return &cfg.ValueMappings[domain][i]
 		}
 	}

@@ -386,3 +386,35 @@ func TestLookupCLIVariantDottedLabel(t *testing.T) {
 		t.Fatal("无 X 条目站应返回 nil（直查路径）")
 	}
 }
+
+// §59.417: Other 兜底前缀变体——我的PT "Other/转载" 形态增强。
+func TestLookupOtherOptionPrefixVariant(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainTeam: {
+			{Label: "HDS", Value: "1"},
+			{Label: "MY/发布者", Value: "4"},
+			{Label: "Other/转载", Value: "5"},
+		},
+	}}
+	e := &PublishExecutor{}
+	if v := e.lookupOtherOption(cfg, model.FieldDomainTeam); v == nil || v.Value != "5" {
+		t.Fatalf("Other/转载 前缀变体应命中兜底，got %v", v)
+	}
+	// 精确三态回归（既有行为不变）
+	cfg2 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainTeam: {
+			{Label: "FRDS", Value: "1"},
+			{Label: "其它", Value: "2"},
+		},
+	}}
+	if v := e.lookupOtherOption(cfg2, model.FieldDomainTeam); v == nil || v.Value != "2" {
+		t.Fatal("精确「其它」应命中")
+	}
+	// 无 Other 项站返回 nil（不强填）
+	cfg3 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainTeam: {{Label: "HDS", Value: "1"}},
+	}}
+	if v := e.lookupOtherOption(cfg3, model.FieldDomainTeam); v != nil {
+		t.Fatal("无 Other 项站应返回 nil")
+	}
+}
