@@ -683,3 +683,35 @@ describe('City13Hook - 系列作品验证', () => {
 - 发种规范: https://13city.org/forums.php?action=viewtopic&forumid=1&topicid=13
 - 发布页面: https://13city.org/upload.php
 - NexusPHP 框架文档
+
+### 附：发布适配记录（v0.0.1263 §59.410）
+
+- **form_config**：migration94 分发（七槽 78 项——type 8/medium 13/
+  codec 7/audiocodec 12/standard 5/team 18/tags 15）。实时 HTML
+  （47.3KB 代理）与 4 月资产+本文档全槽一致；[4] 后缀标准形态。
+- **槽位特化**：type 非标值集（**413 纪录片非 404**+406 演唱会、MV
+  三键承接+408 Music 双键+409 有声读物=audiobook）；medium 13 项
+  全配键——**BluRay(11)=[bdrip] 独立**（压制 BluRay 来源与原盘
+  Blu-ray(1) 分立，§59.349 ST 仲裁驼峰语义对位）+WEBRip(12) 独立
+  精确；codec 7 合并命名+VPB/VP9=[vp9]+Xvid 无 AV1；standard 5 项
+  极简——**r720p/sd 不配**（站规≥1080p 硬要求，1988 前远古例外
+  预览人工选 Other，南洋同款保守）；audiocodec DTS-HD/DTS(3)
+  合并项承接家族四键（车站同款）+TrueHD/TrueHD Atmos 分立+DD/AC3
+  三键；processing_sel=产区槽不配（咖啡定案同名异义）。
+- **team 19→18 项 label-only**：站方重复值条目 QHstudIo 8/19 去重
+  留首值 19（克隆 §59.394 先例）+**FRDS(6) 在表直中**+外站官组
+  十五+Other 兜底。
+- **tags 15 项**：8 项配键（禁转/完结/分集/粤语/国语/中字/**HDR 四键
+  泛家族第六站**/DIY）；首发不配（铁律）+7 项 label-only（多语——
+  bilingual_audio 是双语非多语防误配/中英双字——防一键多值冲突/
+  4K+1080p——分辨率类零产出/红叶转载/有声图书）。
+- **formdiff 两修**：①nfo 不配（发布链不投递 NFO 文件+域表无 nfo
+  域——GTK 先例同款）②ADWeb label 去尾空格（对齐解析器 strip
+  口径——label 尾空白无语义）。
+- **验证**：裸对全槽逐字 ✓+formdiff 同栈 0 条（双零发版）+DryRun
+  双形态全绿（WEB-DL 纪录：**type=413 非标值集正确**+team=11 Other
+  兜底；压制 FRDS：DTS-HD/DTS 四键直配+**team=6 FRDS 直中**+HDR
+  泛家族复利）。
+- **站规发布预览人工把关**：≥1080p（1988 前例外）+电影≥1GB+完结
+  必合集+禁转内容概不接收+网络短剧不收+H&R 手动勾选（考察期 240h）。
+- 遗留：首颗真实发布。
