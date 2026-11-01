@@ -566,3 +566,41 @@
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-22*
+
+### 附：发布适配记录（v0.0.1265 §59.412）
+
+- **form_config**：migration96 分发（七槽 93 项——type 16/medium 11/
+  codec 7/audiocodec 13/standard 8/team 22/tags 16）。实时 HTML
+  （49.7KB 直连 CF 未拦）与本文档全槽一致；**文档漂移一处：
+  douban_id 实时无**（本文 10.1 有——不配）；本文 tags 标题"17 个"
+  计数错误（列表实际 16 项）。
+- **槽位特化**：type 16 项全库最多之一（412 短剧第八站+406 Music
+  Videos 三键 [mv,music_video,concert]+408 Audio=[music,lossless_
+  music]+410 Cartoon label-only+411/413/414/415/416 全配+404 纪录
+  双键）；**processing_sel=文件格式**（第三种语义特化站——发布链
+  无容器格式判定维度不配按需生长）；source_sel=地区不配（咖啡
+  定案）；medium 11 全配键——**无 UHD 独立 Blu-ray=[bluray,
+  uhd_bluray] 双键归并**（浦园式近亲）；codec 7 乱序全配
+  （AV1=6/H.265=7 在尾）；audiocodec 13 全配——WAV 第二站+
+  DTS-HD=[dts_hd_ma,dts_hd_hr] 双键+DTS=[dts,dtsx]+E-AC-3=[ddp]+
+  AC-3=[ac3,dd]+TrueHD 承接 Atmos；standard 8 乱序全配（2k=
+  r1440p+8k/4k/SD/Other+p/i 分立——全分辨率覆盖）。
+- **team 22 项 label-only**：FRDS(9) 直中第七站+Other 兜底+外站
+  官组十八个+原创(3) 非官组语义。
+- **tags 16 项配键 11**：**杜比(10)=[dolby_vision] 第三站**+**国英
+  双语(15)=[bilingual_audio] 精确配键首站**（13城多语不配因双语非
+  多语——本站 label 即双语精确匹配）+**HDR 四键泛家族第八站**+
+  英语=[english_audio]+单集=[ongoing]（分集语义）+禁转/DIY/国语/
+  中字/粤语/完结；首发不配（铁律）+4 label-only（已刮削/三级/
+  简英双语字幕/多音轨）。
+- 字段：url+pt_gen+technical_info+uplver；nfo/douban_id 不配
+  （13城教训+实时无）。
+- **验证**：裸对全槽逐字 ✓+formdiff 同栈 0 条（双零发版——服务
+  启动竞态首跑登录失败重试即过）+DryRun 双形态全绿（WEB-DL 纪录：
+  404 纪录正确+team=5 Other 兜底；压制 FRDS：**DTS-HD 双键直配+
+  team=9 FRDS 直中+tags=[中字,英语,杜比,HDR] 三标签键全命中**）。
+- **站规发布预览人工把关**：<100MB 禁发（软件文档/单曲例外）+
+  标清 upscale 禁+RMVB/RMVB/RM/FLV 禁+游戏类候选制（上传员以下
+  须候选区）+RAR 压缩包禁+Dupe 媒介优先级（Blu-ray> HDTV>DVD>TV）
+  +音频≥5.1 声道（国语粤语 2.0 例外）。
+- 遗留：首颗真实发布。
