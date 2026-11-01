@@ -598,3 +598,47 @@ IMDb 输入框带 `data-pt-gen="url"` 属性，表明站点集成了 PT-Gen 自�
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
 *数据来源：rules.php + upload.php 表单采集*
+
+### 附：发布适配记录（v0.0.1266 §59.413）
+
+- **form_config**：migration97 分发（七槽 88 项——type 19/medium 6/
+  codec 9/audiocodec 8/standard 5/team 7/tags 34）。**咖啡式简版
+  第二例**：默认页 17KB 仅基础字段——完整表单在 upload.php?
+  mode=advanced（54.1KB，实时抓取为源）。
+- **实时 vs 文档（4 月）大改版**（实时为准）：①medium 10→6 项大砍
+  （**无 Encode/DVDR/CD/Track**——站方删项，miss 落空预览人工；
+  压制种 DryRun 实证 medium 不填）+HDDVD 无空格化 ②team 47→7 项
+  重组（站方全自家组：MxWeb 网络视频搬运组/慕雪阁音乐组/软件搬运
+  组/教育资源搬运组/压缩组/乐府+**Other(52) 兜底**——FRDS 不在表）
+  ③**audiocodec 新增槽**（本文 1.2 称无——漂移修正）：AAC 6/14 重复
+  值条目去重留 6（克隆先例）+杜比全景声(15)/全景声(19) 同语义双项
+  （15 配 [atmos,truehd_atmos]+19 label-only 防一键多值）；**无
+  FLAC/TrueHD/DDP/AC3**（miss 落空）④standard 增 4320p(7) 删 SD
+  （sd miss 落空）+540p label-only（无键）；无 1080i ⑤type 19 项
+  新增 **421 源码**（label-only）⑥codec H264/H265 简短命名（站方
+  去 & 后缀）+HDR 10(9) label-only（画质属性非编码）；TXT/PDF 已删
+  ⑦tags 34 项（实时新增禁转 60/60Fps 59/Autodesk 58）。
+- **processing_sel=年份槽第四种语义特化站**（咖啡地区/YHPP 地区/
+  垃圾堆文件格式/慕雪阁发布年代——90 年代之前→2027 逐年）：
+  发布链无年份投递维度不配（按需生长）。
+- **槽位映射**：416 短剧第九站+406 Music Videos 三键第五站+404
+  纪录双键+411 Game/412 Ebook/413 Education/415 Software/417 有声
+  书全配+410 系统镜像/414 图片/418 广播剧/421 源码 label-only；
+  medium 无 UHD 独立 Blu-ray=[bluray,uhd_bluray] 双键归并第三例+
+  WEB-DL 承接 webrip；DTS 单项家族四键承接（车站/藏宝阁/垃圾堆式）。
+- **tags 34 项配键 8**：**禁转(60) 实时新增配键**+**杜比视界=
+  dolby_vision 第四站**+**原盘=original_disc**+**HDR 真彩=[hdr_vivid]**
+  （真彩=Vivid 中文译名）+DIY/国语/完结/分集；**站方无中字标签**
+  （DB chinese_subtitle 键 miss 正确——DryRun 实证 tags=[国语]）；
+  label-only 26 项。
+- 字段：url+**pt_gen（本文 1.2 称无——漂移修正）**+**technical_info
+  （本文 1.2 称无——漂移修正）**+descr；nfo 不配（13城教训）；
+  无 uplver。
+- **验证**：裸对全槽（advanced+去重豁免）逐字 ✓+formdiff 同栈 0 条
+  （双零发版）+DryRun 双形态全绿（WEB-DL 纪录：404 纪录正确+
+  team=52 Other 兜底；压制 FRDS：**DTS 家族四键直配+medium 落空
+  （站方删 Encode——预览人工）+tags=[杜比视界] 第四站直配**）。
+- **站规发布预览人工把关**（垃圾堆系同款）：<100MB 禁+upscale 禁+
+  RMVB 禁+游戏候选制+RAR 禁+Dupe 媒介优先级+断种豁免（45 日/18 月）+
+  音频≥5.1（国语粤语 2.0 例外）。
+- 遗留：首颗真实发布。
