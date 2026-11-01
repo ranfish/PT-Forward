@@ -198,7 +198,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "hdbao.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "hdcity.city": {
     "domain": "hdcity.city",
