@@ -768,3 +768,47 @@ Misc 分类（type=409）存在但规则中明确表示「课程、电子书、�
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-22*
+
+### 附：发布适配记录（v0.0.1273 §59.420）
+
+- **form_config**：migration104 分发（七槽 127 项——type 63/medium 8/
+  codec 5/audiocodec 13/standard 6/team 14/tags 18）。实时 HTML
+  （48.1KB 代理）vs 本文档+资产全槽一致；**本文 §6.2"49 个"计数
+  错误**（种子区实际 63 项——表格逐项一致）；type 双区（id=browsecat
+  种子区 63+specialcat LIVE 27 同 name——§59.372+§59.388 双防线
+  自动护首见种子区）；**无 pt_gen/technical_info**（实证）；**tags
+  字符串值**（yc/gy/db 等——第三个非标准值形态）。
+- **★hdhomeCategoryValue type 三维融合词形路由（typeMappingOf 第四
+  站——好大模式第三例放大版）**：63 项=类型×媒介×分辨率三维编码
+  （label "{Prefix} {Medium/Res}" 统一结构）——**label 词形路由**
+  （非硬编码 value：站方改值不破+错拼容错 TVSereis(453)+TVShows(452)
+  复数+Sport(511) 单数）；prefix 9 类+suffix 矩阵（原盘 8K/4K/BD
+  三分+Remux 按分辨率分发 UHD 维度——**归一损失 UHD REMUX→remux
+  的分辨率补偿**+压制按分辨率+音乐 CD 子路由 FLAC/APE）；
+  education/game/concert 无独立项落空（杂项概不接受+演唱会无分类
+  ——预览人工）；测试锚 24 态（**实现坑两枚**：480p→r480p 归一键
+  集+SourceType 构造——mediumStdKeyOf 用 SourceType 非
+  Specification）。
+- **槽位映射**：type 63 项零配键 label-only（特化路由独占）；
+  medium 8 全配键（Remux=[remux,uhd_remux] 双键归并+MiniBD）；
+  codec 5 合并命名（AVC/H264/x264 三重——压制联动不触发=合并语义
+  反证第六站）；standard 6 p/i 分立+4320p/8K；audiocodec 13（TrueHD
+  Atmos 双键+DTS-HDMA:X label-only 好大先例）；team 14 label-only
+  Other(11) 兜底；source/processing 不配（同名异义+双槽冗余）。
+- **tags 18 字符串值配键 10**：DOLBY VISION 第九站+**HDR10/HDR10+
+  独立配键（HDR 三族细分独立标签站——优堡五族先例：泛家族归一不
+  适用，站方无泛 HDR 项）**+禁转/DIY/国语/中字/粤语/完结/连载=
+  ongoing；首发铁律+官字雷区+**Criterion label-only（dict 死键
+  extended 零产出）**+原创/特效/原生/限转/应求 label-only。
+- 字段：url+**douban_id 配 DoubanID 编号域**（站方收 ID/链接双形态
+  ——draft 域启发一致；首版误配 dburl 域致 formdiff 1 条"整域消失"
+  修正）+uplver；offers 候选制不勾（优堡铁律）；nfo 不配。
+- **验证**：裸对全槽（种子区口径）+formdiff 同栈 0 条（双零——
+  douban_id 域修后）+DryRun 双形态全绿（**特化路由双形态分发**：
+  WEB-DL 纪录 2160p→422 Doc 2160p+压制电影 2160p→416 Movies 2160p
+  +douban_id 纯编号投递（'35123121'）+DTS-HDMA 直配+Other 兜底+
+  tags=[中字,DOLBY VISION,HDR10] 双标命中）。
+- **站规发布预览人工把关**：≥1080i 硬要求（§5.2——特化路由保留
+  720p/SD 分支映射正确性，站规人工把关）+<100MB 禁+upscale 禁+
+  RMVB 禁+杂项概不接受+H&R 标志种 60 天/336h 考核+候选制+Dupe。
+- 遗留：首颗真实发布。
