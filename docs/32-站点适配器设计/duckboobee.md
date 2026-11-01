@@ -342,3 +342,42 @@
 | 音乐标签丰富 | 6 个音乐相关标签需正确映射 |
 | 游戏类限制 | 非上传员需先走候选流程 |
 | dupe 优先级 | 来源媒介优先级明确（Blu-ray > HDTV > DVD > TV） |
+
+### 附：发布适配记录（v0.0.1267 §59.414）
+
+- **form_config**：migration98 分发（六槽 59 项——type 9/medium 9/
+  codec 10/standard 7/team 11/tags 13）。实时 HTML（80.8KB 直连）
+  vs 本文档+4 月资产**大改版**（实时为准）。
+- **实时大改版**：①type 三处 label 漂移（405 Cartoon→Animations/
+  406 MTV→Music Videos/408 Music→HQ Audio）②medium 新增 Track(9)+
+  **DVDR 重复双值 6/2**（同 label 双 value——去重留 HTML 首值 6，
+  克隆式第四例；资产漏 6/9 两项）③codec XVID(9)→VP9(9)④**tags
+  大砍 22→13 项**（站方删除 禁转(1)/首发(9)/粤语(10)/限转(16)/
+  应求(17)/MV/卡拉OK/LVE现场/演唱会/音乐专辑 十项——音乐系标签
+  整族+禁转族下线）——新增 **AV1(20)**（编码类标签 label-only）+
+  **Ai双语字幕(18)**（无键 label-only）⑤无 IMG 真字段（本文 1.1
+  有——实时仅编辑器按钮）。
+- **★压制联动第七站+带点形态增强**：codec **H.264(1)/X.264(6)+
+  HEVC(2)/H.265(3)/X.265(7) 三对分立**——三月 label 带点
+  （X.264/X.265）不命中无点精确匹配——lookupCLIVariant variants
+  增强带点四形态（**通用增强未来站自动生效**）+测试锚四态；
+  HEVC(2)=[h265] 首现配键+H.265(3) label-only（一键多值防线）+
+  X.264/X.265 label-only（联动通道）。**DryRun 实战验证：压制种
+  codec=7 X.265（IsEncode 铁证→带点匹配）/WEB-DL 原生 codec=2
+  HEVC（不联动=站方语义）——三对分立完美分发**。
+- **槽位映射**：404 纪录双键+405 Animations+406 三键第六站+408
+  HQ Audio 双键；medium 无 UHD 归并第四例+WEB-DL 承接 webrip+
+  DVDR/DVD 分立配键；standard 大写 P+480P=[sd] 单配（576P 无键
+  label-only）；**无 audiocodec 槽第三站**（GTK/克隆后）；team 11
+  label-only 3MWEB 官组+Other 兜底。
+- **tags 13 配键 9**：**泛 HDR(7)=[hdr_vivid,hlg]**（站方无独立
+  Vivid/HLG 项——泛 HDR 精确归属）+HDR10/HDR10+/**Dolby Vision=
+  [dolby_vision] 第五站**独立配+分集/DIY/国语/中字/完结；**无禁转/
+  首发（站方已删）**+AV1/Ai双语字幕/动画/官字组 label-only。
+- 字段：url+pt_gen+technical_info+uplver；nfo/IMG 不配。
+- **验证**：裸对全槽（去重豁免）逐字 ✓+formdiff 同栈 0 条（双零
+  发版）+DryRun 双形态全绿（404 纪录+X.265 联动+HEVC 原生+Other
+  兜底+tags=[中字,DV,HDR10]）。
+- **站规发布预览人工把关**（垃圾堆系同款）：<100MB 禁+upscale 禁+
+  RMVB 禁+游戏候选制+RAR 禁+Dupe 媒介优先级+断种豁免。
+- 遗留：首颗真实发布。
