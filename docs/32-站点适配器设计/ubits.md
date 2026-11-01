@@ -379,3 +379,44 @@
 14. **IMDb+豆瓣**：同时支持且均为必填项
 15. **静默模式**：站点已开启，注意保存Cookie
 16. **2025.04.11后必填项**：类型、MediaInfo、媒介、视频编码、音频编码、分辨率、地区
+
+### 附：发布适配记录（v0.0.1259 §59.409）
+
+- **form_config**：migration93 分发（七槽 72 项——type 10/medium 10/
+  codec 9/audiocodec 14/standard 7/team 5/tags 17）。实时 HTML
+  52.1KB 为源。
+- **三处真改版**（实时 vs 4 月资产，实时为准）：①type 新增 415
+  有声书（audiobook 首配）②team 新增 8 驻站 ③tags 官方(3) 站方
+  已移除（18→17——财神官种案雷区标签站方主动下线）。
+- **`_token` CSRF 控件首见**（历史 25 站无——Laravel 风格 hidden）：
+  发布链 UploadTorrent 不处理。**挂账**：首颗真实发布验证站方
+  是否校验；若校验需表单页预取 token 通用增强另案。
+- **槽位特化**：409 演唱会(Misic Videos)=[concert,mv,music_video]
+  三键承接（站方拼写错误 Misic 原文——克隆同款合并语义）；406
+  音乐CD=[music,lossless_music] 双键；medium 8 Lossless Music
+  无 canonical 键 label-only；**audiocodec DTS-HD MA/HR 合并双键
+  [dts_hd_ma,dts_hd_hr] 首例**（站方合并项——区别于其它站分立）+
+  Dolby Atmos/DTS:X/TrueHD/DD+/DD 五独立；standard 7 项 p/i
+  分立+1440p 全七项；source_sel 产区槽不配（§59.385 咖啡定案——
+  必填与否首颗真实发布验证）；team 5 label-only（UBits/UBWEB/
+  UBTV 官组+驻站+Other——非管理组禁选官组）。
+- **tags 17——HDR 五族细分独立标签站（首个）**：杜比视界(8)=
+  dolby_vision/HDR10+(10)=hdr10_plus/HDR10(9)=hdr10/菁彩HDR(18)=
+  hdr_vivid/HLG(19)=hlg **五键各配独立**（泛家族四键归一在此站
+  不适用——站方有独立项精确配）；原生原盘(17)=original_disc+
+  连载(23)=ongoing+合集(20)=collection+禁转/国语/粤语/中字/DIY
+  配键；高分国剧(21 限官组)/特效字幕/自购/菜单修改 label-only。
+  三组互斥规则（HDR* 互斥杜比可共存/原生-DIY-菜单修改互斥/
+  连载-合集互斥）——发布预览人工确认。
+- **验证**：裸对 65 项实时 HTML 逐字 ✓+formdiff 同栈 0 条（双零
+  发版）+DryRun 双形态全绿（WEB-DL 纪录：medium=4/standard=5
+  乱序正确+三必填字段全产出；压制 FRDS：audiocodec=11 DTS-HD
+  MA/HR 双键直配+**team=Other 兜底=优堡正确语义**（FRDS 不在
+  优堡表——外站组落 Other）+**tags=[中字,杜比视界,HDR10] HDR
+  细分独立首次实战**（杜比可与任意 HDR* 共存——站方互斥规则））。
+- **发布注意**（站规）：候选制（积分<10 asoffer 不勾）；转载互斥
+  （不可说 CMCT 互斥/官种禁转 PTTime HDSky CMCT）；黑名单组
+  HDSky/CMCT 系禁发——发布预览人工规避；url/pt_gen/
+  technical_info 2025.04.11 后必填。
+- 遗留：首颗真实发布（_token 校验+source_sel 必填+候选制积分
+  三验证）。
