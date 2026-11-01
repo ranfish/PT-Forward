@@ -69,6 +69,8 @@
     "cookiecloud_domain": "cangbao.ge",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+ ,
+    "publish_supported": true
   },
   "carpt.net": {
     "domain": "carpt.net",
