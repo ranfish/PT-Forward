@@ -601,3 +601,54 @@ func TestOfferInjection(t *testing.T) {
 		t.Fatal("无映射不应注入")
 	}
 }
+
+// §59.423: 天空分集/合集×国产/海外双维路由（恒合集+产区路由——用户定案）。
+func TestHdskyCategoryDualRoute(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {
+				{Label: "TV Series/剧集(合集）", Value: "411"},
+				{Label: "TV Series/海外剧集(合集）", Value: "413"},
+				{Label: "TV Shows/综艺", Value: "403", StandardKeys: []string{"category.tv_shows"}},
+				{Label: "TV Shows/海外综艺(合集）", Value: "415"},
+				{Label: "Movies/电影", Value: "401", StandardKeys: []string{"category.movie"}},
+			},
+		},
+	}
+	cnMeta := func(cat string) *model.TorrentMetadata {
+		return &model.TorrentMetadata{Category: cat, PTGenSourceJSON: `{"region":["中国大陆"]}`}
+	}
+	usMeta := func(cat string) *model.TorrentMetadata {
+		return &model.TorrentMetadata{Category: cat, PTGenSourceJSON: `{"region":["美国"]}`}
+	}
+	// 剧集：国产→411 / 海外→413 / 无产区→413（默认海外）
+	if v := hdskyCategoryValue(cfg, "天空", cnMeta("category.tv_series")); v == nil || v.Value != "411" {
+		t.Fatalf("国产剧集合集应 411，得 %v", v)
+	}
+	if v := hdskyCategoryValue(cfg, "天空", usMeta("category.tv_series")); v == nil || v.Value != "413" {
+		t.Fatalf("海外剧集合集应 413，得 %v", v)
+	}
+	if v := hdskyCategoryValue(cfg, "天空", &model.TorrentMetadata{Category: "category.tv_series"}); v == nil || v.Value != "413" {
+		t.Fatalf("无产区默认海外 413，得 %v", v)
+	}
+	// 港台=国产
+	if v := hdskyCategoryValue(cfg, "天空", &model.TorrentMetadata{Category: "category.tv_series", PTGenSourceJSON: `{"region":["中国香港"]}`}); v == nil || v.Value != "411" {
+		t.Fatalf("港台应归国产 411，得 %v", v)
+	}
+	// 综艺：国产→403 / 海外→415
+	if v := hdskyCategoryValue(cfg, "天空", cnMeta("category.tv_shows")); v == nil || v.Value != "403" {
+		t.Fatalf("国产综艺应 403，得 %v", v)
+	}
+	if v := hdskyCategoryValue(cfg, "天空", usMeta("category.tv_shows")); v == nil || v.Value != "415" {
+		t.Fatalf("海外综艺合集应 415，得 %v", v)
+	}
+	// 电影等回退通用链（nil）
+	if v := hdskyCategoryValue(cfg, "天空", usMeta("category.movie")); v != nil {
+		t.Fatalf("电影应回退通用链，得 %v", v)
+	}
+	// 他站不触发
+	if v := hdskyCategoryValue(cfg, "麒麟", usMeta("category.tv_series")); v != nil {
+		t.Fatalf("他站不应触发，得 %v", v)
+	}
+}

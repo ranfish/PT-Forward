@@ -1841,7 +1841,68 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := hdhomeCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
+	if v := hdskyCategoryValue(cfg, siteName, meta); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// hdskyCategoryValue §59.423: 天空（hdsky.me）type 槽分集/合集×国产/海外
+// 双维路由（typeMappingOf 第五站——用户定案：恒合集+产区路由）。站规
+// 明文"剧集分集仅官方发布员可发"+我方发布恒整季合集（v1.05）——
+// 402/412/414 分集项 label-only 防撞；本特化只服务合集侧产区路由：
+//   剧集 tv_series：陆港澳台→411 国产合集 ｜ 其余/无产区→413 海外合集
+//   综艺 tv_shows：陆港澳台→403 国产综艺 ｜ 其余/无产区→415 海外合集
+// 产区数据源=meta.PTGenSourceJSON→src.Region（Tab1"作品信息-产地"同源
+// ——葡萄先例复用；首值优先+全数组兜底）。无产区证据默认海外（海外
+// 剧集大盘——预览可手改）。403 配 [tv_shows] 键：综艺特化 miss 时
+// 通用链兜底命中国产综艺（错分好过 miss——预览可手改）；411/413
+// label-only（必须经产区路由，通用链不猜国籍）。
+// 电影/纪录/动漫/短剧等其余类型回退通用链。
+func hdskyCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	if siteName != "天空" || cfg == nil || meta == nil {
+		return nil
+	}
+	var want string
+	switch meta.Category {
+	case "category.tv_series":
+		want = "413"
+		if hdskyIsDomesticRegion(meta) {
+			want = "411"
+		}
+	case "category.tv_shows":
+		want = "415"
+		if hdskyIsDomesticRegion(meta) {
+			want = "403"
+		}
+	default:
+		return nil
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == want {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
+}
+
+// hdskyIsDomesticRegion 陆港澳台=国产判定（天空双维路由消费——
+// classifyRegionWords §59.391 复用：regionMainland+regionHKTW）。
+func hdskyIsDomesticRegion(meta *model.TorrentMetadata) bool {
+	var regions []string
+	if meta.PTGenSourceJSON != "" {
+		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+			regions = src.Region
+		}
+	}
+	if len(regions) == 0 {
+		return false
+	}
+	cls := classifyRegionWords(regions[:1]) // 首值优先（葡萄定案）
+	if cls == regionNone {
+		cls = classifyRegionWords(regions)
+	}
+	return cls == regionMainland || cls == regionHKTW
 }
 
 // hdhomeCategoryValue §59.420: 家园（hdhome.org）type 槽三维融合特化
