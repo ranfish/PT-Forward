@@ -639,3 +639,42 @@ W6 检测关键词（英文词边界匹配，中文 contains）：dv/dolby visio
 | 视频编码 | hevc/h.265/h265/x265→HEVC；avc/h.264/h264/x264→AVC；av1→AV1；vp9→VP9；vc-1→VC-1；mpeg-4/mpeg4→MPEG-4；mpeg-2/mpeg2→MPEG-2；mpeg-1/mpeg1→MPEG-1；h.261→H.261 |
 | 音频 | truehd→TrueHD；flac→FLAC；opus→Opus；dts-hd ma/dts-hd/dts:x/dts→DTS；e-ac3/eac3/ddp5.1/ddp/dd+→DDP；aac→AAC；ac3→AC3；pcm→PCM；mp3→MP3 |
 | 分辨率 | 4320p/8k→4320p；2160p/4k/uhd→2160p；1440p/2k→1440p；1080p/1080i→1080p；720p/720i→720p；540p→540p；480p/480i→480p |
+
+### 附：发布适配记录（v0.0.1264 §59.411）
+
+- **form_config**：migration95 分发（七槽 66 项——type 10/medium 9/
+  codec 9/audiocodec 9/standard 7/team 3/tags 19）。实时 HTML
+  （54.5KB 直连）与本文档 §3.7 终版一致——**文档 4.6"跳过值 17"
+  说法有误**（实时 17=DIY 存在，实际仅缺 6）。
+- **槽位特化**：**全字段值倒序排列（全库唯一）**——媒介 UHD=9→VCD=1/
+  编码 AV1=9→H.261=1/音频 PCM=9→MP3=1/分辨率 4320p=7→480P=1；
+  type 10 项全非标值集（第四套）——**404 动画/405 动漫分立特化**
+  （站方多集信号双向校验：cbgCategoryValue 挂 typeMappingOf 第三站
+  ——SeasonEpisode 非空→405 动漫/空→404 动画通用兜底+测试锚四态）
+  +403 短剧第七站+406 儿童 label-only+408 纪录双键+410 书籍=ebook；
+  medium WEB-DL 承接 webrip+UHDTV 配键（农场先例第二站）+VCD
+  label-only；codec AVC/HEVC 简短命名无 X26x 联动+MPEG-1/H.261
+  label-only 无 Xvid；audiocodec PCM=[lpcm]+Opus+TrueHD 承接
+  truehd_atmos+**DTS 单项承接家族四键**（车站式——站方不区分细分）
+  +AC3 三键；standard 倒序全配+480P=[sd] 单配（r540p 无键 540p
+  label-only 防一键多值）。
+- **team 3 项 label-only 全库最少之一**：NONE(1) 兜底语义（非官组
+  miss→nil 不填=站方表单默认态）+CBGWT/CBGER 官组资产在
+  release_group_mappings（is_official=1——label 直配自动命中）。
+- **tags 19 项配键 11 个**：**英字=english_subtitle（首次配键站）**
+  +**DV=dolby_vision（第二站——优堡后）**+**原盘=original_disk→
+  original_disc**+**HDR 四键泛家族第七站**+合集=collection+完结/
+  分集/中字/国语/禁转/DIY；首发（铁律）+官方（财神官种案雷区）
+  不配+7 项 label-only（自购/驻站/零魔/高码/特效/原声）。
+- 字段：url+pt_gen（四源）+technical_info+uplver；**nfo 不配**
+  （13城教训——发布链不投递+域表无此域）；无 processing/source。
+- **验证**：裸对全槽逐字 ✓+formdiff 同栈 0 条（双零发版）+DryRun
+  双形态全绿（WEB-DL 纪录：408 非标值集正确+倒序值全对 WEB-DL=6/
+  HEVC=8/2160p=6；压制 FRDS：Encode=3+DTS 家族四键直配+**英字
+  首配键实证 tags=[中字,英字,DV,HDR] 四新键全命中**+team 不填=
+  NONE 兜底语义）。
+- **站规发布预览人工把关**：剧集转载必须完结标签严禁分集（官组
+  除外——站方脚本检测 S01E01 模式非官组触发错误）+低于 1080p 电影
+  慎重+多季合集四统一（分辨率/格式/制作组/完整性）+音乐/书籍豁免
+  质量字段（标签限官方/国语/粤语/中字/英字/分集/完结/合集）。
+- 遗留：首颗真实发布。
