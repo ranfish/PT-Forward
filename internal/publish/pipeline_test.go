@@ -481,32 +481,6 @@ func TestExtractTMDBID(t *testing.T) {
 	}
 }
 
-func TestPipeline_CheckPublishEligibility_Exclusion(t *testing.T) {
-	db := setupPipelineTestDBWithMappings(t)
-	p := NewPipeline(db, zap.NewNop())
-	ctx := context.Background()
-
-	exclusion := model.PublishExclusion{TargetSite: "目标站", SourceSite: "源站A"}
-	if err := db.Create(&exclusion).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	candidate := &model.PublishCandidate{TorrentName: "Normal Title", SourceSite: "源站A"}
-
-	ok, reason := p.CheckPublishEligibility(ctx, candidate, "目标站")
-	if ok {
-		t.Error("should be excluded")
-	}
-	if reason == "" {
-		t.Error("reason should not be empty")
-	}
-
-	ok, _ = p.CheckPublishEligibility(ctx, candidate, "其他站")
-	if !ok {
-		t.Error("should not be excluded for other target")
-	}
-}
-
 func TestPipeline_SetCompletionWatcher(t *testing.T) {
 	db := setupPipelineTestDB(t)
 	p := NewPipeline(db, zap.NewNop())

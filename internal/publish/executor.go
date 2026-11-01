@@ -116,6 +116,45 @@ func NewPublishExecutor(pipe *Pipeline) *PublishExecutor {
 }
 
 // Execute 单站发布主流程。
+// preflightNoTransfer §59.409 附二: 发布行为前置检查——禁转/互斥/排除
+// 家族单点（用户语义定案两层：获取链打标与目标无关；发布链拦"转载/
+// 发布行为本身"与目标相关）。原挂 Pipeline.CheckPublishEligibility——
+// §59.147 拆自动发布流后零生产调用（死代码），全家族从未在发布页链路
+// 生效；用户"一站多种官种混选是否被阻塞"问出系统性缺口，本次搬家激活。
+// 粒度=单颗×单目标（批量逐颗独立 Execute 不连坐——官种颗拦名单站，
+// 同批非官种颗/官种颗发其它站均正常）：
+//  ① 种子禁转标记（获取链落库 flags）：绝对禁转族拦全部目标站；限时
+//     禁转窗内拦全部、窗外放行；深度站限转名单站永久拦+窗内全站拦
+//     （checkFlagsFromMetadata 单点）
+//  ② 定向禁转名单（优堡官种→PTTime 等——checkOfficialDirectedNoTransfer 单点）
+//  ③ 互斥转载站点对（HardcodedExclusionPairs）
+//  ④ 用户自定义排除规则（双保险——candidate 创建层已查，单发/重放路径）
+func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.TorrentMetadata, targetSite string) (bool, string) {
+	if targetSite == "" || meta == nil {
+		return false, ""
+	}
+	sourceSite := meta.SiteName
+	if sourceSite == "" {
+		return false, ""
+	}
+	if blocked, reason := e.pipe.checkFlagsFromMetadata(ctx, meta.InfoHash, sourceSite, targetSite); blocked {
+		return true, reason
+	}
+	if blocked, reason := e.pipe.checkOfficialDirectedNoTransfer(ctx, sourceSite, meta.Title, targetSite); blocked {
+		return true, reason
+	}
+	if IsHardcodedExclusion(sourceSite, targetSite) {
+		return true, fmt.Sprintf("源站 %s → 目标站 %s 为互斥站点（禁止互相转载）", sourceSite, targetSite)
+	}
+	var exclusion model.PublishExclusion
+	if err := e.db.WithContext(ctx).
+		Where("target_site = ? AND source_site = ?", targetSite, sourceSite).
+		First(&exclusion).Error; err == nil {
+		return true, fmt.Sprintf("源站 %s → 目标站 %s 存在发布排除规则", sourceSite, targetSite)
+	}
+	return false, ""
+}
+
 func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *ExecuteResult {
 	fail := func(status, msg string) *ExecuteResult {
 		return &ExecuteResult{Status: status, Message: msg}
@@ -146,6 +185,13 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	cfg := model.ParseFormConfig(site.PublishFormConfig)
 	if cfg == nil || !cfg.Enabled {
 		return failRec("disabled", "目标站未启用发布配置")
+	}
+
+	// §59.409 附二: 发布行为前置检查（禁转/互斥/排除——拦"转载/发布
+	// 行为本身"）。DryRun 同样生效（适配预览可见拦截）；PushOnly 补推
+	// 通道同拦（推送也属转载行为）。
+	if blocked, reason := e.preflightNoTransfer(ctx, meta, in.TargetSite); blocked {
+		return failRec("ineligible", reason)
 	}
 
 	// §59.159 PushOnly 补推通道：跳过上传/dedup——推指定 TorrentID（SavePath 取资源目录）
