@@ -81,6 +81,7 @@
 | 幸运 | [luckpt.md](./luckpt.md) | ✅ 完成（Cloudflare·**LuckAudit预审核系统100分制·含完整审核规则逆向分析+转载自动填写优化方案**·17条审核规则·6站组·短剧分类·8K·AV1·最小1GB·HDR四标签·中字/国语智能检测·标题-MI交叉验证） |
 | 猫 | [pterclub.md](./pterclub.md) | ✅ 完成（**极简字段3下拉框·PTerClub Torrent Checker v1.0.22 完整逆向2245行/141KB→40+校验规则·TORRENT_INFO结构化对象三方交叉验证(标题+MI+豆瓣)·分辨率从宽高差值推断·制作组白名单决定质量等级·多音轨完整流解析·标题命名7种类型·音频格式映射表·17制作组白名单·9编码组·DUPE规则·图床黑名单·独立Wiki·标签checkbox非tags数组·含转载方案**） |
 | 套套哥 | [ttg.md](./ttg.md) | ✅ 完成（自研框架·56混合分类·无质量字段无标签·禁转=nodistr·team=type重复·标题正则解析·[TTG]前缀清理） |
+| 红豆饭 | [hdfans.md](./hdfans.md) | ✅ 完成（零漂移·407/408分立首站·压制分辨率分发·audiocodec 23全配键·FRDS直中） |
 | 星陨阁 | [xingyungept.md](./xingyungept.md) | ✅ 完成（UHD分立·audiocodec 18全配键·长尾键四首配·tags 22项·Other兜底） |
 | 我的PT | [mypt.md](./mypt.md) | ✅ 完成（双区互斥·影视区映射·无UHD归并·tags 17项·Other/转载兜底） |
 | 躺平 | [tangpt.md](./tangpt.md) | ✅ 完成（standard_sel含8K·32制作组·19音频含AV3V·30标签含NSFW·AV1·站组TPWEB） |

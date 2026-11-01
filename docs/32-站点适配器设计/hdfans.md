@@ -758,3 +758,48 @@ HDFans 区分原盘编码和压制编码：
 *分析时间：2026-04-16*
 *文档更新：2026-04-22*
 *数据来源：HDFans 论坛(#2662/#2522/#2/#7_27) + rules.php (9342字符) + upload.php HTML 分析*
+
+### 附：发布适配记录（v0.0.1272 §59.419）
+
+- **form_config**：migration103 分发（七槽 131 项——type 16/medium 19/
+  codec 10/audiocodec 23/standard 7/team 29/tags 27）。实时 HTML
+  （59.7KB 代理）vs 本文档+资产**全槽零漂移**（第十个零漂移站）。
+- **★resolutionEncodeOption 压制媒介分辨率分发新实施（本站核心）**：
+  §5.1 站方权威规则锚（Encode+1080p→"1080P/i压制"/720p→"720P压制"/
+  SD→MiniSD/UHD(4K)→"UHD压制"）——§59.387 库非挂账（resolution×
+  medium 联动零案例不预实施）第二站转通用实施；挂 mediumMappingOf
+  直查 miss 后 fallback；动态检测 label 压制+分辨率词形（通用
+  Encode 项站不触发——库非 18 式兜底优先/无细分站零变化/目标族缺失
+  UHD→1080→720→SD 降级链）；测试锚八态；**DryRun 实战：压制 2160p
+  种 medium=20 UHD压制分发命中**。
+- **槽位映射**：type 16 项——**407 MV 与 408 Concert 分立首站**
+  （408=[concert] 独立单键——历史站均合并项三键承接）+416 综艺/
+  417 动漫非标值集+403 纪录双键（非 404！）+406 双键+education/
+  audiobook/sports/software/game/ebook 全配+409 Drama label-only；
+  medium 19 中文细分（UHD/BD 四分+压制分辨率四分+音乐系 SACD/
+  CD+VCD/CD+DVD/黑胶）——§59.407 DIY 联动自动生效（18/22）+
+  encode 不配（细分分发接管）+DVD=[dvd,dvdr] 双键；codec 10 项
+  H/X 分立——**§59.380 压制联动第八站**（§5.2 编码细分规则印证）
+  +MPEG-4/Xvid/AV1；standard 7 项 p/i 分立全配键；**audiocodec
+  23 项全配键（好大 28 后第三例）**：DD/DDP/AC3 三分立（各自
+  单键）+TrueHD Atmos/DDP Atmos 双键+DTS:X+DSD/TTA/MPEG/ALAC/m4a。
+- team 29 label-only：HDFans(9) 官组+**FRDS(6) 直中第九站**+国际组
+  （PTP/BTN/NTb/EPSiLON/FraMeSToR/DIC/Red/GGN）+Others(27) 兜底；
+  **§8.1 黑名单 11 公网组**（Hao4K/Mp4ba/rag/rarbg/rartv/FGT/
+  xiaomi/huawei/GPTHD/DreamHD/SONYHD）发布预览人工规避。
+- processing_sel 产区槽不配（咖啡定案同名异义——13城同款）。
+- **tags 27 配键 9**：**中英双语=[bilingual_audio] 第二站**（垃圾堆后
+  ——§5.4 站方双语标签增强规则印证）+HDR 四键泛家族第十二站+
+  Dolby Vision 第八站+禁转/DIY/国语/中字/粤语/完结；首发(15) 铁律
+  label-only+官字组(14) 财神雷区+**Atmos(12)/CC收藏(22) dict 死键
+  不配**（extended tag 域零产出——配键无收益 label-only）+微光星辰/
+  甄选/驻站/原创/限转/源站转发/原生/特效/4K/8K/Hi-Res/刮削/AI修复/
+  保种 label-only。
+- 字段：url+pt_gen+technical_info+uplver；nfo 不配（13城教训）。
+- **验证**：裸对全槽+formdiff 同栈 0 条（双零）+DryRun 双形态全绿
+  （WEB-DL 纪录：403 非标正确+WEB-DL 直查+HEVC 不联动+Others 兜底；
+  压制 FRDS：**medium=20 UHD压制 分发命中+codec=4 x265 联动+
+  DTS-HDMA 直配+team=6 FRDS 直中第九站+tags=[中字,DV,HDR]**）。
+- **站规人工把关**：全站 H&R V2.0（考核+HP 系统）+盒子规则+黑名单
+  组+游戏候选制+Dupe 媒介优先级+色情禁。
+- 遗留：首颗真实发布。
