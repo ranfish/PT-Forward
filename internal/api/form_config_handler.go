@@ -203,6 +203,14 @@ func (h *FormConfigHandler) handleSetAnonymous(w http.ResponseWriter, r *http.Re
 		Error(w, http.StatusBadRequest, 40002, "站点未配置发布表单——先完成 HTML 接入")
 		return
 	}
+	// §59.422 附三：开启但站点无 uplver 字段映射——保存意向+warning（对齐
+	// set-offer 模式；executor/adapter 消费点走 form_fields["uplver"]，无映射不生效）
+	warn := ""
+	if req.Anonymous {
+		if _, ok := cfg.FormFields[model.FieldDomainUplver]; !ok {
+			warn = "站点无匿名发布字段映射（uplver）——开关已保存，字段映射补齐后生效"
+		}
+	}
 	cfg.Anonymous = req.Anonymous
 	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).
 		Where("id = ?", site.ID).
@@ -216,7 +224,7 @@ func (h *FormConfigHandler) handleSetAnonymous(w http.ResponseWriter, r *http.Re
 		Detail:    fmt.Sprintf(`{"anonymous":%v}`, req.Anonymous),
 		CreatedAt: time.Now(),
 	})
-	Success(w, map[string]any{"ok": true})
+	Success(w, map[string]any{"ok": true, "warning": warn})
 }
 
 // handleSetOffer §59.421: 候选发布站点默认开关（即时保存+审计——独立小端点：

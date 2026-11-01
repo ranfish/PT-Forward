@@ -22,7 +22,9 @@
           <div class="kv"><span>enabled</span><b>{{ current.enabled }}</b></div>
           <div class="kv"><span>framework</span><b>{{ current.framework || '—' }}</b></div>
           <div class="kv"><span>pre_audit_url</span><b>{{ current.pre_audit_url || '—' }}</b></div>
-          <div class="kv">
+          <!-- §59.422 附三：仅 form_fields.uplver 存在显示（对齐 offer 开关 §59.421 模式）——
+               无 uplver 站（慕雪阁/星陨阁/冬樱）不显示无效开关 -->
+          <div v-if="current.form_fields?.uplver" class="kv">
             <span>匿名发布</span>
             <a-switch
               :checked="current.anonymous || false"
@@ -163,8 +165,11 @@ async function saveInterval() {
 
 async function setAnonymous(v: boolean) {
   if (!current.value || !props.siteName) return
-  await formConfigApi.setAnonymous(props.siteName, v)
+  const res = await formConfigApi.setAnonymous(props.siteName, v)
   current.value = { ...current.value, anonymous: v }
+  if (res.data?.data?.warning) {
+    console.warn('[setAnonymous]', res.data.data.warning)
+  }
 }
 
 async function setOffer(v: boolean) {
