@@ -356,3 +356,33 @@ func TestCbgCategoryValue(t *testing.T) {
 		t.Fatal("非藏宝阁不走特化")
 	}
 }
+
+// §59.414: 压制联动带点形态——三月 X.264/X.265 label 带点匹配增强。
+func TestLookupCLIVariantDottedLabel(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainCodec: {
+			{Label: "H.264", Value: "1", StandardKeys: []string{"video.h264"}},
+			{Label: "X.264", Value: "6"},
+			{Label: "HEVC", Value: "2", StandardKeys: []string{"video.h265"}},
+			{Label: "X.265", Value: "7"},
+		},
+	}}
+	// 带点形态命中（三月形态）
+	if v := lookupCLIVariant(cfg, "video.h264"); v == nil || v.Value != "6" {
+		t.Fatalf("X.264 带点应命中联动通道，got %v", v)
+	}
+	if v := lookupCLIVariant(cfg, "video.h265"); v == nil || v.Value != "7" {
+		t.Fatalf("X.265 带点应命中联动通道，got %v", v)
+	}
+	// CLI 原始键形态同命中
+	if v := lookupCLIVariant(cfg, "video.x264"); v == nil || v.Value != "6" {
+		t.Fatal("video.x264 原始键应命中")
+	}
+	// 无点形态站不受影响（无 X264 条目返回 nil——原盘走直查）
+	cfg2 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainCodec: {{Label: "H.264", Value: "1", StandardKeys: []string{"video.h264"}}},
+	}}
+	if v := lookupCLIVariant(cfg2, "video.h264"); v != nil {
+		t.Fatal("无 X 条目站应返回 nil（直查路径）")
+	}
+}
