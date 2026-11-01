@@ -599,6 +599,11 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
+	// ⚠️ §59.409 附二警示：本方法自 §59.147 拆自动发布流后**零生产调用**
+	// （死代码——仅测试引用）。禁转/互斥/排除家族检查已迁
+	// PublishExecutor.preflightNoTransfer（Execute 活链单点）——勿在此
+	// 挂新检查。保留的映射/compliance/声明过滤/HR/标题校验/limitGuard
+	// 维持现状，未来若发布链需要以 preflight 模式接入 Execute。
 	// §59.20: 第 0 层——源站映射检查（制作组不在 release_group_mappings 中 → 不可发布）
 	// 仅当映射表有数据时生效（测试环境/全新安装跳过）
 	var totalMappings int64
@@ -660,10 +665,9 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		}
 	}
 
-	// 2. flags 检查（来自 torrent_metadata）
-	if blocked, reason := p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite, targetSite); blocked {
-		return false, reason
-	}
+	// §59.409 附二: 以下四块（flags 禁转族/互斥对/官种定向禁转/DB 排除
+	// 规则）已迁 PublishExecutor.preflightNoTransfer——此处删除防双实现
+	// 漂移（§59.343 教训）。
 
 	// 3. declaration_filter 检查（flags 不可用时兜底）
 	if p.declarationFilter != nil {
@@ -674,28 +678,6 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 			if len(fr.RemovedDecls) > 0 {
 				return false, fmt.Sprintf("声明过滤命中: %v", fr.RemovedDecls)
 			}
-		}
-	}
-
-	// 硬编码互斥站点对（不可修改）
-	if IsHardcodedExclusion(candidate.SourceSite, targetSite) {
-		return false, fmt.Sprintf("源站 %s → 目标站 %s 为互斥站点（硬编码规则）", candidate.SourceSite, targetSite)
-	}
-
-	// §59.409 附: 源站官种定向禁转（优堡 rules.php 首例——统一基建链
-	// 判官种，见 checkOfficialDirectedNoTransfer）
-	if blocked, reason := p.checkOfficialDirectedNoTransfer(ctx, candidate.SourceSite, candidate.TorrentName, targetSite); blocked {
-		return false, reason
-	}
-
-	// 用户自定义排除规则
-	if targetSite != "" && candidate.SourceSite != "" {
-		var exclusion model.PublishExclusion
-		err := p.db.WithContext(ctx).
-			Where("target_site = ? AND source_site = ?", targetSite, candidate.SourceSite).
-			First(&exclusion).Error
-		if err == nil {
-			return false, fmt.Sprintf("源站 %s → 目标站 %s 存在发布排除规则", candidate.SourceSite, targetSite)
 		}
 	}
 

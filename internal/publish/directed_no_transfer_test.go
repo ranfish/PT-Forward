@@ -168,3 +168,116 @@ func TestUbitsOfficialDirectedNoTransfer(t *testing.T) {
 		t.Fatal("优堡'限转'不应走深度站名单/72h 窗（官种通道独立判）")
 	}
 }
+
+// §59.409 附二: 发布行为前置检查（preflightNoTransfer——Execute 活链
+// 单点）。用户语义定案：获取链打标与目标无关；发布链拦"转载/发布行为
+// 本身"与目标相关。七态：
+// ① 绝对禁转 flags → 拦全部目标站
+// ② 限时禁转窗内 → 拦；窗外 → 放行
+// ③ 优堡官种 → 定向名单站（时间）拦；名单外放行
+// ④ 互斥转载对（优堡→不可说）拦
+// ⑤ 用户排除规则拦
+// ⑥ 非官种/无标记 → 放行
+// ⑦ 空 meta/空目标站 → 放行（防御态）
+func TestPreflightNoTransfer(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.ReleaseGroupMapping{}, &model.PublishExclusion{}); err != nil {
+		t.Fatal(err)
+	}
+	pipe := &Pipeline{db: db, logger: zap.NewNop()}
+	e := &PublishExecutor{pipe: pipe, db: db, logger: zap.NewNop()}
+	ctx := context.Background()
+
+	for _, g := range []string{"UBits", "UBWEB", "UBTV"} {
+		if err := db.Create(&model.ReleaseGroupMapping{
+			GroupName: g, Domain: "ubits.club", SiteName: "优堡", IsOfficial: true,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Create(&model.PublishExclusion{TargetSite: "织梦", SourceSite: "朋友"}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	future := time.Now().Add(48 * time.Hour)
+	past := time.Now().Add(-2 * time.Hour)
+	seedMetaFlags(t, db, "pf1", "朋友", []string{"禁转"}, nil)          // 绝对禁转
+	seedMetaFlags(t, db, "pf2", "朋友", []string{"限时禁转"}, &future)   // 窗内
+	seedMetaFlags(t, db, "pf3", "朋友", []string{"限时禁转"}, &past)     // 窗外
+	seedMetaFlags(t, db, "pf4", "优堡", nil, nil)                       // 官种载体（flags 空）
+	seedMetaFlags(t, db, "pf5", "优堡", nil, nil)                       // 非官种载体
+	seedMetaFlags(t, db, "pf6", "朋友", nil, nil)                       // 排除规则载体
+
+	var m1, m2, m3, m4, m5, m6 model.TorrentMetadata
+	for h, m := range map[string]*model.TorrentMetadata{
+		"pf1": &m1, "pf2": &m2, "pf3": &m3, "pf4": &m4, "pf5": &m5, "pf6": &m6,
+	} {
+		if err := db.Where("info_hash = ?", h).First(m).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	m4.Title = "Movie 2024 1080p Blu-ray DD5.1 x264-UBits" // 官种
+	m5.Title = "Film 2023 1080p WEB-DL DDP5.1 H.264-FRDS"  // 非官种
+	if err := db.Save(&m4).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Save(&m5).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// ① 绝对禁转 → 拦全部目标站
+	if blocked, reason := e.preflightNoTransfer(ctx, &m1, "织梦"); !blocked {
+		t.Fatal("绝对禁转应拦全部目标站")
+	} else if !strings.Contains(reason, "禁转") {
+		t.Fatalf("文案缺禁转标识: %s", reason)
+	}
+
+	// ② 限时禁转窗内拦 / 窗外放行（用"克隆"——避开 ⑤ 排除规则的朋友→织梦组合）
+	if blocked, _ := e.preflightNoTransfer(ctx, &m2, "克隆"); !blocked {
+		t.Fatal("限时禁转窗内应拦")
+	}
+	if blocked, _ := e.preflightNoTransfer(ctx, &m3, "克隆"); blocked {
+		t.Fatal("限时禁转窗外应放行")
+	}
+
+	// ③ 优堡官种 → 时间拦；织梦放行
+	if blocked, reason := e.preflightNoTransfer(ctx, &m4, "时间"); !blocked {
+		t.Fatal("优堡官种 → 时间 应拦")
+	} else if !strings.Contains(reason, "官种") {
+		t.Fatalf("文案缺官种标识: %s", reason)
+	}
+	if blocked, _ := e.preflightNoTransfer(ctx, &m4, "克隆"); blocked {
+		t.Fatal("优堡官种 → 名单外站应放行")
+	}
+
+	// ④ 互斥转载对：优堡 → 不可说拦
+	if blocked, reason := e.preflightNoTransfer(ctx, &m5, "不可说"); !blocked {
+		t.Fatal("优堡 → 不可说 互斥应拦")
+	} else if !strings.Contains(reason, "互斥") {
+		t.Fatalf("文案缺互斥标识: %s", reason)
+	}
+
+	// ⑤ 排除规则：朋友 → 织梦拦
+	if blocked, reason := e.preflightNoTransfer(ctx, &m6, "织梦"); !blocked {
+		t.Fatal("排除规则应拦")
+	} else if !strings.Contains(reason, "排除") {
+		t.Fatalf("文案缺排除标识: %s", reason)
+	}
+
+	// ⑥ 非官种无标记 → 放行（对照）
+	if blocked, _ := e.preflightNoTransfer(ctx, &m5, "克隆"); blocked {
+		t.Fatal("非官种无标记应放行")
+	}
+
+	// ⑦ 防御态：空 meta/空目标站
+	if blocked, _ := e.preflightNoTransfer(ctx, nil, "织梦"); blocked {
+		t.Fatal("空 meta 应放行（防御）")
+	}
+	if blocked, _ := e.preflightNoTransfer(ctx, &m5, ""); blocked {
+		t.Fatal("空目标站应放行（防御）")
+	}
+}
