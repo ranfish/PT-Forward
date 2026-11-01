@@ -507,3 +507,49 @@
 15. **严禁官组资源外流**：禁止分享官组资源到 PT 站以外场所（网盘/论坛/emby 等）
 16. **站点已关闭游客访问**：需要保持 Cookie，勿退出或清理
 17. **HDR 标签细分**：HDR10/HDR10+/Dolby Vision/HLG/SL-HDR1/DoVi+HDR 六种
+
+### 附：发布适配记录（v0.0.1280 §59.423）
+
+- **form_config**：migration108 分发（七槽 113 项——type 16/medium 15/
+  codec 12/audiocodec 21/standard 6/team 17/tags 26）。实时 HTML
+  （58.1KB 代理）vs 文档 vs 4 月资产全槽一致；**本文档两处计数错
+  勘误**：type"17 个"实 16 项、标签"31 个"实 26 项（最大 ID 非
+  count）；**实时实证 nfo 不存在**（本文档漂移——基础字段表有、
+  实时无）+url 存在+url_douban 独立豆瓣字段；标签字段名
+  **option_sel[]**（全库第三个非标准名——tags[4][]/span[]/tag_list[]
+  后）。
+- **type 双维路由（typeMappingOf 第五站 hdskyCategoryValue——用户
+  定案恒合集+产区路由）**：站规"剧集分集仅官方发布员可发"+我方
+  恒整季合集（v1.05）→402/412/414 分集项+411/413 剧集合集
+  label-only（必须经产区路由：陆港澳台→411 国产/其余→413 海外/
+  无产区默认海外）；403 综艺=[tv_shows]（通用链兜底+特化海外改
+  415）；测试锚八态+DryRun 双态实证（美国→413/大陆→411）。
+- medium 15：UHD/BD 各自原盘/DIY 四分（13/14/1/12——§59.407 DIY
+  联动自动生效）+Remux 双键归并+MiniBD 精确键+SACD/HD DVD/3D
+  Blu-ray extended 键形（农场先例）；codec 12 H/X 分立——§59.380
+  压制联动自动生效（DryRun 压制种 codec=13 x265 实证）；
+  audiocodec 21：TrueHD Atmos 双键+DDP with Dolby Atmos=[ddp_atmos]
+  （红豆饭先例）+HDMA:X 7.1=[dtsx]（冬樱先例）+PCM/LPCM 共存各配
+  各键（冬樱先例）+DTS 四级细分。
+- team 17 label-only：HDS 系官组+Other(27) 兜底（FRDS 不在表）。
+- **标签 option_sel[] 26 配键 10**：HDR 细分站（HDR10/HDR10+/DV/
+  HLG 独立配键——优堡式五族泛家族归一不适用）+**特效=
+  [special_effects_subs]（用户定案——PT 圈语义惯例=特效字幕简写）**
+  +原生原盘=original_disc+禁转/国语/粤语/中字/DIY；首发/官组
+  （雷区）/限转/SL-HDR1/DoVi+HDR/Atmos（tag 域死键——红豆饭
+  extended 零产出验证）/DTS-X/次世代国语/全景声国语/临境声国语/
+  DIY纯净版/无广告/去头尾广告纯净版 label-only。
+- 字段：url（IMDb）+**url_douban（域键=dburl FieldDomainDoubanURL
+  ——海胆 §59.404 同款坑重犯即修：本地单测 draft 产出 dburl 键
+  实证；ParsePublishFormHTML 域表补 url_douban 第四形态）**+
+  uplver+anonymous:true（§59.422 附二默认开启）。
+- **验证**：裸对全槽一致（DTS-HDMA 尾空格对齐解析器 strip——
+  13城同款预防性修正）+formdiff 同栈 0 条（双零）+DryRun 四形态
+  全绿（WEB-DL 纪录 404+Encode+x265 联动+DTS-HDMA 直配+HDR 细分
+  双标 [中字,DV,HDR10]+url_douban 投递+产区路由双态 411/413）。
+- **站规发布预览人工把关**：**禁转发 REMUX 电影/剧集（站方明文
+  ——REMUX 种发天空必被拒）**+官组 Dupe 特权（已有官组 HDS/HDSPad
+  资源不允许再上传其他小组重编码/iPad 资源）+剧集分集仅官方
+  发布员+<100MB/RAR/RMVB/upscale 禁+游戏仅上传员+**上传者资格**
+  （终身影帝/65 周 VIP 直发否则候选区——29 账号资格挂账首颗验证）。
+- 遗留：首颗真实发布+上传者资格验证。

@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 天空 | [hdsky.md](./hdsky.md) | ✅ 完成（双维路由·option_sel[]第三名·HDR细分·禁转REMUX站规） |
 | 麒麟 | [hdkyl.md](./hdkyl.md) | ✅ 完成（资产完全失效第二例·audiocodec 18全配键·短剧第十二站·官种雷区） |
 | 家园 | [hdhome.md](./hdhome.md) | ✅ 完成（type 63项三维词形路由·HDR三族细分·douban_id编号域·Other兜底） |
 | 红豆饭 | [hdfans.md](./hdfans.md) | ✅ 完成（**全站H&R V2.0(下载100%后720h/保种72h/分享率1:1/10HP/99,999魔力消除)**·**盒子100%黑种+72h/3x上传限额+25MB/s限速+羊毛盒封禁(GCP/AWS/Azure/Oracle等)**·**11制作组黑名单(Hao4K/Mp4ba/rarbg/FGT/xiaomi/huawei/GPTHD等)**·**HDR后缀禁止转载**·印度/新加坡/马来西亚须候选·媒介20种(UHD/BD分开·原盘/DIY/Remux/压制分开)·30制作组·27标签·24音频·认领100种(3倍魔力)·来源优先级Dupe·发布者双倍上传·PT-Gen四来源） |
