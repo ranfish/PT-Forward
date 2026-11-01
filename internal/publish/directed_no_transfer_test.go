@@ -485,3 +485,77 @@ func TestResolutionEncodeOption(t *testing.T) {
 		t.Fatal("UHD 种无 UHD 压制项应降级 1080 压制兜底")
 	}
 }
+
+// §59.420: 家园 type 三维融合词形路由——63 项 label 前缀+媒介+分辨率分发。
+func TestHdhomeCategoryValue(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainType: {
+			{Label: "Movies 8K UHD BD", Value: "506"}, {Label: "Movies UHD Blu-ray", Value: "499"},
+			{Label: "Movies UHD REMUX", Value: "518"}, {Label: "Movies Bluray", Value: "450"},
+			{Label: "Movies REMUX", Value: "415"}, {Label: "Movies 8K/4320p", Value: "505"},
+			{Label: "Movies 2160p", Value: "416"}, {Label: "Movies 1080p", Value: "414"},
+			{Label: "Movies 720p", Value: "413"}, {Label: "Movies SD", Value: "411"},
+			{Label: "TVSereis Bluray", Value: "453"}, {Label: "TVSeries 1080p", Value: "436"},
+			{Label: "TVShows Bluray", Value: "452"}, {Label: "TVShow 2160p", Value: "431"},
+			{Label: "Doc 8K UHD BD REMUX", Value: "529"}, {Label: "Doc UHD Blu-ray", Value: "500"},
+			{Label: "Doc REMUX", Value: "421"}, {Label: "Doc 1080p", Value: "420"},
+			{Label: "Anime UHD REMUX", Value: "531"}, {Label: "Anime 2160p", Value: "449"},
+			{Label: "Musics APE", Value: "439"}, {Label: "Musics FLAC", Value: "440"},
+			{Label: "Musics MV", Value: "441"}, {Label: "Musics Bluray", Value: "503"},
+			{Label: "Sports 720p", Value: "442"}, {Label: "Sport 8K/4320p", Value: "511"},
+			{Label: "Misc", Value: "409"},
+		},
+	}}
+	cases := []struct {
+		name       string
+		category   string
+		medium     string // Specification（encode/web/hdtv 形态）
+		source     string // SourceType（原盘/remux 形态——mediumStdKeyOf 归一源）
+		resolution string
+		audio      string
+		want       string
+	}{
+		{"电影 8K 原盘", "category.movie", "", "UHD Blu-ray", "4320p", "", "506"},
+		{"电影 4K 原盘", "category.movie", "", "UHD Blu-ray", "2160p", "", "499"},
+		{"电影 BD 原盘", "category.movie", "", "Blu-ray", "", "", "450"},
+		{"电影 UHD Remux", "category.movie", "", "REMUX", "2160p", "", "518"},
+		{"电影 Remux", "category.movie", "", "REMUX", "1080p", "", "415"},
+		{"电影 4K 压制", "category.movie", "encode", "", "2160p", "", "416"},
+		{"电影 1080p WEB", "category.movie", "web-dl", "", "1080p", "", "414"},
+		{"电影 720p", "category.movie", "encode", "", "720p", "", "413"},
+		{"电影 SD", "category.movie", "encode", "", "480p", "", "411"},
+		{"剧集 BD（错拼容错）", "category.tv_series", "", "Blu-ray", "", "", "453"},
+		{"剧集 1080p", "category.tv_series", "encode", "", "1080p", "", "436"},
+		{"综艺 Bluray（复数）", "category.tv_shows", "", "Blu-ray", "", "", "452"},
+		{"综艺 2160p", "category.tv_shows", "webdl", "", "2160p", "", "431"},
+		{"纪录 8K Remux", "category.documentary", "", "REMUX", "4320p", "", "529"},
+		{"纪录 4K 原盘", "category.documentary", "", "UHD Blu-ray", "2160p", "", "500"},
+		{"纪录 Remux", "category.documentary", "", "REMUX", "1080p", "", "421"},
+		{"动画 UHD Remux", "category.animation", "", "REMUX", "2160p", "", "531"},
+		{"动画 2160p", "category.animation", "encode", "", "2160p", "", "449"},
+		{"音乐 CD FLAC", "category.music", "", "CD", "", "FLAC", "440"},
+		{"音乐 APE", "category.lossless_music", "", "CD", "", "APE", "439"},
+		{"音乐 BD", "category.music", "", "Blu-ray", "", "", "503"},
+		{"MV", "category.mv", "", "", "", "", "441"},
+		{"体育 720p", "category.sports", "encode", "", "720p", "", "442"},
+		{"体育 8K（单数 Sport）", "category.sports", "encode", "", "4320p", "", "511"},
+	}
+	for _, c := range cases {
+	tp := titleparser.TechProfile{Specification: c.medium, SourceType: c.source, Resolution: c.resolution, AudioCodec: c.audio}
+		meta := &model.TorrentMetadata{Category: c.category}
+		v := hdhomeCategoryValue(cfg, "家园", meta, tp)
+		if v == nil || v.Value != c.want {
+			t.Errorf("%s: 应命中 %s，got %v", c.name, c.want, v)
+		}
+	}
+	if v := hdhomeCategoryValue(cfg, "好大", &model.TorrentMetadata{Category: "category.movie"}, titleparser.TechProfile{}); v != nil {
+		t.Fatal("非家园应不触发")
+	}
+	tp := titleparser.TechProfile{Specification: "encode"}
+	if v := hdhomeCategoryValue(cfg, "家园", &model.TorrentMetadata{Category: "category.movie"}, tp); v != nil {
+		t.Fatal("encode 无分辨率应不路由")
+	}
+	if v := hdhomeCategoryValue(cfg, "家园", &model.TorrentMetadata{Category: "category.education"}, titleparser.TechProfile{}); v != nil {
+		t.Fatal("education 应不路由（杂项概不接受）")
+	}
+}

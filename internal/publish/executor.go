@@ -1830,7 +1830,149 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := cbgCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
+	if v := hdhomeCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// hdhomeCategoryValue §59.420: 家园（hdhome.org）type 槽三维融合特化
+// （typeMappingOf 第四站——好大模式第三例放大版）。站方 type 种子区
+// 63 项=类型×媒介×分辨率三维编码（label 结构 "{Prefix} {Medium/Res}"
+// 统一），form_config 单键单值不可表达——**label 词形路由**（非硬编码
+// value：站方改值不破+错拼容错 "TVSereis"(453)+"TVShows"(452) 复数+
+// "Sport 8K"(511) 单数）。
+// prefix（category 键→归一大写前缀）：
+//   movie→MOVIES ｜ tv_series→TVSER ｜ tv_shows→TVSHOW ｜ documentary
+//   (单复数)→DOC ｜ animation→ANIME ｜ music/lossless_music→MUSICS
+//   （音频格式词 FLAC/APE 子路由）｜ sports→SPORT ｜ mv/music_video→
+//   MUSICS+MV ｜ 其余（education/ebook/software/game/concert 等）→nil
+//   （杂项站方概不接受/无独立项——通用链兜底）。
+// suffix 路由矩阵（medium 单源+resolution 归一，label 归一去连字符
+// 大写后 Contains 匹配）：
+//   uhd_bluray: 8K(r4320p)→"8K"+"UHD BD" ｜ 其余→"UHD"+"BLURAY"
+//   bluray→"BLURAY"（排除 UHD/8K）
+//   uhd_remux: 8K→"8K"+"REMUX" ｜ 其余→"UHD"+"REMUX"
+//   remux→"REMUX"（排除 UHD/8K）
+//   encode/webdl/webrip/hdtv/minibd/hddvd/dvd/dvdr/other+分辨率：
+//     r4320p→"4320P" ｜ r2160p→"2160P" ｜ r1080p→"1080P" ｜ r1080i→
+//     "1080I" ｜ r720p→"720P" ｜ sd→"SD" ｜ 空分辨率→nil
+//   music 类 cd/track 媒介→音频词形 FLAC/APE（tp.AudioCodec）
+// 匹配：prefix 子集内 suffix 词形首中；REMUX 项由 remux 族分支独占
+// （原盘分支排除 REMUX 词防 529 "Doc 8K UHD BD REMUX" 撞 8K 原盘）。
+// nil=非家园/无 prefix/无分辨率（encode 族）——通用链零变化。
+func hdhomeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "家园" || cfg == nil || meta == nil {
+		return nil
+	}
+	cat := meta.Category
+	prefix, isMusic := "", false
+	switch cat {
+	case "category.movie":
+		prefix = "MOVIES"
+	case "category.tv_series":
+		prefix = "TVSER" // 容错站方错拼 TVSereis(453)
+	case "category.tv_shows":
+		prefix = "TVSHOW" // 匹配单数 TVShow+复数 TVShows(452)
+	case "category.documentary", "category.documentaries":
+		prefix = "DOC"
+	case "category.animation":
+		prefix = "ANIME"
+	case "category.music", "category.lossless_music":
+		prefix, isMusic = "MUSICS", true
+	case "category.sports":
+		prefix = "SPORT" // 匹配单复数
+	case "category.mv", "category.music_video":
+		prefix = "MUSICS" // +MV 词形
+	default:
+		return nil
+	}
+	mediumKey := mediumStdKeyOf(tp, "")
+	resKey := extract.LookupStandardKey("resolution", tp.Resolution)
+	norm := func(s string) string {
+		return strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(s, "-", ""), " ", ""))
+	}
+	// 路由目标词形（norm 后 Contains 匹配）
+	type wordMatch struct{ words []string; exclude []string }
+	var m wordMatch
+	isMV := cat == "category.mv" || cat == "category.music_video"
+	switch {
+	case isMV:
+		m = wordMatch{words: []string{"MV"}, exclude: nil}
+	case isMusic && (mediumKey == "medium.cd" || mediumKey == "medium.track"):
+		// 音乐音频格式子路由（FLAC/APE）
+		ac := strings.ToUpper(tp.AudioCodec)
+		switch {
+		case strings.Contains(ac, "FLAC"):
+			m = wordMatch{words: []string{"FLAC"}}
+		case strings.Contains(ac, "APE"):
+			m = wordMatch{words: []string{"APE"}}
+		default:
+			return nil
+		}
+	case mediumKey == "medium.uhd_bluray":
+		if resKey == "resolution.r4320p" {
+			m = wordMatch{words: []string{"8K", "UHDBD"}, exclude: []string{"REMUX"}}
+		} else {
+			m = wordMatch{words: []string{"UHDBLURAY"}, exclude: []string{"REMUX"}}
+		}
+	case mediumKey == "medium.bluray":
+		m = wordMatch{words: []string{"BLURAY"}, exclude: []string{"UHD", "8K", "REMUX"}}
+	case mediumKey == "medium.uhd_remux", mediumKey == "medium.remux":
+		// 归一损失 UHD 维度（"UHD REMUX"→remux）——按分辨率分发：
+		// 8K(4320p)→8K REMUX（529 Doc）；2160p→UHD REMUX（518/531）；
+		// 其它→REMUX（415 等 BD Remux）
+		switch resKey {
+		case "resolution.r4320p":
+			m = wordMatch{words: []string{"8K", "REMUX"}}
+		case "resolution.r2160p":
+			m = wordMatch{words: []string{"UHD", "REMUX"}, exclude: []string{"8K"}}
+		default:
+			m = wordMatch{words: []string{"REMUX"}, exclude: []string{"UHD", "8K"}}
+		}
+	default:
+		// encode/webdl/webrip/hdtv/minibd/hddvd/dvd/dvdr/cd/track/other+分辨率
+		switch resKey {
+		case "resolution.r4320p":
+			m = wordMatch{words: []string{"4320P"}}
+		case "resolution.r2160p":
+			m = wordMatch{words: []string{"2160P"}}
+		case "resolution.r1080p":
+			m = wordMatch{words: []string{"1080P"}}
+		case "resolution.r1080i":
+			m = wordMatch{words: []string{"1080I"}}
+		case "resolution.r720p":
+			m = wordMatch{words: []string{"720P"}}
+		case "resolution.sd", "resolution.r480p", "resolution.r576p":
+			m = wordMatch{words: []string{"SD"}}
+		default:
+			return nil // encode 族无分辨率不路由（预览人工）
+		}
+	}
+	items := cfg.ValueMappings[model.FieldDomainType]
+	for i := range items {
+		label := norm(items[i].Label)
+		if !strings.HasPrefix(label, prefix) {
+			continue
+		}
+		ok, excluded := true, false
+		for _, w := range m.words {
+			if !strings.Contains(label, w) {
+				ok = false
+				break
+			}
+		}
+		for _, x := range m.exclude {
+			if strings.Contains(label, x) {
+				excluded = true
+				break
+			}
+		}
+		if ok && !excluded {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 // cbgCategoryValue §59.411: 藏宝阁（cangbao.ge）type 槽动画/动漫分立
