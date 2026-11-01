@@ -303,6 +303,7 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		"imdbid":         model.FieldDomainIMDbID,   // §59.399: 学校站编号形态（仅收 tt4154756）
 		"doubanid":       model.FieldDomainDoubanID, // §59.399: 学校站编号形态（仅收纯数字）
 		"durl":           model.FieldDomainDoubanURL, // §59.404: 海胆豆瓣链接独有字段名（dburl 第三形态）
+		"url_douban":     model.FieldDomainDoubanURL, // §59.423: 天空豆瓣链接独立字段名（dburl 第四形态）
 		"team_suffix":    model.FieldDomainTeam,     // §59.404: 海胆制作组自由文本框（无 team_sel——文本框形态）
 	}
 	// §59.373: current 配置的文本域字段名优先（壹吧简介 name=b——
