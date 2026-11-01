@@ -1114,7 +1114,13 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 	if v := diyMediumOption(cfg, tp, stdKey); v != nil {
 		return v
 	}
-	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
+	m := e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
+	// §59.419: 压制媒介按分辨率细分匹配（直查 miss 后 fallback——
+	// 站方按分辨率细分压制项：红豆饭 20/24/25/26 式四分）
+	if m == nil {
+		m = resolutionEncodeOption(cfg, tp, stdKey)
+	}
+	return m
 }
 
 // diyMediumOption §59.407: DIY 原盘媒介细分匹配（站方 DIY 项 label 直达）。
@@ -1143,6 +1149,94 @@ func diyMediumOption(cfg *model.PublishFormConfig, tp titleparser.TechProfile, s
 		isUHDFamily := strings.Contains(up, "UHD") || strings.Contains(up, "4K")
 		if isUHDFamily == wantUHD {
 			return &items[i]
+		}
+	}
+	return nil
+}
+
+// resolutionEncodeOption §59.419: 压制媒介按分辨率细分匹配（站方表单
+// 按分辨率细分压制项——红豆饭 §5.1 站方权威规则：Encode+1080p→
+// "1080P/i压制"/720p→"720P压制"/SD→MiniSD/UHD(4K)→"UHD压制"）。
+// §59.387 库非挂账（resolution×medium 联动零案例不预实施）第二站
+// 实施——站方文档规则锚+通用动态检测（label 压制/Encode+分辨率词形），
+// 未来站自动生效（§59.407 DIY 联动同款通用投资）。
+// 挂载位：mediumMappingOf 直查 miss 后 fallback（站方有通用 Encode 项
+// 的站直查已命中不进此函数语义；双保险再排除 label 精确 "Encode" 项）。
+// 分发：r2160p/r4320p→UHD 族；r1080p/r1080i→1080 族；r720p→720 族；
+// sd/其余→SD/MiniSD 族；目标族缺失按 UHD→1080→720→SD 降级链兜底
+// （族内取首项——数组序=站方表单序）。
+// nil=不触发（无细分项站零变化——库非 18 通用兜底不受影响）。
+func resolutionEncodeOption(cfg *model.PublishFormConfig, tp titleparser.TechProfile, stdKey string) *model.FormValueMapping {
+	if cfg == nil || stdKey != "medium.encode" {
+		return nil
+	}
+	resKey := extract.LookupStandardKey("resolution", tp.Resolution)
+	if resKey == "" {
+		return nil
+	}
+	items := cfg.ValueMappings[model.FieldDomainMedium]
+	for i := range items {
+		if strings.EqualFold(strings.TrimSpace(items[i].Label), "Encode") {
+			return nil // 站方有通用 Encode 项——通用兜底优先，特例不触发
+		}
+	}
+	var uhdOpt, opt1080, opt720, sdOpt *model.FormValueMapping
+	for i := range items {
+		up := strings.ToUpper(items[i].Label)
+		if !strings.Contains(up, "压制") && !strings.Contains(up, "ENCODE") &&
+			!strings.Contains(up, "MINISD") && !strings.EqualFold(strings.TrimSpace(up), "SD") {
+			continue
+		}
+		if strings.Contains(up, "DIY") { // 压制族不含 DIY 项（原盘 DIY 联动另管）
+			continue
+		}
+		switch {
+		case strings.Contains(up, "UHD") || strings.Contains(up, "4K"):
+			if uhdOpt == nil {
+				uhdOpt = &items[i]
+			}
+		case strings.Contains(up, "1080"):
+			if opt1080 == nil {
+				opt1080 = &items[i]
+			}
+		case strings.Contains(up, "720"):
+			if opt720 == nil {
+				opt720 = &items[i]
+			}
+		case strings.Contains(up, "MINISD") || strings.Contains(up, "SD"):
+			if sdOpt == nil {
+				sdOpt = &items[i]
+			}
+		}
+	}
+	if uhdOpt == nil && opt1080 == nil && opt720 == nil && sdOpt == nil {
+		return nil // 非细分站（无任何压制分辨率细分项）零触发
+	}
+	var want string
+	switch resKey {
+	case "resolution.r2160p", "resolution.r4320p":
+		want = "uhd"
+	case "resolution.r1080p", "resolution.r1080i":
+		want = "1080"
+	case "resolution.r720p":
+		want = "720"
+	default:
+		want = "sd"
+	}
+	// 目标族优先，缺失按 UHD→1080→720→SD 降级链兜底
+	for _, cand := range []struct {
+		key string
+		opt *model.FormValueMapping
+	}{
+		{"uhd", uhdOpt}, {"1080", opt1080}, {"720", opt720}, {"sd", sdOpt},
+	} {
+		if cand.opt != nil && cand.key == want {
+			return cand.opt
+		}
+	}
+	for _, cand := range []*model.FormValueMapping{uhdOpt, opt1080, opt720, sdOpt} {
+		if cand != nil {
+			return cand
 		}
 	}
 	return nil

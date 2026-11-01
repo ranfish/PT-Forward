@@ -418,3 +418,70 @@ func TestLookupOtherOptionPrefixVariant(t *testing.T) {
 		t.Fatal("无 Other 项站应返回 nil")
 	}
 }
+
+// §59.419: 压制媒介按分辨率细分匹配——红豆饭 §5.1 权威规则四分形态。
+func TestResolutionEncodeOption(t *testing.T) {
+	cfg := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainMedium: {
+			{Label: "UHD原盘", Value: "17", StandardKeys: []string{"medium.uhd_bluray"}},
+			{Label: "UHD DIY", Value: "18"},
+			{Label: "UHD Remux", Value: "19", StandardKeys: []string{"medium.uhd_remux"}},
+			{Label: "UHD压制", Value: "20"},
+			{Label: "BD原盘", Value: "21", StandardKeys: []string{"medium.bluray"}},
+			{Label: "BD Remux", Value: "23", StandardKeys: []string{"medium.remux"}},
+			{Label: "1080P/i压制", Value: "24"},
+			{Label: "720P压制", Value: "25"},
+			{Label: "MiniSD", Value: "26"},
+			{Label: "WEB-DL", Value: "5", StandardKeys: []string{"medium.webdl", "medium.webrip"}},
+		},
+	}}
+	cases := []struct {
+		resolution string
+		want       string
+	}{
+		{"2160p", "20"}, {"4320P", "20"},
+		{"1080p", "24"}, {"1080i", "24"},
+		{"720p", "25"},
+		{"480p", "26"}, {"576p", "26"}, // SD 族（r480p/r576p/sd 归 default）→MiniSD
+	}
+	for _, c := range cases {
+		tp := titleparser.TechProfile{Resolution: c.resolution}
+		v := resolutionEncodeOption(cfg, tp, "medium.encode")
+		if v == nil || v.Value != c.want {
+			t.Fatalf("Resolution=%q 应命中 %s 项，got %v", c.resolution, c.want, v)
+		}
+	}
+	// 空 Resolution→归一键空→不触发（medium 落空预览人工）
+	if v := resolutionEncodeOption(cfg, titleparser.TechProfile{}, "medium.encode"); v != nil {
+		t.Fatal("空 Resolution 应不触发")
+	}
+	// 非压制媒介不触发
+	tp := titleparser.TechProfile{Resolution: "1080p"}
+	if v := resolutionEncodeOption(cfg, tp, "medium.bluray"); v != nil {
+		t.Fatal("非 encode 媒介应不触发")
+	}
+	// 通用 Encode 项站不触发（label 精确 Encode——通用兜底优先）
+	cfg2 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainMedium: {
+			{Label: "Encode", Value: "18", StandardKeys: []string{"medium.encode"}},
+			{Label: "1080P/i压制", Value: "24"},
+		},
+	}}
+	if v := resolutionEncodeOption(cfg2, titleparser.TechProfile{Resolution: "1080p"}, "medium.encode"); v != nil {
+		t.Fatal("通用 Encode 项站应不触发（直查兜底优先）")
+	}
+	// 无细分项站零触发
+	cfg3 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainMedium: {{Label: "WEB-DL", Value: "5", StandardKeys: []string{"medium.webdl"}}},
+	}}
+	if v := resolutionEncodeOption(cfg3, titleparser.TechProfile{Resolution: "1080p"}, "medium.encode"); v != nil {
+		t.Fatal("无细分项站应返回 nil")
+	}
+	// 目标族缺失降级链（无 UHD 压制项的细分站→1080 压制兜底）
+	cfg4 := &model.PublishFormConfig{ValueMappings: map[string][]model.FormValueMapping{
+		model.FieldDomainMedium: {{Label: "1080P/i压制", Value: "24"}},
+	}}
+	if v := resolutionEncodeOption(cfg4, titleparser.TechProfile{Resolution: "2160p"}, "medium.encode"); v == nil || v.Value != "24" {
+		t.Fatal("UHD 种无 UHD 压制项应降级 1080 压制兜底")
+	}
+}
