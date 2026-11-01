@@ -408,6 +408,12 @@ func MergeDraftWithCurrent(current, draft *model.PublishFormConfig) (*model.Publ
 		Enabled:      current.Enabled || draft.Enabled,
 		Framework:    draft.Framework,
 		PreAuditURL:  current.PreAuditURL, // 预检 URL 非站方 HTML 信息——继承现配置
+		// §59.421 回归审核修复：布尔开关继承（HTML 无此信息——改版 apply 不重置）。
+		// 既有缺口：Anonymous 自 §59.159 上线起 apply 改版会静默重置匿名开关；
+		// Offer 新增同款。两开关唯一写点=set-anonymous/set-offer 端点（§59.328
+		// 两写入口竞争同族——apply 是另一写点，不携带即重置）。
+		Anonymous: current.Anonymous,
+		Offer:     current.Offer,
 		FormFields:   map[string]string{},
 		ValueMappings: map[string][]model.FormValueMapping{},
 		TagConfig:    current.TagConfig,

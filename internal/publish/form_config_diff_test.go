@@ -302,3 +302,33 @@ func TestParsePublishFormHTMLSpanTagsCurrentHint(t *testing.T) {
 		t.Fatal("标准 tags 前缀站行为应零变化")
 	}
 }
+
+// §59.421 回归审核：MergeDraftWithCurrent 布尔开关继承（改版 apply 不重置 Anonymous/Offer）。
+func TestMergeDraftInheritsBoolSwitches(t *testing.T) {
+	current := &model.PublishFormConfig{
+		Enabled: true, Anonymous: true, Offer: true,
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}}},
+		},
+	}
+	draft := &model.PublishFormConfig{
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {{Label: "电影", Value: "401"}},
+		},
+	}
+	merged, _ := MergeDraftWithCurrent(current, draft)
+	if !merged.Anonymous {
+		t.Fatal("改版 apply 应继承 Anonymous=true（此前静默重置——既有 bug）")
+	}
+	if !merged.Offer {
+		t.Fatal("改版 apply 应继承 Offer=true")
+	}
+	// 现配置关闭态不被反向打开
+	current2 := &model.PublishFormConfig{FormFields: map[string]string{}, ValueMappings: map[string][]model.FormValueMapping{}}
+	merged2, _ := MergeDraftWithCurrent(current2, draft)
+	if merged2.Anonymous || merged2.Offer {
+		t.Fatal("关闭态不应被反向打开")
+	}
+}
