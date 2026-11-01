@@ -838,7 +838,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hdkyl.in",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "www.hitpt.com": {
     "domain": "www.hitpt.com",
