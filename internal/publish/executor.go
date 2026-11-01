@@ -152,6 +152,15 @@ func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.T
 		First(&exclusion).Error; err == nil {
 		return true, fmt.Sprintf("源站 %s → 目标站 %s 存在发布排除规则", sourceSite, targetSite)
 	}
+	// ⑤ compliance 系统禁转（§59.143"红标不隐藏+提交兜底"设计的兜底层——
+	// 原挂死代码 Eligibility 从未生效，§59.409 附三同族补全）。nil 跳过
+	// （列表层先例——装配点 main 无条件注入，nil 仅测试构造）。判定输入=
+	// meta.Title 站方标题（发布消费权威——与列表用下载器名相比更严一格）。
+	if e.pipe.complianceChecker != nil {
+		if r := e.pipe.complianceChecker.CheckWithSite(ctx, meta.Title, sourceSite); r != nil && !r.Passed {
+			return true, fmt.Sprintf("系统禁转（compliance %s）：%s", r.Category, r.Reason)
+		}
+	}
 	return false, ""
 }
 
