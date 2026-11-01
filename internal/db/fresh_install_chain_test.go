@@ -82,6 +82,17 @@ func TestFreshInstallChain(t *testing.T) {
 		}
 		if s.PublishFormConfig == "" {
 			t.Errorf("已适配站 %s(%s) 新装链 publish_form_config 为空——配置交付断裂（检查该站 form_config migration 是否存在/是否依赖 seed 先行）", supp.NameCN, supp.Domain)
+			continue
+		}
+		// §59.422 附二：匿名发布=全系统默认开启（用户定案）。有 uplver
+		// 字段（匿名能力）的站 anonymous 必须默认 true——未来新站漏配
+		// 或 refresh migration 整配置重写丢键即红（§59.421 附布尔重置
+		// 同族防线：65/68 refresh 丢 anonymous 实证）。
+		cfg := model.ParseFormConfig(s.PublishFormConfig)
+		if cfg != nil && cfg.FormFields != nil {
+			if _, hasUplver := cfg.FormFields["uplver"]; hasUplver && !cfg.Anonymous {
+				t.Errorf("已适配站 %s(%s) 有 uplver 字段但 anonymous 默认 false——违反全系统匿名默认开启定案（migration107 落盘；检查该站 form_config/refresh migration 是否携带 anonymous:true）", supp.NameCN, supp.Domain)
+			}
 		}
 	}
 
