@@ -24,6 +24,12 @@ type PublishFormConfig struct {
 	// 勾选=该站发布默认匿名 uplver=yes；发布请求可显式覆盖）
 	Anonymous bool `json:"anonymous,omitempty"`
 
+	// Offer 候选发布站点默认（§59.421 用户定案：站点配置-发布配置勾选项——
+	// 勾选=该站发布走候选流程 offers/asoffer=yes；默认不勾=直接发布。
+	// checkbox 语义：勾=自愿进候选区（站方管理员审核）；优堡积分制/
+	// 家园 Crazy User 等级为站方后端强制路由层与此独立）
+	Offer bool `json:"offer,omitempty"`
+
 	// FormFields 逻辑域 → 表单字段名（站方 HTML 真名，如幸运 medium_sel[4] data-mode 后缀）
 	FormFields map[string]string `json:"form_fields,omitempty"`
 
@@ -50,6 +56,7 @@ const (
 	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
 	FieldDomainDoubanID    = "douban_id" // §59.399: 豆瓣编号形态（学校站 doubanid=24773958——subject/ 尾部编号提取）
 	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
+	FieldDomainOffer       = "offer"    // §59.421: 候选发布（checkbox value=yes——语义由 Offer 承载，域记录存在性；站方字段名两形态优堡 asoffer/家园 offers——form_fields 映射承载）
 	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"

@@ -332,6 +332,14 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 	if doc.Find("input[type='checkbox'][name='uplver']").Length() > 0 {
 		draft.FormFields[model.FieldDomainUplver] = "uplver"
 	}
+	// offer 候选发布（checkbox——存在性记录；语义由 form_config.Offer 承载。
+	// §59.421: 站方字段名两形态优堡 asoffer/家园 offers——记录实际名）
+	for _, n := range []string{"asoffer", "offers"} {
+		if doc.Find("input[type='checkbox'][name='" + n + "']").Length() > 0 {
+			draft.FormFields[model.FieldDomainOffer] = n
+			break
+		}
+	}
 
 	if len(draft.FormFields) == 0 {
 		return nil

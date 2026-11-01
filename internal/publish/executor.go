@@ -358,6 +358,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			form[field] = j.match.Value
 		}
 	}
+	// §59.421: 候选发布站点默认（form_config.Offer——站点配置勾选项）：
+	// 开启则提交时勾选站方候选 checkbox（优堡 asoffer/家园 offers——字段名
+	// 走 form_fields["offer"] 映射；默认不勾=直接发布）
+	if cfg.Offer {
+		if fn, ok := cfg.FormFields[model.FieldDomainOffer]; ok && fn != "" {
+			form[fn] = "yes"
+		}
+	}
 	// §59.289 fail-fast: 站方表单要求 type（FormFields 有域）但映射不出
 	// （元数据 category 无对应选项）——注定失败的上传不发出去，本地精准
 	// 拒发（修道院纪录片单复数错位案：type 不发→站方 Invalid integer
@@ -1648,7 +1656,7 @@ func buildFormLabels(cfg *model.PublishFormConfig, form map[string]string) map[s
 		model.FieldDomainTechInfo: "技术信息", model.FieldDomainIMDBURL: "IMDb",
 		model.FieldDomainPTGen: "豆瓣链接", model.FieldDomainDoubanURL: "豆瓣链接",
 		model.FieldDomainIMDbID: "IMDb编号", model.FieldDomainDoubanID: "豆瓣编号",
-		model.FieldDomainCNName: "中文名", model.FieldDomainUplver: "匿名发布",
+		model.FieldDomainCNName: "中文名", model.FieldDomainUplver: "匿名发布", model.FieldDomainOffer: "候选发布",
 	}
 	// 字段名 → 域名（FormFields 反查）
 	fieldToDomain := map[string]string{}

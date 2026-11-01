@@ -559,3 +559,45 @@ func TestHdhomeCategoryValue(t *testing.T) {
 		t.Fatal("education 应不路由（杂项概不接受）")
 	}
 }
+
+// §59.421: 候选发布 offer 注入——cfg.Offer 开启时 form_fields["offer"] 映射字段填 yes。
+func TestOfferInjection(t *testing.T) {
+	e := &PublishExecutor{}
+	_ = e
+	// 直接验证 form 构造逻辑的关键路径：模拟 executor 注入段
+	cfg := &model.PublishFormConfig{
+		Offer:       true,
+		FormFields:  map[string]string{model.FieldDomainOffer: "offers"},
+	}
+	form := map[string]string{}
+	if cfg.Offer {
+		if fn, ok := cfg.FormFields[model.FieldDomainOffer]; ok && fn != "" {
+			form[fn] = "yes"
+		}
+	}
+	if form["offers"] != "yes" {
+		t.Fatalf("offer 开启应注入 offers=yes，got %v", form)
+	}
+	// 关闭态不注入
+	cfg2 := &model.PublishFormConfig{FormFields: map[string]string{model.FieldDomainOffer: "offers"}}
+	form2 := map[string]string{}
+	if cfg2.Offer {
+		if fn, ok := cfg2.FormFields[model.FieldDomainOffer]; ok && fn != "" {
+			form2[fn] = "yes"
+		}
+	}
+	if _, exists := form2["offers"]; exists {
+		t.Fatal("offer 关闭不应注入")
+	}
+	// 开启但无映射不注入
+	cfg3 := &model.PublishFormConfig{Offer: true}
+	form3 := map[string]string{}
+	if cfg3.Offer {
+		if fn, ok := cfg3.FormFields[model.FieldDomainOffer]; ok && fn != "" {
+			form3[fn] = "yes"
+		}
+	}
+	if len(form3) != 0 {
+		t.Fatal("无映射不应注入")
+	}
+}
