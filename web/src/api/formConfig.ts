@@ -44,7 +44,7 @@ export const formConfigApi = {
     >('/publish/form-config/parse', { site_name: siteName, html })
   },
   setAnonymous(siteName: string, anonymous: boolean) {
-    return client.post<ApiResponse<{ ok: boolean }>>('/publish/form-config/set-anonymous', {
+    return client.post<ApiResponse<{ ok: boolean; warning?: string }>>('/publish/form-config/set-anonymous', {
       site_name: siteName,
       anonymous,
     })
