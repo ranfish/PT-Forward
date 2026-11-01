@@ -32,6 +32,16 @@
             />
             <small>站点默认——勾选后该站发布默认匿名（uplver）</small>
           </div>
+          <div v-if="current.form_fields?.offer" class="kv">
+            <span>候选发布</span>
+            <a-switch
+              :checked="current.offer || false"
+              checked-children="候选"
+              un-checked-children="直发"
+              @change="(v: boolean) => setOffer(v)"
+            />
+            <small>站点默认——勾选后该站发布提交候选区（{{ current.form_fields.offer }}）；默认直发</small>
+          </div>
           <div class="kv">
             <span>发布间隔</span>
             <a-input-number
@@ -155,6 +165,15 @@ async function setAnonymous(v: boolean) {
   if (!current.value || !props.siteName) return
   await formConfigApi.setAnonymous(props.siteName, v)
   current.value = { ...current.value, anonymous: v }
+}
+
+async function setOffer(v: boolean) {
+  if (!current.value || !props.siteName) return
+  const res = await formConfigApi.setOffer(props.siteName, v)
+  current.value = { ...current.value, offer: v }
+  if (res.data?.data?.warning) {
+    console.warn('[setOffer]', res.data.data.warning)
+  }
 }
 
 async function doParse() {

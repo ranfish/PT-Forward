@@ -14,6 +14,7 @@ export interface PublishFormConfig {
   framework?: string
   pre_audit_url?: string
   anonymous?: boolean
+  offer?: boolean
   form_fields?: Record<string, string>
   value_mappings?: Record<string, FormValueMapping[]>
   tag_config_legacy?: { mode?: string } | null
@@ -46,6 +47,12 @@ export const formConfigApi = {
     return client.post<ApiResponse<{ ok: boolean }>>('/publish/form-config/set-anonymous', {
       site_name: siteName,
       anonymous,
+    })
+  },
+  setOffer(siteName: string, offer: boolean) {
+    return client.post<ApiResponse<{ ok: boolean; warning?: string }>>('/publish/form-config/set-offer', {
+      site_name: siteName,
+      offer,
     })
   },
   apply(siteName: string, config: PublishFormConfig, note?: string) {
