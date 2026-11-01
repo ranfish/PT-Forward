@@ -1043,7 +1043,48 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 			return m
 		}
 	}
+	// §59.407: DIY 原盘媒介联动——原盘族（bluray/uhd_bluray）+ DIY 信号在场
+	// 且站方有 DIY 媒介细分项时优先匹配（六站受益：库非/壹吧/咖啡/五二/
+	// 冬樱/海的宝；触发条件动态检测非站名硬编码——未来站点有 DIY 项自动
+	// 生效零新代码，§59.380 联动同款通用投资）。DIY 信号=tags 列 tag.diy
+	// OR 标题 DIY 词形（双源）；DIY Remux 不触发（用户定案——六站均无
+	// Remux DIY 项，信号+Remux 键照旧选 Remux）；无 DIY 项/无信号/
+	// 非原盘媒介三重零触发面。
+	if v := diyMediumOption(cfg, tp, stdKey); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
+}
+
+// diyMediumOption §59.407: DIY 原盘媒介细分匹配（站方 DIY 项 label 直达）。
+// 匹配形态：各站 label 词形不一（"Blu-ray DIY"/"BD DIY"/"Blu-ray/DIY"/
+// "UHD Blu-ray/DIY"/"4K UHD DIY"）——统一按 UHD/4K 关键词分两族：
+// label 含 (UHD 或 4K) → UHD DIY 族；其余 → BD DIY 族；族内取首项
+// （数组序即站方表单序）。种子媒介键 uhd_bluray→UHD 族 / bluray→
+// BD 族。nil=不触发（零信号/非原盘族/站方无 DIY 项任一）。
+func diyMediumOption(cfg *model.PublishFormConfig, tp titleparser.TechProfile, stdKey string) *model.FormValueMapping {
+	if cfg == nil || (stdKey != "medium.bluray" && stdKey != "medium.uhd_bluray") {
+		return nil
+	}
+	// DIY 信号双源：标题 DIY 词形 OR RawTitle（TechProfile 无 tags 列——
+	// tags 由调用方 meta 传入场景少；标题词形是稳定主源，fetch 推断
+	// tag.diy 的上游依据也是标题/副标题词形——双源在标题侧收敛）
+	if !strings.Contains(strings.ToUpper(tp.RawTitle), "DIY") {
+		return nil
+	}
+	wantUHD := stdKey == "medium.uhd_bluray"
+	items := cfg.ValueMappings[model.FieldDomainMedium]
+	for i := range items {
+		if !strings.Contains(strings.ToUpper(items[i].Label), "DIY") {
+			continue
+		}
+		up := strings.ToUpper(items[i].Label)
+		isUHDFamily := strings.Contains(up, "UHD") || strings.Contains(up, "4K")
+		if isUHDFamily == wantUHD {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 // mediumStdKeyOf §59.380: 媒介 canonical 键推导单源（mediumMappingOf 主链
