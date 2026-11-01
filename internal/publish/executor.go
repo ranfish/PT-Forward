@@ -288,7 +288,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return fail("failed", "标题重组失败：标题不可解析且 PTGen 无英文名——重新获取数据后再发布")
 	}
 	jobs := []domainJob{
-		{model.FieldDomainType, e.typeMappingOf(cfg, in.TargetSite, meta)},
+		{model.FieldDomainType, e.typeMappingOf(cfg, in.TargetSite, meta, tp)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
 		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp)},
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
@@ -1617,16 +1617,84 @@ func (e *PublishExecutor) mergePTGenSource(ctx context.Context, tp *titleparser.
 	})
 }
 
-// typeMappingOf §59.391: type 槽映射统一入口（产区站特化+通用链）。
+// typeMappingOf §59.391: type 槽映射统一入口（产区站/媒介细分站特化+通用链）。
 // 葡萄产区×类型双维分类（站方 type 27 项——电影按产区三分/剧集四分/
 // 综艺四分）无法用 form_config 单键单值表达——产区类 label-only（防
 // lookupByStdKey 撞错），本入口按 PTGen 产区现算（§59.380 codec 联动
 // 同款跨槽特化先例）；非产区站/非产区类回退通用链零变化。
-func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+// §59.405: 好大媒介细分站（type 18 项——电影按媒介/分辨率细分 10 项）
+// 同入口第二站；非电影类回退通用链。
+func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
 	if v := sjtuRegionCategoryValue(cfg, siteName, meta); v != nil {
 		return v
 	}
+	if v := hdareaCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// hdareaCategoryValue §59.405: 好大（hdarea.club）type 槽媒介细分特化
+// （用户五定案 2026-11-01）。站方 type 18 项=电影按媒介/分辨率细分
+// 10 项（type×medium×resolution 三维融合——form_config 单键单值不可
+// 表达，葡萄产区模式第二站）。**仅 category.movie 走特化**——非电影
+// 类（动画 3D 归 405/MV/剧集等）回退通用链直配（416 命名 *Movies* 3D
+// 只服务电影）。
+// 路由矩阵（判定优先级自上而下，用户定案）：
+//  ① Stereo3D → 416（定案1：3D 最优先）
+//  ② uhd_bluray → 300 ｜ ③ bluray → 401 ｜ ④ remux/uhd_remux → 415
+//  ⑤ dvdr/dvd → 414 ｜ ⑥ webdl/webrip → 412（定案4：不看分辨率——
+//     4K WEB 也进，分辨率由 standard_sel 表达）｜ ⑦ hdtv → 413
+//  ⑧ 兜底（encode/minibd/hddvd/ipad 等）按分辨率（定案2/3）：
+//     2160p → 300 ｜ 1080p/1080i → 410 ｜ 720p → 411 ｜ SD/其它 → 414
+//     （414=DVD 分辨率宽语义=原盘/镜像/DVDRip/SD 重编码——用户定义）
+// 数据源：mediumStdKeyOf 媒介单源+tp.Resolution+tp.Stereo3D（§59.380
+// 联动同源）。
+func hdareaCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "好大" || cfg == nil || meta == nil {
+		return nil
+	}
+	if meta.Category != "category.movie" {
+		return nil // 非电影类回退通用链（B 组直配——用户定案5）
+	}
+	var target string
+	mediumKey := mediumStdKeyOf(tp, "")
+	switch mediumKey {
+	case "medium.uhd_bluray":
+		target = "300"
+	case "medium.bluray":
+		target = "401"
+	case "medium.remux", "medium.uhd_remux":
+		target = "415"
+	case "medium.dvdr", "medium.dvd":
+		target = "414"
+	case "medium.webdl", "medium.webrip":
+		target = "412"
+	case "medium.hdtv":
+		target = "413"
+	default:
+		// 兜底按分辨率（encode/minibd/hddvd/ipad/其它——iPad 与
+		// MiniBD 无专属分类，SD 并入 414 DVD 分辨率族——用户定案2/3）
+		switch extract.LookupStandardKey("resolution", tp.Resolution) {
+		case "resolution.r2160p", "resolution.r4320p":
+			target = "300"
+		case "resolution.r1080p", "resolution.r1080i":
+			target = "410"
+		case "resolution.r720p":
+			target = "411"
+		default:
+			target = "414"
+		}
+	}
+	if tp.Stereo3D != "" {
+		target = "416" // 定案1：3D 最优先（Movies 3D——电影类专属）
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == target {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
 }
 
 // regionClass 产区归类（§59.391 用户定案规则）：
