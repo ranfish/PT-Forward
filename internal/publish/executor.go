@@ -1010,12 +1010,12 @@ func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, tp titlep
 // video.h264/video.h265 有 CLI 惯例变体（AV1/VVC 无）。
 func lookupCLIVariant(cfg *model.PublishFormConfig, stdKey string) *model.FormValueMapping {
 	variants := map[string][]string{
-		"video.h264": {"X264", "x264"},
-		"video.h265": {"X265", "x265"},
+		"video.h264": {"X264", "x264", "X.264", "x.264"},
+		"video.h265": {"X265", "x265", "X.265", "x.265"},
 		// CLI 原始键形态（LookupStandardKey 对 x265 可能产出独立键——
 		// 折叠前直查即命中的站走此形态）
-		"video.x264": {"X264", "x264"},
-		"video.x265": {"X265", "x265"},
+		"video.x264": {"X264", "x264", "X.264", "x.264"},
+		"video.x265": {"X265", "x265", "X.265", "x.265"},
 	}
 	labels, ok := variants[stdKey]
 	if !ok {
