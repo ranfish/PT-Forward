@@ -40,6 +40,8 @@ func (h *FormConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleApply(w, r)
 	case strings.HasSuffix(path, "/publish/form-config/set-anonymous") && r.Method == http.MethodPost:
 		h.handleSetAnonymous(w, r)
+	case strings.HasSuffix(path, "/publish/form-config/set-offer") && r.Method == http.MethodPost:
+		h.handleSetOffer(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
 	}
