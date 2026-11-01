@@ -444,3 +444,34 @@ adapter.SkipTeam = true // Use team_suffix text field instead
 *数据来源: Playwright 采集 rules.php + upload.php (2026-04-22)*
 *文档创建: 2026-04-16*
 *文档更新: 2026-04-22（补充完整 rules.php 规则、Tracker URL、促销规则、魔力购买、账号保留、字幕区、upload 新增字段）*
+
+### 附：发布适配记录（v0.0.1254 §59.404）
+
+- **form_config**：migration89 分发（七槽 45 项）。实时 HTML 与 4 月
+  资产全槽一致；**四资产缺口实时补全**（tags/team/processing/source
+  全 None——全库最大资产缺口站）。无模式裸名字段（五二同款）。
+- **三特色**：①**无 team_sel——team_suffix 自由文本（必填）**：team
+  域映射文本框配 label=value 同值条目（FRDS="FRDS"——文本框填组名
+  本身非 select value；DryRun 压制种 team_suffix=FRDS 实证）；其它
+  组 miss 不填预览人工 ②**durl 豆瓣独有字段**（dburl 域第四站复用）
+  ③**tags 字段名 tag_list[]**（第二个非标准名——span[] 后；
+  §59.398 current 提示零新代码）。
+- season/episode 独立文本字段（剧集必填）：发布链无此域挂账（电影种
+  不适用；剧集种预览人工填）。原盘→original_disc+外语→english_audio
+  配键；无首发/禁转（站方无此标签✓）。
+- 槽位：type 9 标准值集双键×2+lossless_music；medium 8 乱序
+  （UHD=9/WEB=11/DVD=6）；codec 6 三重合并命名（联动零触发）+13
+  承接 [mpeg4,xvid]；audiocodec AC3 三键+True-HD 承接 Atmos 三键；
+  standard 5 p/i 分立第三站+540P→sd。
+- **过程两修**（formdiff 拦 2 条→裸对一致=工具+配置双问题）：
+  ①**域键配置错误**：首版误写 douban_url 键——域常量是 dburl
+  （葡萄实证；自校断言跟着想当然键名错——教训：form_fields 断言
+  必须对域常量）；29 刷正注意 json('null') 是设 null 值非删键
+  （键仍遍历出 removed——须 json_remove）②textFieldDomains 补
+  durl+team_suffix 两行（§59.398/399 同族第四案——team 域文本框
+  形态首例）。
+- **验证**：裸对 45 项逐字 ✓+formdiff 0 条（双零）+DryRun 双形态
+  全绿（404 纪录双键/11 WEB-DL/11 H.265/6 AAC/1 4K/durl+url 五
+  字段+tags=[国语,中字]；压制种 401/7 Encode/**12 DTS-HDMA**/
+  1 4K/**team_suffix=FRDS 文本框**/tags=[中字,外语]）。
+- 遗留：首颗真实发布（剧集种 season/episode 预览人工填）。
