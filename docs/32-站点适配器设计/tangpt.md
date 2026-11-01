@@ -460,3 +460,53 @@
 13. **认领系统**：上限 1000
 14. **游戏限制**：游戏类资源需上传员及以上等级才能自由上传
 15. **发布者双倍上传**：发布者获得双倍上传量
+
+### 附：发布适配记录（v0.0.1269 §59.416）
+
+- **form_config**：migration100 分发（七槽 112 项——type 9/medium 11/
+  codec 8/audiocodec 18/standard 7/team 31/tags 28）。实时 HTML
+  （74.8KB 直连）vs 本文档+4 月资产全槽一致+**tags 30→28 漂移**
+  （站方已删 自由(36)/纯享(22)）；type select 实名 name=type（本文
+  "browsecat"为 id 形态——单 type 无双区混入）；本文三处表数勘误
+  （team 称 32 实 31/audio 称 19 实 18/medium 称 12 实 11）。
+- **槽位映射**：type 9 乱序（414 其他=[other] 非标值+406 MV 三键
+  第七站 [mv,music_video,concert]+404 双键+409 音乐双键）；medium
+  11 全 canonical **UHD 独立分立**（Blu-ray(1)/UHD Blu-ray(10) 各
+  单键——有独立项分立不归并）+Remux 双键+WEB-DL 承接 webrip；
+  codec 8 合并命名（H.264/AVC——无 X26x 联动零触发）+VP8/9=[vp9]；
+  standard 7 **i/p 合并形态**（咖啡同款：1080 双键+其余 p 单键——
+  r720i/r1440i/r2160i/r4320i 无键）+480i/480P=[sd]+Other=
+  [resolution.other]（extended 活键）。
+- **audiocodec 18 项零 label-only 全配键（全库少有）**：TrueHD
+  Atmos=[atmos,truehd_atmos] 双键（好大先例——audioMappingOf 组合
+  路径活键）+DTS:X=[dtsx]+**AV3V=[av3v]**（extended 活键——站方
+  独有拼写）+M4A=[m4a]+LPCM=[lpcm]+DD/AC3=[ac3,dd] 双键+DTS/
+  DTS-HD MA/TrueHD/FLAC/APE/MP3/OGG/AAC/WAV/OPUS 全独立。
+- team 31 label-only：TPWEB(39) 官组+**FRDS(8) 在表直中第八站**+
+  LUCK 系三组+Other(5) 兜底+**CSWEB(38) 外站官组直配**（DryRun
+  财神源站种自动命中——车站外站官组入表机制复利）。
+- **tags 28 配键 10**：**大包=[big_pack] dict 有键无站消费首配**+
+  **禁转=[restricted]**（extended tag 域活键——禁转六词形禁转/
+  严禁转载/禁止转载/谢绝转载/谢绝搬运/限时禁转）+HDR 四键泛家族
+  第九站+**DV=[dolby_vision] 第六站**+DIY/国语/中字/粤语/完结/
+  分集；首发(45) 铁律 label-only+演唱会/特效/动画/短视频/情色/
+  自制/软件/游戏/书籍/恐怖/娱乐/玄学/写真/cosplay/NSFW/秀人网
+  18 label-only。
+- 字段：url+technical_info+uplver；**nfo 不配**（13城教训）；无
+  pt_gen（站方真无）；候选制走 offers.php 独立页（表单无 asoffer
+  控件）。
+- **配置键有效性体系核查（本站考古成果）**：dict（发布 canonical
+  16 audio 键/7 resolution 键）与 extended_standard_keys（39 audio
+  键/16 resolution 键+tag 域 24 键）双体系并存——发布链 audioMappingOf
+  三路查找（组合键 extended→dict canonical→extended），配置配
+  extended 键同样有效；**tag.restricted/audio.truehd_atmos 均为
+  extended 活键**（此前误判死键）；dtsx（"DTS X/DTS-X"词形）与
+  dts_x（"DTS_X"词形）双词形键并存——好大先例配 dtsx。
+- **验证**：裸对全槽逐字 ✓+formdiff 同栈 0 条（双零发版）+DryRun
+  双形态全绿（WEB-DL 纪录：404+**CSWEB 直配**+AAC；压制 FRDS：
+  401+**team=8 FRDS 直中第八站**+DTS-HD MA 全细分直配+tags=[中字,
+  DV,HDR] 双标命中）。
+- **站规发布预览人工把关**（垃圾堆系同款）：<100MB 禁+upscale 禁+
+  RMVB 禁+游戏候选制（上传员级）+RAR 禁+Dupe 媒介优先级+断种豁免
+  （45 日/18 月）+<5.1 有损音频禁（国粤 2.0 例外）。
+- 遗留：首颗真实发布。
