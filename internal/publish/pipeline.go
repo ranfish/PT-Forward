@@ -682,6 +682,12 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		return false, fmt.Sprintf("源站 %s → 目标站 %s 为互斥站点（硬编码规则）", candidate.SourceSite, targetSite)
 	}
 
+	// §59.409 附: 源站官种定向禁转（优堡 rules.php 首例——统一基建链
+	// 判官种，见 checkOfficialDirectedNoTransfer）
+	if blocked, reason := p.checkOfficialDirectedNoTransfer(ctx, candidate.SourceSite, candidate.TorrentName, targetSite); blocked {
+		return false, reason
+	}
+
 	// 用户自定义排除规则
 	if targetSite != "" && candidate.SourceSite != "" {
 		var exclusion model.PublishExclusion
@@ -734,7 +740,8 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	if containsStr(flags, "限转") {
 		// 72h 全站窗语义仅限名单映射站（深度站 rules.php 定义）——
 		// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
-		if _, ok := siteDirectedNoTransferTargets[siteName]; ok {
+		// 优堡虽在名单表（§59.409 附官种通道）但非"限转"语义站，排除。
+		if _, ok := siteDirectedNoTransferTargets[siteName]; ok && siteName != "优堡" {
 			for _, t := range siteDirectedNoTransferTargets[siteName] {
 				if t == targetSite {
 					return true, fmt.Sprintf("源站 %s 限转规则永久禁转至 %s（站规定向名单），跳过发布", siteName, targetSite)
@@ -761,12 +768,19 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	return false, ""
 }
 
-// siteDirectedNoTransferTargets §59.369 附二: 站规定向禁转名单单点——
-// 源站"限转"标签解除后仍永久禁转的目标站（规则页权威定义）。
-// 深度站 rules.php 首例："限转解除后，此类资源仍然禁转至 PTT、Rousi、
-// HDhome"（PTT=时间/Rousi=肉丝/HDhome=家园）。第二站出现再配置化。
+// siteDirectedNoTransferTargets §59.369 附二: 站规定向禁转名单单点。
+// 触发条件分站（§59.409 附起）：
+//   - 深度（首例）："限转"标签驱动——限转解除后仍永久禁名单站
+//     （rules.php："限转解除后，此类资源仍然禁转至 PTT、Rousi、HDhome"
+//     ——PTT=时间/Rousi=肉丝/HDhome=家园）。
+//   - 优堡（第二站，§59.409 附）：官种驱动——"任何官方资源(UBits/
+//     UBWEB/UBTV)，禁止转载到以下黑名单PT站点：PTTime，CMCT
+//     （SpringSunDay）"。CMCT=不可说已由 HardcodedExclusionPairs 双向
+//     互斥覆盖不重复；名单仅 PTTime=时间。docs/32 旧稿"HDSky 黑名单"
+//     为 4 月分析杜撰——实时 rules.php 无 HDSky（2026-11-01 实证勘误）。
 var siteDirectedNoTransferTargets = map[string][]string{
 	"深度": {"时间", "肉丝", "家园"},
+	"优堡": {"时间"},
 }
 
 // HardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改。
@@ -786,6 +800,35 @@ func IsHardcodedExclusion(sourceSite, targetSite string) bool {
 		return targets[targetSite]
 	}
 	return false
+}
+
+// checkOfficialDirectedNoTransfer §59.409 附: 源站官种定向禁转（优堡
+// rules.php 首例）。官种判定=统一基建链：util.ExtractGroupName（官方组
+// 版——@复合 DIY 形态归一到官方组后段）→ release_group_mappings 查表
+// （site_name+is_official——§59.20 第 0 层同款；优堡官组资产在表含
+// UBits/UBWEB/UBTV/SHB931@UBWEB 等行）。名单消费 siteDirectedNoTransferTargets。
+func (p *Pipeline) checkOfficialDirectedNoTransfer(ctx context.Context, sourceSite, torrentName, targetSite string) (bool, string) {
+	targets, ok := siteDirectedNoTransferTargets[sourceSite]
+	if !ok {
+		return false, ""
+	}
+	groupName := util.ExtractGroupName(torrentName)
+	if groupName == "" {
+		return false, ""
+	}
+	var mapping model.ReleaseGroupMapping
+	err := p.db.WithContext(ctx).
+		Where("LOWER(group_name) = LOWER(?) AND site_name = ? AND is_official = 1", groupName, sourceSite).
+		First(&mapping).Error
+	if err != nil {
+		return false, ""
+	}
+	for _, t := range targets {
+		if t == targetSite {
+			return true, fmt.Sprintf("源站 %s 官种(%s) 站规黑名单禁转至 %s，跳过发布", sourceSite, groupName, targetSite)
+		}
+	}
+	return false, ""
 }
 
 func parseTargetSites(s string) []string {

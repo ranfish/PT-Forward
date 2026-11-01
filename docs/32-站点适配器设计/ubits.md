@@ -39,21 +39,22 @@
 - **双语规则**：论坛发种规则中英双语
 - **禁止删除原站标识**：转载时保留原站标识（如DIY@UBits），删除者删种+警告+取消发布权限
 - **与不可说互斥**：禁止互相转载发布
-- **黑名单站点/制作组**：HDSky（-HDSky/@HDSky/-HDS/-HDSWEB/-HDSTV）、CMCT（-CMCT/@CMCT/-CMCTV/-CMCTA）资源禁止发布
-- **禁止官种转载至黑名单站**：PTTime、HDSky、CMCT（SpringSunDay）
+- **黑名单站点/制作组**：CMCT（-CMCT/@CMCT/-CMCTV/-CMCTA）资源禁止发布
+- **禁止官种转载至黑名单站**：PTTime、CMCT（SpringSunDay）
 - **发布者双倍上传量**（仅官组种子）
 
 ## ⚠ 转载互斥规则
 
 - **与不可说（SpringSunDay/CMCT）互斥**：禁止互相转载发布
-- **官种禁止转载至**：PTTime、HDSky、CMCT（SpringSunDay）
+- **官种禁止转载至**：PTTime、CMCT（SpringSunDay）
 - **带有"禁转"标签的种子**：禁止转载到其他站点
 
 ## 黑名单站点/制作组
 
 禁止发布以下来源的资源：
-- **HDSky**：-HDSky, @HDSky, -HDS, -HDSWEB, -HDSTV
 - **CMCT**：-CMCT, @CMCT, -CMCTV, -CMCTA
+
+> **勘误（2026-11-01 §59.409 附）**：旧稿曾记载 HDSky 黑名单（-HDSky/@HDSky/-HDS/-HDSWEB/-HDSTV）——为 4 月批量分析期杜撰，**站方 rules.php 实时无 HDSky**（官种禁转黑名单仅 PTTime+CMCT；上传黑名单小组仅 CMCT 系）。以 rules.php 实时原文为准。
 
 ## 发布页面字段
 
@@ -322,7 +323,7 @@
 - RMVB/RM/flv文件
 - RAR等压缩文件
 - 色情/敏感政治内容
-- **黑名单站点资源**：HDSky、CMCT 全系列
+- **黑名单站点资源**：CMCT 全系列
 - **非Untouched抓取的2D原盘以ISO封装**（3D除外）
 - **破解软件/游戏破解版/工具软件**（因无法鉴别安全性）
 - **人为将合集拆分成小种子**
@@ -366,7 +367,7 @@
 1. **仅源站角色**：官组非常活跃，不适合做发布站
 2. **种审制**：发布后需等待审核，增加发布延迟
 3. **与不可说互斥**：禁止互相转载发布
-4. **黑名单制作组**：HDSky、CMCT 全系列资源禁止发布
+4. **黑名单制作组**：CMCT 全系列资源禁止发布（2026-11-01 勘误：旧稿含 HDSky 为杜撰，rules.php 实时无）
 5. **禁止删除原站标识**：转载时保留原站标识，违者严惩
 6. **制作组仅4个**：UBits/UBWEB/UBTV/Other，转载只能选Other
 7. **编码含AVS**：有国产AVS编码选项
@@ -415,8 +416,9 @@
   优堡表——外站组落 Other）+**tags=[中字,杜比视界,HDR10] HDR
   细分独立首次实战**（杜比可与任意 HDR* 共存——站方互斥规则））。
 - **发布注意**（站规）：候选制（积分<10 asoffer 不勾）；转载互斥
-  （不可说 CMCT 互斥/官种禁转 PTTime HDSky CMCT）；黑名单组
-  HDSky/CMCT 系禁发——发布预览人工规避；url/pt_gen/
+  （不可说 CMCT 互斥/官种禁转 PTTime+CMCT）；上传黑名单
+  CMCT 系禁发——发布预览人工规避（HDSky 为旧稿杜撰已勘误——rules.php
+  实时无）；url/pt_gen/
   technical_info 2025.04.11 后必填。
 - 遗留：首颗真实发布（_token 校验+source_sel 必填+候选制积分
   三验证）。

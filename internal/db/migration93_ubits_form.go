@@ -17,7 +17,8 @@ import (
 // 预取 token 通用增强另案）。
 // 槽位特化：
 //   - **候选制站**（积分<10 自动候选区）：asoffer 不勾不配；
-//     **转载互斥+黑名单**（HDSky/CMCT 系组禁发——发布预览人工规避）
+//     **转载互斥+黑名单**（CMCT 系组禁发——发布预览人工规避；
+//     旧稿 HDSky 为杜撰已勘误 rules.php 实时无）
 //   - type 10 项：409 演唱会(Misic Videos)=[concert,mv,music_video]
 //     三键承接（站方拼写错误 Misic 原文——克隆同款合并语义）+
 //     **415 有声书=audiobook（实时新增首配）**+406 音乐CD=
