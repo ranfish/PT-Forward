@@ -265,7 +265,8 @@
     "publish_form_fields": {
       "douban": ""
     },
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "hdtime.org": {
     "domain": "hdtime.org",
