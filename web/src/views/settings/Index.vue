@@ -367,19 +367,29 @@ async function saveSettings() {
     for (const [key, value] of entries) {
       await settingsApi.update(key, { value })
     }
-    // §59.367 附六: github_token 三态——脱敏哨兵=保持不动（跳过）｜空=清除
-    //（DELETE——"选中删除+保存"路径）｜其它=新值覆盖。哨兵含 **** 与真
-    // token（字母数字）字符集不相交，输入值不可能撞哨兵。
+    // §59.367 附六: github_token 四态——已配置态三态（脱敏哨兵=保持不动
+    // （跳过）｜空=清除（DELETE——"选中删除+保存"路径）｜其它=新值覆盖）
+    // + **未配置态写入**（§59.403：28 环境案——首配时 masked 为空，旧条件
+    // `masked && ...` 恒 false 整个分支被短路，用户输入的真 token 静默
+    // 丢弃不落库；其它环境均 1211 前配好（masked 恒非空）无感——三态
+    // 重构漏了第四态"未配置→新值写入"）。哨兵含 **** 与真 token（字母
+    // 数字）字符集不相交，输入值不可能撞哨兵。
     const tok = form.githubToken.trim()
-    if (githubTokenMasked.value && tok !== githubTokenMasked.value) {
-      if (tok) {
-        await settingsApi.update('github_token', { value: tok })
-      } else {
-        await settingsApi.remove('github_token')
+    if (githubTokenMasked.value) {
+      if (tok !== githubTokenMasked.value) {
+        if (tok) {
+          await settingsApi.update('github_token', { value: tok })
+        } else {
+          await settingsApi.remove('github_token')
+        }
       }
+    } else if (tok) {
+      // 未配置态：输入新值直接写入（首配路径——28 环境案修复）
+      await settingsApi.update('github_token', { value: tok })
     }
     message.success(t('settings.settingsSaved'))
-    if (githubTokenMasked.value && tok !== githubTokenMasked.value) {
+    // §59.403: 三态变化（覆盖/清除/首配）统一刷新——哨兵保持（tok==masked）不刷
+    if (tok !== githubTokenMasked.value) {
       await fetchSettings()
     }
   } catch (e: unknown) {
