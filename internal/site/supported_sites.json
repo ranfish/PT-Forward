@@ -529,6 +529,8 @@
     "cookiecloud_domain": "pt.muxuege.org",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+ ,
+    "publish_supported": true
   },
   "pt.novahd.top": {
     "domain": "pt.novahd.top",
