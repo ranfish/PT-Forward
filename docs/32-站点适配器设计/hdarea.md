@@ -529,3 +529,29 @@ func mapHDAreaCategory(standardCat string) int {
 *数据来源: upload.php HTML (68458字节) + rules.php HTML (45088字节) + 论坛#6126盒子规则 (30729字节) + 论坛#6123完结剧规则 (27574字节) + HDApt Auto Transfer 源码分析 (2026-04-17/2026-04-22)*
 *文档创建: 2026-04-17*
 *文档更新: 2026-04-22 — 补充完整 rules.php 规则、盒子规则(#6126)、完结剧规则(#6123)、字幕区规则、Tracker URL*
+
+### 附：发布适配记录（v0.0.1255 §59.405）
+
+- **form_config**：migration90 分发（六槽 83 项——type 18/medium 9/
+  codec 10/audiocodec 28/standard 5/team 13）。实时 HTML 与 4 月资产
+  全槽一致；tags/processing/source 站方真无。无模式裸名字段。
+- **★ type 18 项=电影按媒介/分辨率细分 10 项（三维融合）**：
+  hdareaCategoryValue 特化（**用户五定案 2026-11-01**——§59.391
+  葡萄模式第二站 typeMappingOf 统一入口挂载）：①3D 最优先 ②-⑦
+  媒介路由（UHD→300/BD→401/REMUX→415/DVD→414/WEB-DL→412 不看
+  分辨率/HDTV→413）⑧兜底按分辨率（Encode+4K→300/SD→414 DVD
+  分辨率宽语义/iPad 与 MiniBD 走 410/411）；仅 category.movie 走
+  特化（B 组直配——动画 3D 归 405）；电影 10 项 label-only 防撞键。
+- **dburl 收豆瓣 ID 数字**（douban_id 编号域第二站——id 属性叫
+  douban_url 但 name=dburl 以 name 为准；DryRun dburl=35123121 纯
+  数字实证）。
+- 槽位：medium 9 乱序+Blu-ray 归并 UHD；codec 合并命名+AVS 配键；
+  audiocodec 28 项全库最多级别（DD5.1/DD2.0 通道分立+DDP 独立+
+  XLL=dts_hd_ma 别名+DSD/TTA/MPEG/AV3A 配键；Vorbis/WMA/AC-4/
+  MPEG-H/MQA 无键 label-only）；standard p/i 分立第四站；team 13
+  label-only（HDArea 官组+外站十一组含 cXcY）。
+- **验证**：裸对 83 项逐字 ✓+formdiff 0 条（双零）+测试锚 19 态+
+  DryRun 双形态全绿——**特化路由核心命中**：压制 4K 电影→
+  **type=300**（定案2 生效）+纪录片 WEB-DL→**404** B 组直配
+  （定案5）+DTS-HD MA（XLL 别名）直配。
+- 遗留：首颗真实发布。
