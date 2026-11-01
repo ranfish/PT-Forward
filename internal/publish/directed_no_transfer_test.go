@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -279,5 +280,49 @@ func TestPreflightNoTransfer(t *testing.T) {
 	}
 	if blocked, _ := e.preflightNoTransfer(ctx, &m5, ""); blocked {
 		t.Fatal("空目标站应放行（防御）")
+	}
+}
+
+// §59.409 附三: compliance 第五序——§59.143"红标不隐藏+提交兜底"设计的
+// 兜底层（原挂死代码从未生效）。两态：规则命中拦 / 无规则放行（含 nil 跳过）。
+func TestPreflightCompliance(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.ReleaseGroupMapping{},
+		&model.PublishExclusion{}, &model.ComplianceRule{}); err != nil {
+		t.Fatal(err)
+	}
+	checker := compliance.NewChecker(db, zap.NewNop())
+	pipe := &Pipeline{db: db, logger: zap.NewNop(), complianceChecker: checker}
+	e := &PublishExecutor{pipe: pipe, db: db, logger: zap.NewNop()}
+	ctx := context.Background()
+
+	meta := &model.TorrentMetadata{InfoHash: "cf1", SiteName: "朋友", Title: "Normal Movie 2024"}
+
+	// ① 无规则：放行
+	if blocked, _ := e.preflightNoTransfer(ctx, meta, "克隆"); blocked {
+		t.Fatal("无 compliance 规则应放行")
+	}
+
+	// ② nil checker：跳过不 panic（测试构造防御态）
+	e2 := &PublishExecutor{pipe: &Pipeline{db: db, logger: zap.NewNop()}, db: db, logger: zap.NewNop()}
+	if blocked, _ := e2.preflightNoTransfer(ctx, meta, "克隆"); blocked {
+		t.Fatal("nil checker 应跳过放行")
+	}
+
+	// ③ forbidden_keyword 规则命中：拦
+	if err := db.Create(&model.ComplianceRule{
+		RuleType: model.RuleTypeForbiddenKeyword, Pattern: "Normal Movie",
+		Scope: "publish", Source: "builtin",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if blocked, reason := e.preflightNoTransfer(ctx, meta, "克隆"); !blocked {
+		t.Fatal("compliance 规则命中应拦")
+	} else if !strings.Contains(reason, "系统禁转") {
+		t.Fatalf("文案缺系统禁转标识: %s", reason)
 	}
 }
