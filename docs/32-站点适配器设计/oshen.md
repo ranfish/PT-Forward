@@ -353,3 +353,39 @@ H.265/HEVC 的值为 **10**（而非6），转种映射时需注意。
 *分析时间：2026-04-16*
 *最后更新：2026-04-22*
 *数据来源：https://www.oshen.win/rules.php + https://www.oshen.win/upload.php 发布页面 HTML 分析*
+
+### 附：发布适配记录（v0.0.1288 §59.431）
+
+- **form_config**：migration115 分发（六槽 48 项——type 10/medium 9/
+  codec 6/standard 5/team 11/tags 7）。实时 HTML（40.6KB 直连）vs
+  4 月资产全槽一致（零漂移站）；**文档 §1.3"无 url"为漂移**（实时实证
+  url 真字段在——data-pt-gen="url"；实时为准配 imdb_url 域）。
+- type 10：**408 高清音乐/409 音乐分立各单键**（[lossless_music]/
+  [music]——站方无损/一般音乐分立，历史站合并项双键不适用）+406/404
+  双键+410=[game]+402 连续剧=[tv_series]。
+- **medium 9 全配键零 label-only（大青虫后第二例媒介全 canonical）**：
+  倒序乱序（Track 9 首→Blu-ray 1 尾）+HD DVD/DVDR/MiniBD 全在——
+  Blu-ray=[bluray,uhd_bluray]/Remux=[remux,uhd_remux] 双键归并（站方
+  无 UHD 分立项——好大/浦园先例）+Track/CD/DVDR/HDTV/MiniBD/Encode/
+  HD DVD 各单键；**无 WEB-DL 项**（WEB-DL 种 miss 落空预览人工——
+  不猜 Encode 归并，站方用户实态未知）。
+- codec 6 简短命名全配（藏宝阁同款）：H.265/HEVC **值 10 非序号连续**
+  （文档 §5.2 警示）+无 X26x CLI 形态（压制联动零触发=站方语义——
+  DryRun ② 压制种 codec=1 H.264 不联动实证）。
+- standard 5：4K/UHD 置尾乱序（5）+1080p/i 分立全配键。
+- **无 audiocodec 槽第四站**（GTK/克隆/三月后）；team 11：OshenPT
+  官组+外站八组（HDS/CHD/MySiLU/WiKi 标准四组+CMCT/SCSG/HDTIME/
+  PTHOME/52pt）label-only+Other=[team.other] 兜底。
+- tags 7：**首发(2)/官方(3) 绝不配键（财神雷区）**+禁转(1) 不配+
+  DIY/国语/中字 配键+HDR 四键泛家族（16 站）。
+- 字段：url+uplver+anonymous:true；无 pt_gen/technical_info（实时
+  实证）；nfo 不配。
+- **验证**：裸对全槽一致+formdiff 0 条（双零）+DryRun 三形态（① UHD
+  原盘→401+medium=1 双键归并+codec=10+standard=5 置尾+tags=[中字,HDR]
+  ✓/② MI 压制→medium=7 Encode+codec=1 不联动+tags=[DIY,国语] ✓/
+  ③ 无损音乐→408 分立单键 ✓+medium None=音乐形态 CD/Track 预览人工
+  正确）。
+- 站规人工把关：Dupe 标准 HD 媒介优先级（Blu-ray>HD DVD>HDTV>DVD+
+  同媒介同分辨率一组优先）+游戏 5 题候选+RAR 禁+总量≥400MB（音乐
+  豁免）+促销自动 2xFree+吸血封号+H&R 无强制。
+- 遗留：首颗真实发布。
