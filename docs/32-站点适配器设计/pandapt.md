@@ -395,3 +395,50 @@ GPTHD、SeeWeb、DreamHD、BlackTV、Xiaomi、Huawei、MOMOHD、DDHDTV、Nukehd�
 8. **黑名单制作组多**：25+个黑名单组，转载前需检查
 9. **候选区修改时限**：收到站务要求修改后7天内完成，否则删种扣200魔力
 10. **简介排序严格要求**：海报-简介-info-截图的固定顺序
+
+### 附：发布适配记录（v0.0.1290 §59.434）
+
+- **form_config**：migration117 分发（七槽 78 项——type 11/medium 12/
+  codec 8/audiocodec 13/standard 6/team 9/tags 19）。实时 HTML
+  （63KB 直连）vs 4 月资产全槽一致（零漂移站）；本文档 §60"站点特色：
+  无 AV1"为过时表述（实时+资产 codec 均含 AV1(8)）。
+- **双模式站**（mode=4 种子区/5 特别区——type 双区 browsecat/specialcat
+  §59.372 判别+§59.388 模式互斥过滤自动护）；发布链走种子区——特别区
+  电子书/有声书/MV/音乐 type miss 落空预览人工（我的PT/OKPT 定案）；
+  **team 种子区/特别区同名不同 ID**（Panda diy=6/25 等——配置只做 [4]
+  区，特别区发布需手选）。
+- type 11：**415 短剧第十四站**+413 演唱会/音乐会=[concert] 单键（我堡
+  419 同款独立分类）+412/411/404 双键。
+- **medium 12 全配键零 label-only（大青虫/奥申后第三例媒介全 canonical
+  大满贯）**：UHD/Blu-ray 分立+UHDTV/MiniBD/HD DVD/DVDR/Track 全在+
+  Remux=[remux,uhd_remux] 双键归并（无独立 UHD Remux 项）+WEB-DL=
+  [webdl,webrip]。
+- codec 8 合并命名零联动（HEVC/H.265/x265 一项）+VP8/VP9/AV1/VC-1/
+  Xvid/MPEG-2/Other 全配。
+- audiocodec 13：**TrueHD Atmos/TrueHD 分立+DTS-HD/DTS-HR 分立**（站方
+  细粒度分立各单键——无需家族承接）+DTS-X=[dtsx]+AV3A=[av3a]
+  （extended 活键躺平/麒麟先例）+DD/AC3=[ac3,dd]+DDP/EAC3=[ddp]+
+  LPCM/PCM=[lpcm,pcm] 双键合并。
+- standard 6：4320k/8K 首乱序+SD(7) 尾全配键。
+- team 9：Panda 系官组（原盘 diy/Remux/压制）+AilM 系（Web/TV/
+  Upscale）+CatEDU（部分禁转）+Red Leaves 红叶 label-only（官组绝不
+  配键——组映射层 label 直配，PANDA/AilM 系资产在表）+Other=
+  [team.other] 兜底。
+- source_sel[4]=产区槽不配（CHN/EU/HK/JPN/KOR/IND/SEA 8 区——产区
+  语义历史定案预览人工）。
+- tags 19 配键 11 项：DIY/完结/分集=[ongoing]/国语/粤语/中字/特效+
+  **HDR 四族细分独立（优堡/天空/家园/我堡后第五站）**：杜比视界/
+  HDR10+/HDR10/菁彩HDR/HLG 五键独立；禁转不配+驻站（官方专属）/
+  纯净版/横屏HOR/竖屏VER/应求/自购（官方专属）label-only。
+- 字段：**tmdb 独立字段首见**（data-pt-gen="tmdb"——发布链无 tmdb 域
+  不配，TMDB 信息走 pt_gen 链）+url+**pt_gen 真字段**（data-pt-gen=
+  "pt_gen" 带获取按钮）+technical_info+uplver+anonymous:true；approval
+  （候选发布勾选——默认不勾直发不配，同 offers 定案）；nfo 不配。
+- **验证**：裸对全槽一致+formdiff 0 条（双零）+DryRun 三形态（① WEB-DL
+  电影→401+10+tags=[中字,杜比视界,HDR10] 三标全中 ✓/② UHD Remux→
+  medium=3 双键归并+standard=5+audio=3 DTS-HD 分立单键 ✓/③ 短剧→
+  415 ✓）+48 包全绿。
+- 站规人工把关：标题规范（电影/剧集/音乐类命名）+简介格式（影视类
+  引用 PTGen）+站免池+复活区+官方组导航（按媒介筛选）+CatEDU 部分
+  禁转。
+- 遗留：首颗真实发布。
