@@ -652,3 +652,55 @@ func TestHdskyCategoryDualRoute(t *testing.T) {
 		t.Fatalf("他站不应触发，得 %v", v)
 	}
 }
+
+// §59.424: 系统级禁发剧集分集（用户定案全链——范围/形态/完结信号/P1 P2/全集一集/边界）。
+func TestEpisodeReleaseBlocked(t *testing.T) {
+	tpOf := func(se string) titleparser.TechProfile { return titleparser.TechProfile{SeasonEpisode: se} }
+	mk := func(cat, title, subtitle, tags, ptgen string) *model.TorrentMetadata {
+		return &model.TorrentMetadata{Category: cat, Title: title, Subtitle: subtitle, Tags: tags, PTGenSourceJSON: ptgen}
+	}
+	SER := `{"region":["美国"],"episodes":"12"}`
+	EP1 := `{"region":["美国"],"episodes":"1"}`
+
+	cases := []struct {
+		name    string
+		meta    *model.TorrentMetadata
+		se      string
+		blocked bool
+	}{
+		// 范围与形态豁免
+		{"电影带SE形态豁免（范围外）", mk("category.movie", "Show S01E05 1080p", "", "", SER), "S01E05", false},
+		{"短剧豁免", mk("category.short_drama", "剧 S01E05", "", "", SER), "S01E05", false},
+		{"动漫电影无SE豁免", mk("category.animation", "剧场版 2023 1080p", "", "", ""), "", false},
+		{"纯季合集放行", mk("category.tv_series", "Show S01 1080p", "", "", SER), "S01", false},
+		{"跨季合集放行", mk("category.tv_series", "Show S01-S02 1080p", "", "", SER), "S01-S02", false},
+		// 拦截核心场景
+		{"剧集单集无信号拦", mk("category.tv_series", "Show S01E05 1080p", "第5集", "", SER), "S01E05", true},
+		{"动漫单集无信号拦", mk("category.animation", "番组 S01E05 1080p", "", "", SER), "S01E05", true},
+		{"综艺单集无信号拦", mk("category.tv_shows", "综艺 S01E03 1080p", "", "", SER), "S01E03", true},
+		{"非E01起区间拦", mk("category.tv_series", "Show S01E05-E10", "", "", SER), "S01E05-E10", true},
+		{"E01起区间无完结信号拦（归一未命中）", mk("category.tv_series", "Show S01E01-E10", "", "", SER), "S01E01-E10", true},
+		// 完结信号三来源放行（任一即放——宁放勿拦）
+		{"信号①源站tags complete放", mk("category.tv_series", "Show S01E05 1080p", "", `["complete"]`, SER), "S01E05", false},
+		{"信号②主标Complete放", mk("category.tv_series", "Show Complete Series S01E05", "", "", SER), "S01E05", false},
+		{"信号②主标中文完结放", mk("category.tv_series", "某剧 全集 S01E05", "", "", SER), "S01E05", false},
+		{"信号③副标中文完结放", mk("category.tv_series", "Show S01E05 1080p", "全12集完结", "", SER), "S01E05", false},
+		{"信号③副标英文Complete放（P2直查）", mk("category.tv_series", "Show S01E05 1080p", "Season 1 Complete", "", SER), "S01E05", false},
+		// 全集一集（BBC 单剧）
+		{"单集E01∧eps=1全集放行", mk("category.tv_series", "BBC Single Drama S01E01", "", "", EP1), "S01E01", false},
+		{"单集E01∧eps=12仍拦（非全集）", mk("category.tv_series", "Show S01E01", "", "", SER), "S01E01", true},
+		// 词形防御
+		{"incomplete不误命中Complete", mk("category.tv_series", "Show S01E05 Incomplete", "", "", SER), "S01E05", true},
+	}
+	for _, c := range cases {
+		tp := tpOf(c.se)
+		blocked, _ := episodeReleaseBlocked(c.meta, &tp)
+		if blocked != c.blocked {
+			t.Errorf("%s: 期望 blocked=%v 实得 %v", c.name, c.blocked, blocked)
+		}
+	}
+	// nil 防御
+	if b, _ := episodeReleaseBlocked(nil, nil); b {
+		t.Error("nil 输入应不拦")
+	}
+}
