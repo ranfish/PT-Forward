@@ -912,7 +912,8 @@
     "cookiecloud_domain": "www.oshen.win",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "blocked",
-    "special_notes": "奥申 - 空页面"
+    "special_notes": "奥申 - 空页面",
+    "publish_supported": true
   },
   "www.pttime.org": {
     "domain": "www.pttime.org",
