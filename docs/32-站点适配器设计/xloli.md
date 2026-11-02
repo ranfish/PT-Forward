@@ -562,3 +562,64 @@
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-17*
+
+### 附：发布适配记录（v0.0.1303 §59.447）
+
+- **form_config**：migration130 分发（七槽 79 项——type 10/medium 9/
+  codec 6/audiocodec 12/standard 6/team 15/tags 21）。实时 HTML
+  （55.5KB 代理）vs 资产差异：**team -ADE(55)/@ADE(56) 新增**（资产
+  13→16——@ADE @子组形态双行式）+**bangumi_url/tmdb_id/mal_id 三
+  番组编号字段资产未捕获**（实时发现——发布链无域不配熊猫 tmdb
+  定案）。
+- **双模式站**（type×2 同 name 裸名：mode=4 普通区 10 项✓/成人区
+  12 项 418-429 AV/里番/H 系/写真/音声⛔——§59.372 双 type 互斥
+  双防线+§59.388 模式后缀过滤双防线自动护——**[6] 槽全套混入**
+  （source/medium/codec/audiocodec/standard/team/tags 七槽成人区
+  控件一并过滤——模式后缀过滤通用性验证）；发布链走普通区）。
+- type 10（普通区）：**410 舞台演出=[concert] 单键**+408 音乐双键+
+  **411 漫画/CG杂图/动漫杂志 label-only**+404 双键+430 综艺非标=
+  [tv_shows]。
+- medium 9：UHD Blu-ray(14)/Blu-ray(1) 分立各单键+Remux(3) 双键
+  归并+Encode+HDTV+WEB-DL(12)=[webdl,webrip] 双键承接+**DVD(2)=
+  [dvd] 单键（无 DVDR 项）**+CD+Other。
+- codec 6 合并命名零联动：**AVC/x264(9)=[h264]+HEVC/x265(8)=
+  [h265] 合并项语义第八站反证**（§59.380 label 精确匹配 x264/
+  x265 不触发=站方合并项——车站先例）+AV1/VC-1/MPEG-2/Other。
+- **audiocodec 12 全配键**：**AC3/DD(13)=[ac3,dd] 双键+DDP/E-AC3
+  (20)=[ddp] 单键（eac3 无键 ddp 承接——Nova 先例）**+DTS:X(23)
+  =[dtsx]+**OPUS(24) ext 活键**+AAC/MP3/FLAC/DTS/TrueHD/LPCM/
+  DTS-HD MA/Other。
+- standard 6：2160p/4K(5) 斜杠合并+1080p/i 分立+720p+SD+Other=
+  [resolution.other]。
+- team 15（配置侧）：**VCB-Studio/7³ACG/AI-Raws/ANK-Raws/
+  LittleBakas!/mawen1250/jsum@U2/Moozzi2/Snow-Raws/-ADE/@ADE/
+  CMCT/GodDramas/beAst 动漫 raws 组大表 label-only**+Other(5)=
+  [team.other] 兜底。
+- **tags 21 五绝不配**（**R18(8)/禁转(1)/原创(20)/自购(15)/首发
+  (2)——财神雷区全集+R18 成人标记**）+配键 8：国语/粤语/中字/
+  **ENSub(18)=[english_subtitle]（英文 label 直配——藏宝阁首配
+  键复利）**/特效=[special_effects_subs]/DIY/DoVi=[dolby_vision]/
+  **HDR10(7)+HDR10+(14) 两族独立**+原生原盘(9)=[original_disc]+
+  分集(21)=[ongoing]；**Atmos(16) label-only（dict 无 tag.atmos
+  红豆饭定案）**+LOLI(11)/无对白(24)/GalGame(19)/其他(10)
+  label-only。
+- **source_sel 10=产区槽不配**（咖啡定案——日本/大陆/欧美等产区
+  数据无静态投递能力预览人工）。
+- 字段：type/medium_sel[4]/codec_sel[4]/audiocodec_sel[4]/
+  standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
+  technical_info+url（IMDb）+**douban_id=豆瓣ID 编号（DoubanID
+  域——家面/家园先例）**+pt_gen+uplver+anonymous:true；**bangumi_
+  url/tmdb_id/mal_id 三番组编号字段不配**（发布链无域——熊猫
+  tmdb 首见定案）；nfo 不配（13城先例）；bangumi_match_option/
+  disable_bangumi_match（番组匹配 UI 字段发布链不处理）。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+12+9+1+**tags=[中字,ENSub,DoVi] ENSub
+  英文直配命中** ✓/② UHD 原盘→medium=14+**codec=8 HEVC/x265
+  合并项**+audio=10 DTS-HD MA+standard=5+tags=[DoVi,HDR10] 两族
+  独立 ✓/③ MI 压制→medium=7+**codec=8 合并项通用（x265 折叠
+  命中）**+audio=10 ✓）+48 包。
+- 站规人工把关：**§4 禁发制作组黑名单**（公网 BT 盗转组——发布
+  预览人工规避）+低分电视剧禁发（§3.8）+分集资源规则（§3.4
+  ——§59.424 系统级禁发分集铁律已覆盖）+已完结资源规则（§3.5）
+  +打包合集规则+语言要求（§3.7）+违规做种处罚（§3.9-3.10）。
+- 遗留：首颗真实发布。
