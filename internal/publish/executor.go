@@ -401,6 +401,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
+	// §59.453: 好学 410 纪录片特别通道四槽注入（年级恒其它/版本恒其它/
+	// 年份三级链/格式容器判定——用户逐点定案；jobs 通用链零配键 miss 不填
+	// 的槽由特化覆盖——非纪录片已在上游 hxptOnlyDocumentary 拦截）。
+	// 挂载点=jobs 段后 DryRun 检查点前（首版误挂 pubReq 装配段在 DryRun
+	// return 之后——DryRun 看不到注入，形态一实测年级/版本/年份全 None 抓出）。
+	if in.TargetSite == "好学" {
+		hxptDocumentaryPrefill(form, cfg, meta, tp)
+	}
+
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
 	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),
 		in.TargetSite, meta.Title, meta.Subtitle)
@@ -609,12 +618,6 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			}
 			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
 		}
-	}
-	// §59.453: 好学 410 纪录片特别通道四槽注入（年级恒其它/版本恒其它/
-	// 年份三级链/格式容器判定——用户逐点定案；jobs 通用链零配键 miss 不填
-	// 的槽由特化覆盖——非纪录片已在上游 hxptOnlyDocumentary 拦截）
-	if in.TargetSite == "好学" {
-		hxptDocumentaryPrefill(form, cfg, meta, tp)
 	}
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
