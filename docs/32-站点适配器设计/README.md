@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 时光 | [hdtime.md](./hdtime.md) | ✅ 完成（424原盘分类第七站·x264_10bit独有键·P0门控教训） |
 | 碟粉 | [discfan.md](./discfan.md) | ✅ 完成（五年规则·禁欧美·产区路由第六站·复古媒介全库唯一） |
 | 天空 | [hdsky.md](./hdsky.md) | ✅ 完成（双维路由·option_sel[]第三名·HDR细分·禁转REMUX站规） |
 | 麒麟 | [hdkyl.md](./hdkyl.md) | ✅ 完成（资产完全失效第二例·audiocodec 18全配键·短剧第十二站·官种雷区） |
