@@ -531,3 +531,51 @@ func mapAudioCodec(codec string) int {
 *数据来源: Playwright 采集 rules.php + upload.php (2026-04-22)*
 *文档创建: 2026-04-16*
 *文档更新: 2026-04-22（补充完整 rules.php 规则、Tracker URL、促销规则、Dupe 规则、账号保留、认领系统、字幕区规则、用户发布范围指示）*
+
+### 附：发布适配记录（v0.0.1301 §59.445）
+
+- **form_config**：migration128 分发（六槽 52 项——type 14/medium 9/
+  codec 6/audiocodec 10/standard 6/tags 7）。**咖啡式简版第三例**
+  （默认页 28KB 基础字段→mode=advanced 46.2KB 完整表单——咖啡/
+  慕雪阁同款）；**资产 tags 槽缺口实时补全 7 项**（None→7）；
+  实时=资产=文档三源全槽一致。
+- **双模式站**（mode=4 种子区 id=browsecat 14 项✓/mode=5 特殊区
+  name=type 413-418 六项成人⛔——§59.372 双 type 互斥双防线+
+  §59.388 [5] 槽模式过滤双防线自动护——[5] 槽三组混入 medium_
+  sel[5]/codec_sel[5]/standard_sel[5]/tags[5][] 一并过滤）。
+- type 14：**420 下架视频备份（B 站备份站特色分类）+419 漫画
+  label-only**（无键）+406/408 双键+404 双键。
+- medium 9（倒序乱序）：Blu-ray(1)/UHD(2) 分立各单键+Remux(3)
+  双键归并（无 UHD Remux 项）+WEB-DL(4)=[webdl,webrip] 双键
+  承接+**DVD(6)=[dvd,dvdr] 双键宽语义**（无 DVDR 项垃圾堆同款）
+  +Encode/HDTV/CD/Track；无 Other 项 miss 落空预览人工。
+- codec 6 简短命名全配（H264/H265 无点+XVID 大写）——无 AV1 无
+  X26x 零联动。
+- **audiocodec 10 合并项承接三连**：**TrueHD/Atmos(1)=[truehd,
+  atmos,truehd_atmos] 三键承接**（站方 TrueHD+Atmos 合并项——
+  历史双键模式扩展首例）+**DTS-HD/DTS-HDMA(2)=[dts,dts_hd_ma,
+  dts_hd_hr] 三键承接**（DTS 基础无独立项归并——车站家族式无
+  dtsx）+**AC3(3)=[ac3,dd,ddp] 三键承接**（大青虫先例）+LPCM/
+  Flac/MP3/AAC/APE/Other/WAV。
+- standard 6：4K(1)/**1080p/i(2)=[r1080p,r1080i] 合并双键（咖啡
+  同款）**/720p/SD/Other(5)=[resolution.other]/**2K(6)=[r1440p]
+  置尾乱序**。
+- **无 team_sel（第三站）**（海胆 team_suffix/南洋无 team 后）。
+- tags 7：禁转(1)/首发(2)/官方(3) 三绝不配（财神雷区）+DIY/
+  国语/中字/HDR 四键泛家族 四键配；无 DoVi/HDR10 细分。
+- 字段：type/medium_sel[4]/codec_sel[4]/standard_sel[4]/
+  audiocodec_sel[4]/tags[4][]/small_descr/descr+url（IMDb）+
+  pt_gen+uplver+anonymous:true；**无 technical_info**（文档 §1.2
+  实证——MI 塞简介）；nfo 不配（13城先例）。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+4+1+2+tags=[国语,中字,HDR] ✓/② UHD 原盘
+  →medium=2 分立单键+codec=2+**audio=1 TrueHD/Atmos 三键**+
+  standard=1 ✓/③ MI 压制→medium=7+codec=1+**audio=2 DTS-HD MA
+  三键归并命中** ✓）+48 包。
+- **借壳坑再现实录**：形态二/三 qb13 导出 404（§59.423 时变坑——
+  种子被移除）→重列新 hash+完整模板重注入解决；教训：每次
+  DryRun 前重列 qb13 铁律不变，meta 行迁移 UNIQUE 冲突须彻底
+  清行重注入。
+- 站规人工把关：特殊区 413-418 六项成人全局禁止（§30.3 用户
+  指令）+下架视频备份(420) 版权敏感性预览人工核对。
+- 遗留：首颗真实发布。
