@@ -386,3 +386,29 @@ adapter.SkipNFO = true
 
 *数据来源: upload.php HTML (34941 chars) + rules.php HTML (30721 chars) (2026-04-22)*
 *文档创建: 2026-04-16 | 更新: 2026-04-22*
+
+### 附：发布适配记录（v0.0.1285 §59.428）
+
+- **form_config**：migration112 分发（三槽 12 项——type 8/standard 3/
+  team 1）。实时 HTML（34.9KB 直连）vs 文档一致；**4 月资产 type 值集
+  漂移**（站方改版：403 综艺/409 其他已删+新增 410 软件/411 游戏——
+  实时为准）。
+- **type 414 蓝光独立分类**（站内实态仲裁——414 列表页 123 种全原盘
+  标题 Blu-ray AVC/UHD Blu-ray DoVi——时光 424 同构形态）——
+  itzmxCategoryValue typeMappingOf 第八站+**discCategoryRoute 公共路由
+  抽取首复用**（§59.426 时光实现收敛公共+两站 target 参数化——
+  复用优先纪律）；414 label-only 特化独占；404 漫画 label-only（dict
+  无 comic 键）。
+- standard 3 极简（乱序 2160p=3）全配键；team 1 Other=[team.other]
+  （全库最少——无官组转载站）。
+- **极简站历史最少之一**：无 medium/codec/audiocodec/tags/url/pt_gen/
+  nfo/technical_info/**uplver**（南洋式扩展；无匿名字段——anonymous
+  无承载点不消费）。
+- **验证**：测试锚三态+裸对全槽一致+formdiff 0 条（双零）+DryRun 双
+  形态（纯原盘电影→414+1080p=1 特化 ✓/MI 压制电影→401 通用 ✓——
+  MI 铁证正确压倒标题）。
+- 站规人工把关：候选制+游戏上传员等级+<100MB 禁（软件/文档/单曲
+  豁免）+upscale/RMVB/硬盘版游戏禁+dupe 媒介优先级（断种 45 日·18
+  个月豁免）+促销 90% 50%+体育不得泄露比赛结果+电影/剧集简介必须含
+  IMDb 链接。
+- 遗留：首颗真实发布。
