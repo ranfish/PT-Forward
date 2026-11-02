@@ -423,3 +423,51 @@ Blu-ray 细分为4种：
 *分析时间：2026-04-16*
 *最后更新：2026-04-22*
 *数据来源：https://p.t-baozi.cc/rules.php + https://p.t-baozi.cc/upload.php*
+
+### 附：发布适配记录（v0.0.1299 §59.443）
+
+- **form_config**：migration126 分发（七槽 80 项——type 10/medium 13/
+  codec 6/audiocodec 15/standard 7/team 7/tags 22）。实时 HTML
+  （74.9KB 直连）vs 资产 vs 文档**一处差异：tags 22 项实时新增
+  SDR(25)**（资产/文档 21 项无——真改版 label-only 防松查乱挂）；
+  文档 tags 计数 22 实列 21（计数错实时仲裁）。
+- **type 10**：410 短剧第十七站+408 高品质音频=[music,
+  lossless_music] 双键+406 音乐视频=[mv,music_video] 双键+404
+  双键；无游戏/软件。
+- **medium 13 原盘×DIY 四分（海的宝同款——§59.407 diyMediumOption
+  自动生效第九站）**：UHD 原盘(11)=[uhd_bluray] 分立单键+UHD DIY
+  (12) label-only+Blu-ray 原盘(1)=[bluray] 分立单键+Blu-ray DIY
+  (13) label-only（**DryRun 形态三 UHD DIY 原盘种 medium=12 联动
+  命中实证**）+Remux 双键+WEB-DL=[webdl,webrip] 双键承接+MiniBD/
+  HD DVD/HDTV+**DVDR(6)=[dvdr] 单键精确（无 DVD 项）**+Encode/
+  CD/Track；无 Other 项 miss 落空预览人工。
+- codec 6 全配键零联动（合并写法站方语义）；**audiocodec 15 全配
+  键**：DTS:X(8)=[dtsx]+TrueHD Atmos(9)=[atmos,truehd_atmos]
+  双键（躺平模式）+DTS-HD MA/TrueHD 分立+**DD/AC3(1)=[ac3,dd,
+  ddp] 三键承接（无 DDP 分立——大青虫先例）**+**OPUS(2)/M4A(5)
+  ext 活键**+LPCM/DTS/AAC/FLAC/APE/WAV/MP3/Other。
+- standard 7：8K/4K/1080p/1080i/720p/SD 全配+None(7) label-only
+  （非视频资源语义）。
+- team 7：**BAOZIWEB(6)/Baozi(7) 站方官组 label-only**+HDS/CHD/
+  MySiLU/WiKi 外站 label-only+Other(5)=[team.other] 兜底。
+- **tags 22 五绝不配**（原创 9/首发 2/禁转 1/限转 16/成人 23——
+  官方专属财神雷区+成人区标记）+8 键配：国语/粤语/中字/完结/DIY/
+  **Dolby Vision(13)=[dolby_vision]+HDR10(14)=[hdr10]+HDR10+(15)=
+  [hdr10_plus] 三族独立**+**7 HDR=[hdr_vivid,hlg] 泛剩余键（星湾
+  同款精细化分配——独立项各归位后泛项只承接剩余 Vivid/HLG）**；
+  11 动画/17 应求/18 MV/19 卡拉OK/20 LIVE现场/21 演唱会/22 音乐
+  专辑 label-only（分类/音乐语义 dict 无键）+**25 SDR label-only
+  （实时新增真改版）**。
+- 字段：type/medium_sel[4]/codec_sel[4]/audiocodec_sel[4]/
+  standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
+  technical_info+url+pt_gen+uplver+anonymous:true；nfo 不配
+  （13城先例域表无此域）。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+10+1+tags=[中字,HDR10,粤语] **hdr10 细分
+  归 14 独立项** ✓/② UHD 原盘→medium=11 分立单键+codec=6+
+  **audio=9 Atmos 双键**+tags=[Dolby Vision,HDR10] 双标独立 ✓/
+  ③ **UHD DIY 原盘→medium=12 §59.407 第九站联动命中实证** ✓）+
+  48 包。
+- 站规人工把关：Dupe 规则（标准 HD 站规则）+资源打包规则+促销
+  规则+账号保留规则；成人(23) 标签绝不投递。
+- 遗留：首颗真实发布。
