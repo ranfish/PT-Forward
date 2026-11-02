@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 劳改所 | [ptlgs.md](./ptlgs.md) | ✅ 完成（资产完全失效第三例·压制四分立·REMUX标签首配·高码率高帧率复利） |
 | 铂金家 | [pthome.md](./pthome.md) | ✅ 完成（双type互斥·原盘×DIY双分第七站复利·tags字符串值五绝不配·家园互斥对实录） |
 | PTFans | [ptfans.md](./ptfans.md) | ✅ 完成（教育向17分类·407五键合并·Bluray编码分维特化·Encode重复值第五例） |
 | 猫 | [pterclub.md](./pterclub.md) | ✅ 完成（极简三下拉·medium→source_sel第四站·team字段名陷阱label-only占位·tags独立checkbox不配） |
