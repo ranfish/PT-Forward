@@ -878,3 +878,55 @@ OKPT **有地区选择**（`processing_sel[4]` / `processing_sel[5]`），之前
 - `descr` BBCode 编辑器 ✅
 - `pt_gen` 字段 ✅
 - **无** `nfo` 独立文件上传字段
+
+### 附：发布适配记录（v0.0.1287 §59.430）
+
+- **form_config**：migration114 分发（七槽 106 项——type 13/medium 14/
+  codec 12/audiocodec 16/standard 5/team 28/tags 18）。实时 HTML
+  （53.2KB 直连）vs 4 月资产**三处漂移**（实时为准）：medium 新增
+  Web(20)+team 新增 Audiences(13)/Other(14)+**无 uplver**（文档 §2.1
+  称有——实时零命中，checkbox 全为 tags；无匿名字段 anonymous 无
+  承载点）。
+- **双模式站**（mode=4 影视/5 音乐——type 双区 id=browsecat/specialcat
+  §59.372 判别+§59.388 模式互斥过滤自动护六站复利）；发布链走影视区
+  ——音乐类种子（音乐/MV/演唱会/写真）type miss 落空预览人工（我的PT
+  同款定案）。
+- type 13：**440 短剧第十三站**+434 电子书=[ebook]+432 有声书=
+  [audiobook]+431 软件+413 游戏+404 双键+436 漫画书 label-only（dict
+  无 comic 键——分享站同款）。
+- medium 14 乱序（16 Other 首）：Remux=[remux,uhd_remux] 双键归并+
+  SACD/Vinyl 配键（extended 活键——农场/躺平先例）+HDCD/HI-RES/Web
+  label-only（无键/语义存疑）。
+- codec 12 视频编码+文档类混入：HEVC/H.265/x265=[h265]+AVC/H.264/
+  x264=[h264] 合并命名（压制联动 label 精确匹配不触发=站方合并项语义
+  ——好大第六站反证同款）+VVC/AV1/VP9/Other 配键+**文档类 7 项
+  label-only**（EPUB/AZW3/PDF/TXT/ZIP 发布链零产出）。
+- audiocodec 16：DTS:X/DTS-HD=[dts_hd_ma,dts_hd_hr] 双键/TrueHD=
+  [truehd,truehd_atmos] 双键/LPCM=[lpcm,pcm] 双键三家族承接+DD/DD+=
+  [ac3,dd,ddp] 三键+MP3/MPEG/APE/WAV/FLAC 分轨/DTS/AAC/Other 配键+
+  整轨分轨 3 项 label-only（音乐形态无产出）。
+- **team 28 外站官组表最大站**（ZmPT/Ying/U2/UBits/TTG/Rousi/PTHome/
+  Red Leaves/PterClub/Panda/OurBits/M-Team/LemonHD/HD4FANS/HDSky/
+  HDHome/HDDollby/HDChina/HHClub/FRDS/DaJiao/CMCT/CHDBits/BTSchool/
+  BeiTai/Audiences 26 外站组+OKPT——学校站 6 组四倍扩展）：全部
+  label-only 组映射层 label 直配+Other(14)=[team.other] 兜底（实时
+  新增）；**黑名单 9 组人工规避**（FGT/RARBG/Mp4Ba/xiaomi/huawei/
+  BlackTV/BitsTV/DreamHD/Hao4K）。
+- tags 18 配键 11 项 14 键：完结=[complete]/分集=[ongoing]（躺平/麒麟/
+  13城三站先例）/国语/粤语/英语/中字/英字/DIY/特效=[special_effects_subs]
+  （星陨阁首配+天空定案）/HDR 四键泛家族（15 站）/DoVi=[dolby_vision]
+  （11 站）；**禁转不配+驻站/自购 label-only**（官方专属——§1.8 转载
+  不得勾禁转/首发/官方）+日/韩语 label-only（推断链零产出——历史无站
+  配）+**Atmos 不配**（extended 零产出——红豆饭实证定案）+资料教程
+  label-only。
+- processing_sel[4]=产区槽不配（8 产区含印度/东南亚——发布链无投递域
+  历史定案；预览人工）。
+- 字段：url（data-pt-gen="url" IMDb 真字段）+technical_info（MediaInfo
+  独立字段）+无 pt_gen/nfo/dburl。
+- **验证**：裸对全槽一致+formdiff 0 条（双零）+DryRun 三形态（① WEB-DL
+  电影→401+10+2 AVC 合并+tags=[中字,英字,HDR] 三标全中 ✓/② UHD
+  Remux→medium=3 双键归并+audio=7 DTS-HD 双键+standard=2+tags=[DIY,
+  DoVi] ✓/③ 短剧→440 ✓）。
+- 站规人工把关：无重复判定（多小组共存）+H&R 全站强制+吸血降级
+  Peasant+简介严格顺序+转载出处按制作组源站+黑名单组禁转。
+- 遗留：首颗真实发布。
