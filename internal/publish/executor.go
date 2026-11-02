@@ -1012,6 +1012,11 @@ func (e *PublishExecutor) lookupOtherOption(cfg *model.PublishFormConfig, domain
 // 通用语义：站方提供 X26x 选项=站方有此区分维度（NP 惯例），压制种选
 // CLI 形态更贴站方；无该选项的站（龙之家/壹吧）行为零变化。
 func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+	// §59.436: 原盘编码分维特化（PTFans §4.1 站方明文：原盘/Remux→
+	// Bluray(AVC/HEVC/VC-1) 项、压制/WEB→H.26x 项——编码×媒介双维）
+	if v := blurayCodecOption(cfg, tp); v != nil {
+		return v
+	}
 	stdKey := extract.LookupStandardKey("video_codec", tp.VideoCodec)
 	m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey)
 	if m == nil {
@@ -1033,6 +1038,44 @@ func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, tp titlep
 		}
 	}
 	return m
+}
+
+// blurayCodecOption §59.436: 原盘编码分维特化——站方 codec 区分原盘
+// （Bluray(AVC)/Bluray(HEVC)/Bluray(VC-1)）与压制（H.264/H.265）两
+// 体系（PTFans §4.1 站方明文：原盘/Remux→Bluray 项、压制/WEB→H.26x）。
+// **动态检测非站名硬编码**：codec 槽存在 label 前缀 "Bluray(" 项才触
+// 发（未来同形态站自动生效，§59.407 diyMediumOption 同款通用投资）；
+// 仅原盘族媒介（含 Remux——站方语义 Remux 归原盘编码项）分发，
+// 压制/WEB-DL 走通用链零变化。
+func blurayCodecOption(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+	if cfg == nil {
+		return nil
+	}
+	switch mediumStdKeyOf(tp, "") {
+	case "medium.bluray", "medium.uhd_bluray", "medium.hddvd",
+		"medium.remux", "medium.uhd_remux":
+	default:
+		return nil // 压制/WEB/CD 等走通用链
+	}
+	stdKey := extract.LookupStandardKey("video_codec", tp.VideoCodec)
+	var want string
+	switch stdKey {
+	case "video.h264", "video.x264":
+		want = "AVC"
+	case "video.h265", "video.x265":
+		want = "HEVC"
+	case "video.vc1":
+		want = "VC-1"
+	default:
+		return nil // AV1/MPEG-2 等无原盘分维项
+	}
+	items := cfg.ValueMappings[model.FieldDomainCodec]
+	for i := range items {
+		if strings.HasPrefix(items[i].Label, "Bluray(") && strings.Contains(items[i].Label, want) {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 // lookupCLIVariant §59.380: 视频编码 CLI 压制形态选项查找（百川 §5.2

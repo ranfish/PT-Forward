@@ -882,3 +882,53 @@ func TestItzmxDiscCategoryRoute(t *testing.T) {
 		t.Errorf("他站不应触发分享站路由，得 %v", v)
 	}
 }
+
+// §59.436: 原盘编码分维特化（PTFans——原盘→Bluray 项/压制走通用）。
+func TestBlurayCodecOption(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"codec": "codec_sel[4]"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"codec": {
+				{Label: "H.264(x264/AVC)", Value: "1", StandardKeys: []string{"video.h264"}},
+				{Label: "H.265(x265/HEVC)", Value: "2", StandardKeys: []string{"video.h265"}},
+				{Label: "Bluray(VC-1)", Value: "3"},
+				{Label: "Bluray(AVC)", Value: "4"},
+				{Label: "Bluray(HEVC)", Value: "5"},
+			},
+		},
+	}
+	tpOf := func(st, vc string) titleparser.TechProfile {
+		return titleparser.TechProfile{SourceType: st, VideoCodec: vc}
+	}
+	// 原盘 AVC → Bluray(AVC)(4)；原盘 HEVC → Bluray(HEVC)(5)
+	if v := blurayCodecOption(cfg, tpOf("Blu-ray", "AVC")); v == nil || v.Value != "4" {
+		t.Errorf("原盘 AVC 应 Bluray(AVC)=4，得 %v", v)
+	}
+	if v := blurayCodecOption(cfg, tpOf("UHD Blu-ray", "HEVC")); v == nil || v.Value != "5" {
+		t.Errorf("UHD 原盘 HEVC 应 Bluray(HEVC)=5，得 %v", v)
+	}
+	// Remux 归原盘编码项（站方 §4.1 语义）
+	if v := blurayCodecOption(cfg, tpOf("Remux", "AVC")); v == nil || v.Value != "4" {
+		t.Errorf("Remux AVC 应 Bluray(AVC)=4，得 %v", v)
+	}
+	// 压制/WEB 走通用链（不触发）
+	if v := blurayCodecOption(cfg, tpOf("Encode", "AVC")); v != nil {
+		t.Errorf("Encode 不应触发原盘分维，得 %v", v)
+	}
+	if v := blurayCodecOption(cfg, tpOf("WEB-DL", "HEVC")); v != nil {
+		t.Errorf("WEB-DL 不应触发，得 %v", v)
+	}
+	// 无 Bluray 项的站零触发（动态检测）
+	cfg2 := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			"codec": {{Label: "H.264", Value: "1", StandardKeys: []string{"video.h264"}}},
+		},
+	}
+	if v := blurayCodecOption(cfg2, tpOf("Blu-ray", "AVC")); v != nil {
+		t.Errorf("无 Bluray 项站不应触发，得 %v", v)
+	}
+	// AV1 无原盘分维项
+	if v := blurayCodecOption(cfg, tpOf("Blu-ray", "AV1")); v != nil {
+		t.Errorf("AV1 不应触发，得 %v", v)
+	}
+}
