@@ -42,6 +42,9 @@ type TechProfile struct {
 	VideoCodec      string `json:"video_codec"`      // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
 	AudioCodec      string `json:"audio_codec"`      // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
 	AudioChannels   string `json:"audio_channels"`   // 14. 声道数（2.0/5.1/7.1）
+	// §59.453: MI General 容器 Format（Matroska/MPEG-4/BDAV...）——
+	// 好学格式槽消费（文件格式语义）；标题解析无此维度（MI 唯一源）。
+	ContainerFormat string `json:"container_format,omitempty"`
 	AudioTechnology string `json:"audio_technology"` // 15. 对象信息（Atmos）
 	AudioTracks     int    `json:"audio_tracks"`     // 16. 音轨数
 

@@ -42,6 +42,10 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 	if mi.BitDepth != "" {
 		p.BitDepth = mi.BitDepth
 	}
+	// §59.453: 容器 Format 透出（MI 为准——标题解析无容器维度）。
+	if mi.ContainerFormat != "" {
+		p.ContainerFormat = mi.ContainerFormat
+	}
 	// §59.226 附二十一: 帧率 MI 优先（标题 60fps 形态兜底——技术参数族）
 	if mi.FrameRate != "" {
 		p.FrameRate = mi.FrameRate

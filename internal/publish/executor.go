@@ -345,6 +345,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			return failRec("ineligible", reason)
 		}
 	}
+	// §59.453: 好学站点级拦截（用户定案）——仅纪录片（410 特别通道）可发，
+	// 普通影视资源不适用本站（学习资料站）。挂载同碟粉（PushOnly 分支后
+	// 恒定检查+DryRun 同拦可见+站点门控——§59.426 形态差异清单）。
+	if in.TargetSite == "好学" {
+		if blocked, reason := hxptOnlyDocumentary(meta); blocked {
+			return failRec("ineligible", reason)
+		}
+	}
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纭错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
 	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
@@ -601,6 +609,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			}
 			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
 		}
+	}
+	// §59.453: 好学 410 纪录片特别通道四槽注入（年级恒其它/版本恒其它/
+	// 年份三级链/格式容器判定——用户逐点定案；jobs 通用链零配键 miss 不填
+	// 的槽由特化覆盖——非纪录片已在上游 hxptOnlyDocumentary 拦截）
+	if in.TargetSite == "好学" {
+		hxptDocumentaryPrefill(form, cfg, meta, tp)
 	}
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
@@ -2151,6 +2165,94 @@ func mteamLabelsBits(tags []string) int {
 		}
 	}
 	return bits
+}
+
+// hxptLabelOption §59.453: value_mappings 项 label 精确匹配（返回命中项
+// ——label 动态匹配零硬编码 value：站方加新年份/改值自动适配）。
+func hxptLabelOption(items []model.FormValueMapping, label string) *model.FormValueMapping {
+	for i := range items {
+		if items[i].Label == label {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
+// hxptOnlyDocumentary §59.453: 好学站点级拦截（用户定案）——学习资料站
+// 仅纪录片（410 特别通道）可发；非纪录片 ineligible（DryRun 同拦预览可见
+// ——碟粉模式同款）。分叉族双形态（单/复数）都放行。
+func hxptOnlyDocumentary(meta *model.TorrentMetadata) (bool, string) {
+	if meta == nil {
+		return false, ""
+	}
+	switch meta.Category {
+	case "category.documentary", "category.documentaries":
+		return false, ""
+	}
+	return true, "好学仅接受纪录片（410 特别通道）——普通影视资源不适用本站"
+}
+
+// hxptDocumentaryPrefill §59.453: 好学（www.hxpt.org）410 纪录片特别通道
+// 四槽注入（用户逐点定案讨论终案）：
+//   - 年级恒"其他"（audiocodec_sel——站方语义=教育年级幼儿园~高三，
+//     纪录片无年级概念；字段名走 form_fields 域键）
+//   - 版本恒"其他"（processing_sel——站方语义=教材出版社，纪录片无
+//     教材概念；无域常量直写站方字段名 [4] 形态——好学特化站字段名稳定）
+//   - 年份三级链（source_sel——站方语义=发布年份）：tp.Year（Tab1 同源
+//     标题+PTGen 校正）精确 label 匹配 → 早于 2010→"2010年前" →
+//     空/未来年份站方未加项→不填（非必填不硬造）
+//   - 格式（codec_sel——站方语义=文件格式）：MI General 容器规范名
+//     （Matroska→MKV/MPEG-4→MP4）+标题词形兜底→其它一律"其他"。
+//
+// value_mappings 的 source/processing 槽 label 全录（值集完备——站方
+// HTML 对照）+label 动态匹配消费；codec/audiocodec 槽零 standard_keys
+// （jobs 通用链 miss 不填，特化覆盖）。
+func hxptDocumentaryPrefill(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile) {
+	if form == nil || cfg == nil {
+		return
+	}
+	// ① 年级恒其它（audiocodec 域键取字段名）
+	if f := cfg.FormFields[model.FieldDomainAudiocodec]; f != "" {
+		if m := hxptLabelOption(cfg.ValueMappings[model.FieldDomainAudiocodec], "其他"); m != nil {
+			form[f] = m.Value
+		}
+	}
+	// ② 版本恒其它（直写站方字段名）
+	if m := hxptLabelOption(cfg.ValueMappings["processing"], "其他"); m != nil {
+		form["processing_sel[4]"] = m.Value
+	}
+	// ③ 年份三级链（直写站方字段名）。站方值集 2011 起有独立项——2010
+	// 及更早一律"2010年前"（n<=2010：值集无 2010 独立 label，精确匹配必
+	// miss——裸对修正时同步校准）。
+	if y := strings.TrimSpace(tp.Year); y != "" {
+		if n, err := strconv.Atoi(y); err == nil && n > 0 {
+			target := y
+			if n <= 2010 {
+				target = "2010年前"
+			}
+			if m := hxptLabelOption(cfg.ValueMappings["source"], target); m != nil {
+				form["source_sel[4]"] = m.Value
+			}
+		}
+	}
+	// ④ 格式：MI 容器（§59.453 透出）→标题词形兜底→"其他"
+	if f := cfg.FormFields[model.FieldDomainCodec]; f != "" {
+		label := "其他"
+		raw := strings.ToLower(tp.RawTitle)
+		switch {
+		case strings.EqualFold(tp.ContainerFormat, "Matroska"):
+			label = "MKV"
+		case strings.EqualFold(tp.ContainerFormat, "MPEG-4"):
+			label = "MP4"
+		case strings.Contains(raw, "mkv"):
+			label = "MKV"
+		case strings.Contains(raw, "mp4"):
+			label = "MP4"
+		}
+		if m := hxptLabelOption(cfg.ValueMappings[model.FieldDomainCodec], label); m != nil {
+			form[f] = m.Value
+		}
+	}
 }
 
 // hdtimeCategoryValue §59.426（实现收敛 discCategoryRoute 公共——§59.428

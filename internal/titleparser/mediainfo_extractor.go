@@ -22,6 +22,10 @@ type MediaInfoTech struct {
 	HDR             string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
 	BitDepth        string // 8bit/10bit
 	Encoded         bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
+	// §59.453: General 层容器 Format 透出（Matroska/MPEG-4/BDAV...）——
+	// 此前局部变量 BDAV 门用完即弃；好学格式槽（文件格式语义）消费，
+	// 通用投资（未来容器维度判定站自动受益）。
+	ContainerFormat string
 }
 
 // miStream MediaInfo 纯文本中的一个段（Video / Audio #N）。
@@ -62,6 +66,8 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	// 恒 false）。词表只收压制工具，封装器（mkvmerge/libebml/libmatroska
 	// ——Remux 重封装也写）排除。
 	result.Encoded = generalReencoderDetected(sections.General)
+	// §59.453: 容器 Format 透出（§59.235 P3 局部变量升格字段）
+	result.ContainerFormat = strings.TrimSpace(containerFormat)
 	for _, s := range streams {
 		if s.name == "video" {
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
