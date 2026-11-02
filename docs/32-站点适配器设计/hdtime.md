@@ -305,3 +305,44 @@
 | 认领系统 | 每用户最多 1000 种子 |
 | Cloudflare 防护 | 需要 cf_clearance cookie |
 | 候选制 | 导航栏有"候选"入口，游戏类需上传员等级 |
+
+### 附：发布适配记录（v0.0.1283 §59.426）
+
+- **form_config**：migration110 分发（六槽 70 项——type 13/medium 10/
+  codec 11/audiocodec 15/team 13/tags 8）。实时 HTML（46.8KB 直连）
+  vs 文档 vs 4 月资产全槽一致。
+- **type 424 Blu-Ray原盘独立分类**（站内实态仲裁——424 列表页 62 种
+  全原盘标题实证：原盘资源发 424 而非 401+medium Blu-ray）——
+  hdtimeCategoryValue typeMappingOf 第七站（媒介维度路由：影视类 ∧
+  原盘族 bluray/uhd_bluray/hddvd→424；Remux/Encode 非原盘不触发——
+  §59.407 教训复现实证：借壳 encode_meta 的 MI 压制铁证压倒标题判
+  Encode→401 正确；清 MI 构造纯原盘→424 命中）；424 label-only
+  特化独占；411 文档 label-only（语义模糊不猜）。
+- **无 standard/processing/source 槽**（分辨率仅标题传递）。
+- medium 10：Blu-ray=[bluray,uhd_bluray] 归并（无 UHD 项浦园式）+
+  Remux=[remux,uhd_remux]+MiniBD 精确+HD DVD。
+- codec 11 H/X 合一（压制联动零触发站方合并语义）+**x264-10bit=
+  [x264_10bit] extended 独有键首配**+AVS3=[avs3]+VVC/H.266/x266=
+  [h266]+AV1/VP9 新代编码全配键。
+- audiocodec 15：TrueHD Atmos 双键+DTS-HD=[dts_hd_ma,dts_hd_hr]
+  优堡先例+DD/AC3+DDP/EAC3+LPCM/PCM=[lpcm,pcm] 合并双键+**Audio
+  Vivid/AV3A=[av3a]**+OPUS 全配键。
+- team 13 label-only：HDTime 系官组+外站组（CHD/beAst/WiKi/CMCT/
+  QHstudIo/AilMWeb/HHWEB）+个人原创+Other(5) 兜底。
+- tags 8 配键 7：禁转/国语/中字/DIY/HDR 四键泛家族/杜比视界；
+  首发铁律+官方雷区 label-only。
+- 字段：url+pt_gen（四来源）+technical_info+uplver+anonymous:true；
+  nfo 不配（13城定案）。
+- **P0 实施教训（时光 DryRun 抓出）**：§59.425 discfanReleaseBlocked
+  首版漏站点门控——碟粉五年/禁欧美规则拦了**所有站**（时光 DryRun
+  报"碟粉站点规则"拦）——**站点级检查挂载必须带 targetSite 门控**
+  （与 §59.424 全站铁律无门控的形态差异：铁律 vs 站点规则的挂载
+  清单项差异）；修复=挂载点 `if in.TargetSite == "碟粉"`。
+- **验证**：测试锚八态（原盘三族/非原盘回退/非影视回退/他站不触发）
+  +裸对全槽一致+formdiff 0 条（双零）+DryRun 三形态（WEB-DL 剧集
+  →402+10 ✓/纯原盘电影→424+1 特化 ✓/MI 压制电影→401+7 Encode
+  铁证压倒标题 ✓）。
+- 站规人工把关：转发规则（不得去原创组标识/严禁转独占禁转限转）+
+  <100MB/upscale/RMVB/硬盘版游戏禁+游戏上传员等级+dupe 断种 45 天
+  ·18 个月豁免+候选制。
+- 遗留：首颗真实发布。
