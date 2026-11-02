@@ -383,3 +383,41 @@ alingPT 的 PT-Gen 支持最广泛的来源：
 *分析时间：2026-04-16*
 *最后更新：2026-04-22*
 *数据来源：https://pt.aling.de/forums.php?action=viewtopic&forumid=1&topicid=1 + https://pt.aling.de/rules.php + https://pt.aling.de/upload.php*
+
+### 附：发布适配记录（v0.0.1298 §59.442）
+
+- **form_config**：migration125 分发（六槽 34 项——type 4/medium 8/
+  codec 6/standard 5/team 3/tags 8）。实时 HTML（41.5KB 直连）vs
+  资产 vs 文档**三源全槽一致（零漂移站）**。
+- **type 4 全库最少**（电影/剧集/纪录/动画）：综艺/体育/音乐/游戏
+  等 miss 落空预览人工（站方分类限制 §5.4——仅收影视动画四类）+
+  404 双键。
+- **medium 8**：**Blu-ray DIY(2) label-only（§59.407 diyMediumOption
+  自动生效第八站——DryRun 形态三 DIY 原盘种 medium=2 联动命中
+  实证）**+Blu-ray(1)=[bluray,uhd_bluray] 双键归并（无 UHD 项）+
+  Remux(3) 双键+**TV(4)=[hdtv]（TV 代替 HDTV——hdtv 键承接）**+
+  WEB-DL(5)=[webdl,webrip] 双键承接+**DVD 原盘(6)=[dvd,dvdr] 双键
+  宽语义**+Encode/Other。
+- codec 6 全配键（简短括号命名）：H.264/H.265/AV1/MPEG-2/VC-1/
+  Other——无 X26x 零联动。standard 5 简短命名（8K 置首乱序）全配；
+  无 Other/1080i——i 形态 miss 落空预览人工。
+- **无 audiocodec 槽（第七站）**；team 3 极简：aling/alingWEB 站方
+  官组 label-only+Other(3)=[team.other] 兜底。
+- **source_sel 11=产区槽不配（咖啡/青蛙/红豆饭定案）**——产区最
+  细分站（内地/港/台/日/朝/印度/印尼/泰国/苏联/欧米/其他）发布链
+  产区数据无静态投递能力预览人工（§5.3；零案例不预实施）。
+- tags 8：禁转(1) 绝不配+7 键配——DIY/中字/HDR 四键泛家族/国语/
+  粤语/**Dolby Vision(14)=[dolby_vision]**+其他中国方言(10)
+  label-only（无键）。
+- 字段：**pt_gen 四来源最广（IMDb/豆瓣/Bangumi/indienova）**+
+  technical_info+**uplver 默认勾选（checked——anonymous:true 对齐
+  站方默认）**+small_descr/descr；无 url/nfo。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+5+1+3+tags=[国语,中字,HDR] ✓/② UHD 原盘→
+  medium=1 双键归并+codec=2+standard=2+tags=[Dolby Vision,HDR]
+  双标 ✓/③ **DIY 原盘→medium=2 Blu-ray DIY §59.407 联动第八站
+  命中实证** ✓）+48 包。
+- 站规人工把关：Dupe 规则（媒介优先级+同媒介分辨率组优先级+动漫
+  HDTV/DVD 同级特例 §5.1）+资源打包规则+促销规则+认领规则+站点
+  特殊政策（topicid=1）。
+- 遗留：首颗真实发布。
