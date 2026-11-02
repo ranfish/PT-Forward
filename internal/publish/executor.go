@@ -1999,7 +1999,7 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := itzmxCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
-	if v := mteamCategoryValue(cfg, siteName, meta, tp); v != nil {
+	if v := e.mteamCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
@@ -2015,21 +2015,34 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 //   - 动画 405+453 BluRay（原盘特化——discCategoryRoute 单类形态）
 //   - 其余 13 类标准键直配（通用链：404 纪录/406 演唱/407 运动/434 无损/
 //     409 其他/422 软件/427 电子书/442 有声书/451 教育/423 PC 游戏）。
-// 路由规则（影视族×mediumStdKeyOf §59.380 单源×分辨率）：
-//   原盘族（bluray/uhd_bluray/hddvd）→电影 421/影剧 438；
-//   dvd/dvdr→电影 420/影剧 435；remux/uhd_remux→电影 439/影剧 402；
-//   分发形态（encode/webdl/webrip/hdtv/其它）→分辨率 sd→电影 401/影剧 403，
-//   ≥720p→电影 419/影剧 402（default 兜底——媒介判定空也走 HD）。
+// 媒介判定源=mediumMappingOf 结果的 StandardKeys（§59.380 单源同判定链
+// ——首版误用 mediumStdKeyOf 弱判定：SourceType 归一损失致 REMUX 标题判
+// bluray→421 误路由（龙PT 归一损失同款），DryRun 形态三/四抓出即修）：
+//   原盘族（bluray/uhd_bluray/hddvd 键）→电影 421/影剧 438；dvd/dvdr→
+//   420/435；remux/uhd_remux→439/402（影剧无 Remux 叶归 HD）；
+//   分发形态（encode/webdl/webrip/hdtv/其它/miss）→分辨率 sd→401/403，
+//   ≥720p→419/402（default 兜底）。
 // 影视族 9 叶+453 全 label-only（路由独占——通用链永不命中影视叶）；成人
 // 15 叶不录（发布层成人拦截在前 §59.222 不可达）。
-func mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+func (e *PublishExecutor) mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
 	if siteName != "馒头" || cfg == nil || meta == nil {
 		return nil
+	}
+	// 媒介族判定：mediumMappingOf 判定结果（与 medium 槽同源——归一损失
+	// 免疫：REMUX 规格优先路径正确判 remux）
+	mediumKey := ""
+	if m := e.mediumMappingOf(cfg, siteName, meta, tp); m != nil {
+		for _, k := range m.StandardKeys {
+			if strings.HasPrefix(k, "medium.") {
+				mediumKey = k
+				break
+			}
+		}
 	}
 	// 动画×原盘族→453 BluRay（非原盘动画回退通用链 405）
 	switch meta.Category {
 	case "category.animation":
-		switch mediumStdKeyOf(tp, "") {
+		switch mediumKey {
 		case "medium.bluray", "medium.uhd_bluray", "medium.hddvd":
 			for i := range cfg.ValueMappings[model.FieldDomainType] {
 				if cfg.ValueMappings[model.FieldDomainType][i].Value == "453" {
@@ -2046,7 +2059,7 @@ func mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *mod
 		return nil
 	}
 	var target string
-	switch mediumStdKeyOf(tp, "") {
+	switch mediumKey {
 	case "medium.bluray", "medium.uhd_bluray", "medium.hddvd":
 		target = "421" // BluRay 原盘
 		if isTV {
@@ -2063,7 +2076,7 @@ func mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *mod
 			target = "402"
 		}
 	default:
-		// 分发形态（encode/webdl/webrip/hdtv/其它/空）——分辨率二分
+		// 分发形态（encode/webdl/webrip/hdtv/其它/miss）——分辨率二分
 		target = "419" // HD
 		if isTV {
 			target = "402"
