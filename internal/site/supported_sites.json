@@ -401,7 +401,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pandapt.net",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "piggo.me": {
     "domain": "piggo.me",
