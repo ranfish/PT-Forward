@@ -408,3 +408,53 @@
 10. **趣味盒已关闭**
 11. **封存线为 Insane User**（非 Elite User），且封禁线 365 天（非 400 天）
 12. **邀请抵消封禁**：有邀请名额可抵消长期未登录封禁（每邀请=10天）
+
+### 附：发布适配记录（v0.0.1305 §59.449）
+
+- **form_config**：migration132 分发（六槽 56 项——type 9/medium 16/
+  codec 8/audiocodec 11/standard 5/team 7）。实时 HTML（48.4KB 代理）
+  vs 资产**零漂移**；tags 资产 None=站方真无（实证）。
+- 站点形态：**裸名字段站**（五二同款——质量六槽全裸名无 [4] 后缀）
+  +**无 pt_gen**（实证——站规推荐 PTgen 生成后贴 descr）+**无
+  technical_info**（MI 塞简介）+**无 tags 槽**。
+- **type 9 教育向非标值集**（站规影视剧全站禁止——发布链 movie/
+  tv_series miss 落空预览人工）：624 纪录双键+**628 杂项学习=
+  [education] 唯一归位**+629 电子书/小说=[ebook]+**632 漫画=
+  [comic]（dict 无 manga 键用 comic）**+633 有声书=[audiobook]；
+  630 电子书/非小说+634 公开课+635 视频教程 label-only（ebook/
+  education 键已归位防一键多值——细分无 canonical 键）+631 杂志
+  label-only（无键）。
+- medium 16 视频×文档混合（猫站同族）：UHD/BluRay 分立+Remux 双键
+  归并+WEB-DL 双键+**DVDR(7)=[dvd,dvdr] 双键宽语义（阿玲先例）**+
+  DVDRip(4)=[dvdrip]（dict 键）+**HDRip(3) label-only（无键）**+
+  Other+**文档族：PDF(12)=[pdf]/AZW3(14)=[azw]/MOBI(15)=[mobi]
+  ext 活键（猫站首配同款——AZW3 配 azw 家族键）+EPUB(13)/TXT(16)/
+  Pictures(17) label-only（无键）**。
+- **codec 8 H/X 四分立压制联动站**（天枢同款）：H.264(1)=[h264]+
+  x264(7) label-only（§59.380 联动通道）+H265/HEVC(8)=[h265]+
+  x265(6) label-only（联动通道）+VC-1+Xvid(3)=[xvid]+MPEG-2+Other。
+- audiocodec 11：**AC3(4)=[ac3,dd,ddp] 三键承接（大青虫先例——无
+  DD/DDP 分立项）+DTS-HD(8)=[dts_hd_ma,dts_hd_hr] 双键承接（合并项
+  无细分——车站/红豆饭先例）**+FLAC/APE/DTS/MP3/AAC/TrueHD/LPCM/
+  WAV/Other。
+- standard 5：2160/4K(5)+1080p/i 分立+720p+SD(4)=[sd]；无 Other。
+- team 7：TorrentCCF/TLF/BMDru/CatEDU/MADFOX 老牌五组 label-only+
+  **个人原创资源(6) 绝不配（原创官方专属——我堡同款）**+其他(7)=
+  [team.other] 兜底。
+- **source_sel 14=学科槽不配**（**NP 同名字段语义第五变**：产区/
+  文件格式/年份/教育年级/学科——发布链无学科投递能力预览人工；
+  域识别表无 source_sel 解析跳过 formdiff 零差异咖啡同构）。
+- 字段：type/medium_sel/codec_sel/audiocodec_sel/standard_sel/
+  team_sel/small_descr/descr+**url（IMDb——label "IMDb链接"实证）**
+  +uplver+anonymous:true；**无 pt_gen/technical_info**（实证）；nfo
+  不配（13城先例）。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 纪录片→624+9+1+1+6 ✓/② UHD 原盘→medium=10+**codec=8
+  H265/HEVC 原盘不联动**+**audio=8 DTS-HD 双键承接**+standard=5 ✓/
+  ③ MI 压制→medium=11 Encode+**codec=6 x265 联动通道命中（H/X 四
+  分立）**+audio=3 ✓）+48 包。
+- 站规人工把关：**影视剧类全站禁止**（稀有/有价值例外）+FGT 小组
+  黑名单+mp4ba 水印禁+合集优先有合集不发单集+CAM/TS/SCR/R5 低画质
+  禁+RAR 分卷（Scene 影视须解压）+教育类简介开头必须一张图+视频类
+  MI/截图二选一+英文 0day 主标题+中文副标题+首发组专用标记。
+- 遗留：首颗真实发布。
