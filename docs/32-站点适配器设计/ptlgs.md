@@ -737,3 +737,44 @@
 | 分辨率 | 2160p、uhd（无 1080p）、`4k[.| ]`→2160p（remastered 时跳过）；1080p；1080i；720p；其余→Other |
 | 完结 | `complete`→完结标识 |
 | 制作组 | dyz-web→DYZ-WEB；dyz-movie→DYZ-Movie；dyz-tv→DYZ-TV；beast→beAst；zmweb→ZmWeb |
+
+### 附：发布适配记录（v0.0.1294 §59.438）
+
+- **form_config**：migration121 分发（七槽 69 项——type 9/medium 11/
+  codec 5/audiocodec 11/standard 6/team 7/tags 20）。实时 HTML
+  （70.7KB 直连）vs 文档映射表一致；**4 月资产完全失效（末日式
+  第三例）**——七槽值集全变：type 408 Audio→411 字幕组替换+medium
+  全套乱序（Blu-ray=14/Remux=8）+audiocodec DTS=19 罕见值+team/
+  tags 全套换值+standard 无 8K（双源覆盖资产失效 §59.396 定案持续
+  实证）。
+- **medium 11 乱序+压制四分立（百川/13城同族强化）**：**BDRip(5)=
+  [bdrip,encode] 双键承接**（百川无 Encode 项同构——压制通用键归
+  BD 源项；**DryRun 形态三 BluRay 压制种 medium=None 实测抓出即修**
+  首版 [bdrip] 单键 encode miss）+WEBRiP(7)=[webrip]/TVRip(2)=
+  [tvrip]/DVDRiP(11)=[dvdr] 压制分立各单键+WEB-DL(4)=[webdl]
+  （webdl/webrip 站方语义分立不并键）+Blu-ray(14)/Remux(8) 双键
+  归并+DVD(1)=[dvd] 单键（DVDRiP 分立）。
+- type 9：411 字幕组 label-only（dict 无键）+406 音乐双键；codec 5
+  全配零联动（无 X26x 无 AV1）；audiocodec 11：**DTS-HD=[dts_hd_ma,
+  dts_hd_hr] 双键承接**+**DTS=19 罕见值直配**+AC-3=[ac3,dd,ddp]
+  三键承接+MP3 extended 活键；无 DTS:X/Atmos/DDP。
+- standard 乱序非递增非递减+Other(7)=[resolution.other]；team 7：
+  DYZ 官组系+Eleph/beAst/ZmWeb label-only+Other(13)=[team.other]。
+- **tags 20 五绝不配**（22 独家/17 驻站/1 禁转/2 首发/3 官方——
+  官方专属财神雷区）+12 键配：**REMUX(11)=[remux] dict 有键 40+ 站
+  后首配**+原盘=[original_disc]+DoVi+HDR 四键泛家族（18 站）+特效
+  字幕+完结/分集+**高码率(18)/高帧率(19) 星陨阁首配键复利**+3D/
+  SDR/WEB-DL label-only。
+- 字段：**pt_gen 真字段**（IMDb/豆瓣统一走 pt_gen——无独立 url/
+  dburl §197 实证）+cover+screenshots+technical_info（发布链截图
+  链产出）+uplver+anonymous:true；pos_state/pos_state_until/hr[4]
+  （促销持久字段）不配；无 nfo。
+- **验证**：裸对全槽一致+formdiff 0 条+DryRun 三形态（① WEB-DL
+  剧集→402+medium=4 非 WEBRiP+tags=[中字,HDR,高码率] 三标 ✓/②
+  UHD 原盘→medium=14 双键归并+audio=10 DTS-HD+tags=[DoVi,原盘] ✓/
+  ③ MI 压制→medium=5 BDRip 承接+codec=7 ✓——**修正后复验**）+48 包。
+- 候选制站（10 次候选通过后直发——首颗须走候选通道）。站规人工
+  把关：审核脚本标签交叉验证（中字/国语/DoVi/HDR=MI 交叉+原盘/
+  完结=副标题词形——站方检测在审核侧非提交侧+发布预览对齐）+
+  非官组禁选官方组+H&R+标题规范。
+- 遗留：首颗真实发布（候选通道）。
