@@ -579,3 +579,50 @@ BluRay/HDDVD > DVDISO > VCDISO > TV/HDTV > WEB-DL
 
 *数据来源: upload.php HTML + Wiki 6页（rule/post, guidance/post, guidance/0day-name, guidance/description-rule, guidance/add-offers, guidance/create-torrent）+ Forum 4帖（topicid=692/654/655/896）(2026-04-22)*
 *文档创建: 2026-04-16 | 更新: 2026-04-22*
+
+### 附：发布适配记录（v0.0.1282 §59.425）
+
+- **form_config**：migration109 分发（三槽 34 项——type 13/medium 12/
+  tags 9）。三源对照：实时 upload.php（43.8KB）vs 文档一致+**本文档
+  tags"10 个"计数错勘误**（实列 9=实时 9）；**wiki 发布规则实时重读**
+  （用户供 cookie——wiki 独立认证主站 cookie 不通；实时六节 vs 4 月
+  抄录逐节一致：五年规则/候选制/禁令/dupe 全部仍生效）。
+- **type 电影产区 7 细分路由**（discfanCategoryValue typeMappingOf
+  第六站——用户定案）：大陆 401/港 404/台 405/泰 402/日 403/韩 406
+  词形直配（discfan 专属细粒度词表——港台分立/日韩分立比
+  classifyRegionWords §59.391 更细）+列举地区 miss→410 世界兜底
+  （欧美被上游禁欧美拦——410 承接=亚洲小国）；电影 8 项 label-only；
+  非电影（411 剧集/413 纪录双键/414 音乐双键/416 综艺/417 体育/419
+  动漫）标准键直配。
+- **source_sel[4] 12 项=唯一质量槽**（极简站——无 medium/codec/
+  audiocodec/standard/team）：Web-DL 承接 webrip+4K UltraHD=
+  [uhd_bluray]+**Remux=131 异常值双键归并**+Rip=[encode,bdrip]
+  （重编码泛指）+HDTV+DVD 双键；**复古媒介 SDTV/VCD/LD/VHS+Book
+  label-only**（LD/VHS 全库唯一——五年规则旧资源主战场，预览人工）。
+- tags 9 配键 7：HDR 四键泛家族（站方单 HDR 标签——泛家族归一）+
+  DoVi+粤语+禁转/国语/中字/DIY；首发铁律+自购 label-only；值 3
+  站方跳号。
+- **站点级双检查（discfanReleaseBlocked 用户定案全链——挂 PushOnly
+  分支后同 §59.424 P1 补推豁免）**：
+  - ①**五年规则**（站规硬规则）：tp.Year（标题+PTGen 校正终态=Tab1
+    同源）≤当前年-5 放/年内拦/**无年份放**（用户定案 A——29 库 0 例
+    实证+审核门九字段无 year 按需生长）。
+  - ②**禁欧美**（用户策略性定案——欧美一颗不发连候选不走；站规
+    "欧美需候选"升级我方直接禁）：亚洲四类（大陆/港台/日韩/亚洲
+    其它）放/**有产区但不中亚洲词表=欧美拦**/无产区防御放
+    （315/315 Region 全覆盖实证不触发）。
+  - **实现坑**：classifyRegionWords 对欧美返回 regionNone 非
+    regionWestern（§59.391"其余=欧美"系消费端默认）——产区段语义
+    修正 None=拦（测试锚抓出）。
+- 字段：url+pt_gen+technical_info+uplver+anonymous:true（§59.422
+  附二默认）；nfo 不配（13城定案）。
+- **验证**：测试锚 18 态（产区 8 态+兜底+回退+五年 3 态+产区 4 态）+
+  裸对全槽一致+formdiff 0 条（双零）+DryRun 四形态端到端（大陆电影
+  2019→401+Rip=10 命中 ✓/美国电影 2019→禁欧美拦 ✓/大陆电影 2024→
+  五年拦 ✓/日本剧集 2019→411 通用链 ✓）。
+- **站规人工把关**：音乐类须无损（<5.1 有损禁令=音乐专属——用户
+  澄清影视有损音轨不受限）/dupe（媒介优先级+断种 45 日·18 个月
+  豁免）/upscale/RMVB/标清差质/样片/他站禁转/游戏 AV 政治禁。
+- **站点定位**：华语为主+日韩为辅（亚洲直发）/经典旧资源（五年
+  规则——只吃 2021 前存量）/复古媒介（LD/VHS/VCD 全库唯一）。
+- 遗留：首颗真实发布（29 等级用户确认够+不够自然发布失败兜底）。
