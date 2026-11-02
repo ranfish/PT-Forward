@@ -382,7 +382,8 @@
     "cookiecloud_domain": "ourbits.club",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": "仅源站"
+    "special_notes": "仅源站",
+    "publish_supported": true
   },
   "p.t-baozi.cc": {
     "domain": "p.t-baozi.cc",
