@@ -424,3 +424,36 @@ func mapHDUPTCodec(codec string, medium int) int {
 *数据来源: upload.php HTML (68458字节) + rules.php (5349字符) + 论坛#304发布总则 (6704字符) (2026-04-17/2026-04-22)*
 *文档创建: 2026-04-17*
 *文档更新: 2026-04-22 — 补充完整 rules.php 规则、论坛#304 八类资源发种细则(电影/剧集/纪录片/综艺/动漫/体育/游戏/音轨)、H&R规则、促销阶梯、Dupe规则、Tracker URL*
+
+### 附：发布适配记录（v0.0.1284 §59.427）
+
+- **form_config**：migration111 分发（六槽 52 项——type 10/medium 15/
+  codec 7/audiocodec 12/standard 6/team 2）。实时 HTML（44.2KB 直连）
+  vs 文档 vs 4 月资产全槽一致。
+- **medium 15 电影/剧集 TV 双轨**（站方 Remux/Encode/WEB-DL 各带 TV
+  后缀分立项——全库唯一细分）：hduptTVMediumOption 挂 mediumMappingOf
+  （签名扩展 siteName+meta——§59.380 codecMappingOf 同款）：
+  tv_series∧remux→12 Remux TV/uhd_remux→16 UHD Remux TV/encode→14
+  Encode TV/webdl·webrip→13 WEB-DL TV；电影形态主键归通用项——TV 4 项
+  label-only 特化独占；原盘/CD/MiniBD/HDTV/DVD 无 TV 分立走通用。
+- codec 7 **x264-only 半分立**（x264 label-only 压制联动通道+无 x265
+  项——压制 h265 联动 miss→H.265/HEVC 通用兜底=站方语义；DryRun ②
+  压制电影 codec=16 x264 联动命中实证）。
+- audiocodec 12：AC3/EAC3=[ac3,dd,ddp] 三键合并（无 DDP 分立）+
+  TrueHD=[truehd,truehd_atmos] 双键（无 Atmos 分立家族承接）。
+- **processing_sel=地区槽不配**（FieldDomainProcessing 常量不存在——
+  发布链无投递能力历史定案持续；8 地区含 India/SEA 全库最细——预览
+  人工选）。
+- **无 tags 槽**（实时+资产双 None）；**无 url/pt_gen/technical_info**
+  （实时实证简介-only 形态——海的宝同款）；nfo 不配；uplver+
+  anonymous:true。
+- team 2 label-only 全库最少之一：HDU 官组+Other(5) 兜底。
+- **验证**：测试锚十态+裸对全槽一致+formdiff 0 条（双零）+DryRun 三
+  形态（① WEB-DL 剧集→402+13 WEB-DL TV 特化 ✓/② 压制电影→401+7
+  Encode 通用+16 x264 联动 ✓/③ 压制剧集→402+14 Encode TV 特化 ✓
+  ——TV 双轨分发电影/剧集双向实证）。
+- **站规人工把关**：Dupe 严格（已有 BluRay Encode 禁发 WEB-DL/HDTV+
+  同分辨率单份例外/每季完结禁发单集——§59.424 系统分集拦截上游已
+  拦/官方小组优先一切）+禁二次编码 BR/HR-HDTV+禁 WEB-DL 重编码+禁
+  非官方打包合集+H&R 1:1 或 72h+新人候选制+转载注明来源感谢原后缀。
+- 遗留：首颗真实发布。
