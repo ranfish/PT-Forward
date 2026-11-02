@@ -393,7 +393,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "p.t-baozi.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "pandapt.net": {
     "domain": "pandapt.net",
