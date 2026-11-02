@@ -455,3 +455,52 @@
 
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
+
+### 附：发布适配记录（v0.0.1286 §59.429）
+
+- **form_config**：migration113 分发（七槽 56 项——type 9/medium 10/
+  codec 5/audiocodec 13/standard 5/team 6/tags 8）。完整表单在
+  `upload.php?mode=advanced`（41.1KB——默认页 13.2KB 简版，咖啡/慕雪
+  阁模式）。实时 vs 4 月资产全槽一致（零漂移站）。
+- **type 9 非标值集**（402=Muisc 音乐/403=Animations 动漫/406=TV
+  Series 剧集）：402/404/405 双键+直配；**408"3D" label-only（实态
+  矛盾仲裁）**——cat408 列表页 90 行全音乐 MV 内容（Sia/Beach Boys/
+  FLAC 分轨）与表单 label 脱节；3D 电影实态在 401（IMAX 3D/HKG 3D
+  样本在列）——站方用户不用 408 装 3D，Stereo3D 无需路由。
+- **medium 10 纯来源形态语义（实态三铁证仲裁）**：
+  - Sneakers 2160p UHD Blu-ray 原盘 → 媒介=**Blu-ray(1)**+分辨率=
+    4K_UHD(1)
+  - Lock Up UHD Blu-ray Remux → 媒介=**Remux(3)**+分辨率=4K_UHD(1)
+  - Mutiny 1080p Blu-ray 原盘 → 媒介=**Blu-ray(1)**+分辨率=1080p/i
+  - **UHD 维度由 standard 槽承担，媒介不分 UHD**：Blu-ray=[bluray,
+    uhd_bluray]/Remux=[remux,uhd_remux] 双键归并；**4K-UltraHD(6)/
+    8K-UltraHD(7) label-only**（语义存疑不猜——实态证明 UHD 原盘/
+    Remux 均走 1/3）。
+- codec 5 极简全配（无 X26x——压制联动零触发=站方语义）；audiocodec
+  13 全配：**Atmos TrueHD(1)/TrueHD(2) 分立**+DTS X=[dtsx]（空格
+  label——13+ 站单键先例）+AC3/DD=[ac3,dd] 双键+EAC3/DDP=[ddp] 单键
+  （无 eac3 键）+LPCM=[lpcm,pcm] 双键承接（藏宝阁先例）。
+- standard 5：4K_UHD 置顶乱序+1080p/i=[r1080p,r1080i] 双键+**720p/i
+  =[r720p] 单键（r720i 无键——织梦同款）**+SD/Other extended 活键
+  （躺平先例）。
+- team 6：LemonHD 官组+HDS/CHD/MySiLU/WiKi 外站官组 label-only（组
+  映射层自动命中——车站/学校先例）+Other=[team.other] 兜底。
+- tags 8：**首发(2) 绝不配键（财神雷区铁律）**+禁转不配+4K label-only
+  （分辨率类标签零产出——13城/麒麟先例）+五键配（HDR 四键泛家族
+  14 站+原盘 original_disc+国语 chinese_audio+中字+DIY）。
+- **无 url/pt_gen 真字段**（实时实证——文档 §1.1/§1.2 url+PT-Gen 五
+  来源为漂移/旧版形态；ptgen.js 仅脚本引用）；nfo 不配；uplver+
+  anonymous:true。
+- **验证**：裸对全槽一致+formdiff 0 条（双零）+DryRun 四验证
+  （① UHD 原盘→401+medium=1 双键归并+standard=1 ✓/② UHD Remux→
+  medium=3 归并+audio=1 Atmos TrueHD+tags=[原盘,中字,HDR] 三键全中 ✓/
+  ③ MI 压制→medium=2 Encode+codec=1 H.264 不联动 ✓——三铁证形态
+  DryRun 全对齐）。
+- **借壳注入两坑记录**：①DB tags 列形态=JSON 数组无前缀 canonical
+  （`["original_disc",...]`）非 `tag.xxx` 逗号串；②DryRun tags 输出
+  在 `tags_labels` 独立通道非 form map `tags[4][]` 键（历史站报告
+  "tags=[...]" 即此字段）；③稀疏行触发资产完备门（name/简介空→
+  ineligible——必须完整模板注入）。
+- 站规人工把关：禁转资源发布前获许可+同名资源≥6 月间隔+官方原盘
+  优先+禁抢发+候选区审核+促销自动 2xFree。
+- 遗留：首颗真实发布。
