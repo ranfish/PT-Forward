@@ -401,3 +401,57 @@ PTZone 使用 Cloudflare（`cf_clearance` cookie），适配器的 HTTP 客户�
 *分析时间：2026-04-16*
 *最后更新：2026-04-22*
 *数据来源：https://ptzone.xyz/rules.php + https://ptzone.xyz/upload.php 发布页面 HTML 分析*
+
+### 附：发布适配记录（v0.0.1304 §59.448）
+
+- **form_config**：migration131 分发（七槽 64 项——type 10/medium 10/
+  codec 6/audiocodec 14/standard 6/team 6/tags 8）。实时 HTML
+  （45.1KB 直连）vs 4 月资产**大漂移（末日式局部）**：
+  - **type 11→12**：408/409 同 label "Others(其它）" 双 value（§59.444
+    龙PT 同形态——配置对齐 draft 单行口径删 409 留 HTML 首值 408）+
+    410 Ebook→Software+411 Edu→Games（资产后四项全漂移）。
+  - **medium 换血**：HD DVD(2) 新增+**UHD(10) 顶替资产 Other(10)**
+    （同 value 不同 label——value 漂移站方直接拒收；实时 HTML 唯一
+    真源）+Other 消失（miss 落空预览人工）。
+  - **audiocodec 15 大换血**：LPCM/ALAC/M4A/AIFF/OPUS 消失+**DTS
+    3/9 同 label 克隆式重复（配置留首值 3）**+AC3(8)/DD/AC3(11) 双
+    value 近语义+DDP/EAC3(12)/DTS-HD(13)/TrueHD(14)/WAV(15) 新增。
+  - **tags 资产 None→实时 8 项**（青蛙/学校/海的宝同款缺口补全）。
+  - codec/standard/team 三槽零漂移。
+- type 10（配置侧删 409）：404 双键+406 Music=[music,lossless_music]
+  双键（克隆先例）+408 Others label-only（杂项无键）+410/411 配键。
+- medium 10：UHD(10)/Blu-ray(1)/HD DVD(2)=[hddvd] ext 活键+Remux(3)
+  双键归并+Encode+WEB-DL(4) 双键+HDTV+**DVDR(6)=[dvd,dvdr] 双键宽
+  语义（阿玲先例——无 DVD 项用 DVDR 项收 dvd 键）**+CD+Track(9)=
+  [track] ext 活键；无 Other 项。
+- codec 6：H.264/H.265 配键+VC-1/MPEG-2/MPEG-4=[mpeg4] ext+Other
+  ——无 X26x 分立零联动+无 AV1/VP9。
+- **audiocodec 14（配置侧删 DTS(9) 克隆）**：**AC3(8) label-only
+  （audio.ac3/dd 键均归 11——文档 §4.1 站方语义定案 DTS→3+AC3/DD→
+  11 DD/AC3 全语义，一键多值防线）**+DDP/EAC3(12)=[ddp] 单键（eac3
+  无键——Nova/萝莉先例）+**DTS-HD(13)=[dts_hd_hr] 家族剩余键**（MA
+  已分立归 10，无 MA 的 DTS-HD 即 HR——星湾泛剩余先例）+TrueHD+
+  WAV+FLAC/APE/DTS(3)/MP3/OGG(ext)/AAC/Other。
+- standard 6（值 5=8K/6=4K 乱序）：1080p/i 分立+720p+SD=[sd] 统一
+  承接（无 576p/480p 独立项）+8K/4K；无 Other。
+- team 6：PTZWeb 官组 label-only+HDS/CHD/MySiLU/WiKi 外站组
+  label-only+Other(5)=[team.other] 兜底。
+- tags 8：**禁转(1)/首发(2) 绝不配**（财神雷区）+完结=[complete]+
+  分集=[ongoing]+DIY+国语+中字+**HDR(7)=[hdr10,hdr10_plus,hdr_vivid,
+  hlg] 财神四键泛家族**（站方无细分四键全承接）。
+- 字段：type/medium_sel[4]/codec_sel[4]/audiocodec_sel[4]/
+  standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
+  technical_info+url（IMDb data-pt-gen 真字段）+pt_gen+uplver+
+  anonymous:true；**nfo 不配**（13城先例）；无 douban 字段（豆瓣走
+  pt_gen）；url×2 第二个是编辑器按钮（浦园/青蛙同款）。
+- **验证**：裸对全槽一致（同 label 去重口径）+formdiff 0 条（一次
+  归零）+DryRun 三形态（① WEB-DL 剧集→402+4+1+1+**tags=[国语,中字,
+  HDR] hdr10_plus 细分归泛 HDR 承接** ✓/② UHD 原盘→**medium=10 UHD
+  乱序正确**+audio=10 DTS-HD MA+standard=6 4K 乱序正确 ✓/③ MI 压制
+  →medium=7 Encode+**codec=6 H.265 折叠命中（无 X26x 分立站方语义）**
+  ✓）+48 包。
+- 站规人工把关：上传者资格（§3.3）+不允许的资源（§3.5）+Dupe 判定
+  （§3.6 同媒介+同分辨率+更高/同优先级组——动漫 HDTV/DVD 同级例外）
+  +资源打包（§3.7）+标题格式规范（§3.8 分模板）+无损音轨只保留一
+  版本（§4.5 分轨 FLAC 优先）+CF 防护（§4.3 cf_clearance）。
+- 遗留：首颗真实发布。
