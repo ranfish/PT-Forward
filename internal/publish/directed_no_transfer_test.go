@@ -810,3 +810,50 @@ func TestHdtimeDiscCategoryRoute(t *testing.T) {
 		t.Errorf("他站不应触发，得 %v", v)
 	}
 }
+
+
+// §59.427: 好多油 TV 双轨分发（剧集→TV 后缀媒介项）。
+func TestHduptTVMediumRoute(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"medium": "medium_sel"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"medium": {
+				{Label: "Blu-ray", Value: "1", StandardKeys: []string{"medium.bluray"}},
+				{Label: "UHD Blu-ray", Value: "11", StandardKeys: []string{"medium.uhd_bluray"}},
+				{Label: "Remux", Value: "3", StandardKeys: []string{"medium.remux"}},
+				{Label: "UHD Remux", Value: "15", StandardKeys: []string{"medium.uhd_remux"}},
+				{Label: "Remux TV", Value: "12"},
+				{Label: "UHD Remux TV", Value: "16"},
+				{Label: "Encode", Value: "7", StandardKeys: []string{"medium.encode"}},
+				{Label: "Encode TV", Value: "14"},
+				{Label: "WEB-DL/WEBRip", Value: "10", StandardKeys: []string{"medium.webdl", "medium.webrip"}},
+				{Label: "WEB-DL/WEBRip TV", Value: "13"},
+			},
+		},
+	}
+	tv := &model.TorrentMetadata{Category: "category.tv_series"}
+	movie := &model.TorrentMetadata{Category: "category.movie"}
+	cases := []struct{ cat, key, want string }{
+		{"tv", "medium.remux", "12"}, {"tv", "medium.uhd_remux", "16"},
+		{"tv", "medium.encode", "14"}, {"tv", "medium.webdl", "13"}, {"tv", "medium.webrip", "13"},
+		{"movie", "medium.remux", ""}, {"movie", "medium.encode", ""},
+		{"tv", "medium.bluray", ""}, {"tv", "medium.cd", ""},
+	}
+	for _, c := range cases {
+		meta := movie
+		if c.cat == "tv" {
+			meta = tv
+		}
+		v := hduptTVMediumOption(cfg, "好多油", meta, c.key)
+		got := ""
+		if v != nil {
+			got = v.Value
+		}
+		if got != c.want {
+			t.Errorf("%s %s: 期望 %q 实得 %q", c.cat, c.key, c.want, got)
+		}
+	}
+	if v := hduptTVMediumOption(cfg, "天空", tv, "medium.encode"); v != nil {
+		t.Error("他站不应触发")
+	}
+}

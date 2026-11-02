@@ -363,7 +363,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
 		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp)},
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
-		{model.FieldDomainMedium, e.mediumMappingOf(cfg, tp)},
+		{model.FieldDomainMedium, e.mediumMappingOf(cfg, in.TargetSite, meta, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
 	}
 	for _, j := range jobs {
@@ -1105,7 +1105,9 @@ func hasMinBDToken(rawTitle string) bool {
 	return strings.Contains(lower, "minbd") || strings.Contains(lower, "minibd")
 }
 
-func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+// §59.427 签名扩展：siteName+meta（好多油 TV 双轨分发——站方媒介
+// 电影/剧集分立项，分发依据 category=tv_series）。
+func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
 	stdKey := ""
 	switch strings.ToLower(tp.Specification) {
 	case "remux":
@@ -1121,6 +1123,14 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 	}
 	// §59.380: stdKey 推导抽单源（codec 压制形态联动复用——防双实现漂移）
 	stdKey = mediumStdKeyOf(tp, stdKey)
+	// §59.427: 好多油 TV 双轨分发——站方媒介 Remux/Encode/WEB-DL 各带
+	// TV 后缀分立项（Remux TV 12/UHD Remux TV 16/Encode TV 14/WEB-DL TV
+	// 13）：剧集（tv_series）种分发 TV 项（电影形态主键归 Remux/Encode/
+	// WEB-DL——TV 项 label-only 特化独占，直查永不命中防撞键）。
+	// 分发依据=stdKey（媒介单源同源）；非 tv_series 零变化。
+	if v := hduptTVMediumOption(cfg, siteName, meta, stdKey); v != nil {
+		return v
+	}
 	// §59.325: MinBD 特例优先——有 MiniBD 精确选项的站点映 medium.minibd，
 	// miss 时 fallback 原链（无该选项的站点走 Encode/原盘原语义）
 	if hasMinBDToken(tp.RawTitle) {
@@ -2482,6 +2492,35 @@ func sjtuRegionCategoryValue(cfg *model.PublishFormConfig, siteName string, meta
 	for i := range cfg.ValueMappings[model.FieldDomainType] {
 		if cfg.ValueMappings[model.FieldDomainType][i].Value == want {
 			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
+}
+
+// hduptTVMediumOption §59.427: 好多油 TV 双轨分发（剧集媒介 TV 后缀项）。
+func hduptTVMediumOption(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, stdKey string) *model.FormValueMapping {
+	if siteName != "好多油" || cfg == nil || meta == nil {
+		return nil
+	}
+	if meta.Category != "category.tv_series" {
+		return nil // 电影/综艺等走通用键（电影形态主键）
+	}
+	var want string
+	switch stdKey {
+	case "medium.remux":
+		want = "12" // Remux TV
+	case "medium.uhd_remux":
+		want = "16" // UHD Remux TV
+	case "medium.encode":
+		want = "14" // Encode TV
+	case "medium.webdl", "medium.webrip":
+		want = "13" // WEB-DL/WEBRip TV
+	default:
+		return nil // 原盘/CD 等 TV 无分立项——通用链
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainMedium] {
+		if cfg.ValueMappings[model.FieldDomainMedium][i].Value == want {
+			return &cfg.ValueMappings[model.FieldDomainMedium][i]
 		}
 	}
 	return nil
