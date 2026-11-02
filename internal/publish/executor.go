@@ -329,6 +329,13 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	e.mergePTGenSource(ctx, &tp, meta)
 	// §59.308 完结季包季集归一（单点方法——主管线与 preAuditTitle 同路径）
 	e.normalizeSeasonPackOf(meta, &tp)
+	// §59.424: 系统级禁发剧集分集（用户定案——所有站点仅允许合集/完结/
+	// 全集形态）。挂载点=归一后（tp.SeasonEpisode 已是归一终态）+PushOnly
+	// 分支之后（P1 定案：补推豁免——形态恒定检查与时变检查（flags）挂载
+	// 策略不同，补推重放重查只误伤存量加种）。DryRun 同拦（预览可见）。
+	if blocked, reason := episodeReleaseBlocked(meta, &tp); blocked {
+		return failRec("ineligible", reason)
+	}
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纭错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
 	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
@@ -1718,8 +1725,73 @@ var crossSeasonTagRe = regexp.MustCompile(`(?i)(?:[.\s]S\d{1,2}-S?\d{1,2}\b|第\
 // multiWorkCollectionRe §59.177: 多作品合集信号（副标题）。
 var multiWorkCollectionRe = regexp.MustCompile(`(合集|集全|期全)`)
 
-// completeSignalRe §59.177: 完结信号（副标题）。
-var completeSignalRe = regexp.MustCompile(`(全集|全季|已完结|完结|全\d+集|全剧终)`)
+// completeSignalRe §59.177: 完结信号（副标题）。§59.424 扩英文词形
+// （用户定案中英双语——\bcomplete\b 词边界防误匹配 incomplete）。
+var completeSignalRe = regexp.MustCompile(`(\b(?i:COMPLETE)\b|全集|全季|已完结|完结|全\d+集|全剧终)`)
+
+// mainTitleCompleteRe §59.424: 主标题完结信号（中英双语词形——
+// Complete Seasons/Series/Collection 全形态经 \bcomplete\b 命中）。
+var mainTitleCompleteRe = regexp.MustCompile(`(\b(?i:COMPLETE)\b|完结|全集|全季)`)
+
+// seasonPackFormRe §59.424: 合集形态季集（纯季 S01 / 跨季 S01-S02 /
+// 第N-M季——无 E 后缀）。归一通道（§59.308）命中的完整季已是纯季号。
+var seasonPackFormRe = regexp.MustCompile(`^S\d{1,2}(-S?\d{1,2})?$`)
+
+// singleEpisodeRe §59.424: 单集形态（S01E02——无区间后缀）。
+var singleEpisodeRe = regexp.MustCompile(`^(S\d{1,2})E(\d{1,4})$`)
+
+// episodeReleaseBlocked §59.424: 系统级禁发剧集分集（用户定案——所有
+// 站点仅允许合集/完结/全集形态发布；与"转存发布禁勾首发"同层行为铁律，
+// 纯代码规则零配置）。
+// 范围：category ∈ {tv_series, animation, tv_shows}（②定案；动漫电影
+// 形态无 S/E 信号天然豁免；短剧/音乐/MV/体育不在范围——边界定案④）。
+// 放行（任一）：
+//   - 无分集形态（无 S/E 信号，或 S01 纯季/跨季合集形态——归一通道
+//     §59.308 命中的完整季此时已是纯季号）
+//   - 完结信号任一（①定案宁放勿拦）：meta.Tags 含 complete（源站采集
+//     标签①）∨ 主标题中英词形② ∨ 副标题中英词形直查③（P2 定案：
+//     直查不依赖 fetch 推断产物——历史种/推断 miss 兜底）
+//   - 全集一集：单集 E01 ∧ PTGen episodes=1（BBC 单剧形态——定案不禁）
+// 拦截：单 E / 归一后仍是区间（非 E01 起或无完结信号的 E01 起区间）且
+// 无任何完结信号。
+// 边界（漏判放行·定案）：S01 标题权威（内容半季不判读文件清单）/
+// 多区间复杂形态按第一组锚/源站误标 movie 等范围外豁免。
+func episodeReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProfile) (bool, string) {
+	if meta == nil || tp == nil {
+		return false, ""
+	}
+	switch meta.Category {
+	case "category.tv_series", "category.animation", "category.tv_shows":
+	default:
+		return false, "" // 范围外（电影/短剧/音乐/MV/体育等）——豁免
+	}
+	se := tp.SeasonEpisode
+	if se == "" {
+		return false, "" // 无 S/E 信号（含动漫电影/OVA 形态）——豁免
+	}
+	if seasonPackFormRe.MatchString(se) {
+		return false, "" // S01 纯季 / S01-S02 跨季——合集形态放行
+	}
+	// 单集/区间形态：完结信号集（任一即放——宁放勿拦）
+	if strings.Contains(meta.Tags, `"complete"`) { // ①源站采集标签（归一 tag.complete）
+		return false, ""
+	}
+	if mainTitleCompleteRe.MatchString(meta.Title) { // ②主标题中英词形
+		return false, ""
+	}
+	if completeSignalRe.MatchString(meta.Subtitle) { // ③副标题中英词形直查（P2）
+		return false, ""
+	}
+	// 全集一集：单集 E01 ∧ PTGen episodes=1（整部剧就一集——完整全集）
+	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil && m[2] == "01" {
+		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+			if v, perr := strconv.Atoi(strings.TrimSpace(src.Episodes)); perr == nil && v == 1 {
+				return false, ""
+			}
+		}
+	}
+	return true, fmt.Sprintf("剧集分集形态（%s）——系统规则仅允许合集/完结/全集发布（放行信号：源站完结标签 / 主·副标题 Complete·完结词形 / 全集数对照）", se)
+}
 
 // crossSeasonCollectionSites §59.177: 覆写组——跨季=合集（Session Pack 语义）。
 // 藏宝阁: 多季合集规范（S01-SXX 专门命名规范）; ubits: 整季包/跨季包。
