@@ -59,7 +59,8 @@
     "cookiecloud_domain": "bilibili.download",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": "仅目标"
+    "special_notes": "仅目标",
+    "publish_supported": true
   },
   "cangbao.ge": {
     "domain": "cangbao.ge",
