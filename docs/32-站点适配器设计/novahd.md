@@ -565,3 +565,55 @@ Blu-ray / HD DVD > HDTV > DVD > TV
 rules.php 中**没有盒子/SeedBox 规则**章节。
 
 > **对 PT-Forward 的影响**：NovaHD 对盒子无特殊限制，PT-Forward 转发行为不受盒子规则约束。站点促销策略宽松（90% 种子有促销），发布后自动获得双倍上传量。
+
+### 附：发布适配记录（v0.0.1296 §59.440）
+
+- **form_config**：migration123 分发（七槽 88 项——type 13/medium 12/
+  codec 6/audiocodec 15/standard 8/team 16/tags 18）。实时 HTML
+  （62.3KB 直连）vs 资产 vs 文档**三源全槽一致（零漂移站）**——
+  文档 4-22 Playwright 验证与实时完全吻合。
+- **type 13**：411 短剧第十六站+406=[mv,music_video,concert] 三键
+  承接（克隆/优堡合并项同款）+404 双键+**412 动漫/413 番剧
+  label-only**（站方细分语义 §4.3：412 单季/单集 vs 413 多季合集
+  ——发布链无该判定维度，405=[animation] 承接动画电影标准语义，
+  412/413 预览人工）+414=[game]。
+- **medium 12（值 1-12 连续排列乱序）**：**Blu-ray(1)/UHD Blu-ray(10)
+  分立各单键**（奥申/躺平分立先例）+Remux(3)=[remux,uhd_remux]
+  双键归并+**WEB-DL(11)=[webdl,webrip] 双键承接**（站方无 WEBRip
+  项）+MiniBD/HD DVD/DVDR/Encode/CD/Track/DVD 全配。
+- codec 6 合并命名零联动（H264/x264/AVC 三命名一项——站方合并项
+  语义第六站反证）。
+- **audiocodec 15 全配键**：**TrueHD Atmos(8)=[atmos,truehd_atmos]
+  双键（躺平模式）+TrueHD(12) 分立**+**DDP/E-AC3(9)=[ddp] 单键
+  （eac3 无键 ddp 承接）+DD/AC3(10)=[ac3,dd] 双键分立**+DTS:X(14)=
+  [dtsx]+DTS-HD MA(13)+**ALAC(7) ext 活键**+FLAC/APE/DTS/MP3/OGG/
+  AAC/LPCM/Other。
+- **standard 8**：主链全配+**60Fps(7)/120Fps(8) label-only**（帧率
+  维度混入分辨率槽——站方 §4.1 规则 FrameRate>=60/120 分发；发布
+  链 standard 槽静态映射无帧率判定维度，零案例不预实施（按需生长），
+  5=[r2160p] 承接全部 4K，60/120Fps 种预览人工调）。
+- **team 16 外站官组大表**：HDSky/CHD/MySiLU/WiKi/beAst/CMCT/TLF/
+  M-Team/BeiTai/AGSV/HDHome/TTG label-only+**FRDS(6) 在表 label
+  直配命中**+**NHDWeb(15)/NDJWEB(16) 站方官组 label-only**+Other(5)=
+  [team.other] 兜底。
+- **tags 18 罕见标签丰收——四长尾键同站配**：**60FPS(21)=
+  [high_frame_rate]（星陨阁首配键复利）+高码(19)=[high_bitrate]
+  （星陨阁/劳改所复利）+大包(13)=[big_pack]（躺平首配键复利）+
+  杜比(14)=[dolby_vision]（垃圾堆先例）**；首发(2)/驻站(8) 绝不配
+  （官方专属财神雷区）；DIY/国语/中字/HDR 四键泛家族/英字/特效/
+  完结/分集 十一键配；**10Bit(20) label-only（bit depth 无键）+
+  连载(18) label-only（与分集(9) 分立语义模糊——分集=ongoing 历史
+  先例，连载保守不猜）+番组(17) label-only+应求(12) label-only**。
+- 字段：type/medium_sel[4]/codec_sel[4]/audiocodec_sel[4]/
+  standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
+  technical_info+url+pt_gen+uplver+anonymous:true；**nfo 不配
+  （13城先例域表无此域）**。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+11+1+tags=[中字,60FPS,大包] 长尾三标全中 ✓/
+  ② UHD 原盘→medium=10 UHD 分立+codec=6+**audio=8 Atmos 双键**+
+  **team=6 FRDS label 直中**+tags=[杜比,HDR] ✓/③ MI 压制→medium=7
+  Encode+codec=1 合并项通用+audio=13 DTS-HD MA ✓）+48 包。
+- 站规人工把关：§6.4 上传规则（H&R+上传者资格）+§6.5 标题命名
+  规范+§6.6 无盒子规则；60/120Fps 高帧率种+10Bit 种预览人工核对
+  （§4.1/§4.2 站方规则）。
+- 遗留：首颗真实发布。
