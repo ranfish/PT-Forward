@@ -424,3 +424,56 @@
 *文档创建：2026-04-19*
 *最后更新：2026-04-22*
 *数据来源：rules.php (6989字节) + upload.php (1724字节)*
+
+### 附：发布适配记录（v0.0.1300 §59.444）
+
+- **form_config**：migration127 分发（七槽 77 项——type 10/medium
+  11/codec 6/audiocodec 18/standard 7/team 8/tags 18）。实时 HTML
+  （56.9KB 直连）vs 资产差异：**tags 18 项实时新增 官方(3)+零魔
+  (18)**（资产 16——官方绝不配+零魔 label-only 麒麟站方标记同款）
+  +standard label 实时扩充 i 形态三元合并+medium 顺序漂移。
+- **type 409/411 双"其他"同 label 双 value 重复项**（**label 重复
+  新形态**——历史 FRDS 是同 value 双 label）：draft 解析器同 label
+  去重保 HTML 首见 409，配置对齐删 411（formdiff 抓出 changed
+  cur=411 draft=409 即修）。
+- **medium 11 原盘/Remux 双单键分流**：UHD Blu-ray(2)/Blu-ray(1)
+  原盘分立各单键+**UHD Blu-ray Remux(11)=[uhd_remux]+Blu-ray
+  Remux(3)=[remux] 双单键分流**（**DryRun 形态二实测：UHD Remux
+  标题判定层"UHD REMUX→remux"归一损失（§59.420 家园注释明证）→
+  命中 3 历史站普遍形态；11 承接 uhd_remux 键精确路径——两键无
+  冲突，Remux 双键归并反而制造一键多值**）+WEB-DL 双键承接+
+  **DVD(6)=[dvd,dvdr] 双键宽语义**（无 DVDR 项垃圾堆同款）+
+  Encode/HDTV/CD/Track/Other。
+- codec 6 全配键零联动；**standard 7 p/i 三元合并形态**（咖啡
+  放大版：1080p/1080i=[r1080p,r1080i] 双键+4K/8K/2K/720p/480p
+  主键单键——i 变体无 ext 键 miss 落空织梦 r720i 同款）。
+- **audiocodec 18 全配键**：TrueHD Atmos(9)=[atmos,truehd_atmos]
+  双键+TrueHD(19) 分立+**E-AC3(DDP)(10)=[ddp]+AC3(15)=[ac3]
+  分立不互承接**+DTS:X+DTS+DTS-HD MA+LPCM+**M4A/ALAC/AV3A ext
+  活键**+FLAC/APE/MP3/OGG/AAC/WAV/Other。
+- team 8：**LongA/LongWeb/LongPT 站方官组 label-only**+WiKi/RL/
+  CMCT/HHWEB 外站 label-only+Other(5)=[team.other] 兜底。
+- **tags 18 长尾键丰收第二站**：**臻彩MAX(14)=[hdr_vivid]（HDR
+  Vivid 中文品牌名第四站——优堡"菁彩HDR"/慕雪阁"真彩"/熊猫
+  "菁彩HDR"同键不同译名先例）+高码(15)+高帧(16)**（星陨阁/
+  劳改所/Nova 复利）+杜比(10)+特效(11)+英字(9)+完结(8)+分集
+  (12)+DIY/国语/中字/**HDR=[hdr10,hdr10_plus,hlg] 三键泛剩余**
+  （**自查抓出一键多值即修——hdr_vivid 让位臻彩MAX 独立项包子/
+  星湾精细化分配同款**）十键配；**禁转(1)/首发(2)/官方(3) 三
+  绝不配**+零魔(18)/高分(13)/去广告纯享版(17) label-only。
+- 字段：url（IMDb）+technical_info+uplver+anonymous:true；nfo
+  不配（13城先例）；**无 pt_gen**；action/nonce/mode/redirect/
+  amount（魔改 UI 字段发布链不处理）+pos_state/pos_state_until
+  促销不配。
+- **验证**：裸对全槽一致+formdiff 两修归零（label 重复项+Remux
+  分流）+DryRun 三形态（① WEB-DL 剧集→402+4+2+**tags=[中字,
+  臻彩MAX,高码,高帧] 四标命中 hdr_vivid 让位 14 实证** ✓/②
+  UHD Remux→medium=3 归一损失命中+audio=9 Atmos 双键+tags=[杜比,
+  HDR] 泛三键 ✓/③ MI 压制→medium=7+codec=2+audio=3 DTS-HD MA ✓）
+  +48 包。
+- **测试占位域名修正**：longpt.org 开闸致 TestSiteIsTargetGate/
+  ImportDegradeWarning"未适配站"占位失效（断言反转 403→200）——
+  piggo.me 真未适配站替换 5 处。
+- 站规人工把关：上传者资格+Dupe 媒介优先级（§4.1）+同媒介同
+  分辨率重编码+豁免条款+资源打包规则（试行）+例外规则。
+- 遗留：首颗真实发布。
