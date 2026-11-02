@@ -480,3 +480,48 @@ PTFans mode=5 包含 11 个成人内容分类：
 > - 盒子限速 100Mbps，PT-Forward 部署在盒子时需备案且限速
 > - 新种头 3 天盒子仅 3 倍上传，下载无优惠
 > - 无匿名发布选项
+
+### 附：发布适配记录（v0.0.1292 §59.436）
+
+- **form_config**：migration119 分发（六槽 52 项——type 17/medium 8/
+  codec 9/standard 6/team 5/tags 7）。实时 HTML（48.3KB 直连）vs 资产
+  vs 文档全槽一致（零漂移站）。
+- 双模式站（mode=4 综合区/5 9KG 成人区禁止——§59.372+§59.388 双防线
+  自动护；发布链走综合区；9KG 区 12 分类全局禁止成人拦截在前天然
+  不可达）。
+- type 17 **教育/知识向大分类站**（Science/School/Book/Code/ACGN/
+  Baby/Resource 罕见细分）+非标值集（404 电视剧/405 综艺/406 纪录片
+  错位）：**407 Music=[music,lossless_music,mv,music_video,concert]
+  五键合并承接**（音乐/专辑/MV/演唱会一大类——历史三键承接放大）
+  +412 Book=[ebook,audiobook] 双键+414 Animate=[animation]+411
+  School=[education]+418 Software；408 Art/410 Science/413 Code/
+  415 ACGN/416 Baby/417 Resource label-only（dict 无键）。
+- medium 9：**Encode 7/8 重复值站方配置错误（克隆式去重第五例）**——
+  配置只留 **HTML 首值 8**（§59.394 蟹黄堡口径——首版误留资产序首值
+  7，formdiff 抓出 changed cur=7 draft=8 即修）+Other(9) 首乱序+
+  Blu-ray=[bluray,uhd_bluray]/Remux=[remux,uhd_remux] 双键归并。
+- **★codec 原盘/压制编码双维站——blurayCodecOption 特化挂
+  codecMappingOf**（站方 §4.1 明文：原盘/Remux→Bluray(AVC/HEVC/
+  VC-1) 项、压制/WEB→H.26x 项）：**动态检测 "Bluray(" 前缀非站名
+  硬编码**（原盘族媒介∧有原盘项才分发——§59.407 diyMediumOption
+  同款通用投资未来同形态站自动生效）；Bluray 三项 label-only 特化
+  独占（防 h264 键一键多值）+H.264(x264/AVC)/H.265(x265/HEVC)
+  合并命名零联动+MPEG-2/Xvid/AV1/Other 配键；测试锚八态。
+- standard 4K(5)/8K(6) 置尾全配键；**无 audiocodec 槽第五站**
+  （GTK/克隆/三月/奥申后）。
+- team 5：HDS/CHD/MySiLU/WiKi 老牌四组 label-only（文档 §1.9
+  "转种基本都选 Other"）+Other=[team.other] 兜底。
+- tags 7：首发/禁转绝不配（财神雷区）+DoVi=[dolby_vision]+DIY/
+  国语/中字+HDR 四键泛家族（17 站）。
+- 字段：url+**pt_gen 真字段**+technical_info+**无 uplver**（实时
+  实证——控件全列无匿名字段 anonymous 无承载）；nfo 不配；
+  qch_bt_rainbow_enable（站点插件）不配。
+- **验证**：裸对全槽一致+formdiff 0 条（Encode 首值修正后归零）+
+  DryRun 四形态（① UHD 原盘 AVC→401+6+**codec=4 Bluray(AVC)
+  特化**+tags=[DoVi,中字,HDR] 三标 ✓/② MI 压制 AVC→medium=8+
+  codec=1 H.264 通用**不触发特化** ✓/③ WEB-DL 剧集→404 非标+5 ✓/
+  ④ 演唱会→407 五键+codec=4 Bluray 特化 ✓——**原盘/压制双向分发
+  实证**）+48 包全绿。
+- 站规人工把关：标题命名规范+鼓励保种+吸血处罚+转载注明来源+9KG
+  区禁止（全局）+教育类内容健康要求。
+- 遗留：首颗真实发布。
