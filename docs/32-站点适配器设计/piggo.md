@@ -410,3 +410,26 @@ func canPublishToPiggo(req *PublishRequest) bool {
 *数据来源: upload.php HTML（儿童专区模式）+ Forum 3帖（topicid=102/183/394）(2026-04-22)*
 *文档创建: 2026-04-22*
 *定位: 仅发布站（儿童动画资源），禁止做源站，全站官种禁转*
+
+### 附：目标站适配停止记录（2026-11-02）
+
+- **用户指令停止**（考古阶段终止——零代码落盘：无 migration/未开闸）。
+- **停止动因：站方已改 SPA 前端框架**（实时铁证：upload.php 仅 3766B
+  Vue/React 壳——`<div id="app-boot">` 加载中+`/assets/css/DgVlznA.css`
+  Vite 构建哈希资源——表单完全由 JavaScript 动态渲染，view-source
+  静态源码无任何表单控件；4 月资产+本文档的 NP 传统表单结构已全面
+  过时）。
+- **实时抓取受阻实录**：29 直连 IP+代理 IP 双被 CF WAF 硬拦（IP 级
+  block"You have been blocked"——curl 直连/代理+完整头/Playwright
+  真浏览器直连/代理+首页预热四手段穷尽全 403；cf_clearance 在
+  CookieCloud cookie 中但绑签发 IP 无法跨 IP 使用——百川同款）。
+- **未来重启前置条件**（若再次适配）：
+  1. 用户提供**渲染后 DOM**（F12 Elements → html → Copy outerHTML
+     ——非 view-source）——SPA 表单字段名/值集唯一可靠源；
+  2. 核验提交端形态：`<form action="takeupload.php">` 传统提交保留
+     与否——若 API 化（JSON REST）则 adapter 提交链需新适配（逆向
+     API 协议），适配复杂度与 NP 站完全不同级；
+  3. formdiff 解析器对 SPA 页面无效（解析静态 HTML）——需渲染 DOM
+     作为输入。
+- 站点定位不变（§7.1：仅发布站+禁做源站+全站官种禁转——is_source=
+  false 已落库验证 ✓）。
