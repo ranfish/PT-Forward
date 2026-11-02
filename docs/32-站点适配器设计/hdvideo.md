@@ -667,3 +667,58 @@ Enya - And Winter Came 2008 FLAC
 > **全站白盒模式**：未在控制面板登记盒子地址的用户将被取消下载权限，这是强制要求。
 
 > **对 PT-Forward 的影响**：PT-Forward 部署在盒子服务器时，必须确保已在 HDVideo 控制面板登记盒子 IP 地址。48h 上传量限制对转发行为无直接影响（转发是发布新种子，不是做种下载）。
+
+### 附：发布适配记录（v0.0.1302 §59.446）
+
+- **form_config**：migration129 分发（七槽 84 项——type 8/medium 9/
+  codec 8/audiocodec 20/standard 6/team 5/tags 28）。实时 HTML
+  （112.5KB 代理）vs 资产差异：**team HDVTV(6) 新增**（资产 4——
+  groups DHVTV 疑笔误实时为准）+**tags AI仿真(32) 新增**（27→
+  28 label-only 财神 Ai 先例）+**region_sel 17 产区槽+style_sel
+  18 题材槽资产未捕获**（实时发现新槽）。
+- type 8：音乐MV=[mv,music_video] 双键+音轨=[music] 单键+404 双键。
+- medium 9（值 10-20 乱序）：UHD Blu-ray(10)/FHD Blu-ray(11) 原盘
+  分立各单键（FHD 命名特有形态）+Remux(12) 双键归并+**UHDTV/
+  HDTV(16)=[hdtv,uhdtv] 双键（合并项——我堡 UHDTV 键复利）**+
+  WEB-DL 双键+DVD 双键宽语义+Encode/CD/Other。
+- codec 8 合并命名零联动（AVC/H.264/x264 一项三命名——合并项
+  语义第七站反证）+ProRes ext 键（星湾首配复利）+AV1/S+VP8/9。
+- **audiocodec 20 全配键**：**DDP Atmos/EAC3(23)=[ddp_atmos,
+  atmos] 双键（红豆饭先例）+TrueHD_Atmos(14)=[truehd_atmos]
+  单键（站方 label 下划线形态精确）+DDP/EAC3(10)=[ddp,eac3]
+  双键（eac3 ext 首配键）+DTS_HD|MA(3)/DTS_HD|HR(15) 分立各
+  单键（label 含管道符站方特有）+LPCM/PCM(8)=[lpcm,pcm] 合并项
+  双键（咖啡先例）+DD/AC3(9)=[dd,ac3]+DTS_X=[dtsx]+MP2/3(18)=
+  [mp3,mp2] 双键+Opus/WAV/AAC/APE/OGG/FLAC/Other**；TAA(19)
+  label-only（疑 TTA 误写保守不猜——安全侧）+MPEG(22) label-only
+  （mpeg_audio 无键）。
+- standard 6：4320p/8K+2160p/4K 斜杠合并形态+1080p/i 分立+720p+
+  Other=[resolution.other]。
+- team 5（配置侧）：**HDV/HDVWEB/HDVMV/HDVTV 官组系 label-only**
+  （HDVTV 实时新增）+Other(4)=[team.other] 兜底。
+- **tags 28 五绝不配**（禁转/限转/官方/原创/首发——财神雷区全集）
+  +**HDR 五族细分独立第六站**（Dolby Vision/HDR10/HDR10+/HDR
+  Vivid/HLG 五键各独立——熊猫/优堡同款）+连载=[ongoing]+完结=
+  [complete]+国语/粤语/中字/特效/DIY 九键配；源码(8)/金种(16)/
+  应求(21)/零魔(15)/**AI仿真(32)（实时新增 label-only）**/微短剧
+  (31)/漫剧(30)（tag dict 无 short_drama 键——category 域键不
+  混用）/MV/LIVE现场/演唱会/音乐专辑 label-only。
+- **region_sel 17=产区槽不配**（咖啡定案——产区数据无静态投递
+  能力预览人工）+**style_sel 18=题材槽不配**（§59.400 定案：题材
+  不进 tag dict 走站方特化通道非配置映射——财神喜剧注入是站方
+  特化函数非通用配置）。
+- 字段：type/medium_sel[4]/codec_sel[4]/audiocodec_sel[4]/
+  standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr+url
+  （IMDb）+**douban_url=豆瓣条目链接（dburl 域——天空
+  FieldDomainDoubanURL 先例复用）**+pt_gen+uplver；nfo 不配
+  （13城先例）；**无 technical_info**（MI 塞简介）；search_mode
+  （搜索 UI 字段发布链不处理）。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+14+7+8+**tags=[国语,中字,HDR10+] 细分
+  独立命中** ✓/② UHD 原盘→medium=10+codec=6+**audio=23 DDP
+  Atmos 双键**+standard=6+tags=[Dolby Vision,HDR10] 双标独立 ✓/
+  ③ MI 压制→medium=13 Encode+**codec=6 HEVC 合并项（x265 折叠
+  命中）**+audio=3 DTS-HD MA ✓）+48 包。
+- 站规人工把关：上传规则（§6.4）+标题命名规范（§6.5 rules.php
+  原文）+账号保留规则+金种/源码官方标记语义。
+- 遗留：首颗真实发布。

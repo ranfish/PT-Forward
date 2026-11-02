@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| HDVideo | [hdvideo.md](./hdvideo.md) | ✅ 完成（AI仿真新增·HDR五族第六站·DDP Atmos双键·region/style双新槽不配·eac3首配键） |
 | 轨道炮 | [railgunpt.md](./railgunpt.md) | ✅ 完成（咖啡式简版第三例·420下架备份特色·Atmos三键承接·无team第三站） |
 | 龙PT | [longpt.md](./longpt.md) | ✅ 完成（label重复项新形态·Remux双单键分流·臻彩MAX第四站·测试占位域名失效即修） |
 | 包子 | [baozi.md](./baozi.md) | ✅ 完成（tags SDR真改版·原盘×DIY四分第九站·五绝不配·Atmos双键·HDR泛剩余分配） |
