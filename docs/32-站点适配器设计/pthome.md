@@ -644,3 +644,50 @@ site:
 
 *分析时间：2026-04-16*
 *数据来源：https://pthome.net/upload.php + upload_music.php + rules.php*
+
+### 附：发布适配记录（v0.0.1293 §59.437）
+
+- **form_config**：migration120 分发（七槽 73 项——type 11/medium 12/
+  codec 5/audiocodec 12/standard 7/team 8/tags 18）。实时 HTML
+  （60.9KB 直连）vs 资产全槽一致（零漂移站）；**文档 §1.1 称综合页
+  无标签——实时有 tags[] 23 项字符串值（文档漂移实时为准）**。
+- **双 type 互斥**（browsecat 综合区/specialcat 资料区——同 name 裸名
+  双 select disableother 联动：§59.372 首见+special 跳过双防线自动护）；
+  发布链走综合区，507 有声书/508 电子书 miss 落空预览人工。
+- **medium 12 原盘×DIY 双分（§59.407 diyMediumOption 自动生效第七站
+  复利）**：UHD Blu-ray(12)/UHD Blu-ray/DIY(13)/Blu-ray(1)/
+  Blu-ray/DIY(14) 四分——DIY 2 项 label-only 特化独占；
+  encode(15) 小写 label 站方特有形态；REMUX=[remux,uhd_remux]
+  双键归并。
+- codec 5 全配无 X26x 零联动；audiocodec 12：DD/AC3=[ac3,dd] 双键
+  承接（无 DDP 分立）+**M4A/MP3 extended 活键配**（躺平 m4a+好大
+  mp3 先例）；无 Atmos/DTS:X/DTS-HD HR。
+- standard 8K(10)/4K(5) 置首乱序全配+None(11) label-only。
+- team 8：**PTHome 官组系 7 组 label-only**（PTHome/PTH/PTHweb/
+  PTHtv/PTHAudio/PTHeBook/PTHmusic——官组绝不配键）+Other(5)=
+  [team.other] 兜底。
+- **tags[] 18 主区字符串值（家园/我堡后第三例——yc/gy/db 拼音键）**：
+  **yc 原创/gz 官字组/jz 禁转/xz 限转/sf 首发五绝不配**（官方专属
+  财神雷区）+gy/yy/zz/db/hdr10/hdrm/diy 七键配+yq 应求+音乐标签 5
+  项（MV/卡拉OK/live/concert/yzj）label-only（dict 无键；第二区
+  5 项同名重复控件不重复配置）；**formdiff 抓出 yzj 同 value renamed
+  （第二区长 label "音乐专辑(请使用“" 后覆盖）——配置对齐 HTML
+  原文长形态归零（§59.384 冬樱 label 源=站方 HTML 原文同款）**。
+- 字段：url+**douban_id="豆瓣ID/链接"双形态**（FieldDomainDoubanID
+  编号域第三站——家面后）+uplver+anonymous:true；no_promotion（不勾
+  促销）不配；nfo 不配；**无 pt_gen/technical_info**（综合页实证）。
+- **音乐发布页 upload_music.php 独立表单**（music_format_sel 四/
+  music_medium_sel 七/music_publish_sel 八）——发布链走综合页 408
+  音乐命中综合区，独立页字段不配预览人工。
+- **验证**：裸对全槽一致+formdiff 0 条（yzj label 对齐后归零）+
+  DryRun 三形态（① UHD 原盘→401+12+audio=20 TrueHD+tags=[DOLBY
+  VISION,HDR10,中字] 三标 ✓/② WEB-DL 剧集→402+10+tags=[国语,中字] ✓/
+  ③ 纪录片→404 双键+medium=15 encode ✓）+48 包。
+- **DryRun 互斥拦截实录**：encode_meta 模板源=家园→**家园×铂金家
+  互斥对**拦 ineligible（§59.409 附二 preflightNoTransfer 正确工作
+  实证）——借壳改 site_name='幸运' 绕开；互斥对名单含家园-铂金家
+  （发布预览天然规避）。
+- 站规人工把关：**黑名单制作组**（FGT/RARBG 系公网组）+H&R 360 天/
+  144h+上传者资格（Power User 及以上+考核）+Dupe 组内同分辨率禁+
+  禁转种转载前获许可+盒子备案+游戏区规则。
+- 遗留：首颗真实发布。
