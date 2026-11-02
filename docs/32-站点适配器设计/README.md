@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 天枢 | [dubhe.md](./dubhe.md) | ✅ 完成（无文档站第五例·photo键历史首配·H/X四分立带点联动·DVDR宽语义） |
 | Nova高清 | [novahd.md](./novahd.md) | ✅ 完成（三源零漂移·四长尾标签键同站配·Atmos双键·60/120Fps帧率混入保守） |
 | 星湾 | [xingwan.md](./xingwan.md) | ✅ 完成（资产两槽缺口补全·codec罕见格式大满贯·standard 16项·泛HDR键分配精细化） |
 | 劳改所 | [ptlgs.md](./ptlgs.md) | ✅ 完成（资产完全失效第三例·压制四分立·REMUX标签首配·高码率高帧率复利） |

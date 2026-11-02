@@ -1,259 +1,84 @@
-# 天枢（Dubhe）站点适配器设计
+# 天枢 站点适配器设计
 
 ## 站点信息
 
-| 项目 | 值 |
-|------|-----|
-| 站点名称 | 天枢（Dubhe） |
-| 域名 | dubhe.site |
-| 框架 | NexusPHP |
-| Cloudflare | 否 |
-| 候选制 | 是（部分用户需提交候选；游戏资源仅上传员及以上可自由发布） |
-| MediaInfo | 是（technical_info） |
-| IMDb | 是（url） |
-| 豆瓣 | 否 |
-| 匿名发布 | 是（uplver） |
-| NFO | 是 |
-| 认领系统 | 是（上限 1000） |
-| 小游戏 | 是（接流星/星际矿工/火星幸运局/星尘农场） |
+- **站名**：天枢 | **域名**：dubhe.site
+- **框架**：NexusPHP（字段后缀 [4]）
+- **建档**：2026-11-02（**docs/32 无文档站第五例**——咖啡/海的宝/我的PT 路径：实时 HTML 为源当天建档）
+- **官组**：DubheWeb
 
-## 上传表单
+## 一、发布页面表单（upload.php 实时 102.5KB 2026-11-02）
 
-**提交地址**: `takeupload.php`（POST multipart/form-data）
+**提交地址**：`takeupload.php`（POST multipart/form-data）
 
-**字段模式**: `data-mode='4'`，所有质量字段使用 `[4]` 后缀
+### 1.1 字段
 
-| 字段 | name | 类型 | 必填 | 说明 |
-|------|------|------|------|------|
-| 种子文件 | `file` | file | 是 | |
-| 标题 | `name` | text | 是 | |
-| 副标题 | `small_descr` | text | 否 | |
-| IMDb链接 | `url` | text | 否 | |
-| NFO文件 | `nfo` | file | 否 | |
-| 种子售价 | `price` | number | 否 | 最大值 30，30% 税率 |
-| 简介 | `descr` | textarea | 是 | BBCode |
-| MediaInfo | `technical_info` | textarea | 否 | |
-| 类型 | `type` | select | 是 | data-mode='4' |
-| 媒介 | `medium_sel[4]` | select | 否 | |
-| 编码 | `codec_sel[4]` | select | 否 | |
-| 分辨率 | `standard_sel[4]` | select | 否 | |
-| 制作组 | `team_sel[4]` | select | 否 | |
-| 标签 | `tags[4][]` | checkbox | 否 | 多选 |
-| 匿名发布 | `uplver` | checkbox | 否 | |
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| `file` | file | 种子文件 |
+| `name` / `small_descr` | text | 标题/副标题 |
+| `url` | text | IMDb 链接（data-pt-gen="url"） |
+| `nfo` | file | NFO 文件 |
+| `price` | select | 促销（不配） |
+| `descr` | textarea | 简介 |
+| `technical_info` | textarea | MediaInfo/BDInfo |
+| `uplver` | checkbox | 匿名发布（value="yes"） |
 
-> **注意**：`price` 种子售价字段为非常规字段，最大值 30，发布时收取 30% 税率。
+无 pt_gen；无 audiocodec 槽（第六站）。
 
-## Tracker URL
-`https://dubhe.site/announce.php`
+### 1.2 type（11 项）
 
-## 发布页面字段
+401 Movies/402 TV Series/403 TV Shows/404 Documentaries/405 Animations/406 Music Videos/407 Sports/408 HQ Audio/409 Misc/410 Books/411 photo
 
-| 字段 | name | 必填 | 说明 |
-|------|------|------|------|
-| 种子文件 | `file` | 是 | |
-| 标题 | `name` | 是 | |
-| 副标题 | `small_descr` | 否 | |
-| IMDb链接 | `url` | 否 | |
-| NFO文件 | `nfo` | 否 | |
-| 简介 | `descr` | 是 | BBCode (textarea) |
-| MediaInfo | `technical_info` | 否 | textarea |
-| 类型 | `type` | 是 | |
-| 媒介 | `medium_sel[4]` | 否 | |
-| 编码 | `codec_sel[4]` | 否 | |
-| 分辨率 | `standard_sel[4]` | 否 | |
-| 制作组 | `team_sel[4]` | 否 | |
-| 标签 | `tags[4][]` | 否 | checkbox 多选 |
-| 匿名发布 | `uplver` | 否 | |
+### 1.3 medium_sel[4]（10 项，值 1-10 乱序排列）
 
-## 分类 (type，12 个)
+1 Blu-ray/2 HD DVD/3 Remux/4 MiniBD/5 HDTV/6 DVDR/7 Encode/8 CD/9 Track/10 WEB-DL——无 UHD/DVD/Other 项
 
-| ID | 名称 |
-|----|------|
-| 401 | Movies |
-| 402 | TV Series |
-| 403 | TV Shows |
-| 404 | Documentaries |
-| 405 | Animations |
-| 406 | Music Videos |
-| 407 | Sports |
-| 408 | HQ Audio |
-| 409 | Misc |
-| 410 | Books |
-| 411 | photo |
+### 1.4 codec_sel[4]（10 项，H/X 四分立）
 
-## 质量字段
+11 H.265/HEVC、10 x.265（带点）、13 H.264/AVC、12 x264、7 MPEG-4、6 MPEG-2、2 VC-1、9 AV1、8 Xvid、5 Other
 
-### 媒介 medium_sel[4]（11 个）
+### 1.5 standard_sel[4]（5 项，p/i 合并形态）
 
-| ID | 名称 |
-|----|------|
-| 1 | Blu-ray |
-| 2 | HD DVD |
-| 3 | Remux |
-| 4 | MiniBD |
-| 5 | HDTV |
-| 6 | DVDR |
-| 7 | Encode |
-| 8 | CD |
-| 9 | Track |
-| 10 | WEB-DL |
+5 2160p/2160i、1 1080p/1080i、3 720p、4 SD、7 Other/其他
 
-### 编码 codec_sel[4]（11 个）
+### 1.6 team_sel[4]（6 项）
 
-| ID | 名称 |
-|----|------|
-| 11 | H.265/HEVC |
-| 10 | x.265 |
-| 13 | H.264/AVC |
-| 12 | x264 |
-| 7 | MPEG-4 |
-| 6 | MPEG-2 |
-| 2 | VC-1 |
-| 9 | AV1 |
-| 8 | Xvid |
-| 5 | Other |
+1 HDS/2 CHD/3 MySiLU/4 WiKi/5 Other/6 DubheWeb（站方官组）
 
-### 分辨率 standard_sel[4]（6 个）
+### 1.7 tags[4][]（6 项极简）
 
-| ID | 名称 |
-|----|------|
-| 5 | 2160p/2160i |
-| 1 | 1080p/1080i |
-| 3 | 720p |
-| 4 | SD |
-| 7 | Other/其他 |
+1 禁转、2 首发、4 DIY、5 国语、6 中字、7 HDR
 
-### 制作组 team_sel[4]（7 个）
+## 二、发布适配记录（v0.0.1297 §59.441）
 
-| ID | 名称 |
-|----|------|
-| 1 | HDS |
-| 2 | CHD |
-| 3 | MySiLU |
-| 4 | WiKi |
-| 5 | Other |
-| 6 | DubheWeb |
-
-## 标签 tags[4][]（6 个）
-
-| ID | 名称 | 转发相关 |
-|----|------|---------|
-| 1 | **禁转** | **全局禁转标记** |
-| 2 | 首发 | |
-| 4 | DIY | |
-| 5 | 国语 | |
-| 6 | 中字 | |
-| 7 | HDR | |
-
-## 缺失字段
-
-- **无 audiocodec_sel**
-- **无 source_sel**
-- **无 processing_sel**
-- **无豆瓣链接**
-
-## 促销规则
-
-### 随机促销（种子上传后自动随机）
-| 概率 | 促销类型 |
-|------|---------|
-| 10% | 50%下载 |
-| 5% | 免费 |
-| 5% | 2x上传 |
-| 3% | 50%下载 & 2x上传 |
-| 1% | 免费 & 2x上传 |
-
-### 自动免费条件
-- 文件总体积 > 20GB → 自动免费
-- Blu-ray Disk / HD DVD 原盘 → 自动免费
-- 电视剧每季第一集 → 自动免费
-
-### 促销时限
-- 除"2x上传"外，其余促销限时 **7 天**
-- "2x上传"**无时限**
-- 所有种子发布 **1 个月**后自动永久成为"2x上传"
-
-## 站点规则
-
-### 账号保留规则
-1. **Veteran User 及以上**等级用户永久保留
-2. **Elite User 及以上**等级封存账号后不会被删除
-3. 封存账号连续 **400 天**不登录 → 删除
-4. 未封存账号连续 **150 天**不登录 → 删除
-5. 无流量用户连续 **100 天**不登录 → 删除
-
-### 上传者资格
-- 任何人都能发布资源
-- 部分用户需先在候选区提交候选
-- 游戏类资源仅 **上传员**及以上等级可自由上传
-- 发布者获得**双倍上传量**
-
-### 允许的资源
-- 高清视频（Blu-ray/HD DVD 原碟、Remux、HDTV 流媒体、高清重编码 ≥720p、高清 DV）
-- 标清视频（高清媒介标清重编码 ≥480p、DVDR/DVDISO、DVDRip/CNDVDRip）
-- 无损音轨及 cue 表单（FLAC/APE 等）
-- 5.1 声道及以上音轨、评论音轨
-- PC 游戏（原版光盘镜像）
-- 7 日内高清预告片
-- 高清相关软件和文档
-
-### 不允许的资源
-- 总体积 < 100MB
-- 标清 upscale 视频
-- CAM/TC/TS/SCR/DVDSCR/R5/HalfCD
-- RealVideo/RMVB/RM/FLV
-- 单独样片
-- < 5.1 声道有损音频
-- 无正确 cue 多轨音频
-- 硬盘版/高压版游戏
-- RAR 压缩文件
-- 重复资源
-- 色情/敏感内容
-- 损坏文件/垃圾文件
-
-### Dupe 判定规则
-- 媒介优先级：Blu-ray/HD DVD > HDTV > DVD > TV
-- 高清版本使标清版本判定为重复
-- 动漫 HDTV 和 DVD 相同优先级（特例）
-- 相同媒介相同分辨率按发布组确定优先级
-- 保留一个 DVD5 大小最佳画质版本
-- 不同配音/字幕的 Blu-ray/HD DVD 原盘不算重复
-- 每个无损音轨只保留一个版本（分轨 FLAC 最高优先级）
-- 旧版本断种 45 日或发布 18 个月以上，新版本不受 dupe 约束
-
-### 打包规则
-- 按套装售卖的高清电影合集
-- 整季电视剧/综艺/动漫
-- 同一专题纪录片
-- 7 日内高清预告片
-- 同一艺术家 MV（标清按 DVD 打包，高清需分辨率相同）
-- 同一艺术家音乐（≥5 张专辑；两年内可单独发布）
-- 分卷动漫剧集/角色歌/广播剧
-- 发布组打包资源
-
-### 标题规范
-- 电影：`[中文名] 名称 [年份] [剪辑版本] [发布说明] 分辨率 来源 [音频/]视频编码-发布组`
-- 电视剧：`[中文名] 名称 [年份] S**E** [发布说明] 分辨率 来源 [音频/]视频编码-发布组`
-- 音轨：`[中文艺术家名 - 中文专辑名] 艺术家名 - 专辑名 [年份] [版本] [发布说明] 音频编码[-发布组]`
-- 游戏：`[中文名] 名称 [年份] [版本] [发布说明][-发布组]`
-
-### 管理组退休待遇
-- 上传员：升职 1 年+发布 200+种子 → 养老族；升职 6 月+发布 100+种子 → VIP
-- 管理员：升职 1 年+参加 2 次站务会议+参与规则修订 → 养老族
-- 总管理员及以上：直接养老族
-
-## 特殊说明
-
-1. **极简质量字段**：无音频编码、无来源、无处理方式，仅媒介/编码/分辨率/制作组四项
-2. **编码 ID 非标准**：不从 1 开始，使用 5-13 范围（H.265/HEVC=11, x.265=10, H.264/AVC=13, x264=12）
-3. **无 UHD Blu-ray 媒介**：最高媒介为 Blu-ray(1)，无 UHD Blu-ray 独立选项
-4. **无 8K 分辨率**：最高分辨率为 2160p/2160i(5)
-5. **仅 6 个标签**：极简标签集，含禁转(1)标签
-6. **仅 6 个制作组**：含站组 DubheWeb(6)，传统组仅 HDS/CHD/MySiLU/WiKi
-7. **特殊分类**：Books(410) 和 photo(411) 独立分类，无 Games 分类
-8. **编码区分 HEVC/x265 和 AVC/x264**：H.265/HEVC(11) 与 x.265(10) 分开，H.264/AVC(13) 与 x264(12) 分开
-9. **发布者双倍上传**：发布者获得双倍上传量
-10. **认领系统**：上限 1000
-11. **小游戏系统**：接流星/星际矿工/火星幸运局/星尘农场（天文主题命名）
-12. **站点主题**：天文/宇宙主题（星河/黑洞/星光/星尘等概念）
-13. **站点创建于 2025 年**：较新的站点
+- **form_config**：migration124 分发（六槽 48 项）。实时=资产全槽
+  一致（零漂移站）。
+- **type 11**：**411 photo=[category.photo] ext 活键历史首配**（罕见
+  摄影类目）+410 Books=[ebook]+406=[mv,music_video,concert] 三键
+  承接+408/404 双键。
+- **medium 10 乱序**：Blu-ray(1)=[bluray,uhd_bluray] 双键归并（无
+  UHD 项奥申同款）+**DVDR(6)=[dvd,dvdr] 双键宽语义（无 DVD 项——
+  我堡单项宽语义同款）**+Remux/WEB-DL 双键+MiniBD/HD DVD/HDTV/
+  Encode/CD/Track；无 Other 项 miss 落空预览人工。
+- **codec 10 H/X 四分立压制联动第九站（§59.380）**：x.265(10)
+  带点 label-only（联动通道——三月带点增强同款）+x264(12)
+  label-only 联动通道+H.265(11)/H.264(13) 配键+MPEG-4/MPEG-2/
+  VC-1/AV1/Xvid/Other 全配。
+- standard 5 p/i 合并（咖啡同款）：2160p/i(5)=[r2160p] 单键
+  （r2160i 无 ext 键 miss 落空——织梦 r720i 同款）+1080p/i(1)=
+  [r1080p,r1080i] 双键+720p/SD/Other。
+- team 6：HDS/CHD/MySiLU/WiKi 外站 label-only+Other(5)=[team.
+  other] 兜底+DubheWeb(6) 站方官组 label-only。
+- tags 6 极简：禁转/首发绝不配（财神雷区）+DIY/国语/中字/HDR
+  四键泛家族 四键配。
+- 字段：url（IMDb）+technical_info+uplver+anonymous:true；nfo
+  不配（13城先例）；price 促销不配；无 pt_gen。
+- **验证**：裸对全槽一致+formdiff 0 条（一次归零）+DryRun 三形态
+  （① WEB-DL 剧集→402+10+13+1+tags=[国语,中字,HDR] ✓/② UHD
+  原盘→medium=1 双键归并+codec=11+standard=5 ✓/③ MI 压制→
+  medium=7 Encode+**codec=10 x.265 带点联动通道命中实证** ✓）+
+  48 包。
+- 站规人工把关：上传者资格+H&R+Dupe 规则（无 wiki 文档实时未
+  采集——首颗发布前人工核验站方规则页）。
+- 遗留：首颗真实发布。
