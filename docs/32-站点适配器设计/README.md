@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 奥申 | [oshen.md](./oshen.md) | ✅ 完成（medium全canonical第二例·408/409音乐分立·无audiocodec第四站） |
 | OKPT | [okpt.md](./okpt.md) | ✅ 完成（双模式影视区·440短剧第十三站·外站官组表最大站28组） |
 | 柠檬不甜 | [lemonhd.md](./lemonhd.md) | ✅ 完成（medium纯来源形态实态仲裁·408实态矛盾label-only·tags五键） |
 | 分享站 | [itzmx.md](./itzmx.md) | ✅ 完成（414原盘公共路由首复用·极简站最少槽位之一） |
