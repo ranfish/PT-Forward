@@ -40,7 +40,8 @@
     "api_key_label": "存取令牌",
     "api_key_hint": "请从 控制台-实验室 获取",
     "verification_status": "verified",
-    "special_notes": "CookieCloud 域名 m-team.cc；禁调 /login /admin/** /apikey/**"
+    "special_notes": "CookieCloud 域名 m-team.cc；禁调 /login /admin/** /apikey/**",
+    "publish_supported": true
   },
   "audiences.me": {
     "domain": "audiences.me",

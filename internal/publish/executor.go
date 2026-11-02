@@ -590,6 +590,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
 	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
 	pubReq.TagArrayFields = tagArrayFields
+	// §59.451: 馒头 labels 位掩码注入（站方特化——API TorrentUploadForm
+	// labels int：bit0=DIY/bit1=中配/bit2=中字，无 tags checkbox 槽——
+	// TagArrayFields 空，标签经 ExtraFields 通道翻译投递；adapter
+	// uploadViaAPI 透传。0=无标签不写（bit 全零省字段）。
+	if in.TargetSite == "馒头" {
+		if bits := mteamLabelsBits(tags); bits > 0 {
+			if pubReq.ExtraFields == nil {
+				pubReq.ExtraFields = map[string]string{}
+			}
+			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
+		}
+	}
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
 	if aErr != nil {
@@ -1987,7 +1999,88 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := itzmxCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
+	if v := mteamCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// mteamCategoryValue §59.451: 馒头（api.m-team.cc）type 槽三维融合路由
+// （typeMappingOf 第十站——好大模式同族：category 树=类型×媒介×分辨率
+// 融合，22 非成人叶中影视族 9 叶按媒介/分辨率细分）。API 值集 2026-11-02
+// 实时拉取（List API 八端点——team 3 增 1 删外其余零漂移）：
+//   - 电影族（parent=100）：401 SD/419 HD/420 DVDiSo/421 BluRay/439 Remux
+//   - 影剧/综艺族（parent=105，含剧集）：402 HD/403 SD/435 DVDiSo/438 BluRay
+//     ——影剧族无 Remux 叶（Remux 归 402 HD——站方树实态）
+//   - 动画 405+453 BluRay（原盘特化——discCategoryRoute 单类形态）
+//   - 其余 13 类标准键直配（通用链：404 纪录/406 演唱/407 运动/434 无损/
+//     409 其他/422 软件/427 电子书/442 有声书/451 教育/423 PC 游戏）。
+// 路由规则（影视族×mediumStdKeyOf §59.380 单源×分辨率）：
+//   原盘族（bluray/uhd_bluray/hddvd）→电影 421/影剧 438；
+//   dvd/dvdr→电影 420/影剧 435；remux/uhd_remux→电影 439/影剧 402；
+//   分发形态（encode/webdl/webrip/hdtv/其它）→分辨率 sd→电影 401/影剧 403，
+//   ≥720p→电影 419/影剧 402（default 兜底——媒介判定空也走 HD）。
+// 影视族 9 叶+453 全 label-only（路由独占——通用链永不命中影视叶）；成人
+// 15 叶不录（发布层成人拦截在前 §59.222 不可达）。
+func mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "馒头" || cfg == nil || meta == nil {
+		return nil
+	}
+	// 动画×原盘族→453 BluRay（非原盘动画回退通用链 405）
+	switch meta.Category {
+	case "category.animation":
+		switch mediumStdKeyOf(tp, "") {
+		case "medium.bluray", "medium.uhd_bluray", "medium.hddvd":
+			for i := range cfg.ValueMappings[model.FieldDomainType] {
+				if cfg.ValueMappings[model.FieldDomainType][i].Value == "453" {
+					return &cfg.ValueMappings[model.FieldDomainType][i]
+				}
+			}
+		}
+		return nil
+	}
+	// 影视族×媒介×分辨率
+	isMovie := meta.Category == "category.movie"
+	isTV := meta.Category == "category.tv_series" || meta.Category == "category.tv_shows"
+	if !isMovie && !isTV {
+		return nil
+	}
+	var target string
+	switch mediumStdKeyOf(tp, "") {
+	case "medium.bluray", "medium.uhd_bluray", "medium.hddvd":
+		target = "421" // BluRay 原盘
+		if isTV {
+			target = "438"
+		}
+	case "medium.dvd", "medium.dvdr":
+		target = "420" // DVDiSo
+		if isTV {
+			target = "435"
+		}
+	case "medium.remux", "medium.uhd_remux":
+		target = "439" // Remux（影剧族无 Remux 叶→402 HD）
+		if isTV {
+			target = "402"
+		}
+	default:
+		// 分发形态（encode/webdl/webrip/hdtv/其它/空）——分辨率二分
+		target = "419" // HD
+		if isTV {
+			target = "402"
+		}
+		if extract.LookupStandardKey("resolution", tp.Resolution) == "resolution.sd" {
+			target = "401" // SD
+			if isTV {
+				target = "403"
+			}
+		}
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == target {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
 }
 
 // hdtimeCategoryValue §59.426: 时光（hdtime.org）type 槽原盘形态路由
@@ -2025,6 +2118,26 @@ func discCategoryRoute(cfg *model.PublishFormConfig, meta *model.TorrentMetadata
 		}
 	}
 	return nil
+}
+
+// mteamLabelsBits §59.451: 馒头 labels 位掩码翻译（tags canonical 键 →
+// int 位掩码——站方 API 文档 TorrentUploadForm.labels 定义：bit0=DIY/
+// bit1=中配（国语配音）/bit2=中字）。键集白名单精确匹配（diy/
+// chinese_audio/chinese_subtitle）——其余标签（HDR/DV 等）馒头无对应
+// bit 不翻译（tags 自定义字符串字段本发布链不投递）。
+func mteamLabelsBits(tags []string) int {
+	bits := 0
+	for _, t := range tags {
+		switch t {
+		case "diy":
+			bits |= 1 << 0
+		case "chinese_audio":
+			bits |= 1 << 1
+		case "chinese_subtitle":
+			bits |= 1 << 2
+		}
+	}
+	return bits
 }
 
 // hdtimeCategoryValue §59.426（实现收敛 discCategoryRoute 公共——§59.428

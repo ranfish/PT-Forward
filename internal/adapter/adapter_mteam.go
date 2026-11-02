@@ -1306,6 +1306,10 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 	if req.Anonymous {
 		fw.writeField("anonymous", "true")
+	} else {
+		// §59.451: 馒头 anonymous 为必填 boolean（spec required）——false
+		// 也必须显式写（缺字段 API 报必填错）。
+		fw.writeField("anonymous", "false")
 	}
 	if req.IMDbLink != "" {
 		fw.writeField("imdb", req.IMDbLink)
