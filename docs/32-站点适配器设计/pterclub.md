@@ -1486,3 +1486,42 @@ U2: [机动战士高达0080：口袋里的战争][Mobile Suit Gundam 0080 War In
 - 视频编码归一：H.264/H264、H.265/H265 视为等价。
 - HDR 归一：HDR10 比对时按 HDR 处理、HDR10P→HDR10+。
 - 禁：主标题中文/全角字符、BDRip/BDMV 字样、多余点、多余括号、连续空格（≥2）、组名内空格、`2.05.1` 通道写法。
+
+### 附：发布适配记录（v0.0.1291 §59.435）
+
+- **form_config**：migration118 分发（三槽 36 项——type 13/medium 15/
+  team 8 占位）。实时 HTML（89.7KB 直连）vs 资产 vs 文档全槽一致
+  （零漂移站）。**极简三下拉站**（type/source_sel/team_sel——无
+  medium/codec/standard/audiocodec 四槽，质量信息靠标题+简介 MI）。
+- type 13 非标值集（**404=电视剧/403=动画/405=综艺错位**+402=纪录片）：
+  418 舞台演出=[concert]（演唱会同族单键——我堡 419/熊猫 413 同款）
+  +411 学习=[education]+408 电子书/413/406 双键。
+- **medium→source_sel 槽位特化第四站**（财神/壹吧/青蛙后）：source_sel
+  15=质量槽（媒介+文档格式混合）——**FLAC/WAV/ISO/PDF/AZW/MOBI
+  extended 活键六项首配齐**+PUB 唯一 label-only+Remux=[remux,
+  uhd_remux] 双键归并+WEB-DL=[webdl,webrip]。
+- **team_sel=字段名陷阱（name=team_sel 实为地区槽 8 区）**：产区语义
+  不投递——**首版 formdiff 抓出整域假差异 8 条 added**（字段名被域
+  启发命中 team 域 vs 配置无 team 域）——修正=team 域映射+**8 项
+  label-only 占位**（无 standard_keys 永不命中→零投递行为不变+diff
+  归零——时光 424 特化独占同款）；DryRun ① team_sel=None 零投递
+  实证 ✓。
+- **tags 不配（独立 checkbox 形态首见——非 tags[] 数组**：11 标签各自
+  独立 name jinzhuan/guoyu/zhongzi 等，发布链 tags 域数组投递机制
+  不适用——全标签预览人工；guanfang 官方 disabled 仅管理员（绝不配
+  双保险）+pr 原创/bim 自购/jinzhuan 禁转官方专属本就不配。
+- 字段：url（IMDb text input）+**douban 独立豆瓣字段（dburl 域第五站）**
+  +uplver+anonymous:true；referid（转载引用）/offer/has_allowed_offer
+  （候选 hidden）不配；无 pt_gen/nfo/technical_info（简介粘贴
+  [hide=MediaInfo] 包裹）。
+- **站方检查脚本交叉校验对齐**（脚本逆向 §266）：分类判定顺序（纪录
+  片>舞台演出>动画>综艺>电视剧>电影默认）与 canonical 同向；质量
+  判定（标题 REMUX→Remux/Blu-ray+x264→Encode/**WEB-DL+FRDS→Encode**
+  /WEBRip→Encode）与 §59.380 压制联动语义同构零冲突。
+- **验证**：裸对全槽一致+formdiff 0 条（team 占位修正后归零）+
+  DryRun 四形态（① WEB-DL→401+5+**team_sel=None 零投递** ✓/② UHD
+  原盘→401+1 UHD Discs ✓/③ 电视剧→**404 非标值集** ✓/④ 演唱会→
+  418+2 BD Discs ✓）+48 包。
+- 站规人工把关：0DAY 英文命名+副标题中文名+Dupe 同组同分辨率禁+
+  死种重发 45 天+6 月+禁 SD 拉伸/CAM/RMVB/无 CUE 整盘/成人。
+- 遗留：首颗真实发布。
