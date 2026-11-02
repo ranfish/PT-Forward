@@ -23,7 +23,7 @@ func TestSiteIsTargetGate(t *testing.T) {
 		}
 		return s
 	}
-	unsupported := mk("未适配站", "longpt.org", "")                                     // 白名单内但未适配
+	unsupported := mk("未适配站", "piggo.me", "")                                      // 真未适配站（二师兄——longpt.org 已适配 §59.444 原占位失效）
 	unconfigured := mk("幸运", "pt.luckpt.de", "")                                      // 适配但未配置
 	configured := mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配已配置(暂停)
 
@@ -93,13 +93,13 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 		}
 		return s
 	}
-	mk("未适配站", "longpt.org", "")                                     // 白名单内但未适配
+	mk("未适配站", "piggo.me", "")                                      // 真未适配站（§59.444 原占位 longpt.org 已适配失效）
 	mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配
 
 	const plainPasskey = "0123456789abcdef0123456789abcdef"
 	w := env.doRequest("POST", "/api/v1/sites/import", map[string]interface{}{
 		"sites": []map[string]interface{}{
-			{"domain": "longpt.org", "is_target": true, "passkey": plainPasskey},
+			{"domain": "piggo.me", "is_target": true, "passkey": plainPasskey},
 			{"domain": "xdypt.vip", "is_target": true},
 		},
 	})
@@ -119,7 +119,7 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 		t.Errorf("降级不应计入 errors, got %v", errs)
 	}
 	var unsupported2, configured2 model.Site
-	if err := env.db.Where("domain = ?", "longpt.org").First(&unsupported2).Error; err != nil {
+	if err := env.db.Where("domain = ?", "piggo.me").First(&unsupported2).Error; err != nil {
 		t.Fatal(err)
 	}
 	if unsupported2.IsTarget {
@@ -133,7 +133,7 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 	}
 	// 附六：passkey 落库形态必须是 enc2: 密文，且可解密回明文
 	var rawPasskey string
-	if err := env.db.Raw("SELECT passkey FROM sites WHERE domain = 'longpt.org'").Scan(&rawPasskey).Error; err != nil {
+	if err := env.db.Raw("SELECT passkey FROM sites WHERE domain = 'piggo.me'").Scan(&rawPasskey).Error; err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(rawPasskey, "enc2:") {
