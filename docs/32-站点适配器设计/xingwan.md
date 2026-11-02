@@ -334,3 +334,58 @@ details.php?id={torrent_id}&hit=1
 5. **建设初期**：2025-2026 年新建站，开放注册
 6. **标签系统丰富**：支持禁转/首发/官组/DIY/国语/中字/HDR 等标签
 7. **有 Telegram 社区群**
+
+### 附：发布适配记录（v0.0.1295 §59.439）
+
+- **form_config**：migration122 分发（六槽 110 项——type 14/medium 12/
+  codec 11/standard 16/team 26/tags 31）。实时 HTML（47KB 代理）vs
+  文档：**资产两槽缺口实时补全**（team_sel 27 项+tags 31 项 4 月
+  完全未捕获——青蛙/学校/海的宝同款）+label 全面漂移（emoji+
+  中文说明长形态——实时为准）+**文档 §1.1 称有 uplver——实时
+  grep 零次=文档漂移（无匿名字段）**。
+- **type 14（emoji label）**：410 短剧第十五站+416 漫画 label-only
+  （dict 无 comics 键）+406=[mv,music_video]+408 双键+404 双键。
+- **medium 12 全配键（值 10-21 全乱序）**：Blu-ray/BD(10)=[bluray,
+  uhd_bluray] 双键归并（无 UHD 分立项）+Remux(11)=[remux,
+  uhd_remux] 双键+Encode(12)/WEB-DL(13)/WEBRip(14) 三分立各单键+
+  DVD/DVDR(16)=[dvd,dvdr] 站方合并项双键+**MiniBD(17)+HD DVD(18)
+  精确键复利（大青虫先例）**+CD/Track/Other。
+- **codec 11 全配键罕见格式大满贯**：AV1/VP9/Xvid/**DivX ext 活键**+
+  **ProRes ext 活键（专业中间格式全库首配）**；DNxHD/DNxHR(14)
+  label-only（ext 无键）；无 X26x 零联动。
+- **standard 16 项全库最多级别**（3D 三形态 SBS/HSBS/MVC+IMAX+
+  VR 180°/360° 罕见细分）：SD→8K 主链全配+**2K(9) label-only
+  （1440p/QHD(10) 独立在表防一键多值——13城分辨率类先例）**+
+  **4K Remux(12) label-only（媒介维度混入分辨率槽语义存疑——
+  柠檬 4K/8K-UltraHD 同款保守不猜）**+3D/IMAX/VR label-only+
+  Other=[resolution.other]；**16 项 label 站方 HTML 原文自带
+  截断（"3D MVC / Blu-ray 3D （原生 3D 蓝光画"——§59.384 照抄
+  原则）**。
+- **team 27 外站官组大表（OKPT 28 组后第二例）**：CHD/WiKi/HDS/
+  PTerWEB/FraMeSToR/TrollUHD/CtrlHD/FLUX/JoyHD/HQC/QHstudIo/DOA/
+  EBP/HDT/EMP/NTb/TayTO/NGB/QxR/YIFY/CMCT/MWeb/MTeam/HHClub/
+  HHWeb/**FRDS(30) 在表 DryRun 直中潜力**/Audiences 全 label-only+
+  Other(24)=[team.other] 兜底。
+- **tags 31 双区（分类镜像区 19+内容区 12）**：分类镜像区 label-only
+  （type 域镜像零产出——TG吃瓜/9KG🈲/已刮削同）+**26 英字=
+  [english_subtitle]（藏宝阁首配键——位置在分类区但语义内容标签）**；
+  内容区：**1 禁转/2 首发 二绝不配**（官方专属财神雷区——本站无
+  原创/官方标签）+**泛 HDR 键分配精细化首发**（7 HDR=[hdr10,hlg]
+  泛家族剩余两键——**hdr10_plus 给 27 HDR10+ 独立项/hdr_vivid 给
+  33 HDRVi 独立项，防一键多值三站首发**）+4 DIY/5 国语/6 中字/
+  31 粤语/35 英语/29 特效=[special_effects_subs] 十二键配+32 4K/
+  34 HDR10bit label-only（分辨率类/站方自定义语义无键）。
+- 字段：type/medium_sel[4]/codec_sel[4]/standard_sel[4]/team_sel[4]/
+  tags[4][]/small_descr/descr/technical_info；**nfo 不配（13城
+  先例——域表无 nfo 域配了必 formdiff 假差异，formdiff 抓出即修）**；
+  **无 uplver（文档漂移）+无 url/pt_gen/dburl/douban_id+无
+  audiocodec 槽（第五站）**——质量信息仅靠选择器+标题传达。
+- **验证**：裸对全槽一致+formdiff 0 条（nfo 移除后归零）+DryRun
+  三形态（① WEB-DL 剧集→402+13+7+tags=[国语,中字,HDR10+]
+  **hdr10_plus 细分正确归 27 独立项** ✓/② UHD 原盘→medium=10
+  双键归并+codec=6+standard=11+tags=[HDR] 泛项+原盘标 miss 正确
+  （本站无 original_disc 标签）✓/③ MI 压制→medium=12 Encode+
+  codec=1 H.264 无 X26x 通用 ✓）+48 包。
+- 站规人工把关：随机促销+自动免费（>20GB/原盘/每季首集）+YIFY/
+  YTS 低码率"不建议收藏"+上传者资格；9KG🈲 标签=成人区镜像禁发。
+- 遗留：首颗真实发布。
