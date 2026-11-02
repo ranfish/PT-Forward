@@ -336,6 +336,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if blocked, reason := episodeReleaseBlocked(meta, &tp); blocked {
 		return failRec("ineligible", reason)
 	}
+	// §59.425: 碟粉站点级双检查（五年规则+禁欧美——用户定案）。挂载
+	// PushOnly 分支后（恒定检查同 §59.424 P1 补推豁免）；DryRun 同拦可见。
+	if blocked, reason := discfanReleaseBlocked(meta, &tp); blocked {
+		return failRec("ineligible", reason)
+	}
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纭错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
 	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
@@ -1916,7 +1921,120 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := hdskyCategoryValue(cfg, siteName, meta); v != nil {
 		return v
 	}
+	if v := discfanCategoryValue(cfg, siteName, meta); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// discfanRegionWords §59.425: 碟粉电影产区细分词表（比 classifyRegionWords
+// §59.391 更细粒度——港/台分立、日/韩分立、泰单列：站方电影按地区 7 分）。
+var (
+	discfanMainlandWr = []string{"中国大陆", "大陆", "内地"}
+	discfanHKWr       = []string{"中国香港", "香港"}
+	discfanTWWr       = []string{"中国台湾", "台湾"}
+	discfanJapanWr    = []string{"日本"}
+	discfanKoreaWr    = []string{"韩国"}
+	discfanThailandWr = []string{"泰国"}
+)
+
+// discfanCategoryValue §59.425: 碟粉（discfan.net）type 槽电影产区细分路由
+// （typeMappingOf 第六站——用户定案）。站方电影按地区 7 分（大陆 401/港 404/
+// 台 405/泰 402/日 403/韩 406/世界 410）——产区数据源=PTGenSourceJSON→
+// src.Region（首值优先——葡萄定案）；列举地区 miss→410 世界兜底（亚洲小国
+// 合法归 410——欧美已被 discfanPreflight 禁欧美上游拦，到路由的 410 承接
+// =亚洲其它+罕见产区）。电影 7 地区+410 全部 label-only（必须经产区路由，
+// 通用链不猜产区）；非电影类型（剧集/音乐/纪录/综艺/体育/动漫）回退通用
+// 链（标准键直配——产区维度由 preflight 禁欧美统一把关）。
+func discfanCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	if siteName != "碟粉" || cfg == nil || meta == nil {
+		return nil
+	}
+	if meta.Category != "category.movie" {
+		return nil // 非电影回退通用链
+	}
+	var regions []string
+	if meta.PTGenSourceJSON != "" {
+		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+			regions = src.Region
+		}
+	}
+	// 产区匹配（首值优先+全数组兜底——葡萄定案）
+	pick := func(words []string) bool {
+		if len(regions) > 0 && containsAnyWord(regions[0], words) {
+			return true
+		}
+		for _, r := range regions {
+			if containsAnyWord(r, words) {
+				return true
+			}
+		}
+		return false
+	}
+	var want string
+	switch {
+	case pick(discfanMainlandWr):
+		want = "401"
+	case pick(discfanHKWr):
+		want = "404"
+	case pick(discfanTWWr):
+		want = "405"
+	case pick(discfanJapanWr):
+		want = "403"
+	case pick(discfanKoreaWr):
+		want = "406"
+	case pick(discfanThailandWr):
+		want = "402"
+	default:
+		want = "410" // 世界兜底（欧美上游已拦——此处承接亚洲小国等）
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == want {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
+}
+
+// discfanReleaseBlocked §59.425: 碟粉站点级发布前置双检查（用户定案）。
+// ①五年规则（站规硬规则——仅允许五年以前的资源）：
+//   year ≤ 当前年-5 放行；year > 当前年-5 拦；无年份放行（宁放——
+//   29 库实证占比 0+审核门无 year 字段按需生长）。
+//   年份信号=tp.Year（标题+PTGen §59.254 校正终态——Tab1 同源）。
+// ②禁欧美（用户策略性定案——欧美资源一颗不发连候选流程都不走；
+//   站规原文"欧美需候选"升级为我方直接禁）：
+//   classifyRegionWords 复用——Western 拦/亚洲四类（大陆/港台/日韩/
+//   亚洲其它）放/无产区防御性放行（29 库 315/315 Region 全覆盖实证
+//   ——实际不触发）。
+// 挂载：Execute PushOnly 分支后（恒定检查同 §59.424 P1——补推豁免）。
+func discfanReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProfile) (bool, string) {
+	if meta == nil || tp == nil {
+		return false, ""
+	}
+	// ①五年规则
+	if y, err := strconv.Atoi(strings.TrimSpace(tp.Year)); err == nil && y > time.Now().Year()-5 {
+		return true, fmt.Sprintf("碟粉五年规则：%d 年资源（仅允许 %d 年及以前）——五年内资源禁止发布", y, time.Now().Year()-5)
+	}
+	// ②禁欧美
+	var regions []string
+	if meta.PTGenSourceJSON != "" {
+		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+			regions = src.Region
+		}
+	}
+	if len(regions) > 0 {
+		cls := classifyRegionWords(regions[:1])
+		if cls == regionNone {
+			cls = classifyRegionWords(regions)
+		}
+		// classifyRegionWords 只分亚洲四类（§59.391——"其余=欧美"系消费端
+		// 默认）：有产区证据但不中任何亚洲词表（regionNone）= 欧美/海外 → 拦。
+		// regions 空 = 无产区证据 → 防御性放行（29 库 315/315 全覆盖实证不触发）。
+		if cls == regionNone {
+			return true, "碟粉站点规则：欧美产区资源禁发（用户策略——亚洲资源直发/欧美不走候选）"
+		}
+	}
+	return false, ""
 }
 
 // hdskyCategoryValue §59.423: 天空（hdsky.me）type 槽分集/合集×国产/海外

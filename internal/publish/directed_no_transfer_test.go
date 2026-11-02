@@ -3,6 +3,7 @@ package publish
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -702,5 +703,69 @@ func TestEpisodeReleaseBlocked(t *testing.T) {
 	// nil 防御
 	if b, _ := episodeReleaseBlocked(nil, nil); b {
 		t.Error("nil 输入应不拦")
+	}
+}
+
+// §59.425: 碟粉电影产区细分路由+站点级双检查（五年规则/禁欧美）。
+func TestDiscfanCategoryAndPreflight(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {
+				{Label: "电影 - 中国大陆", Value: "401"}, {Label: "电影 - 中国香港", Value: "404"},
+				{Label: "电影 - 中国台湾", Value: "405"}, {Label: "电影 - 泰国", Value: "402"},
+				{Label: "电影 - 日本", Value: "403"}, {Label: "电影 - 韩国", Value: "406"},
+				{Label: "电影 - 世界", Value: "410"}, {Label: "剧集", Value: "411", StandardKeys: []string{"category.tv_series"}},
+				{Label: "动漫", Value: "419", StandardKeys: []string{"category.animation"}},
+			},
+		},
+	}
+	mk := func(cat, region string) *model.TorrentMetadata {
+		return &model.TorrentMetadata{Category: cat, PTGenSourceJSON: `{"region":["` + region + `"]}`}
+	}
+	// 电影产区 7 细分
+	cases := []struct{ region, want string }{
+		{"中国大陆", "401"}, {"中国香港", "404"}, {"中国台湾", "405"},
+		{"日本", "403"}, {"韩国", "406"}, {"泰国", "402"}, {"美国", "410"}, {"新加坡", "410"},
+	}
+	for _, c := range cases {
+		v := discfanCategoryValue(cfg, "碟粉", mk("category.movie", c.region))
+		if v == nil || v.Value != c.want {
+			t.Errorf("产区 %s: 期望 %s 实得 %v", c.region, c.want, v)
+		}
+	}
+	// 无产区电影→410 兜底；非电影回退通用链；他站不触发
+	if v := discfanCategoryValue(cfg, "碟粉", &model.TorrentMetadata{Category: "category.movie"}); v == nil || v.Value != "410" {
+		t.Errorf("无产区电影应 410 兜底，得 %v", v)
+	}
+	if v := discfanCategoryValue(cfg, "碟粉", mk("category.tv_series", "美国")); v != nil {
+		t.Errorf("剧集应回退通用链，得 %v", v)
+	}
+	if v := discfanCategoryValue(cfg, "麒麟", mk("category.movie", "美国")); v != nil {
+		t.Errorf("他站不应触发，得 %v", v)
+	}
+	// 双检查：五年规则
+	tpOf := func(y string) *titleparser.TechProfile { return &titleparser.TechProfile{Year: y} }
+	thisYear := time.Now().Year()
+	if b, _ := discfanReleaseBlocked(mk("category.movie", "中国大陆"), tpOf(fmt.Sprint(thisYear-4))); !b {
+		t.Error("四年内资源应拦")
+	}
+	if b, _ := discfanReleaseBlocked(mk("category.movie", "中国大陆"), tpOf(fmt.Sprint(thisYear-5))); b {
+		t.Error("五年前资源应放")
+	}
+	if b, _ := discfanReleaseBlocked(mk("category.movie", "中国大陆"), tpOf("")); b {
+		t.Error("无年份应放（宁放定案）")
+	}
+	// 双检查：禁欧美（亚洲放/欧美拦/无产区防御放）
+	metaUS := mk("category.movie", "美国")
+	tpOld := tpOf(fmt.Sprint(thisYear - 6))
+	if b, msg := discfanReleaseBlocked(metaUS, tpOld); !b {
+		t.Error("欧美产区应拦（年份已过审）", msg)
+	}
+	if b, _ := discfanReleaseBlocked(mk("category.tv_series", "日本"), tpOf(fmt.Sprint(thisYear-6))); b {
+		t.Error("亚洲剧集应放")
+	}
+	if b, _ := discfanReleaseBlocked(&model.TorrentMetadata{Category: "category.movie"}, tpOf(fmt.Sprint(thisYear-6))); b {
+		t.Error("无产区防御性放行")
 	}
 }
