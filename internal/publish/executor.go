@@ -1941,6 +1941,9 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := hdtimeCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
+	if v := itzmxCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
 }
 
@@ -1952,8 +1955,12 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 // §59.380 单源同款；Remux/Encode 非原盘不触发）→424；其余回退通用链
 // （401 电影/402 剧集/... 标准键直配）。音乐 CD/Track 等非"原盘形态"
 // 不触发（CD=音乐介质）。424 label-only（特化独占——通用链永不命中）。
-func hdtimeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
-	if siteName != "时光" || cfg == nil || meta == nil {
+// discCategoryRoute §59.428: 原盘独立分类公共路由（时光 424/分享站 414——
+// 两站同构形态：站方"原盘/蓝光"为独立 type 分类，站内实态全原盘标题）。
+// 判定：影视类 ∧ 原盘族（bluray/uhd_bluray/hddvd——mediumStdKeyOf §59.380
+// 单源；Remux/Encode 非原盘不触发）→ target 分类；其余回退通用链。
+func discCategoryRoute(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile, target string) *model.FormValueMapping {
+	if cfg == nil || meta == nil {
 		return nil
 	}
 	switch meta.Category {
@@ -1970,11 +1977,31 @@ func hdtimeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *mo
 		return nil
 	}
 	for i := range cfg.ValueMappings[model.FieldDomainType] {
-		if cfg.ValueMappings[model.FieldDomainType][i].Value == "424" {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == target {
 			return &cfg.ValueMappings[model.FieldDomainType][i]
 		}
 	}
 	return nil
+}
+
+// hdtimeCategoryValue §59.426（实现收敛 discCategoryRoute 公共——§59.428
+// 分享站同构复用抽公共，两站 target 值差异参数化）。
+func hdtimeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "时光" {
+		return nil
+	}
+	return discCategoryRoute(cfg, meta, tp, "424")
+}
+
+// itzmxCategoryValue §59.428: 分享站（pt.itzmx.com）type 槽原盘独立分类
+// 路由（typeMappingOf 第八站——414 蓝光独立分类，站内实态仲裁：414 列表页
+// 123 种全原盘标题 Blu-ray AVC/UHD Blu-ray DoVi——时光 424 同构形态，
+// discCategoryRoute 公共复用）。414 label-only（特化独占）。
+func itzmxCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "分享站" {
+		return nil
+	}
+	return discCategoryRoute(cfg, meta, tp, "414")
 }
 
 // discfanRegionWords §59.425: 碟粉电影产区细分词表（比 classifyRegionWords

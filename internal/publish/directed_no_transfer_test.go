@@ -857,3 +857,28 @@ func TestHduptTVMediumRoute(t *testing.T) {
 		t.Error("他站不应触发")
 	}
 }
+
+// §59.428: 分享站原盘独立分类路由（414——discCategoryRoute 公共首复用）。
+func TestItzmxDiscCategoryRoute(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {
+				{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}},
+				{Label: "蓝光", Value: "414"},
+			},
+		},
+	}
+	tpOf := func(st string) titleparser.TechProfile { return titleparser.TechProfile{SourceType: st} }
+	// 影视原盘 → 414
+	if v := itzmxCategoryValue(cfg, "分享站", &model.TorrentMetadata{Category: "category.movie"}, tpOf("UHD Blu-ray")); v == nil || v.Value != "414" {
+		t.Errorf("电影 UHD 原盘应 414，得 %v", v)
+	}
+	// 非原盘/他站 → nil
+	if v := itzmxCategoryValue(cfg, "分享站", &model.TorrentMetadata{Category: "category.movie"}, tpOf("Encode")); v != nil {
+		t.Errorf("压制应回退通用链，得 %v", v)
+	}
+	if v := itzmxCategoryValue(cfg, "时光", &model.TorrentMetadata{Category: "category.movie"}, tpOf("Blu-ray")); v != nil {
+		t.Errorf("他站不应触发分享站路由，得 %v", v)
+	}
+}
