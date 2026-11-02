@@ -338,8 +338,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	// §59.425: 碟粉站点级双检查（五年规则+禁欧美——用户定案）。挂载
 	// PushOnly 分支后（恒定检查同 §59.424 P1 补推豁免）；DryRun 同拦可见。
-	if blocked, reason := discfanReleaseBlocked(meta, &tp); blocked {
-		return failRec("ineligible", reason)
+	// **站点门控（回归修复：首版漏门控——碟粉规则拦了所有站，时光
+	// DryRun 被"碟粉站点规则"拦实战抓出）**：仅 targetSite==碟粉 触发。
+	if in.TargetSite == "碟粉" {
+		if blocked, reason := discfanReleaseBlocked(meta, &tp); blocked {
+			return failRec("ineligible", reason)
+		}
 	}
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纭错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
