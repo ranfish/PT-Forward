@@ -463,3 +463,47 @@
 14. **禁止 Adult Video**
 15. **禁止改档资源**：自行添加字幕、修改文件夹结构、修改文件名、增删文件等
 16. **发布者双倍上传量**：不受盒子规则限制
+
+### 附：发布适配记录（v0.0.1289 §59.432）
+
+- **form_config**：migration116 分发（七槽 56 项——type 11/medium 8/
+  codec 7/audiocodec 13/standard 5/team 1/tags 11）。**双源互验**
+  （本文档 Playwright 采集+4 月资产）全槽一致。
+- **实时 upload.php 不可达（资质门铁证）**：29 凭证"通过审核 10 种
+  且待修改≤2（当前通过数 5）才可直接发布"——完整表单页返回候选
+  提示页（7.5KB 仅 userId）；发布走候选制——**首颗真实发布须走候选
+  通道或待权限达标（挂账用户知晓）**。降级验证五二 §59.377 先例：
+  双源互验+DryRun 先行；formdiff 不可跑（无完整 HTML 输入），权限
+  达标后实时比对补验。
+- type 11：**402"Movies-3D" label-only**（柠檬 408 同款保守——cat402
+  实态验证参数不生效两页同题无法仲裁+Stereo3D 无 type 路由消费）；
+  **412 电视剧单集 label-only（§59.424 系统禁分集——槽位设计即
+  站规 13城同款）**+tv_series 全走 405 TV-Pack；419=[concert]+414/
+  416 双键。
+- medium 8：UHD/FHD Blu-ray 分立各单键+UHDTV=[uhdtv]（extended
+  活键——农场/藏宝阁先例）+WEB-DL=[webdl,webrip]。
+- codec 7 **值 12 起跳号**（12/14/15/16/17/19/18）：全配键无 X26x
+  （压制联动零触发）。
+- audiocodec 13 乱序：Atmos=[atmos,truehd_atmos]（慕雪阁模式——
+  站方 Atmos 泛项+TrueHD 分立）+DTS X+**AC3=[ac3,dd,ddp] 三键承接**
+  （无 DDP 分立）+MPEG/OPUS 配键（青蛙先例）。
+- standard 2160p 置尾全配键。
+- **team 1 单项"原创/原抓" label-only**（官方专属绝不配——转种恒
+  非原创首发同族雷区；miss→nil 不填=站方默认态藏宝阁 NONE 同款）。
+- processing_sel=产区槽不配。
+- **tags 11 字符串值形态（家园后第二例——sf/diy/gy 值非数字）**：
+  sf 首发/jz 禁转绝不配+yq 应求 label-only+diy/gy/zz 配键+**HDR 五族
+  细分独立（优堡/天空/家园后第四站）**：db=[dolby_vision]/hdrvivid=
+  [hdr_vivid]/hdr=[hdr10]/hdrp=[hdr10_plus]/hlg=[hlg]。
+- 字段：url（IMDb 必填）+**dburl（豆瓣必填——FieldDomainDoubanURL
+  §59.159 域）**+uplver+anonymous:true；picture/offer（候选关联）
+  不配；无 pt_gen/nfo/technical_info。
+- **验证**：双源互验全槽一致+DryRun 三形态（① WEB-DL 剧集合集→
+  405 TV-Pack ✓+medium=9+tags=[中字]/② UHD 原盘→401+12+5 置尾+
+  audio=14 Atmos+**tags=[杜比视界,HDR10,DIY] 三标全中**/③ 演唱会→
+  419+1 FHD）+48 包全绿。
+- 站规人工把关：编码矩阵（FHD Blu-ray×H.264=720p/1080p、UHD
+  Blu-ray×H.264=×、HEVC 含 HDR）+官方组优先 Dupe+黑名单组+电视剧
+  必须整季包+标题中文副标题规范+候选制。
+- 遗留：首颗真实发布（候选通道）；权限达标后 upload 实时比对+formdiff
+  补验。
