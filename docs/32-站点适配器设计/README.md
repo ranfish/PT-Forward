@@ -11,6 +11,7 @@
 | 站点 | 文档 | 状态 |
 |------|------|------|
 | 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成（**种审制·审核脚本完整逆向(qingwa-torrent-assistant v1.1.1 1886行/82KB→44+项校验规则)**·22音频含DTS:X/DDP/Atmos/AV3A/USAC/OPUS·官组FROG/FROGE/FROGWeb·音乐分类跳过校验·28+禁发制作组·**含完整转载自动填写优化方案**） |
+| 馒头 | [mteam.md](./mteam.md) | ✅ 完成（首个API架构目标站·三维融合路由第十站·labels位掩码·team实时增删） |
 | 他吹吹风 | [et8.md](./et8.md) | ✅ 完成（教育向非标值集·学科槽语义第五变·H/X四分立联动·文档族ext键） |
 | PT地带 | [ptzone.md](./ptzone.md) | ✅ 完成（末日式局部漂移·同label双value+克隆式DTS·AC3键归11·HDR泛四键） |
 | 萝莉 | [xloli.md](./xloli.md) | ✅ 完成（双模式[6]槽全套混入·ENSub英文直配·动漫raws大表·R18五绝不配） |

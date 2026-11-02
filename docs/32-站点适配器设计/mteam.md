@@ -1692,3 +1692,57 @@ TV 01-12 / Fin+SP / Rev 等内容统一放在副标题
 *数据来源: 生产环境 API（api.m-team.io）2026-04-16 via Playwright；测试环境 Swagger API spec（test2.m-team.cc）2026-04-23*
 *Wiki 规则来源: wiki.m-team.cc 2026-04-23 via Playwright + extraHTTPHeaders 认证*
 *文档创建: 2026-04-16 | 更新: 2026-04-23*
+
+### 附：发布适配记录（v0.0.1306 §59.451）
+
+- **首个 API 架构目标站**（非 NP 表单）：MTeamAdapter.uploadViaAPI 已在
+  （multipart POST /api/torrent/createOredit+x-api-key）——form_fields
+  值=API JSON 字段名（camelCase），executor 域→字段名通用链直接工作；
+  framework="mteam"。
+- **在线检查更新（2026-11-02）**：swagger spec（/api/v3/api-docs 225KB
+  414 端点）TorrentUploadForm 28 字段——**bangumi 字段新增**（发布链无
+  域不配——熊猫 tmdb 定案）；**List 八端点实时值集**（真实组件离线
+  驱动——29 库 apiKey 解密 [settings encryption_key] 调 /api/torrent/
+  *List）：**team 3 增 1 删**（+63 ZZH/+64 DStudio/+65 Aisha/-34
+  QHstudIo）；category 22 非成人叶/medium 10/codec 8/audiocodec 15/
+  standard 6/processing 6 全零漂移+source label 微调（5 HDTV→HDTV/TV）。
+- **mteamCategoryValue typeMappingOf 第十站**：category 三维融合树
+  （影视族 9 叶×媒介×分辨率+动画原盘→453）；**媒介判定源=mediumMappingOf
+  同源**（首版误用 mediumStdKeyOf 弱判定——SourceType 归一损失致 REMUX
+  标题判 bluray→421 误路由，DryRun 形态三抓出即修——龙PT 归一损失同款）；
+  影视族 9 叶+453+448 TV遊戲 label-only（路由独占/平台细分无判定维度）；
+  其余 13 类标准键直配。
+- medium 10：1 Blu-ray=[bluray,uhd_bluray] 双键归并（无 UHD 项——奥申
+  同款）+6 DVDR=[dvd,dvdr] 宽语义（阿玲）+Remux/WEB-DL 双键+MiniBD/
+  HD DVD/Track ext 活键。
+- codec 8 合并命名零联动（H.264(x264/AVC)=[h264] 一项三命名——站方
+  合并项语义）+AVS ext 活键。
+- audiocodec 15 全配键：8 AC3(DD)=[ac3,dd] 双键+12 E-AC3(DDP)=[ddp]
+  单键（eac3 无键 Nova 先例）+13 E-AC3 Atmos=[ddp_atmos]（红豆饭——
+  atmos 泛键归 10）+10 TrueHD Atmos=[atmos,truehd_atmos] 双键（慕雪
+  阁模式）+14 LPCM/PCM 双键（咖啡）+4 MP2/3 双键。
+- standard 6 乱序（5 SD/6 4K/7 8K）。
+- **team 26 全 label-only**：MTeam/MWeb/TPTV 官组+外站官组大表（含实时
+  新增）；**无 Other 项**（miss→nil 预览人工——克隆同款）。TnP(23) 首版
+  漏录值集裸对抓出即修+448 繁体站方原文（TV遊戲——§59.384 label 照抄
+  原则）。
+- **labels 位掩码站方特化**（bit0=DIY/bit1=中配/bit2=中字）：无 tags
+  checkbox 槽——mteamLabelsBits 经 ExtraFields 通道翻译投递（executor
+  装配段注入+adapter 透传；单测锚八态——DryRun 不透出 ExtraFields）。
+- **anonymous 必填 boolean 修复**（spec required）：false 显式写（缺字
+  段 API 报必填错）。
+- **processing 产区槽不配**（CN/US-EU/HK-TW/JP/KR/OT——咖啡定案）+
+  **source 来源槽不配**（category 融合已覆盖媒介维度+独立槽非必填系统
+  自动推断）+countries 不配（发布链无产区投递）。
+- 字段：category/medium/videoCodec/audioCodec/standard/team/smallDescr/
+  descr/mediainfo+imdb+douban（dburl 域）；无 uplver（anonymous 走 API
+  boolean）；offer 候选 ID 非候选流程不写；nfo/tags 自定义字符串不投递。
+- **验证体系（API 站无 HTML——formdiff 不适用）**：值集裸对 vs List API
+  实时 JSON 替代门禁（全槽逐值一致 ✓）+DryRun 四形态（① WEB-DL 剧集
+  →402+10+1+6+1 ✓/② UHD 原盘→421+1+16+11+6 ✓/③ Remux→439+3 ✓
+  【mediumMappingOf 同源修复后】/④ 动画原盘→453+1 ✓【Blu-ray 连字符
+  =原盘权威形态——BluRay 驼峰=压制是 v1.05 权威语义非 bug】）+48 包。
+- 站规人工把关：上传规则（§15 双倍上传/候选审核/软件游戏病毒扫描）+
+  标题规范（§14 wiki 分模板）+100GB 音乐区发布码+成人 15 叶发布层拦截
+  在前（§59.222）。
+- 遗留：首颗真实发布（API 端到端——uploadViaAPI 生产首验）。
