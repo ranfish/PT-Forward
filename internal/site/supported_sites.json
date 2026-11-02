@@ -6,8 +6,7 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "13city.org",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
- ,
+    "verification_status": "verified",
     "publish_supported": true
   },
   "1ptba.com": {
@@ -70,8 +69,7 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "cangbao.ge",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
- ,
+    "verification_status": "verified",
     "publish_supported": true
   },
   "carpt.net": {
@@ -528,8 +526,7 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.lajidui.top",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
- ,
+    "verification_status": "verified",
     "publish_supported": true
   },
   "pt.luckpt.de": {
@@ -549,8 +546,7 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.muxuege.org",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
- ,
+    "verification_status": "verified",
     "publish_supported": true
   },
   "pt.novahd.top": {
@@ -892,15 +888,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
-  "www.momentpt.top": {
-    "domain": "www.momentpt.top",
-    "name_cn": "瞬间",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "www.momentpt.top",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
-  },
   "www.musopia.vip": {
     "domain": "www.musopia.vip",
     "name_cn": "音乐乌托邦",
@@ -1014,15 +1001,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "publish_supported": true
-  },
-  "yhpp.cc": {
-    "domain": "yhpp.cc",
-    "name_cn": "昆仑",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "yhpp.cc",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified"
   },
   "zeus.hamsters.space": {
     "domain": "zeus.hamsters.space",
