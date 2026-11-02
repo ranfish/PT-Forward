@@ -1924,7 +1924,43 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 	if v := discfanCategoryValue(cfg, siteName, meta); v != nil {
 		return v
 	}
+	if v := hdtimeCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)
+}
+
+// hdtimeCategoryValue §59.426: 时光（hdtime.org）type 槽原盘形态路由
+// （typeMappingOf 第七站——媒介维度决定 type，好大模式同族）。站方 424
+// Blu-Ray原盘为独立分类（非质量选项）——站内实态仲裁（424 列表页 62 种
+// 全原盘标题实证：Blu-ray AVC 原盘资源发 424 而非 401+medium Blu-ray）。
+// 路由：影视类 ∧ 原盘族媒介（bluray/uhd_bluray/hddvd——mediumStdKeyOf
+// §59.380 单源同款；Remux/Encode 非原盘不触发）→424；其余回退通用链
+// （401 电影/402 剧集/... 标准键直配）。音乐 CD/Track 等非"原盘形态"
+// 不触发（CD=音乐介质）。424 label-only（特化独占——通用链永不命中）。
+func hdtimeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
+	if siteName != "时光" || cfg == nil || meta == nil {
+		return nil
+	}
+	switch meta.Category {
+	case "category.movie", "category.tv_series", "category.animation",
+		"category.documentary", "category.documentaries", "category.tv_shows",
+		"category.sports", "category.mv", "category.music_video":
+	default:
+		return nil // 非影视类（音乐/游戏/软件/文档等）回退通用链
+	}
+	switch mediumStdKeyOf(tp, "") {
+	case "medium.bluray", "medium.uhd_bluray", "medium.hddvd":
+		// 原盘族（含 DIY 原盘——站方无 DIY 媒介细分；Remux 非原盘不触发）
+	default:
+		return nil
+	}
+	for i := range cfg.ValueMappings[model.FieldDomainType] {
+		if cfg.ValueMappings[model.FieldDomainType][i].Value == "424" {
+			return &cfg.ValueMappings[model.FieldDomainType][i]
+		}
+	}
+	return nil
 }
 
 // discfanRegionWords §59.425: 碟粉电影产区细分词表（比 classifyRegionWords

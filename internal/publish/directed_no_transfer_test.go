@@ -769,3 +769,44 @@ func TestDiscfanCategoryAndPreflight(t *testing.T) {
 		t.Error("无产区防御性放行")
 	}
 }
+
+// §59.426: 时光原盘形态路由（424 独立分类——媒介维度 typeMappingOf 第七站）。
+func TestHdtimeDiscCategoryRoute(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields:   map[string]string{"type": "type"},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"type": {
+				{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}},
+				{Label: "剧集", Value: "402", StandardKeys: []string{"category.tv_series"}},
+				{Label: "音乐", Value: "408", StandardKeys: []string{"category.music"}},
+				{Label: "Blu-Ray原盘", Value: "424"},
+			},
+		},
+	}
+	tpOf := func(sourceType string) titleparser.TechProfile {
+		return titleparser.TechProfile{SourceType: sourceType}
+	}
+	// 影视类原盘族 → 424
+	for _, st := range []string{"Blu-ray", "UHD Blu-ray", "HD DVD"} {
+		if v := hdtimeCategoryValue(cfg, "时光", &model.TorrentMetadata{Category: "category.movie"}, tpOf(st)); v == nil || v.Value != "424" {
+			t.Errorf("电影原盘 %s 应 424，得 %v", st, v)
+		}
+	}
+	if v := hdtimeCategoryValue(cfg, "时光", &model.TorrentMetadata{Category: "category.tv_series"}, tpOf("Blu-ray")); v == nil || v.Value != "424" {
+		t.Errorf("剧集原盘应 424，得 %v", v)
+	}
+	// 非原盘（Remux/Encode/WEB-DL）→ 回退通用链 nil
+	for _, st := range []string{"Remux", "Encode", "WEB-DL"} {
+		if v := hdtimeCategoryValue(cfg, "时光", &model.TorrentMetadata{Category: "category.movie"}, tpOf(st)); v != nil {
+			t.Errorf("非原盘 %s 应回退通用链，得 %v", st, v)
+		}
+	}
+	// 非影视类（音乐 CD）→ 回退
+	if v := hdtimeCategoryValue(cfg, "时光", &model.TorrentMetadata{Category: "category.music"}, tpOf("CD")); v != nil {
+		t.Errorf("音乐应回退通用链，得 %v", v)
+	}
+	// 他站不触发
+	if v := hdtimeCategoryValue(cfg, "天空", &model.TorrentMetadata{Category: "category.movie"}, tpOf("Blu-ray")); v != nil {
+		t.Errorf("他站不应触发，得 %v", v)
+	}
+}
