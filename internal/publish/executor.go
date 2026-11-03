@@ -430,11 +430,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// HDR 行时推断器（§59.151 MI 唯一真相）不产 HDR 族标签——标题/DOM 源
 	// 证据补位；站方无对应标签选项时 applier 自然丢弃（跨站安全）。
 	tags = syncHDRTagFromProfile(tp.HDR, tags)
-	// §59.454: 城市站标签依赖注入（chnize 消费 chinese_subtitle——tags
-	// 终态在 syncHDR 后；挂 DryRun 检查点前——§59.453 挂载教训同款，
-	// 首版误挂 pubReq 段 DryRun return 后 DryRun 看不到注入）。
+	// §59.454: 城市站标签依赖注入（chnize 消费 meta.Tags 的
+	// chinese_subtitle——不经 assembleTags 过滤：城市站无 tags 域配置
+	// → allowed 空 → 全部标签被滤（首版传 tags 变量恒空实测抓出）；
+	// 挂 DryRun 检查点前——§59.453 挂载教训）。
 	if in.TargetSite == "城市" {
-		hdcityTagDependentFill(form, tags)
+		hdcityTagDependentFill(form, meta.Tags)
 	}
 	tagCfg := &model.SiteTagConfig{
 		Mode:     model.TagModeTaglist,
@@ -2331,34 +2332,23 @@ func hdcityProcessingOption(cfg *model.PublishFormConfig, tp titleparser.TechPro
 	return nil
 }
 
-// hdcityTagDependentFill §59.454: 城市站标签依赖注入（tags 产出段后
-// 调用）——字幕四 checkbox（用户逐点定案）：
-//
-//	sub_soft = MI Text 轨存在（容器内嵌字幕轨=软字幕——tp 无直接
-//	          Text 轨字段，经 Tab3 字幕轨下拉同源判定？——发布链
-//	          TechProfile 无 Text 轨透出，改由 MI 原文判定传入？——
-//	          简化：tp.AudioTracks>0 不代表字幕。暂以 chinese_subtitle
-//	          软字幕路径区分不可行（标签不区分软硬）。**改为 MI 原文
-//	          含 Text # 段判定**——executor 上下文有 meta.MediaInfo。
-//	sub_hard = 无轨 ∧ 无字幕文件 ∧ chinese_subtitle 在场（用户三信号
-//	          反推——§59.319 附二十六推断通道本就是硬字幕语义）
-//	sub_incl = 种子文件列表含字幕扩展名（fingerprint.FileTree——
-//	          发布链 torrentData bencode 解析，executor 上下文有
-//	          torrentData）
-//	chnize   = chinese_subtitle 标签在场
-func hdcityTagDependentFill(form map[string]string, tags []string) {
-	if form == nil {
+// hdcityTagDependentFill §59.454: 城市站标签依赖注入——字幕
+// chnize checkbox（用户定案：消费 Tab1 中字标签）。
+// 直读 meta.Tags JSON（不经 assembleTags allowed 过滤——城市站无
+// tags 域配置全滤实测首版抓出）。
+func hdcityTagDependentFill(form map[string]string, tagsJSON string) {
+	if form == nil || tagsJSON == "" {
 		return
 	}
-	hasChnSub := false
+	var tags []string
+	if err := json.Unmarshal([]byte(tagsJSON), &tags); err != nil {
+		return
+	}
 	for _, t := range tags {
 		if t == "chinese_subtitle" {
-			hasChnSub = true
-			break
+			form["chnize"] = "1"
+			return
 		}
-	}
-	if hasChnSub {
-		form["chnize"] = "1"
 	}
 }
 func hxptLabelOption(items []model.FormValueMapping, label string) *model.FormValueMapping {
