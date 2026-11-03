@@ -631,3 +631,39 @@ submitted→review→published；LegacyUploadResult.Status 返回）。
 2. 双凭据存储：sites 表新列 pgk API Key（旧 passkey 列=announce 继续用）
 3. RSS 接入：用户 /account/rss 创建订阅填 URL（现成 RSS 基建消费）
 4. 搜索参数用 query（非 search）+详情字段大丰收的采集适配收益
+
+---
+
+## 十、RSS 接入与源站收录（2026-11-03 · §59.456 已实施）
+
+### 10.1 RSS 订阅（A-1 · 已端到端验证）
+
+- **订阅通道**：用户 `/account/rss`（web-session）创建订阅→一次性
+  token→Feed=`/rss/{token}`（token 凭据级——本文档不落盘真实值）。
+- **feed 结构**（rss/service.go 权威+实测一致）：RSS 2.0；item 含
+  Title/Link(`/torrents/{id}`)/Category(中文)/GUID(`peergo:torrent:{id}`)/
+  pubDate/Enclosure(`url=下载直链免认证, length=字节`)；Description
+  多行（副标题/大小/优惠/做种数——订阅配置 IncludeXxx 开关）。
+- **优惠枚举→中文全表**（promotionLabel）：免费(free)/2× 上传/
+  2× 上传 / 免费/50% 下载/2× 上传 / 50% 下载/30% 下载。
+- **PT-Forward 消费链**：discountFromRSSDescription 通用提取
+  （fetcher）+detectHRAndDiscount 短路（engine——SPA 详情页检测器
+  不适用的唯一可靠通道）；ScrapeFree 订阅按 IsFree 过滤
+  （50%/30% 折扣不算免费）。
+- **实测**：50 颗 feed 检测零失败（短路生效）；当轮 0 颗免费全滤
+  =正确语义。
+
+### 10.2 源站收录（A-2 · 官组=Rousi）
+
+- 官组后缀 `Rousi`（用户权威）——sites.json groups=["Rousi"]+
+  is_source=true（源头与 DB 不一致已收敛）+seed 官组行落库。
+- 标题署名 "xxx-Rousi" dash 提取尾段直中。
+- 站内其它署名组（BlackT/BlackTV 等）=用户组非官组不收录。
+
+### 10.3 sites 行采集配置（29 已刷正）
+
+| 字段 | 值 | 说明 |
+|---|---|---|
+| id_strategy | path_segment | 末段=`{id}` 天然命中（pattern 不被读） |
+| hash_strategy | guid | `peergo:torrent:{id}`→IsFakeHash 容忍 |
+| size_strategy | enclosure | enclosure.length=精确字节 |
