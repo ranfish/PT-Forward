@@ -430,6 +430,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// HDR 行时推断器（§59.151 MI 唯一真相）不产 HDR 族标签——标题/DOM 源
 	// 证据补位；站方无对应标签选项时 applier 自然丢弃（跨站安全）。
 	tags = syncHDRTagFromProfile(tp.HDR, tags)
+	// §59.454: 城市站标签依赖注入（chnize 消费 chinese_subtitle——tags
+	// 终态在 syncHDR 后；挂 DryRun 检查点前——§59.453 挂载教训同款，
+	// 首版误挂 pubReq 段 DryRun return 后 DryRun 看不到注入）。
+	if in.TargetSite == "城市" {
+		hdcityTagDependentFill(form, tags)
+	}
 	tagCfg := &model.SiteTagConfig{
 		Mode:     model.TagModeTaglist,
 		Tags:     map[string]string{},
@@ -615,11 +621,6 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
 	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
 	pubReq.TagArrayFields = tagArrayFields
-	// §59.454: 城市站标签依赖注入（chnize/sub_hard 消费 chinese_subtitle
-	// 标签——tags 产物在 ⑤ 段产出后才可用，故分两段：此处在 tags 后）。
-	if in.TargetSite == "城市" {
-		hdcityTagDependentFill(form, tags)
-	}
 	// §59.451: 馒头 labels 位掩码注入（站方特化——API TorrentUploadForm
 	// labels int：bit0=DIY/bit1=中配/bit2=中字，无 tags checkbox 槽——
 	// TagArrayFields 空，标签经 ExtraFields 通道翻译投递；adapter
