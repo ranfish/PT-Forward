@@ -239,3 +239,14 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | Detail 403 | **行为驱动降级**：`/api/torrent/detail` 403 时 fallback Web 面 `GET /api/v1/torrents/{id}`（cookie 通道——**字段比兼容面假想 detail 更全**：info_hash+**source_info_hash 双 hash 原生**/完整 MI/文件树/release_group+official 官种标记/promotion 分数结构/publication_stage 审核状态机/media_id+release_scope 作品关联/screenshots 直链数组/size_bytes 字符串数字） |
 | **RSS** | **定案：当前无公开 RSS 通道**——兼容面 /api/rss 404（openresty）/Web 面 /api/v1/feeds route_not_found/torrentrss.php 拒 cookie 认证；roadmap 13 阶段未列 RSS。订阅获取不可用，站方上线后再接 |
 | Download 端到端复验 | 修复行为级证据完整（同栈对照：无头 200/32894B vs 带头挂 30s）；完整链复验连续 5 撞限流窗（今日配额烧尽）——**挂明日冷启动首验** |
+
+### 限流三层结构与 PT-Forward 节流器对位（2026-11-03 定案）
+
+**站方限流=请求限流非端点限流**（Key 维度跨端点共享：配额烧尽时 profile/search/genDlToken 同批挂——非各端点独立配额）：
+
+| 层 | 维度 | 数字 | 撞限表现 |
+|---|---|---|---|
+| 兼容面（api，x-api-key） | 单 Key 请求总数 | 60/min 突发 20 | 429+Retry-After / 挂到超时 |
+| www Web 面（cookie/无认证） | IP/连接层（CF） | 未知 | reset/000/截断（无 429 语义） |
+
+**PT-Forward 节流器对位**：GlobalLimiter（§59.340）按**请求主机**分桶——可乐双主机两桶（api/www 各自默认 0.5RPS=30/min，fetch_rps 未配置）；生产链（GetAdapter doer）已在默认桶保护内（30/min < Key 配额 60/min，余量给手动操作）。**烧穿站方配额的是探针/独立 client/curl**（诊断工具绕过 limiter）非生产行为。未来站方降配额或加高频链时按 `fetch_rps` 显式收紧（注意：注册键=domain 列的 www 形态，api 子域桶需单评估）。
