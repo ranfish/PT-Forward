@@ -346,6 +346,76 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	return a.detailViaWeb(ctx, config, torrentID)
 }
 
+// detailViaWebJSON §59.460: Web 面详情端点降级——GET
+// https://<domain>/api/v1/torrents/{id}（cookie 通道；可乐实测 12KB/45+
+// 字段完整覆盖 detail 需求：release_name/subtitle/size_bytes 字符串数字/
+// info_hash+source_info_hash/技术规格全套/完整 MI/screenshots/tags）。
+// Web 面判浏览器请求：带 cookie+浏览器 UA，禁止 x-api-key 混带。
+func (a *MTeamAdapter) detailViaWebJSON(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+	host := config.Domain
+	if !strings.HasPrefix(host, "http") {
+		host = "https://" + host
+	}
+	u := strings.TrimRight(host, "/") + "/api/v1/torrents/" + url.PathEscape(torrentID)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Cookie", config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmtES("web detail HTTP %d", resp.StatusCode), nil)
+	}
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var d struct {
+		ReleaseName  string      `json:"release_name"`
+		Subtitle     string      `json:"subtitle"`
+		SizeBytes    json.Number `json:"size_bytes"`
+		InfoHash     string      `json:"info_hash"`
+		VideoCodec   string      `json:"video_codec"`
+		Audio        []string    `json:"audio"`
+		Resolution   string      `json:"resolution"`
+		Source       string      `json:"source"`
+		ReleaseGroup string      `json:"release_group"`
+		MediaInfo    string      `json:"media_info"`
+		Screenshots  []string    `json:"screenshots"`
+		Tags         []string    `json:"tags"`
+	}
+	if err := json.Unmarshal(body, &d); err != nil {
+		return nil, parseError("解析 Web 面详情失败", err)
+	}
+	size, _ := d.SizeBytes.Int64()
+	audioCodec := ""
+	if len(d.Audio) > 0 {
+		audioCodec = d.Audio[0]
+	}
+	return &model.TorrentDetail{
+		Title:        d.ReleaseName,
+		Subtitle:     d.Subtitle,
+		Size:         size,
+		InfoHash:     strings.ToLower(d.InfoHash),
+		Codec:        d.VideoCodec,
+		AudioCodec:   audioCodec,
+		Resolution:   d.Resolution,
+		Source:       d.Source,
+		ReleaseGroup: d.ReleaseGroup,
+		MediaInfo:    d.MediaInfo,
+		Screenshots:  d.Screenshots,
+		Tags:         d.Tags,
+	}, nil
+}
+
 // mteamAdultCategories 馒头成人区 category 编码（mode=adult）。
 // §59.317 修订：按 categoryList 权威树补全——AV(无码)含 AV(网站)/0Day(436) 与
 // AV(Gay)/HD(440)；主类 ID（115 AV有码/120 AV无码/445 IV/446 H-ACG）保险入集。
@@ -604,6 +674,16 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	// §59.460: /api/torrent/detail 不在部分兼容面实现的端点集内（可乐
+	// scope_denied 403 实证）——降级 Web 面详情端点 GET /api/v1/torrents/
+	// {id}（cookie 通道，字段更全：info_hash+source_info_hash 双 hash/
+	// 完整 MI/文件树/审核状态机；M-Team detail 健康 200 不触发）。
+	if resp.StatusCode == http.StatusForbidden && config.Cookie != "" {
+		drainBody(resp)
+		if d, fbErr := a.detailViaWebJSON(ctx, config, torrentID); fbErr == nil {
+			return d, nil
+		}
 	}
 	defer func() { drainBody(resp) }()
 
@@ -1651,11 +1731,22 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	a.setAPIHeaders(peerReq, config.APIKey)
 
 	peerResp, err := a.doer.Client.Do(peerReq)
-	if err != nil {
-		a.logger.Warn("myPeerStatistics request failed", zap.Error(err))
+	if err == nil {
+		defer func() { drainBody(peerResp) }()
+	}
+	// §59.460: myPeerStatistics 不在部分兼容面实现的端点集内（可乐
+	// scope_denied 403 实证）——非 200/读流失败时 fallback
+	// getUserTorrentList 翻页计数（行为驱动降级，主端点健康的站点零变化）。
+	if err != nil || peerResp.StatusCode != http.StatusOK {
+		if a.logger != nil {
+			a.logger.Warn("myPeerStatistics unavailable, fallback to getUserTorrentList",
+				zap.Error(err))
+		}
+		count, size := a.seedingViaUserTorrentList(ctx, config)
+		stats.SeedingCount = count
+		stats.SeedingSize = size
 		return stats, nil
 	}
-	defer func() { drainBody(peerResp) }()
 
 	peerBody, err := readBody(peerResp)
 	if err != nil {
@@ -1678,6 +1769,57 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	stats.SeedingCount = int(peerResult.Data.SeederCount)
 	stats.SeedingSize = int64(peerResult.Data.SeederSize)
 	return stats, nil
+}
+
+// seedingViaUserTorrentList §59.460: myPeerStatistics 不可用时的做种数
+// 降级通道——getUserTorrentList 翻页计数（可乐兼容面实测响应条目为
+// {torrent:{size,source}} 嵌套形态；M-Team 主端点健康不触发本函数）。
+func (a *MTeamAdapter) seedingViaUserTorrentList(ctx context.Context, config *model.SiteConfig) (int, int64) {
+	total, sizeSum := 0, int64(0)
+	const pageSize = 100
+	for page := 1; page <= 20; page++ {
+		payload, _ := json.Marshal(map[string]interface{}{
+			"pageNumber": page,
+			"pageSize":   pageSize,
+		})
+		u := resolveBaseURL(config) + "/api/member/getUserTorrentList"
+		req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
+		if err != nil {
+			return total, sizeSum
+		}
+		req.Header.Set("Content-Type", "application/json")
+		a.setAPIHeaders(req, config.APIKey)
+		resp, err := a.doer.Client.Do(req)
+		if err != nil {
+			return total, sizeSum
+		}
+		body, readErr := readBody(resp)
+		drainBody(resp)
+		if readErr != nil {
+			return total, sizeSum
+		}
+		var result struct {
+			Data struct {
+				Data []struct {
+					Torrent struct {
+						Size flexInt `json:"size"`
+					} `json:"torrent"`
+				} `json:"data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return total, sizeSum
+		}
+		rows := result.Data.Data
+		for _, r := range rows {
+			total++
+			sizeSum += int64(r.Torrent.Size)
+		}
+		if len(rows) < pageSize {
+			return total, sizeSum
+		}
+	}
+	return total, sizeSum
 }
 
 var mteamRoleMap = map[int]string{

@@ -215,3 +215,27 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 ### 关键知识：info.source 盖章差异
 
 可乐发布时把 `.torrent` 的 `info.source` 盖成 `[https://www.colapt.com] ColaPT`——**同内容跨站 info_hash 必然不同**（辅种 hash 比对陷阱：可乐下载的种子 hash≠任何源站 hash，announce 嵌 tracker+passkey 同理）；官方插件做 source 替换/剥除重算 hash 归一化反查。PT-Forward 恢复链/VerifyExists 的 hash 比对需注意此语义。
+
+## wiki 八篇全量+获取链补全（2026-11-03 深夜轮）
+
+### wiki 全目（GET /api/v1/wiki 列表 8 篇）
+
+| slug | 标题 | 关键情报 |
+|---|---|---|
+| billing-rules | 发种计费知识（修订 23） | **下载全免（仅上传计费）**；raw/billed 双口径；**发种人保护：发布后 24h 非发种人辅种上传按 30% 计账**（「发种守护中」标签）；发种奖励 72/144/360h 额外 0.2/0.5/2.0 倍（基数 raw）；离线规则单次≤1h/72h 内 2 次豁免/累计 4 次失效 |
+| site-levels | 站点等级（修订 6） | 7 级迷你罐→可乐大亨；四门槛（实际上传/天数/分享率/完成数）+**付费解锁**（瓶盖+核子可乐）；分享率考核 2026-11-01 起（<1 三天警告→<0.5 限下载→14 天停用）；VIP/工作组豁免 |
+| beginner-downloads | 客户端规则（修订 6） | **白名单**：qB 4.0~5.2.4（**禁增强版**）/Deluge 2.x/TR 4.0.1~4.0.4+4.1（**禁 4.0.6**）；禁 uTorrent/BiglyBT；关 DHT/LPD/PEX；当前公示阶段未启用自动拒绝 |
+| 1 | Cola 转种脚本 | **站方官方转种油猴脚本**（auto_feed 衍生）——转种友好站；"有禁转需点击两次"（禁转标记存在） |
+| beginner-upload-guide | 新手发种指南 | 截图 ≥3 张不同画面+直链可开（拉取截断 90%） |
+| moviepilot-setup/crossseed/invite-meds | — | 已读（规则/插件/瓶盖市场） |
+
+**对 PT-Forward 的直接影响**：①下载全免→RSS/获取链优惠检测天然全过（promotion 结构 `download:{num:0,den:1}` 实证）②24h 发种保护→转发后辅种收益 30%（可辅种非禁辅）③**客户端白名单→推种下载器版本合规**（qb 4.x~5.2.4 官方版 ✓）④官方转种脚本存在→Web 表单结构稳定预期。
+
+### 获取链补全实施（v0.0.1324）
+
+| 缺口 | 实施定案 |
+|---|---|
+| Stats 做种数恒 0 | `myPeerStatistics` 不在兼容面（403 实证）——**行为驱动降级**：非 200 时 fallback `getUserTorrentList` 翻页计数（响应条目 `{torrent:{size,source}}` 嵌套；实测 1 颗 3GB ✓；M-Team 主端点健康零变化） |
+| Detail 403 | **行为驱动降级**：`/api/torrent/detail` 403 时 fallback Web 面 `GET /api/v1/torrents/{id}`（cookie 通道——**字段比兼容面假想 detail 更全**：info_hash+**source_info_hash 双 hash 原生**/完整 MI/文件树/release_group+official 官种标记/promotion 分数结构/publication_stage 审核状态机/media_id+release_scope 作品关联/screenshots 直链数组/size_bytes 字符串数字） |
+| **RSS** | **定案：当前无公开 RSS 通道**——兼容面 /api/rss 404（openresty）/Web 面 /api/v1/feeds route_not_found/torrentrss.php 拒 cookie 认证；roadmap 13 阶段未列 RSS。订阅获取不可用，站方上线后再接 |
+| Download 端到端复验 | 修复行为级证据完整（同栈对照：无头 200/32894B vs 带头挂 30s）；完整链复验连续 5 撞限流窗（今日配额烧尽）——**挂明日冷启动首验** |
