@@ -782,8 +782,8 @@ func TestRousiAdapter_SearchTorrents_OK(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer testkey" {
 			t.Errorf("missing Bearer auth header")
 		}
-		if r.URL.Query().Get("search") != "test" {
-			t.Errorf("unexpected search param: %s", r.URL.Query().Get("search"))
+		if r.URL.Query().Get("keyword") != "test" {
+			t.Errorf("unexpected keyword param: %s", r.URL.Query().Get("keyword"))
 		}
 		resp := map[string]interface{}{
 			"code": 0,
