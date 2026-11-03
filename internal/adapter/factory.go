@@ -130,12 +130,17 @@ var FrameworkDefaults = map[string]FrameworkDefault{
 		IDStrategy:   "query_param",
 		IDPattern:    "id",
 	},
-	// §59.460: 可乐同 mteam 策略（M-Team 兼容面同构）
+	// §59.460 附三: 可乐 RSS（torrentrss.php?passkey= 站方自述 NexusPHP
+	// 兼容格式）——guid=详情页 URL（/torrents/{id} 非 40hex → IsFakeHash
+	// 自动 true 走侧载链算真 hash，肉丝同款）；id 提取用 guid_regex
+	// （link 是 /feeds/downloads/{passkey}/{id} 路径形态，query_param
+	// 恒 miss；guid 路径不含 passkey 更稳定）。
 	"cola": {
-		HashStrategy: "guid",
-		SizeStrategy: "enclosure",
-		IDStrategy:   "query_param",
-		IDPattern:    "id",
+		HashStrategy:        "guid",
+		SizeStrategy:        "enclosure",
+		IDStrategy:          "guid_regex",
+		IDPattern:           `/torrents/(\d+)`,
+		RequiresSideLoading: true,
 	},
 	"luminance": {
 		HashStrategy:        "xml_tag",

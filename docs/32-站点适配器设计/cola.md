@@ -237,7 +237,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 |---|---|
 | Stats 做种数恒 0 | `myPeerStatistics` 不在兼容面（403 实证）——**行为驱动降级**：非 200 时 fallback `getUserTorrentList` 翻页计数（响应条目 `{torrent:{size,source}}` 嵌套；实测 1 颗 3GB ✓；M-Team 主端点健康零变化） |
 | Detail 403 | **行为驱动降级**：`/api/torrent/detail` 403 时 fallback Web 面 `GET /api/v1/torrents/{id}`（cookie 通道——**字段比兼容面假想 detail 更全**：info_hash+**source_info_hash 双 hash 原生**/完整 MI/文件树/release_group+official 官种标记/promotion 分数结构/publication_stage 审核状态机/media_id+release_scope 作品关联/screenshots 直链数组/size_bytes 字符串数字） |
-| **RSS** | **定案：当前无公开 RSS 通道**——兼容面 /api/rss 404（openresty）/Web 面 /api/v1/feeds route_not_found/torrentrss.php 拒 cookie 认证；roadmap 13 阶段未列 RSS。订阅获取不可用，站方上线后再接 |
+| **RSS** | ~~无公开通道~~ **作废修正（2026-11-03 深夜二轮，用户供链接）**：`torrentrss.php?passkey=<RSSKey>&rows=50&linktype=dl` 完整可用（200/43.7KB/50 条，站方自述"NexusPHP 兼容格式，凭据即 RSS Key"）。**此前 403 cookie_authentication_forbidden 是探测方法错误**——passkey 通道禁混带 cookie（与 x-api-key 通道同族"每通道单一凭证"铁律，裸 GET 即 200） |
 | Download 端到端复验 | 修复行为级证据完整（同栈对照：无头 200/32894B vs 带头挂 30s）；完整链复验连续 5 撞限流窗（今日配额烧尽）——**挂明日冷启动首验** |
 
 ### 限流三层结构与 PT-Forward 节流器对位（2026-11-03 定案）
@@ -250,3 +250,30 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | www Web 面（cookie/无认证） | IP/连接层（CF） | 未知 | reset/000/截断（无 429 语义） |
 
 **PT-Forward 节流器对位**：GlobalLimiter（§59.340）按**请求主机**分桶——可乐双主机两桶（api/www 各自默认 0.5RPS=30/min，fetch_rps 未配置）；生产链（GetAdapter doer）已在默认桶保护内（30/min < Key 配额 60/min，余量给手动操作）。**烧穿站方配额的是探针/独立 client/curl**（诊断工具绕过 limiter）非生产行为。未来站方降配额或加高频链时按 `fetch_rps` 显式收紧（注意：注册键=domain 列的 www 形态，api 子域桶需单评估）。
+
+## RSS 通道契约与接入（2026-11-03 深夜二轮——用户供链接实测）
+
+### feed 契约（torrentrss.php，NexusPHP 兼容自述）
+
+- **认证**：URL passkey 参数（RSS Key——account/tracker?tab=rss 页获取；**禁混带 cookie**：带了回 403 cookie_authentication_forbidden——与 x-api-key 通道同族"每通道单一凭证"设计；裸 GET 即 200）
+- **item 结构**：title/link=enclosure（`/feeds/downloads/{RSSKey}/{id}` 下载直链——RSSKey 直接当下载凭据）/guid=`/torrents/{id}` 详情页 URL（isPermaLink=true）/pubDate/category 多维（分类+分辨率+来源）/description 结构化（大小/做种/下载/完成/分类/作品/分辨率/来源——**无优惠字段**：全站免费站，免费语义在 promotion 不在 feed）/enclosure.length 精确字节
+- **参数**：rows=50（条数）/linktype=dl
+
+### cola RSS 策略表（v0.0.1325 修正）
+
+```
+HashStrategy: guid（guid=详情 URL 非 40hex → IsFakeHash 自动 true → 侧载链算真 hash，肉丝同款）
+SizeStrategy: enclosure（length 精确字节）
+IDStrategy: guid_regex + /torrents/(\d+)（link 是路径形态 query_param 恒 miss；guid 路径不含 RSSKey 更稳）
+RequiresSideLoading: true
+```
+
+离线驱动验证 ✓：50 条全解析（id=13731/13730/13729 提取正确+fake hash 标记+size 精确）。
+
+### 免费判定链（全站免费站的 DetectDiscount 路径）
+
+RSS feed 无优惠字段 → 走 adapter DetectDiscount → `/api/torrent/detail` 403 → **Web 面 promotion 降级**（v0.0.1325）：`GET /api/v1/torrents/{id}`（cookie）解析 `promotion.download:{num,den}`——num==0 → FREE/比例归 PERCENT 档/不认识回 NONE（站方全站免费期恒 FREE）。侧载链走 DownloadTorrent（genDlToken 通道已修——自动可用）。
+
+### 待明日冷启动复验（限流窗）
+
+①Download 端到端 ②DetectDiscount 降级链（promotion→FREE）③RSS 侧载真 hash——三发收口。

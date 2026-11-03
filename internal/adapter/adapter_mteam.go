@@ -346,6 +346,64 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	return a.detailViaWeb(ctx, config, torrentID)
 }
 
+// discountViaWebPromotion §59.460 附三: Web 面详情 promotion 结构优惠
+// 解析——可乐实测 {accounting_applied, upload:{num,den}, download:{num,den}}：
+// download.num==0 → FREE；否则按 num/den 比例归 PERCENT 档（不认识的
+// 比例回 NONE——站方全站免费期恒 FREE）。
+func (a *MTeamAdapter) discountViaWebPromotion(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+	host := config.Domain
+	if !strings.HasPrefix(host, "http") {
+		host = "https://" + host
+	}
+	u := strings.TrimRight(host, "/") + "/api/v1/torrents/" + url.PathEscape(torrentID)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Cookie", config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmtES("web promotion HTTP %d", resp.StatusCode), nil)
+	}
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	var d struct {
+		Promotion struct {
+			Download struct {
+				Num json.Number `json:"num"`
+				Den json.Number `json:"den"`
+			} `json:"download"`
+		} `json:"promotion"`
+	}
+	if err := json.Unmarshal(body, &d); err != nil {
+		return nil, parseError("解析 Web 面优惠失败", err)
+	}
+	num, _ := d.Promotion.Download.Num.Int64()
+	den, _ := d.Promotion.Download.Den.Int64()
+	if den <= 0 {
+		return &model.DiscountResult{Level: model.DiscountNone}, nil
+	}
+	switch {
+	case num == 0:
+		return &model.DiscountResult{Level: model.DiscountFree}, nil
+	case num*2 == den:
+		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
+	case num*10 == den*7:
+		return &model.DiscountResult{Level: model.DiscountPercent70}, nil
+	default:
+		return &model.DiscountResult{Level: model.DiscountNone}, nil
+	}
+}
+
 // detailViaWebJSON §59.460: Web 面详情端点降级——GET
 // https://<domain>/api/v1/torrents/{id}（cookie 通道；可乐实测 12KB/45+
 // 字段完整覆盖 detail 需求：release_name/subtitle/size_bytes 字符串数字/
@@ -848,6 +906,15 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
 		return nil, networkError("优惠检测请求失败", err)
+	}
+	// §59.460 附三: /api/torrent/detail 不在部分兼容面端点集（可乐 403）
+	// ——降级 Web 面详情 promotion 结构解析（download:{num,den} 分数：
+	// num==0 免费/否则按比例；M-Team detail 健康 200 不触发）。
+	if resp.StatusCode == http.StatusForbidden && config.Cookie != "" {
+		drainBody(resp)
+		if dr, fbErr := a.discountViaWebPromotion(ctx, config, torrentID); fbErr == nil {
+			return dr, nil
+		}
 	}
 	defer func() { drainBody(resp) }()
 
