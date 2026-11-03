@@ -179,17 +179,17 @@ func TestAudioMappingOfCombinedFirst(t *testing.T) {
 		},
 	}
 	// TrueHD+Atmos → 组合键 audio.truehd_atmos（不得被 B1 裸 truehd 短路）
-	m := e.audioMappingOf(cfg, "TrueHD", "Atmos")
+	m := e.audioMappingOf(cfg, model.FieldDomainAudiocodec, "TrueHD", "Atmos")
 	if m == nil || m.Value != "17" {
 		t.Errorf("TrueHD+Atmos 应选组合键 17: %+v", m)
 	}
 	// 无 tech → B1 直取裸 truehd
-	m2 := e.audioMappingOf(cfg, "TrueHD", "")
+	m2 := e.audioMappingOf(cfg, model.FieldDomainAudiocodec, "TrueHD", "")
 	if m2 == nil || m2.Value != "12" {
 		t.Errorf("纯 TrueHD 应选 12: %+v", m2)
 	}
 	// DD 无组合词条场景（词表 exact 失明修复语义保持）
-	m3 := e.audioMappingOf(cfg, "DD", "")
+	m3 := e.audioMappingOf(cfg, model.FieldDomainAudiocodec, "DD", "")
 	if m3 == nil || m3.Value != "3" {
 		t.Errorf("DD 直取应选 3: %+v", m3)
 	}

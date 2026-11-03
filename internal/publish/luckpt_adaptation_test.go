@@ -31,11 +31,11 @@ func TestOtherFallback_ThreeDomains(t *testing.T) {
 	e := &PublishExecutor{}
 	cfg := otherCfg()
 	// Opus → audio Other（幸运 Robot Dreams 种审案）
-	if m := e.audioMappingOf(cfg, "Opus", ""); m == nil || m.Label != "Other" {
+	if m := e.audioMappingOf(cfg, model.FieldDomainAudiocodec, "Opus", ""); m == nil || m.Label != "Other" {
 		t.Errorf("[audio Opus] got %v", m)
 	}
 	// 原命中不回归
-	if m := e.audioMappingOf(cfg, "AAC", ""); m == nil || m.Label != "AAC" {
+	if m := e.audioMappingOf(cfg, model.FieldDomainAudiocodec, "AAC", ""); m == nil || m.Label != "AAC" {
 		t.Errorf("[audio AAC] got %v", m)
 	}
 	// codec AV1 → Other（无键形态）
