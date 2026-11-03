@@ -183,10 +183,19 @@ reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型—
 
 ## 第四面：插件面 + 源码可得性探测（2026-11-03）
 
-### 源码结论：引擎闭源
+### 源码结论：引擎闭源（roadmap gh-pages 分支深挖）
 
-- **reelcore 主引擎未公开**（wiki 引用的 `internal/publication/*.go` 等为站方内部代码）
-- 官方 GitHub org `ReelCoreHQ` 仅 2 仓库：`reelcore-roadmap`（空壳 README）+ **`moviepilot-plugin-colapt`**（官方 MoviePilot 辅种插件，Python v0.10.5，MIT——**API 消费权威参考**，本地 `/tmp/opencode/cola-plugin`）
+- **主引擎仓库 `ReelCoreHQ/reelcore` 存在但私有**（roadmap data.json `repository` 字段暴露仓库全名；GitHub API 404=私有不可见）
+- `reelcore-roadmap` 默认分支空壳，**gh-pages 分支=主仓库进度的静态导出镜像**（80KB data.json，13 阶段 RC00-RC12 全 feature 清单，source_sha 指向主仓库 commit）
+- 官方 GitHub org `ReelCoreHQ` 公开 2 仓库：`reelcore-roadmap`（进度镜像）+ **`moviepilot-plugin-colapt`**（官方 MoviePilot 辅种插件，Python v0.10.5，MIT——**API 消费权威参考**，本地 `/tmp/opencode/cola-plugin`）
+
+### reelcore 架构全景（roadmap data.json 2026-09-21 生成）
+
+- **Go 重写引擎，独立于 NexusPHP**（RC02 新 Go 核心三入口/自有 DB 版本化建库/双 module CI；RC06-06 与 NexusPHP 解耦验证）
+- **Tracker=Torrust 血统**（RC06-02 "Redis 与 Torrust 故障"；RC04 新 Tracker：租约 fencing/成功前持久化/流水聚合事务一致/计费规则版本化）
+- RC09 完整产品 API：账号邀请/完整种子业务/统计首发运营/管理审计/API 安全矩阵
+- **RC10 IYUU 原生 API 框架适配**：可乐有 IYUU 协议原生辅种 API（独立凭据）+IYUU ReelCore 适配器（上游 PR 材料——IYUU 主仓库未落地，PR 未提/未并）
+- RC11 React 前端（电影分组/双布局/多主题）；RC12 上线演练未完成（scope_note：RC08 长稳跳过）
 
 ### 插件面契约（www 主机 /api/v1/*，Cookie 认证）
 
