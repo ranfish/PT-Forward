@@ -128,9 +128,11 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 			Code json.Number `json:"code"`
 			Data struct {
 				Data []struct {
-					ID     string  `json:"id"`
-					Name   string  `json:"name"`
-					Size   flexInt `json:"size"`
+					// §59.460: json.Number 双兼容（M-Team 官方字符串 id /
+					// 可乐 reelcore 数字 id——纯 string 在数字形态下 unmarshal 失败）
+					ID     json.Number `json:"id"`
+					Name   string      `json:"name"`
+					Size   flexInt     `json:"size"`
 					Status struct {
 						Seeders  flexInt `json:"seeders"`
 						Leechers flexInt `json:"leechers"`
@@ -178,7 +180,7 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 
 		for _, item := range result.Data.Data {
 			r := &model.SeedingSearchResult{
-				TorrentID: item.ID,
+				TorrentID: item.ID.String(),
 				Title:     item.Name,
 				Size:      int64(item.Size),
 				Seeders:   int(item.Status.Seeders),
@@ -259,6 +261,22 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	dlResp, err := a.doer.Client.Do(dlReq)
 	if err != nil {
 		return nil, downloadError("下载种子失败", err)
+	}
+
+	// §59.460: 签名 URL 下载通道对 API 头敏感——可乐 www 主机 /downloads
+	// 路由把 x-api-key 头当 API scope 调用校验（api_key_scope_denied 403
+	// 实证）；签名 URL 自含 exp+sig 鉴权，无头裸 GET 即 200 真种子。
+	// 403 时无头重试一次（馒头带头 200 走原路径零变化）。
+	if dlResp.StatusCode == http.StatusForbidden {
+		drainBody(dlResp)
+		bareReq, bareErr := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
+		if bareErr != nil {
+			return nil, networkError("构造无头下载请求失败", bareErr)
+		}
+		dlResp, err = a.doer.Client.Do(bareReq)
+		if err != nil {
+			return nil, downloadError("下载种子失败", err)
+		}
 	}
 	defer func() { drainBody(dlResp) }()
 
@@ -1527,7 +1545,15 @@ func (a *MTeamAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 }
 
 func resolveBaseURL(config *model.SiteConfig) string {
-	u := config.Domain
+	// §59.460: BaseURL 优先（可乐三面分离站 domain=www.colapt.com Web
+	// 主机 / base_url=api.colapt.com API 兼容面——纯 Domain 构造把 API
+	// 请求发到 www 主机：profile 打中 reelcore Web API 超时不响应）。
+	// 馒头等 API 即主域站 base_url==domain 零变化；全库 base_url≠domain
+	// 仅可乐一例。
+	u := config.BaseURL
+	if u == "" {
+		u = config.Domain
+	}
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
@@ -1580,10 +1606,11 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 			Username    string  `json:"username"`
 			Role        flexInt `json:"role"`
 			MemberCount struct {
-				Uploaded   string `json:"uploaded"`
-				Downloaded string `json:"downloaded"`
-				Bonus      string `json:"bonus"`
-				ShareRate  string `json:"shareRate"`
+				// §59.460: json.Number 双兼容（reelcore 真数字 shareRate=999999）
+				Uploaded   json.Number `json:"uploaded"`
+				Downloaded json.Number `json:"downloaded"`
+				Bonus      json.Number `json:"bonus"`
+				ShareRate  json.Number `json:"shareRate"`
 			} `json:"memberCount"`
 			MemberStatus struct {
 				LastLogin string `json:"lastLogin"`
@@ -1600,10 +1627,10 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	if className := a.resolveRoleName(ctx, config, int(result.Data.Role)); className != "" {
 		stats.UserClass = className
 	}
-	stats.UploadBytes = parseSizeString(result.Data.MemberCount.Uploaded)
-	stats.DownloadBytes = parseSizeString(result.Data.MemberCount.Downloaded)
-	stats.BonusPoints, _ = strconv.ParseFloat(result.Data.MemberCount.Bonus, 64)
-	stats.Ratio, _ = strconv.ParseFloat(result.Data.MemberCount.ShareRate, 64)
+	stats.UploadBytes = parseSizeString(result.Data.MemberCount.Uploaded.String())
+	stats.DownloadBytes = parseSizeString(result.Data.MemberCount.Downloaded.String())
+	stats.BonusPoints, _ = strconv.ParseFloat(result.Data.MemberCount.Bonus.String(), 64)
+	stats.Ratio, _ = strconv.ParseFloat(result.Data.MemberCount.ShareRate.String(), 64)
 	if stats.Ratio == 0 && stats.DownloadBytes > 0 {
 		stats.Ratio = float64(stats.UploadBytes) / float64(stats.DownloadBytes)
 	}

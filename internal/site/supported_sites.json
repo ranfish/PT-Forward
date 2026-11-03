@@ -1047,7 +1047,7 @@
   "www.colapt.com": {
     "domain": "www.colapt.com",
     "name_cn": "可乐",
-    "framework": "mteam",
+    "framework": "cola",
     "auth_type": "apikey",
     "cookiecloud_domain": "colapt.com",
     "download_url_template": "",
