@@ -126,14 +126,19 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 		event.DownloadURL = extractDownloadURL(item, site)
 		event.InfoHash = extractInfoHash(item, site, event.TorrentID)
 		event.Size = extractSize(item, site)
-		// §59.456: RSS 内优惠证据（PeerGo 系 feed description 形态——
-		// "优惠：免费（至 2026-11-05 03:28）"）；零命中面=非 PeerGo 站
-		// description 无 "优惠：" 前缀行不触发，检测链行为不变。
+		// §59.456 附: RSS 内优惠证据（PeerGo 系 feed）双通道：
+		//   ① description "优惠：xxx（至 …）" 行——promotionLabel 枚举
+		//     精确集（未知形态不干预——NP 站自然语言误短路防线）
+		//   ② GUID 前缀 "peergo:torrent:" 且无优惠行=站方权威 NONE
+		//     （回归审核补：首版仅①——49 颗无优惠种每轮全量打 SPA
+		//     详情页 8s×N 超时/骨架 HTML 假检测；feed 无优惠即无折扣）
 		if level, freeEnd := discountFromRSSDescription(item.Description); level != "" {
 			event.Metadata["rss_discount_level"] = level
 			if freeEnd != nil {
 				event.Metadata["rss_free_end"] = freeEnd.Format(time.RFC3339)
 			}
+		} else if strings.HasPrefix(item.GUID, "peergo:torrent:") {
+			event.Metadata["rss_discount_level"] = string(model.DiscountNone)
 		}
 
 		if event.TorrentID == "" && event.DownloadURL == "" {
@@ -369,10 +374,16 @@ func discountFromRSSDescription(desc string) (string, *time.Time) {
 		level = string(model.DiscountFree)
 	case "2× 上传 / 免费", "2x 上传 / 免费":
 		level = string(model.Discount2xFree)
-	default:
-		// 有优惠但不免费（50% 下载等）——显式 NONE 让检测链短路
-		// （feed 是站方权威数据，无需再拉详情页确认）
+	case "2× 上传", "2x 上传", "50% 下载", "30% 下载",
+		"2× 上传 / 50% 下载", "2x 上传 / 50% 下载":
+		// 已知不免费形态（promotionLabel 精确集）——显式 NONE
+		// 短路（feed 是站方权威数据，无需再拉详情页确认）
 		level = string(model.DiscountNone)
+	default:
+		// §59.456 附: 未知形态不干预——NP 站 description 含自然语言
+		// "优惠：xxx"（非 PeerGo 形态）时走原检测链，防误短路漏检
+		// 真实免费（回归审核收紧：首版 default→NONE 是反向 fail-open）
+		return "", nil
 	}
 	var freeEnd *time.Time
 	if len(m) >= 3 && m[2] != "" {
