@@ -706,7 +706,7 @@
     "framework": "rousi",
     "auth_type": "passkey",
     "cookiecloud_domain": "rousi.pro",
-    "download_url_template": "api/torrent/{id}/download/{passkey}",
+    "download_url_template": "api/torrent/{id}/download/{apikey}",
     "verification_status": "verified",
     "show_apikey": true,
     "api_key_hint": "pgk_ 开头的 API Key（站方改版后新增——用于 API 与种子下载；旧 Passkey 仅作 Tracker announce 保留）"
