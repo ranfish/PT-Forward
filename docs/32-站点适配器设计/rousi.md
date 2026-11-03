@@ -667,3 +667,25 @@ submitted→review→published；LegacyUploadResult.Status 返回）。
 | id_strategy | path_segment | 末段=`{id}` 天然命中（pattern 不被读） |
 | hash_strategy | guid | `peergo:torrent:{id}`→IsFakeHash 容忍 |
 | size_strategy | enclosure | enclosure.length=精确字节 |
+
+### 10.4 回归审核注记（v0.0.1311 附）
+
+- **未知优惠形态不干预**：discountFromRSSDescription 仅
+  promotionLabel 精确枚举集命中才短路——NP 站 description 自然
+  语言"优惠：xxx"（非 PeerGo 形态）走原检测链（首版 default→NONE
+  是反向 fail-open，回归审核收紧）。
+- **PeerGo GUID 无优惠行=权威 NONE**：`peergo:torrent:` 前缀判据
+  ②通道——首版仅优惠行短路致 49 颗无优惠种每轮全量打 SPA 详情页
+  （8s×N 超时/骨架 HTML 假检测——cron 轮 failures 0↔11 抖动实证）。
+  修复后 detect_failures 恒 0+检测零网络请求。
+- **时区注记**：优惠截止时间无时区标记（站方服务器 Local 渲染）
+  ——我方 time.Local 解析（29=CST）。若站方非 CST 存在偏差——
+  FreeEndAt 仅影响 blocked retry 过期判定+展示，低影响；首颗免费
+  种实战时可对照站方页面时间校验（观察项）。
+- **A-2 消费边界**：is_source=true 的采集消费面中 RSS 通道可用
+  （feed 元数据完备）；**详情页采集链未适配 SPA**（titleparser 对
+  React 骨架不工作——层选/重获指定肉丝会失败）——详情数据可走
+  公开 JSON API（/api/v1/torrents/{id}——摸底 §9.4 字段大丰收），
+  待需要时适配（挂账）。
+- seeders/leechers 短路后零值（feed 有做种数文本未提取）——展示级
+  影响不计。
