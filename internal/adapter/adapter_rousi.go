@@ -33,7 +33,8 @@ func NewRousiAdapter(doer *HTTPDoer, logger *zap.Logger) *RousiAdapter {
 func (a *RousiAdapter) Framework() string { return "rousi" }
 
 func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-	u := resolveBaseURL(config) + "/api/v1/torrents?perPage=20&page=1"
+	// §59.457: perPage 改版后被忽略（默认 100 全量）；page_size 实测生效
+	u := resolveBaseURL(config) + "/api/v1/torrents?page_size=20&page=1"
 	if keyword != "" {
 		u += "&search=" + url.QueryEscape(keyword)
 	}
@@ -45,7 +46,7 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, searchError("构造搜索请求失败", err)
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -92,6 +93,16 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	return results, nil
 }
 
+// rousiCredential §59.457: 肉丝凭据选择——APIKey（pgk_，改版后 API/下载
+// 真源）优先，fallback Passkey（改版前旧形态/兼容）。config.APIKey 由
+// sites.api_key 列注入（provider :399），双凭据站全库首例。
+func rousiCredential(config *model.SiteConfig) string {
+	if config.APIKey != "" {
+		return config.APIKey
+	}
+	return config.Passkey
+}
+
 func (a *RousiAdapter) setAuthHeaders(req *http.Request, passkey string) {
 	req.Header.Set("Authorization", "Bearer "+passkey)
 	req.Header.Set("Accept", "application/json")
@@ -101,12 +112,12 @@ func (a *RousiAdapter) setAuthHeaders(req *http.Request, passkey string) {
 }
 
 func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	u := resolveBaseURL(config) + "/api/torrent/" + torrentID + "/download/" + config.Passkey
+	u := resolveBaseURL(config) + "/api/torrent/" + torrentID + "/download/" + rousiCredential(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -137,7 +148,7 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -193,7 +204,7 @@ func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -271,7 +282,7 @@ func (a *RousiAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return &model.SLData{}, nil
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -364,7 +375,7 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	a.setAuthHeaders(httpReq, config.Passkey)
+	a.setAuthHeaders(httpReq, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
@@ -439,7 +450,7 @@ func (a *RousiAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, fmt.Errorf("构造请求失败: %w", err)
 	}
-	a.setAuthHeaders(req, config.Passkey)
+	a.setAuthHeaders(req, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {

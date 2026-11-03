@@ -689,3 +689,16 @@ submitted→review→published；LegacyUploadResult.Status 返回）。
   待需要时适配（挂账）。
 - seeders/leechers 短路后零值（feed 有做种数文本未提取）——展示级
   影响不计。
+
+### 10.5 站点支持适配完成（2026-11-03 · §59.457）
+
+- **双凭据（全库首例）**：Passkey（tracker announce 专用旧 32hex
+  保留）+ API Key（pgk_，改版后 API/下载真源）——前端 override
+  双框；adapter rousiCredential APIKey 优先。
+- **RousiAdapter 改版适配**：凭据切换 7 处+Search page_size 参数
+  （perPage 被忽略）+Detail 契约全命中零改动（media_info 保留）+
+  download_url_template {apikey}。
+- **节流（环境层）**：下载端点连续快速请求被节流（TLS timeout/
+  读流挂死两态）——间隔冷却恢复；单颗下载正常间隔不受影响。
+- **遗留**：search= 关键词过滤兼容层未支持（返回最新序全量）；
+  Upload 链契约保留未实测真实发布（议题 B 时验证）。

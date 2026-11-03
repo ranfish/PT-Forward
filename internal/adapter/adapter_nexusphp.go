@@ -1592,6 +1592,7 @@ func buildTemplateURL(config *model.SiteConfig, tpl, torrentID string) string {
 		u = strings.ReplaceAll(u, "{id}", url.PathEscape(torrentID))
 	}
 	u = strings.ReplaceAll(u, "{passkey}", url.QueryEscape(config.Passkey))
+	u = strings.ReplaceAll(u, "{apikey}", url.QueryEscape(config.APIKey))
 	u = strings.ReplaceAll(u, "{rsskey}", url.QueryEscape(config.RSSKey))
 	u = strings.ReplaceAll(u, "{authkey}", url.QueryEscape(config.AuthKey))
 	if !strings.HasPrefix(u, "http") {
