@@ -72,7 +72,11 @@ func TestYemaptAdapter_UploadViaOpenAPI(t *testing.T) {
 			FormFields: map[string]string{
 				"categoryId": "4", "medium": "2", "standard": "4",
 				"codec": "1", "audiocodec": "1", "team": "7",
-				"tags": "6,10",
+			},
+			// §59.459 回归审核修正：tags 走 TagArrayFields 通道
+			TagArrayFields: []model.TagKV{
+				{Key: "tagList", Value: "6"},
+				{Key: "tagList", Value: "10"},
 			},
 			Screenshots: []string{"https://img.example/s1.png", "https://img.example/s2.png"},
 			ExtraFields: map[string]string{
