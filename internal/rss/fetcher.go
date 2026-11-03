@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -125,6 +126,15 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 		event.DownloadURL = extractDownloadURL(item, site)
 		event.InfoHash = extractInfoHash(item, site, event.TorrentID)
 		event.Size = extractSize(item, site)
+		// §59.456: RSS 内优惠证据（PeerGo 系 feed description 形态——
+		// "优惠：免费（至 2026-11-05 03:28）"）；零命中面=非 PeerGo 站
+		// description 无 "优惠：" 前缀行不触发，检测链行为不变。
+		if level, freeEnd := discountFromRSSDescription(item.Description); level != "" {
+			event.Metadata["rss_discount_level"] = level
+			if freeEnd != nil {
+				event.Metadata["rss_free_end"] = freeEnd.Format(time.RFC3339)
+			}
+		}
 
 		if event.TorrentID == "" && event.DownloadURL == "" {
 			continue
@@ -332,4 +342,43 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 	}
 	regexCacheMu.Unlock()
 	return re, nil
+}
+
+
+// rssDiscountLineRe §59.456: PeerGo 系 feed 的优惠行（站方
+// promotionLabel 中文集：免费/2× 上传/2× 上传 / 免费/50% 下载/
+// 2× 上传 / 50% 下载/30% 下载——rss/service.go promotionLabel 权威）。
+// 判定语义对齐 IsFree：免费/2× 上传·免费=免费；纯上传优惠与折扣下载
+// 不算免费（§59.367 PERCENT_50 不算同源）。
+var rssDiscountLineRe = regexp.MustCompile(`优惠[:：]\s*([^\n（(]+)(?:[（(]\s*至\s*([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})\s*[）)])?`)
+
+// discountFromRSSDescription 从 RSS description 提取优惠等级与截止时间。
+// 返回 ("", nil) 表示无证据（非 PeerGo 站常规形态——不干预检测链）。
+func discountFromRSSDescription(desc string) (string, *time.Time) {
+	if !strings.Contains(desc, "优惠") {
+		return "", nil
+	}
+	m := rssDiscountLineRe.FindStringSubmatch(desc)
+	if len(m) < 2 {
+		return "", nil
+	}
+	label := strings.TrimSpace(m[1])
+	var level string
+	switch label {
+	case "免费":
+		level = string(model.DiscountFree)
+	case "2× 上传 / 免费", "2x 上传 / 免费":
+		level = string(model.Discount2xFree)
+	default:
+		// 有优惠但不免费（50% 下载等）——显式 NONE 让检测链短路
+		// （feed 是站方权威数据，无需再拉详情页确认）
+		level = string(model.DiscountNone)
+	}
+	var freeEnd *time.Time
+	if len(m) >= 3 && m[2] != "" {
+		if t, err := time.ParseInLocation("2006-01-02 15:04", m[2], time.Local); err == nil {
+			freeEnd = &t
+		}
+	}
+	return level, freeEnd
 }

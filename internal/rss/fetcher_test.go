@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"time"
+
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -299,5 +301,39 @@ func TestExtractSize_XMLTag(t *testing.T) {
 	s := extractSize(item, site)
 	if s != 536870912 {
 		t.Errorf("expected 536870912, got %d", s)
+	}
+}
+
+// §59.456: RSS description 优惠提取（PeerGo 系 feed 形态）测试锚。
+func TestDiscountFromRSSDescription(t *testing.T) {
+	end := time.Date(2026, 11, 5, 3, 28, 0, 0, time.Local)
+	cases := []struct {
+		name    string
+		desc    string
+		wantLvl string
+		wantEnd *time.Time
+	}{
+		{"免费+截止", "副标题\n大小：8.29 GB\n优惠：免费（至 2026-11-05 03:28）\n做种 11 · 下载 2", string(model.DiscountFree), &end},
+		{"2x上传/免费", "优惠：2× 上传 / 免费（至 2026-11-05 03:28）", string(model.Discount2xFree), &end},
+		{"50%下载不免费", "优惠：50% 下载（至 2026-11-05 03:28）", string(model.DiscountNone), &end},
+		{"30%下载不免费", "优惠：30% 下载", string(model.DiscountNone), nil},
+		{"纯2x上传不免费", "优惠：2× 上传", string(model.DiscountNone), nil},
+		{"2x上传/50%下载", "优惠：2× 上传 / 50% 下载（至 2026-11-05 03:28）", string(model.DiscountNone), &end},
+		{"无优惠行", "副标题\n大小：8.29 GB\n做种 11", "", nil},
+		{"NP 站常规 description", "【剧情】某电影 1080p 全一集", "", nil},
+		{"优惠无截止", "优惠：免费", string(model.DiscountFree), nil},
+	}
+	for _, c := range cases {
+		lv, end := discountFromRSSDescription(c.desc)
+		if lv != c.wantLvl {
+			t.Errorf("%s: level got %q want %q", c.name, lv, c.wantLvl)
+		}
+		if c.wantEnd == nil {
+			if end != nil {
+				t.Errorf("%s: end 应 nil got %v", c.name, end)
+			}
+		} else if end == nil || !end.Equal(*c.wantEnd) {
+			t.Errorf("%s: end got %v want %v", c.name, end, c.wantEnd)
+		}
 	}
 }

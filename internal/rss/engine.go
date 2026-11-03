@@ -1200,6 +1200,30 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 		e.detectCache.Delete(cacheKey)
 	}
 
+	// §59.456: RSS 内优惠证据短路（PeerGo 系 feed description 自带
+	// 站方权威优惠数据——fetcher 提取；命中即填终态不拉详情页：
+	// 肉丝等 SPA 站详情页检测器必 fail，feed 是唯一可靠源。
+	// HR 信息 feed 不携带——保持默认 false（PeerGo 站方无 HR 规则记载）。
+	if lv, ok := event.Metadata["rss_discount_level"].(string); ok && lv != "" {
+		event.DiscountLevel = model.DiscountLevel(lv)
+		event.IsFree = event.DiscountLevel == model.DiscountFree ||
+			event.DiscountLevel == model.Discount2xFree
+		if endStr, ok2 := event.Metadata["rss_free_end"].(string); ok2 && endStr != "" {
+			if t, err := time.Parse(time.RFC3339, endStr); err == nil {
+				event.FreeEndAt = &t
+			}
+		}
+		e.detectCache.Store(cacheKey, &detectCacheEntry{
+			hasHR:         false,
+			hrSeedTimeH:   0,
+			discountLevel: event.DiscountLevel,
+			isFree:        event.IsFree,
+			freeEndAt:     event.FreeEndAt,
+			cachedAt:      time.Now(),
+		})
+		return true
+	}
+
 	detectCtx, detectCancel := context.WithTimeout(ctx, perTorrentDetectTimeout)
 	defer detectCancel()
 
