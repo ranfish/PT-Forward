@@ -420,6 +420,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if in.TargetSite == "肉丝" {
 		rousiPublishInject(form, meta)
 	}
+	// §59.459: 野马特化注入（regionList 产区数组≤3/中文译名/封面 URL）
+	if in.TargetSite == "野马" {
+		yemaPublishInject(form, meta)
+	}
 	if in.TargetSite == "城市" {
 		hdcityPrefill(form, cfg, meta, tp)
 		// codec 音频类切换（§2.7 编码-媒介对应表——音频类查 codec 域
@@ -654,6 +658,17 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			pubReq.ExtraFields = map[string]string{}
 		}
 		for _, k := range []string{"rs_genre", "rs_region", "rs_poster"} {
+			if v := form[k]; v != "" {
+				pubReq.ExtraFields[k] = v
+			}
+		}
+	}
+	// §59.459: 野马 ExtraFields 搬运（regionList JSON 数组/译名/封面）
+	if in.TargetSite == "野马" {
+		if pubReq.ExtraFields == nil {
+			pubReq.ExtraFields = map[string]string{}
+		}
+		for _, k := range []string{"yema_regions", "yema_translated", "yema_poster"} {
 			if v := form[k]; v != "" {
 				pubReq.ExtraFields[k] = v
 			}
@@ -2226,6 +2241,57 @@ func mteamLabelsBits(tags []string) int {
 //
 // 标签依赖项（chnize/sub_hard/sub_soft/sub_incl）在 tags 产出后
 // hdcityTagDependentFill 处理。
+// yemaRegionID §59.459: 野马 region PTGen 产区中文→数字值全表
+// （wiki 枚举权威 8 项——大陆/港/台分立/欧洲聚合/其它兜底）。
+var yemaRegionID = map[string]string{
+	"大陆": "1", "中国大陆": "1", "香港": "2", "中国香港": "2",
+	"台湾": "3", "中国台湾": "3", "美国": "4", "日本": "6", "韩国": "7",
+	// 欧洲聚合（英法德意西俄等→EU=5）
+	"英国": "5", "法国": "5", "德国": "5", "意大利": "5", "西班牙": "5",
+	"俄罗斯": "5", "新西兰": "5", "加拿大": "5", "澳大利亚": "5",
+}
+
+// yemaPublishInject §59.459-②③: 野马 attributes 数据源注入——
+// regionList（PTGen 产区合拍多产区全投 ≤3——野马数组语义比肉丝单选
+// 表达力强；miss 不投）+translated（中文译名 shortDesc 兜底）+poster。
+func yemaPublishInject(form map[string]string, meta *model.TorrentMetadata) {
+	regions := []string{}
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+		for _, raw := range src.Region {
+			for _, part := range strings.Split(raw, "/") {
+				w := strings.TrimSpace(part)
+				if id, ok := yemaRegionID[w]; ok {
+					dup := false
+					for _, e := range regions {
+						if e == id {
+							dup = true
+							break
+						}
+					}
+					if !dup {
+						regions = append(regions, id)
+					}
+				}
+				if len(regions) >= 3 {
+					break
+				}
+			}
+			if len(regions) >= 3 {
+				break
+			}
+		}
+	}
+	if len(regions) > 0 {
+		if b, err := json.Marshal(regions); err == nil {
+			form["yema_regions"] = string(b)
+		}
+	}
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && len(src.TranslatedTitles) > 0 {
+		form["yema_translated"] = string(src.TranslatedTitles)
+	}
+	form["yema_poster"] = meta.Poster
+}
+
 // rousiRegionSlug §59.458: 肉丝 region label→slug 全表（categories API
 // 2026-11-03 实时权威 18 项）。
 var rousiRegionSlug = map[string]string{
