@@ -554,3 +554,42 @@ FilecountField:   "filecount",   // hidden
 
 *数据来源: upload HTML (/tmp/hdcityupload.html) + rules page (2026-04-22)*
 *文档更新: 2026-04-22*
+
+### 附：发布适配记录（v0.0.1309 §59.454）
+
+- **两步上传 adapter**（hdcityUploadTwoStep）：GET /upload 解析
+  vf 动态字段（vf+YYYYMMDD 每日轮换）→POST 种子到跨域接收器
+  （hctres.leniter.org/upload_receiver.php?spm=...）→302 Location
+  解析 tfu/tn/f/s/n/ih/citeid →POST 第二步表单（action=当前
+  URL 含查询参数，hidden infohash/listtype/ressize/filecount）。
+- **bigname/small_descr 双填副标题**（站方实态 t-68751/t-68754
+  双行同值实证；空态拼装退化"译名 | MainTitle | Year"——PT 圈
+  副标题共识 0% 场景纯防御）。
+- **codec 混音视频 17 项单槽**：视频项配 video.* 键+音频项配
+  audio.* 键双族并存——影视类通用链/音频类 hdcityCodecOption
+  特化切换数据源（§2.7 站方编码-媒介对应表权威锚）。
+- **tag1ing 题材注入**：hdcityTag1ingValue——◎类别 100% 必有
+  （29 库 315/315 实证）+27 项映射表+行内多题材按序首中
+  （"科幻 / 纪录"→科幻/Sci-Fi——纪录不在表跳过取科幻）。
+- **WEB-DL 种媒介实态**：城市站无 WEB-DL 媒介项——t-68193
+  实证站方用户选 Encode →Encode 键扩 [encode,webdl,webrip]。
+- **chnize 消费 Tab1 中字标签**：meta.Tags 直读（不经
+  assembleTags allowed 过滤——城市无 tags 域全滤首版实测抓出）。
+- **processing_sel 3D 特化**：HOU→1/HSBS→2/SBS·OU→5 Alt/
+  空→不投（交织(3)/红蓝(4)无词形预览人工——29 库 3D 零存量）。
+- **team 恒不投递**：NoVA/NoPA/NoTA/NoXA 官组+0DAY 全
+  label-only（非官组不得 HDCITY- 前缀+非 Scene 不选 0DAY）。
+- **tag2ing 音乐流派 46 项**：预览人工（发布链无流派数据源）。
+- 字段：type/medium_sel/codec_sel/standard_sel/processing_sel/
+  team_sel/name/bigname/small_descr/url(IMDb)/posterimg/descr/
+  mediainfo/uplver；tag1ing/tag2ing/sub_soft/sub_hard/sub_incl/
+  chnize 全特化直写不进 form_fields。
+- IMDb 必填（站方规则：电影/剧集必须填）。
+- **实战修正**：chnize 挂载点 §59.453 教训再犯（pubReq 段→
+  tags 段后 DryRun 前）/assembleTags allowed 全滤（改 meta.Tags
+  直读）/WMA 死键键复核即修。
+- **sub_soft/sub_hard/sub_incl 挂账**：MI Text 轨透出/三信号反推/
+  文件列表扫描信号接入待后续。
+- 验证：DryRun 纪录片形态全命中+48 包（formdiff 不可用两步站
+  ——裸对+DryRun 替代门禁）。
+- 遗留：首颗真实发布（两步上传端到端生产首验）。
