@@ -99,3 +99,33 @@ func TestBuildMetadata_BDInfoLocalDiscGate(t *testing.T) {
 		t.Errorf("localMI 非空（本地已判非原盘）应拒收 detail.BDInfo，got %d bytes", len(m2.BDInfo))
 	}
 }
+
+// TestNormalizeCategoryRousiSlugs §59.457 附四: 肉丝（PeerGo 改版）detail
+// category=slug 形态锚——六大影视类目 slug→canonical 全覆盖人工推演验证
+// 后补锚（回归审核发现零锚——下任改 Contains 词根无守卫）。
+// software/ebooks miss 属边缘类目定案（恢复链少用）不锚。
+func TestNormalizeCategoryRousiSlugs(t *testing.T) {
+	f := &Fetcher{}
+	cases := map[string]string{
+		"movies":      "category.movie",
+		"tv":          "category.tv_series",
+		"documentary": "category.documentaries",
+		"anime":       "category.animation",
+		"variety":     "category.tv_shows",
+		"sports":      "category.sports",
+		"music":       "category.music",
+	}
+	for slug, want := range cases {
+		if got := f.normalizeCategory(slug); got != want {
+			t.Errorf("normalizeCategory(%q) = %q, want %q", slug, got, want)
+		}
+	}
+	// 已是 canonical 前缀形态直通（default 分支）
+	if got := f.normalizeCategory("category.movie"); got != "category.movie" {
+		t.Errorf("canonical 直通失效: %q", got)
+	}
+	// 未知 slug（software 等）miss 空——不误标
+	if got := f.normalizeCategory("software"); got != "" {
+		t.Errorf("software 应 miss 空, got %q", got)
+	}
+}
