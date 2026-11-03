@@ -593,3 +593,19 @@ FilecountField:   "filecount",   // hidden
 - 验证：DryRun 纪录片形态全命中+48 包（formdiff 不可用两步站
   ——裸对+DryRun 替代门禁）。
 - 遗留：首颗真实发布（两步上传端到端生产首验）。
+
+### 附二：回归审核修正（v0.0.1310 §59.454 附）
+
+- **formEncode**：首版手写 &/= 替换假编码器 → url.QueryEscape
+  （+ 被解码为空格/% 字面误解码——adapter 层 DryRun 盲区）。
+- **hdcityCodecOption 落地**：音频类（category.music/lossless_music）
+  codec_sel 改用音频编码数据源（audioMappingOf 域参数化复用）；
+  FLAC→5/DTS→7/AC3→8/TrueHD·Atmos→15 等 audio.* 键命中；影视类
+  走通用视频链零变化。
+- **mediainfo 补配**：form_fields technical_info→mediainfo（城市
+  独立 iNFO textarea——MI/BDInfo 投递；migration137 终态刷正）。
+- **extractQueryParam** &/? 边界锚定+hdcityGet 状态码+Location
+  相对路径防御。
+- posterimg 不配（descr 已含海报+IMDb 自动覆盖——选填）。
+- 第一步 POST 字段全集：file/name/citeid=0/{vf 动态字段}/
+  domainname/uid（用户授权实测 2026-11-02 验证 302+tfu 成功）。
