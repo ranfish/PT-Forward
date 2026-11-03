@@ -36,7 +36,7 @@ func TestRousiAdapter_DownloadTorrent_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	data, err := a.DownloadTorrent(context.Background(), config, "42")
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestRousiAdapter_DownloadTorrent_Error(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	_, err := a.DownloadTorrent(context.Background(), config, "42")
 	if err == nil {
 		t.Fatal("expected error for 500")
@@ -71,7 +71,7 @@ func TestRousiAdapter_DownloadTorrent_NotFound(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	_, err := a.DownloadTorrent(context.Background(), config, "42")
 	if err == nil {
 		t.Fatal("expected error for 404")
@@ -110,7 +110,7 @@ func TestRousiAdapter_GetTorrentDetail_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	detail, err := a.GetTorrentDetail(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +140,7 @@ func TestRousiAdapter_GetTorrentDetail_NotFound(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	detail, err := a.GetTorrentDetail(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestRousiAdapter_GetTorrentDetail_Error(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	_, err := a.GetTorrentDetail(context.Background(), config, "1")
 	if err == nil {
 		t.Fatal("expected error for 500")
@@ -187,7 +187,7 @@ func TestRousiAdapter_DetectDiscount_Free(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -218,7 +218,7 @@ func TestRousiAdapter_DetectDiscount_2xUp(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -252,7 +252,7 @@ func TestRousiAdapter_DetectDiscount_Free2x(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ func TestRousiAdapter_DetectDiscount_50Percent(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -317,7 +317,7 @@ func TestRousiAdapter_DetectDiscount_2xFree(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -351,7 +351,7 @@ func TestRousiAdapter_DetectDiscount_2x50(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -382,7 +382,7 @@ func TestRousiAdapter_DetectDiscount_30Percent(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +413,7 @@ func TestRousiAdapter_DetectDiscount_FallbackFree(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -444,7 +444,7 @@ func TestRousiAdapter_DetectDiscount_NoPromo(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectDiscount(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -463,7 +463,7 @@ func TestRousiAdapter_DetectDiscount_Error(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	_, err := a.DetectDiscount(context.Background(), config, "1")
 	if err == nil {
 		t.Fatal("expected error on HTTP 500 response")
@@ -472,7 +472,7 @@ func TestRousiAdapter_DetectDiscount_Error(t *testing.T) {
 
 func TestRousiAdapter_DetectHR(t *testing.T) {
 	a := NewRousiAdapter(NewHTTPDoer(), zap.NewNop())
-	config := &model.SiteConfig{Domain: "https://rousi.pro", Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: "https://rousi.pro", APIKey: "testkey"}
 	result, err := a.DetectHR(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -499,7 +499,7 @@ func TestRousiAdapter_GetPreciseSLData_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	sl, err := a.GetPreciseSLData(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -521,7 +521,7 @@ func TestRousiAdapter_GetPreciseSLData_Error(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	sl, err := a.GetPreciseSLData(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -561,7 +561,7 @@ func TestRousiAdapter_UploadTorrent_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	resp, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 		Title:       "Test Upload",
@@ -596,7 +596,7 @@ func TestRousiAdapter_UploadTorrent_ApiError(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	resp, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 		Title:       "Dup",
@@ -661,7 +661,7 @@ func TestRousiAdapter_UploadTorrent_WithAttributes(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	resp, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 		Title:       "Attr Test",
@@ -702,7 +702,7 @@ func TestRousiAdapter_GetTorrentInfoHash_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	hash, err := a.GetTorrentInfoHash(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
@@ -721,7 +721,7 @@ func TestRousiAdapter_GetTorrentInfoHash_NotFound(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	_, err := a.GetTorrentInfoHash(context.Background(), config, "1")
 	if err == nil {
 		t.Fatal("expected error for not found")
@@ -812,7 +812,7 @@ func TestRousiAdapter_SearchTorrents_OK(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	results, err := a.SearchTorrents(context.Background(), config, "test", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -856,7 +856,7 @@ func TestRousiAdapter_VerifyExists_Found(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	found, err := a.VerifyExists(context.Background(), config, "target-uuid")
 	if err != nil {
 		t.Fatal(err)
@@ -885,7 +885,7 @@ func TestRousiAdapter_VerifyExists_NotFound(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	found, err := a.VerifyExists(context.Background(), config, "target-uuid")
 	if err != nil {
 		t.Fatal(err)
@@ -905,7 +905,7 @@ func TestRousiAdapter_DetectHR_IgnoresPageContent(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	result, err := a.DetectHR(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)

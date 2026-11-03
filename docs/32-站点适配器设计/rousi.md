@@ -692,9 +692,12 @@ submitted→review→published；LegacyUploadResult.Status 返回）。
 
 ### 10.5 站点支持适配完成（2026-11-03 · §59.457）
 
-- **双凭据（全库首例）**：Passkey（tracker announce 专用旧 32hex
-  保留）+ API Key（pgk_，改版后 API/下载真源）——前端 override
-  双框；adapter rousiCredential APIKey 优先。
+- **凭据单源化（2026-11-03 定案，§59.457 附五）**：只保留 API Key
+  （pgk_）——passkey 已拆除（tracker 专用，.torrent 下载时站方自动
+  注入下载者 passkey，实测 announce=rousi.pro/tracker/{passkey}/
+  announce；PT-Forward 全链只走 API 通道）。auth_type=apikey+
+  show_passkey:false+migration138 存量刷正。RSS 独立订阅 token
+  （第三凭据，订阅链专用）。
 - **RousiAdapter 改版适配**：凭据切换 7 处+Search page_size 参数
   （perPage 被忽略）+Detail 契约全命中零改动（media_info 保留）+
   download_url_template {apikey}。
