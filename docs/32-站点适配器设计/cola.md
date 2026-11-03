@@ -13,6 +13,7 @@
 | scope 面 | 「兼容面（MoviePilot）」= mtorrent.compat（搜索/下载）；**automation 面**=上传（需单独勾选） |
 | CookieCloud | colapt.com |
 | Tracker | https://tracker.colapt.com/announce?passkey=xxx（passkey 嵌 announce——tracker 专用，不进系统凭据） |
+| ⚠ 双钥匙 | tracker passkey 与 **RSS Key 是两把不同的钥匙**（实测前缀不同）：RSS Key 用于 torrentrss.php 参数+`/feeds/downloads/{RSSKey}/{id}` 下载直链（account/tracker?tab=rss 页获取） |
 | 候选制 | submit → 审核流（API 上传三步终态） |
 
 ## 架构分层（三面分离——全库首见）
@@ -32,7 +33,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 
 - `framework: "cola"`（资产+migration142 存量刷正）
 - Factory：`case "cola"` → MTeamAdapter（**实现层同构复用**，架构语义独立）
-- RSS 策略表/默认路径/发布配置/API Key 测试端点：cola 分支同 mteam 值
+- 默认路径/发布配置/API Key 测试端点：cola 分支同 mteam 值；**RSS 策略表独立**（guid_regex+RequiresSideLoading——见 §RSS 通道契约，v0.0.1325 修正）
 - detect 特征判定：`reelcore` 字样 → cola（探测完备）
 - 前端架构标签：`Cola (ReelCore)`
 
@@ -44,11 +45,11 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | POST /api/torrent/search | 关键词搜索 | catalog.read | ✓（响应字段 id/name/smallDescr/size/category/imdb/status.discount） |
 | POST /api/torrent/genDlToken?id=N | 换下载票 | torrent.download | ✓（首试超时=节流，冷却后通） |
 | GET /downloads/<凭据>/<id> | 下载 .torrent | 凭票访问 | ✓ 7997B bencode |
-| POST /api/member/getUserTorrentList | 做种列表 | Key 有效 | 未实测 |
-| POST /api/tracker/myPeerStatus | peer 状态 | Key 有效 | 未实测 |
+| POST /api/member/getUserTorrentList | 做种列表 | Key 有效 | ✓ 200（v0.0.1324 实测，条目 `{torrent:{size,source}}`——做种数降级通道） |
+| POST /api/tracker/myPeerStatus | peer 状态 | Key 有效 | **✗ 403**（代码实测端点名 `myPeerStatistics` scope_denied；站方文档写 `myPeerStatus`——**端点名存疑**，复验时用站方名再试一发；当前 Stats 走 getUserTorrentList 降级不依赖此端点） |
 | POST /api/msg/search · markRead | 站内信 | Key 有效 | — |
 | POST /api/subtitle/* | 字幕四件套 | catalog.read | 返回空（本站无字幕文件） |
-| ~~POST /api/torrent/detail~~ | **✗ 不在契约**（scope_denied 实证） | — | Detail/DetectDiscount 需替代方案 |
+| ~~POST /api/torrent/detail~~ | **✗ 不在契约**（scope_denied 实证） | — | 已解决：Web 面 `GET /api/v1/torrents/{id}` 降级（v0.0.1324/1325，见 §获取链补全） |
 
 ### 响应形态
 
@@ -63,7 +64,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | POST /api/torrent/search（searchViaAPI :92） | ✓ 同路径同字段 |
 | POST /api/torrent/genDlToken（DownloadTorrent :218） | ✓ 同路径 |
 | code json.Number 解析 | ✓ 混合形态容错 |
-| POST /api/torrent/detail（GetTorrentDetail/Detect） | ✗ **兼容面无此端点**——需特化：search 按 id 反查构造 detail |
+| POST /api/torrent/detail（GetTorrentDetail/Detect） | ✗ **兼容面无此端点**——已实施 Web 面 `/api/v1/torrents/{id}` 降级（403 触发，字段更全） |
 
 ### 契约差异修复（2026-11-03 实施代码层，§59.460）
 
@@ -76,9 +77,9 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | URL 基址 | domain 即 API 主机（api.m-team.cc） | **domain=www 主机，base_url=api 子域** | `resolveBaseURL` BaseURL 优先 |
 | 签名 URL 下载 | 带 x-api-key ✓ | **带 x-api-key → 403 scope_denied** | 403 时无头重试（签名自含鉴权） |
 
-### 节流（环境层）
+### 节流
 
-连续快速请求被节流（genDlToken 首试 20s 超时 0 bytes，冷却 30s 后 200）——肉丝同族。
+~~连续快速请求被节流——肉丝同族~~ **定性修正：非环境层，是站方限流器**（Key 维度 60/min 突发 20——见 §限流三层结构定量节）。
 
 ## automation 上传面（发布链——三步 REST，全库首见第三形态）
 
@@ -124,14 +125,14 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 - sites.json：base_url=**api.colapt.com**（接口主机）/ tracker_domains=[tracker.colapt.com] / groups=[]（官组未知待挖）/ enabled=false（新站铁律）
 - 凭证：用户前端填写（API Key 不落盘文档）；cookie 走 CookieCloud 自动同步
 
-## 待挖清单（cookie 通道 + scope 勾选后）
+## 待挖清单（2026-11-03 深夜二轮更新）
 
-1. automation 三步字段级契约（发布适配核心输入）
-2. 上传表单 Web 页（表单字段/分类值集——form 资产）
-3. 站规（发布规则/禁转/标签）
-4. 官组信息（groups 收录判断——is_source 定案）
-5. RSS 通道存在性
-6. getUserTorrentList/myPeerStatus 实测（做种统计链）
+1. automation 三步字段级契约（发布适配核心输入——**等用户申请发种机权限+勾 scope**）
+2. 上传表单 Web 页（表单字段/分类值集——form 资产；官方转种脚本存在=结构稳定预期）
+3. 官组信息（groups 收录判断——is_source 定案；Web 面详情 release_group+official 字段可做数据支撑）
+4. ~~RSS 通道存在性~~ ✅ 已接入（v0.0.1325）
+5. ~~getUserTorrentList/myPeerStatus 实测~~ ✅ 前者已实测（做种数降级通道）；后者端点名存疑待复验
+6. 站规全貌（wiki 八篇已拉：计费/等级/客户端/发种——禁转标记形态仅转种脚本一句带过，适配源站角色时需深挖）
 
 ## 摸底方法论：Web 面 vs API 面分离（2026-11-03 用户定案）
 
