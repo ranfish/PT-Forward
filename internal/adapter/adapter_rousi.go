@@ -3,7 +3,6 @@ package adapter
 import (
 	"strconv"
 	"time"
-	"os"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/google/uuid"
 	"context"
@@ -452,8 +451,14 @@ var rousiPosterClient = &http.Client{Timeout: 15 * time.Second}
 // rousiBuildImages §59.458: images 组装——封面（ExtraFields["rs_poster"]
 // 单图窄例外下载；≤5M 站方门；失败警告降级不阻塞）+本地截图（路径形态
 // 读文件 base64；URL 形态跳过——内容截图不开放下载）。
+// rousiBuildImages §59.458/§59.459 附二: images 组装——封面+Tab3 截图
+// 全程内存态现算即弃（用户终案：截图临时使用无需保存；mpv 临时文件发布
+// 时已清，Tab3 持久态=图床 URL——现场下载回本地→base64→投递完即弃）。
+// 数量门：封面+截图合计 ≤6（站方 MaxTorrentScreenshots——封面 1 优先
+// 保+截图取前 5）；逐张失败降级跳过（部分投递优于零投递）。
 func rousiBuildImages(ctx context.Context, req *model.PublishRequest, logger *zap.Logger) []string {
-	images := make([]string, 0, len(req.Screenshots)+1)
+	const maxImages = 6
+	images := make([]string, 0, maxImages)
 
 	if poster := req.ExtraFields["rs_poster"]; poster != "" {
 		if dataURL, ok := rousiDownloadImageAsDataURL(ctx, poster, logger); ok {
@@ -461,26 +466,17 @@ func rousiBuildImages(ctx context.Context, req *model.PublishRequest, logger *za
 		}
 	}
 	for _, shot := range req.Screenshots {
+		if len(images) >= maxImages {
+			break
+		}
 		shot = strings.TrimSpace(shot)
-		if shot == "" {
+		// 仅 URL 形态（Tab3 图床链产物）现场下载；非 URL 形态跳过（防御）
+		if !strings.HasPrefix(shot, "http://") && !strings.HasPrefix(shot, "https://") {
 			continue
 		}
-		// 本地路径形态（内容截图——mpv 截图链产物）读文件 base64；
-		// URL 形态跳过（白名单：内容截图不开放图床下载）
-		if strings.HasPrefix(shot, "http://") || strings.HasPrefix(shot, "https://") {
-			continue
+		if dataURL, ok := rousiDownloadImageAsDataURL(ctx, shot, logger); ok {
+			images = append(images, dataURL)
 		}
-		data, err := os.ReadFile(shot)
-		if err != nil {
-			if logger != nil {
-				logger.Warn("rousi screenshot read failed", zap.String("path", shot), zap.Error(err))
-			}
-			continue
-		}
-		if len(data) > 5<<20 {
-			continue
-		}
-		images = append(images, "data:image/jpeg;base64,"+base64.StdEncoding.EncodeToString(data))
 	}
 	return images
 }

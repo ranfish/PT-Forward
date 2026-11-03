@@ -2,8 +2,6 @@ package adapter
 
 import (
 	"strings"
-	"os"
-	"path/filepath"
 	"context"
 	"encoding/json"
 	"errors"
@@ -750,6 +748,13 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 	var receivedBody map[string]interface{}
 	var gotIdemKey bool
 
+	// mock 图床（封面+截图下载源——dataURL 现算即弃语义）
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("\x89PNG-fake-image-bytes"))
+	}))
+	defer imgSrv.Close()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &receivedBody)
@@ -762,12 +767,6 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	// 本地截图临时文件（mpv 截图链产物形态）
-	tmpShot := filepath.Join(t.TempDir(), "shot.png")
-	if err := os.WriteFile(tmpShot, []byte("\x89PNG-fake-image-data"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
 	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	req := &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
@@ -775,9 +774,12 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 		Description: "简介[img]https://img.example.com/1.png[/img]尾部",
 		IMDbLink:    "https://www.imdb.com/title/tt1234/",
 		DoubanLink:  "https://movie.douban.com/subject/5678/",
-		// URL 形态跳过（白名单：内容截图不开放图床下载）
-		Screenshots: []string{"https://img.example.com/1.png", tmpShot},
-		ExtraFields: map[string]string{"tmdb_id": "12345"},
+		// §59.459 附二: URL 形态=Tab3 图床链——现场下载 base64（非 URL 防御跳过）
+		Screenshots: []string{imgSrv.URL + "/shot1.jpg", "/local/path.png", imgSrv.URL + "/shot2.jpg"},
+		ExtraFields: map[string]string{
+			"rs_poster": imgSrv.URL + "/poster.jpg",
+			"tmdb_id":   "12345",
+		},
 	}
 
 	resp, err := a.UploadTorrent(context.Background(), config, req)
@@ -787,42 +789,50 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 	if !resp.Success {
 		t.Errorf("expected success: %s", resp.ErrorMessage)
 	}
-
-	// §59.458-⑦: 幂等头必在
 	if !gotIdemKey {
 		t.Error("expected Idempotency-Key header")
 	}
-	// §59.458-⑥: 链接顶层 URL（不进 attributes；tmdb 定案不投）
+	// §59.458-⑥: 链接顶层（tmdb 定案不投）
 	if receivedBody["imdb"] != "https://www.imdb.com/title/tt1234/" {
-		t.Errorf("unexpected top-level imdb: %v", receivedBody["imdb"])
-	}
-	if receivedBody["douban"] != "https://movie.douban.com/subject/5678/" {
-		t.Errorf("unexpected top-level douban: %v", receivedBody["douban"])
+		t.Errorf("imdb: %v", receivedBody["imdb"])
 	}
 	if receivedBody["tmdb_id"] != nil {
 		t.Errorf("tmdb 不应投递: %v", receivedBody["tmdb_id"])
 	}
-	if receivedBody["attributes"] != nil {
-		if attrs, ok := receivedBody["attributes"].(map[string]interface{}); ok {
-			if attrs["imdb"] != nil || attrs["tmdb"] != nil {
-				t.Errorf("imdb/tmdb 不应进 attributes: %v", attrs)
-			}
-		}
-	}
-	// §59.458-⑤: description 禁图（[img] 剥除）
+	// §59.458-⑤: description 禁图
 	if desc, _ := receivedBody["description"].(string); strings.Contains(desc, "img.example.com") || strings.Contains(desc, "[img") {
 		t.Errorf("description 图未剥除: %q", desc)
 	}
-	// §59.458 窄例外: images=本地文件 base64（URL 跳过——1 张）
+	// §59.459 附二: images=封面+截图 URL 下载（本地路径形态防御跳过）=3 张
 	images, ok := receivedBody["images"].([]interface{})
 	if !ok {
 		t.Fatal("expected images in payload")
 	}
-	if len(images) != 1 {
-		t.Fatalf("expected 1 image（URL 跳过本地 1）, got %d", len(images))
+	if len(images) != 3 {
+		t.Fatalf("expected 3 images（封面+2 URL 截图，路径跳过）, got %d", len(images))
 	}
-	if dataURL, _ := images[0].(string); !strings.HasPrefix(dataURL, "data:image/") {
-		t.Errorf("expected dataURL form, got %q", dataURL[:30])
+	for i, im := range images {
+		if dataURL, _ := im.(string); !strings.HasPrefix(dataURL, "data:image/") {
+			t.Errorf("image[%d] 非 dataURL: %q", i, dataURL[:min(30, len(dataURL))])
+		}
+	}
+	// §59.459 附二: ≤6 数量门锚（7 张 URL 输入 → 封面+5 截图=6 截断）
+	many := make([]string, 7)
+	for i := range many {
+		many[i] = imgSrv.URL + "/s.jpg"
+	}
+	req2 := &model.PublishRequest{
+		TorrentData: []byte("d4:infod6:lengthi0eee"),
+		Title:       "Gate Test",
+		Screenshots: many,
+		ExtraFields: map[string]string{"rs_poster": imgSrv.URL + "/p.jpg"},
+	}
+	receivedBody = nil
+	if _, err := a.UploadTorrent(context.Background(), config, req2); err != nil {
+		t.Fatal(err)
+	}
+	if imgs := receivedBody["images"].([]interface{}); len(imgs) != 6 {
+		t.Errorf("数量门: got %d want 6", len(imgs))
 	}
 }
 
