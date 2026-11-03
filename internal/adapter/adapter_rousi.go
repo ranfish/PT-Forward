@@ -178,10 +178,11 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 			Subtitle  string `json:"subtitle"`
 			Size      int64  `json:"size"`
 			InfoHash  string `json:"info_hash"`
-			Category  string `json:"category"`
-			Seeders   int    `json:"seeders"`
-			Leechers  int    `json:"leechers"`
-			MediaInfo string `json:"media_info"`
+			Category    string `json:"category"`
+			Seeders     int    `json:"seeders"`
+			Leechers    int    `json:"leechers"`
+			MediaInfo   string `json:"media_info"`
+			Description string `json:"description"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -190,11 +191,16 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 
 	d := result.Data
 	detail := &model.TorrentDetail{
-		Title:     d.Title,
-		Size:      d.Size,
-		InfoHash:  strings.ToLower(d.InfoHash),
-		Category:  d.Category,
-		MediaInfo: d.MediaInfo,
+		Title: d.Title,
+		// §59.457 附三: Subtitle/Description 首版丢弃（struct 解析了 Subtitle
+		// 未赋值/Description 未解析）——获取链完整性缺口，meta 副标题/描述
+		// 列恒空（副标题含译名/集数——Tab1 显示+发布链副标题投递双受影响）
+		Subtitle:    d.Subtitle,
+		Size:        d.Size,
+		InfoHash:    strings.ToLower(d.InfoHash),
+		Category:    d.Category,
+		MediaInfo:   d.MediaInfo,
+		Description: d.Description,
 	}
 	// 从结构化字段提取禁转标记（§56.37 合规修复）
 	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
