@@ -219,7 +219,8 @@
     "download_url_template": "download?id={id}&cuhash={passkey}",
     "passkey_label": "cuhash",
     "passkey_hint": "需要从种子下载地址获取，cuhash=后面的值",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "hdfans.org": {
     "domain": "hdfans.org",
