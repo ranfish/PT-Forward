@@ -370,7 +370,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		{model.FieldDomainType, e.typeMappingOf(cfg, in.TargetSite, meta, tp)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
 		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp)},
-		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
+		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, model.FieldDomainAudiocodec, tp.AudioCodec, tp.AudioTechnology)},
 		{model.FieldDomainMedium, e.mediumMappingOf(cfg, in.TargetSite, meta, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
 	}
@@ -416,6 +416,13 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// （hdcityTagDependentFill）。
 	if in.TargetSite == "城市" {
 		hdcityPrefill(form, cfg, meta, tp)
+		// codec 音频类切换（§2.7 编码-媒介对应表——音频类查 codec 域
+		// 的 audio.* 键，覆盖通用链视频键 miss 的空值）
+		if m := e.hdcityCodecOption(cfg, meta, tp); m != nil {
+			if f := cfg.FormFields[model.FieldDomainCodec]; f != "" {
+				form[f] = m.Value
+			}
+		}
 	}
 
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
@@ -1155,26 +1162,28 @@ func lookupCLIVariant(cfg *model.PublishFormConfig, stdKey string) *model.FormVa
 // "标题显示为TrueHD Atmos，但选择了TrueHD"）。组合键未命中自然落 B1
 // （DD 场景行为不变）。注：表单选项的组合词条与标题形态无关——标题
 // 规范（v1.05）Atmos 属对象信息在声道数后（TrueHD 7.1 Atmos），不变。
-func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCodec, audioTech string) *model.FormValueMapping {
+// domain 参数 §59.454 附: 城市站音频编码键配在 codec 域（混音视频单槽
+// ——hdcityCodecOption 切换数据源复用本链）；常规站传 audiocodec 域。
+func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, domain, audioCodec, audioTech string) *model.FormValueMapping {
 	if audioCodec != "" && audioTech != "" {
 		combined := extract.LookupStandardKey("audio_codec", audioCodec+" "+audioTech)
-		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
+		if m := e.lookupByStdKey(cfg, domain, combined); m != nil {
 			return m
 		}
 	}
 	// §59.166 B1：canonical→词条 standard_key 直取（"DD" 词表 exact 失明修复）
 	if sk := titleparser.AudioStandardKey(audioCodec); sk != "" {
-		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, sk); m != nil {
+		if m := e.lookupByStdKey(cfg, domain, sk); m != nil {
 			return m
 		}
 	}
-	m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", audioCodec))
+	m := e.lookupByStdKey(cfg, domain, extract.LookupStandardKey("audio_codec", audioCodec))
 	if m != nil {
 		return m
 	}
 	// §59.273: 音频域 Other 兜底（Opus/ALAC/DSD 等站方无选项——幸运种审
 	// "未选择音频" Robot Dreams AV1 Opus 案）
-	return e.lookupOtherOption(cfg, model.FieldDomainAudiocodec)
+	return e.lookupOtherOption(cfg, domain)
 }
 
 // audioMapping 音频域（组合键优先：TrueHD+Atmos→"TrueHD Atmos"——§59.150 判据六）。
@@ -2191,13 +2200,10 @@ func mteamLabelsBits(tags []string) int {
 // ① bigname/small_descr 双填副标题（站方实态——t-68751/t-68754 双行
 // 同值实证；空态拼装退化"译名 | MainTitle | Year"——PT 圈副标题
 // 共识 0% 场景纯防御）
-// ② codec 音频类切换（hdcityCodecOption——type=408 Audio 或
-// medium=CD/Track 时 codec 域改用音频编码源——§2.7 站方编码-媒介
-// 对应表权威锚；影视类走通用视频编码链零变化）
-// ③ tag1ing 题材注入（hdcityTag1ingValue——◎类别 行 100% 必有
+// ② tag1ing 题材注入（hdcityTag1ingValue——◎类别 行 100% 必有
 // （29 库 315/315 实证），财神 csptGenreTagValue 增强版——27 项
 // 题材映射表+行内多题材按序取首个命中）
-// ④ processing_sel 3D 特化（hdcityProcessingOption——HOU→1/
+// ③ processing_sel 3D 特化（hdcityProcessingOption——HOU→1/
 // HSBS→2/全幅→5 Alt/空→不投递；交织(3)/红蓝(4)无提取词形预览人工）
 //
 // 标签依赖项（chnize/sub_hard/sub_soft/sub_incl）在 tags 产出后
@@ -2215,17 +2221,11 @@ func hdcityPrefill(form map[string]string, cfg *model.PublishFormConfig, meta *m
 		form["bigname"] = subtitle
 		form["small_descr"] = subtitle
 	}
-	// ② codec 音频类切换
-	if m := hdcityCodecOption(cfg, meta); m != nil {
-		if f := cfg.FormFields[model.FieldDomainCodec]; f != "" {
-			form[f] = m.Value
-		}
-	}
-	// ③ tag1ing 题材注入
+	// ② tag1ing 题材注入
 	if v := hdcityTag1ingValue(cfg, meta); v != "" {
 		form["tag1ing"] = v
 	}
-	// ④ processing 3D（城市裸名无域常量——好学 processing_sel[4] 先例）
+	// ③ processing 3D（城市裸名无域常量——好学 processing_sel[4] 先例）
 	if m := hdcityProcessingOption(cfg, tp); m != nil {
 		form["processing_sel"] = m.Value
 	}
@@ -2252,19 +2252,19 @@ func hdcitySubtitleFallback(meta *model.TorrentMetadata, tp titleparser.TechProf
 // 编码-媒介对应表权威锚：FLAC→CD/Track、TrueHD/Atmos→BD/Remux/Encode）。
 // 影视类走通用视频编码链零变化；音频类（type=408 Audio 或 medium 键
 // CD/Track 族）改用音频编码数据源查同一 codec 域值集。
-func hdcityCodecOption(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
+// hdcityCodecOption §59.454 附: codec 域音频类切换实现（e 方法——
+// audioMappingOf 域参数化复用：城市 codec_sel 混音视频 17 项，音频类
+// （category.music/lossless_music——408 Audio）改用音频编码数据源查
+// 同一 codec 域；影视类返回 nil 走通用视频链零变化。
+// 首版为残废函数（恒 nil）——回归审核抓出，AGENTS.md/docs 虚报即正。
+func (e *PublishExecutor) hdcityCodecOption(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
 	if cfg == nil || meta == nil {
 		return nil
 	}
-	isAudioType := meta.Category == "category.music" || meta.Category == "category.lossless_music"
-	// medium 键无法此处判定（hdcityPrefill 无 tp 媒介单源）——
-	// type 判定为主通道（408 Audio 含 CD/Track 音乐种）
-	if !isAudioType {
+	if meta.Category != "category.music" && meta.Category != "category.lossless_music" {
 		return nil
 	}
-	// 音频编码数据源：tp.AudioCodec（发布链 audio 域同源）
-	// 由调用方传入？——签名限制改为在 hdcityPrefill 内联处理
-	return nil
+	return e.audioMappingOf(cfg, model.FieldDomainCodec, tp.AudioCodec, tp.AudioTechnology)
 }
 
 // hdcityTag1ingValue §59.454: 城市 tag1ing 题材注入（财神

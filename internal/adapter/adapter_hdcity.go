@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -91,6 +93,8 @@ func (a *NexusPHPAdapter) hdcityUploadTwoStep(ctx context.Context, config *model
 	}
 	if strings.HasPrefix(loc, "//") {
 		loc = "https:" + loc
+	} else if strings.HasPrefix(loc, "/") {
+		loc = baseURL + loc
 	}
 	if !strings.Contains(loc, "tfu=") {
 		return nil, uploadError("城市第一步 Location 无 tfu 参数（种子可能被拒）", nil)
@@ -102,12 +106,12 @@ func (a *NexusPHPAdapter) hdcityUploadTwoStep(ctx context.Context, config *model
 	formBuf.WriteString("&listtype=1")
 	formBuf.WriteString("&ressize=" + extractQueryParam(loc, "s"))
 	formBuf.WriteString("&filecount=" + extractQueryParam(loc, "f"))
-	formBuf.WriteString("&name=" + urlEncode(req.Title))
-	formBuf.WriteString("&bigname=" + urlEncode(req.FormFields["bigname"]))
-	formBuf.WriteString("&small_descr=" + urlEncode(req.FormFields["small_descr"]))
-	formBuf.WriteString("&descr=" + urlEncode(req.Description))
+	formBuf.WriteString("&name=" + formEncode(req.Title))
+	formBuf.WriteString("&bigname=" + formEncode(req.FormFields["bigname"]))
+	formBuf.WriteString("&small_descr=" + formEncode(req.FormFields["small_descr"]))
+	formBuf.WriteString("&descr=" + formEncode(req.Description))
 	if req.IMDbLink != "" {
-		formBuf.WriteString("&url=" + urlEncode(req.IMDbLink))
+		formBuf.WriteString("&url=" + formEncode(req.IMDbLink))
 	}
 	if req.Anonymous {
 		formBuf.WriteString("&uplver=yes")
@@ -116,7 +120,7 @@ func (a *NexusPHPAdapter) hdcityUploadTwoStep(ctx context.Context, config *model
 	// 的 select 域键）
 	for _, key := range []string{"type", "medium_sel", "codec_sel", "standard_sel", "processing_sel", "team_sel", "tag1ing", "tag2ing", "mediainfo", "posterimg", "sub_soft", "sub_hard", "sub_incl", "chnize"} {
 		if v, ok := req.FormFields[key]; ok && v != "" {
-			formBuf.WriteString("&" + key + "=" + urlEncode(v))
+			formBuf.WriteString("&" + key + "=" + formEncode(v))
 		}
 	}
 
@@ -158,7 +162,7 @@ func (a *NexusPHPAdapter) hdcityUploadTwoStep(ctx context.Context, config *model
 	if m := reHdcityErr.FindStringSubmatch(html); len(m) > 1 {
 		return &model.PublishResponse{Success: false, ErrorMessage: m[1]}, nil
 	}
-	return nil, &model.AppError{Code: 15001, Message: "城市上传失败: HTTP " + fmt.Sprintf("%d", resp2.StatusCode)}
+	return nil, &model.AppError{Code: 15001, Message: "城市上传失败: HTTP " + strconv.Itoa(resp2.StatusCode)}
 }
 
 // hdcityGet 城市站 GET（带 NP 标准 cookie 头）。
@@ -173,23 +177,33 @@ func (a *NexusPHPAdapter) hdcityGet(ctx context.Context, config *model.SiteConfi
 		return nil, err
 	}
 	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d（登录态失效或页面异常）", resp.StatusCode)
+	}
 	return readBody(resp)
 }
 
+// extractQueryParam §59.454 附: Location 参数提取（&/? 边界锚定——
+// 首版裸 Index(key+"=") 在已知参数集实测正确（tfu= 不含 f= 子串）
+// 但值内子串（tn 值含 "s=" 等）存在误中面，锚定后零风险）。
 func extractQueryParam(rawURL, key string) string {
-	i := strings.Index(rawURL, key+"=")
-	if i < 0 {
-		return ""
+	for _, sep := range []string{"&" + key + "=", "?" + key + "="} {
+		if i := strings.Index(rawURL, sep); i >= 0 {
+			rest := rawURL[i+len(sep):]
+			if j := strings.IndexAny(rest, "&"); j >= 0 {
+				return rest[:j]
+			}
+			return rest
+		}
 	}
-	rest := rawURL[i+len(key)+1:]
-	if j := strings.IndexAny(rest, "&"); j >= 0 {
-		return rest[:j]
-	}
-	return rest
+	return ""
 }
 
-func urlEncode(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "&", "%26"), "=", "%3D")
+// formEncode §59.454 附: form-urlencoded 值编码（url.QueryEscape——
+// 首版手写替换 &/= 假编码器回归审核抓出：+ 被服务端解码为空格、
+// % 字面被误解码、裸中文/空格依赖服务端字符集容忍）。
+func formEncode(s string) string {
+	return url.QueryEscape(s)
 }
 
 var (
