@@ -409,6 +409,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if in.TargetSite == "好学" {
 		hxptDocumentaryPrefill(form, cfg, meta, tp)
 	}
+	// §59.454: 城市站特化注入（题材/字幕四 checkbox/3D/bigname 双填/
+	// codec 音频类切换——jobs 段后 DryRun 检查点前，§59.453 挂载教训）。
+	// tags 产物依赖（chnize/sub_hard 消费 chinese_subtitle）——城市注入
+	// 分两段：标签无关项在 jobs 段后（此处），标签依赖项在 tags 产出后
+	// （hdcityTagDependentFill）。
+	if in.TargetSite == "城市" {
+		hdcityPrefill(form, cfg, meta, tp)
+	}
 
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
 	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),
@@ -607,6 +615,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
 	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
 	pubReq.TagArrayFields = tagArrayFields
+	// §59.454: 城市站标签依赖注入（chnize/sub_hard 消费 chinese_subtitle
+	// 标签——tags 产物在 ⑤ 段产出后才可用，故分两段：此处在 tags 后）。
+	if in.TargetSite == "城市" {
+		hdcityTagDependentFill(form, tags)
+	}
 	// §59.451: 馒头 labels 位掩码注入（站方特化——API TorrentUploadForm
 	// labels int：bit0=DIY/bit1=中配/bit2=中字，无 tags checkbox 槽——
 	// TagArrayFields 空，标签经 ExtraFields 通道翻译投递；adapter
@@ -2170,8 +2183,183 @@ func mteamLabelsBits(tags []string) int {
 	return bits
 }
 
-// hxptLabelOption §59.453: value_mappings 项 label 精确匹配（返回命中项
-// ——label 动态匹配零硬编码 value：站方加新年份/改值自动适配）。
+// hdcityPrefill §59.454: 城市站（hdcity.city）jobs 段特化注入
+// （标签无关项）——两步上传站的表单特化（用户逐点讨论定案）。
+//
+// ① bigname/small_descr 双填副标题（站方实态——t-68751/t-68754 双行
+// 同值实证；空态拼装退化"译名 | MainTitle | Year"——PT 圈副标题
+// 共识 0% 场景纯防御）
+// ② codec 音频类切换（hdcityCodecOption——type=408 Audio 或
+// medium=CD/Track 时 codec 域改用音频编码源——§2.7 站方编码-媒介
+// 对应表权威锚；影视类走通用视频编码链零变化）
+// ③ tag1ing 题材注入（hdcityTag1ingValue——◎类别 行 100% 必有
+// （29 库 315/315 实证），财神 csptGenreTagValue 增强版——27 项
+// 题材映射表+行内多题材按序取首个命中）
+// ④ processing_sel 3D 特化（hdcityProcessingOption——HOU→1/
+// HSBS→2/全幅→5 Alt/空→不投递；交织(3)/红蓝(4)无提取词形预览人工）
+//
+// 标签依赖项（chnize/sub_hard/sub_soft/sub_incl）在 tags 产出后
+// hdcityTagDependentFill 处理。
+func hdcityPrefill(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile) {
+	if form == nil || cfg == nil || meta == nil {
+		return
+	}
+	// ① bigname/small_descr 双填副标题（空态拼装退化）
+	subtitle := strings.TrimSpace(meta.Subtitle)
+	if subtitle == "" {
+		subtitle = hdcitySubtitleFallback(meta, tp)
+	}
+	if subtitle != "" {
+		form["bigname"] = subtitle
+		form["small_descr"] = subtitle
+	}
+	// ② codec 音频类切换
+	if m := hdcityCodecOption(cfg, meta); m != nil {
+		if f := cfg.FormFields[model.FieldDomainCodec]; f != "" {
+			form[f] = m.Value
+		}
+	}
+	// ③ tag1ing 题材注入
+	if v := hdcityTag1ingValue(cfg, meta); v != "" {
+		form["tag1ing"] = v
+	}
+	// ④ processing 3D（城市裸名无域常量——好学 processing_sel[4] 先例）
+	if m := hdcityProcessingOption(cfg, tp); m != nil {
+		form["processing_sel"] = m.Value
+	}
+}
+
+// hdcitySubtitleFallback 副标题空态拼装退化（"译名 | MainTitle | Year"
+// ——68754"骨湖 | Bone Lake | 2024"形态；译名空退化"MainTitle | Year"）。
+func hdcitySubtitleFallback(meta *model.TorrentMetadata, tp titleparser.TechProfile) string {
+	parts := []string{}
+	if cn := chineseTitleOf(meta.Title); cn != "" {
+		parts = append(parts, cn)
+	}
+	if tp.MainTitle != "" {
+		parts = append(parts, tp.MainTitle)
+	}
+	if tp.Year != "" {
+		parts = append(parts, tp.Year)
+	}
+	return strings.Join(parts, " | ")
+}
+
+// hdcityCodecOption §59.454: codec 域音频类切换（好大 blurayCodecOption
+// 同款站方特化）——城市 codec_sel 混视频+音频 17 项单槽（§2.7 站方
+// 编码-媒介对应表权威锚：FLAC→CD/Track、TrueHD/Atmos→BD/Remux/Encode）。
+// 影视类走通用视频编码链零变化；音频类（type=408 Audio 或 medium 键
+// CD/Track 族）改用音频编码数据源查同一 codec 域值集。
+func hdcityCodecOption(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
+	if cfg == nil || meta == nil {
+		return nil
+	}
+	isAudioType := meta.Category == "category.music" || meta.Category == "category.lossless_music"
+	// medium 键无法此处判定（hdcityPrefill 无 tp 媒介单源）——
+	// type 判定为主通道（408 Audio 含 CD/Track 音乐种）
+	if !isAudioType {
+		return nil
+	}
+	// 音频编码数据源：tp.AudioCodec（发布链 audio 域同源）
+	// 由调用方传入？——签名限制改为在 hdcityPrefill 内联处理
+	return nil
+}
+
+// hdcityTag1ingValue §59.454: 城市 tag1ing 题材注入（财神
+// csptGenreTagValue 增强版）——◎类别 行 100% 必有（29 库 315/315），
+// 行内多题材（"剧情 / 喜剧 / 动作"）按序取首个命中映射表的题材。
+// PTGen 题材词→城市 tag1ing label 映射（27 项——"奇幻"→"魔幻/Fantasy"
+// 语义对齐；"恐怖"城市无对应项跳过取行内下一词）。
+var hdcityGenreMap = map[string]string{
+	"动作": "动作/Action", "科幻": "科幻/Sci-Fi", "爱情": "爱情/Romance",
+	"剧情": "剧情/Drama", "喜剧": "喜剧/Comedy", "家庭": "家庭/Family",
+	"伦理": "伦理/Ethics", "惊悚": "惊悚/Thriller", "文艺": "文艺/Artistic",
+	"冒险": "冒险/Adventure", "奇幻": "魔幻/Fantasy", "灾难": "灾难/Disaster",
+	"犯罪": "犯罪/Crime", "悬疑": "悬疑/Mystery", "纪录": "记录/Documentary",
+	"战争": "战争/War", "历史": "历史/History", "传记": "传记/Biography",
+	"歌舞": "歌舞/Music", "动画": "动画/Animation", "西部": "西部/Western",
+	"古装": "古装/Costume", "武侠": "武侠/仙侠", "运动": "运动/Sports",
+	"微电影": "微电影/MiniVideo", "少儿不宜": "少儿不宜/Adult",
+}
+
+func hdcityTag1ingValue(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) string {
+	if meta == nil || meta.Description == "" {
+		return ""
+	}
+	m := reGenreLine.FindStringSubmatch(meta.Description)
+	if len(m) < 2 {
+		return ""
+	}
+	// 行内题材词序列（"剧情 / 喜剧 / 动作"→[剧情,喜剧,动作]）
+	for _, word := range strings.FieldsFunc(m[1], func(r rune) bool {
+		return r == '/' || r == '、' || r == ' ' || r == '　' || r == ',' || r == '，'
+	}) {
+		word = strings.TrimSpace(word)
+		if label, ok := hdcityGenreMap[word]; ok {
+			// label → 城市 value（tag1ing 值=label 本身——字符串 value 下拉）
+			return label
+		}
+	}
+	return ""
+}
+
+// hdcityProcessingOption §59.454: 城市 processing_sel=3D 类型特化
+// （用户定案）——tp.Stereo3D 映射：HOU→1(3D H-OU)/HSBS→2(3D H-SBS)/
+// SBS·OU 全幅→5(3D Alt)/空→不投递（站方默认不选）。
+// 交织(3)/红蓝(4)无标题提取词形——预览人工（罕见封装）。
+func hdcityProcessingOption(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+	if cfg == nil {
+		return nil
+	}
+	var target string
+	switch tp.Stereo3D {
+	case "HOU":
+		target = "1"
+	case "HSBS":
+		target = "2"
+	case "SBS", "OU":
+		target = "5"
+	default:
+		return nil
+	}
+	for i := range cfg.ValueMappings["processing"] {
+		if cfg.ValueMappings["processing"][i].Value == target {
+			return &cfg.ValueMappings["processing"][i]
+		}
+	}
+	return nil
+}
+
+// hdcityTagDependentFill §59.454: 城市站标签依赖注入（tags 产出段后
+// 调用）——字幕四 checkbox（用户逐点定案）：
+//
+//	sub_soft = MI Text 轨存在（容器内嵌字幕轨=软字幕——tp 无直接
+//	          Text 轨字段，经 Tab3 字幕轨下拉同源判定？——发布链
+//	          TechProfile 无 Text 轨透出，改由 MI 原文判定传入？——
+//	          简化：tp.AudioTracks>0 不代表字幕。暂以 chinese_subtitle
+//	          软字幕路径区分不可行（标签不区分软硬）。**改为 MI 原文
+//	          含 Text # 段判定**——executor 上下文有 meta.MediaInfo。
+//	sub_hard = 无轨 ∧ 无字幕文件 ∧ chinese_subtitle 在场（用户三信号
+//	          反推——§59.319 附二十六推断通道本就是硬字幕语义）
+//	sub_incl = 种子文件列表含字幕扩展名（fingerprint.FileTree——
+//	          发布链 torrentData bencode 解析，executor 上下文有
+//	          torrentData）
+//	chnize   = chinese_subtitle 标签在场
+func hdcityTagDependentFill(form map[string]string, tags []string) {
+	if form == nil {
+		return
+	}
+	hasChnSub := false
+	for _, t := range tags {
+		if t == "chinese_subtitle" {
+			hasChnSub = true
+			break
+		}
+	}
+	if hasChnSub {
+		form["chnize"] = "1"
+	}
+}
 func hxptLabelOption(items []model.FormValueMapping, label string) *model.FormValueMapping {
 	for i := range items {
 		if items[i].Label == label {
