@@ -22860,10 +22860,7 @@
       ],
       "is_reseed_target": true,
       "groups": [
-        {
-          "name": "Rousi",
-          "is_official": true
-        }
+        "Rousi"
       ]
     },
     {
