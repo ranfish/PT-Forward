@@ -98,6 +98,7 @@ func TestRousiAdapter_GetTorrentDetail_OK(t *testing.T) {
 				"category":  "movie",
 				"seeders":   5,
 				"leechers":  2,
+				"description": "Desc content",
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -119,6 +120,14 @@ func TestRousiAdapter_GetTorrentDetail_OK(t *testing.T) {
 	}
 	if detail.InfoHash != "aabbccdd11223344aabbccdd11223344aabbccdd" {
 		t.Errorf("unexpected info_hash: %s", detail.InfoHash)
+	}
+	// §59.457 附三: Subtitle/Description 防丢字段锚（首版 struct 解析 Subtitle
+	// 未赋值+Description 未解析——获取链完整性缺口端到端实证抓出）
+	if detail.Subtitle != "Sub" {
+		t.Errorf("unexpected subtitle: %q", detail.Subtitle)
+	}
+	if detail.Description != "Desc content" {
+		t.Errorf("unexpected description: %q", detail.Description)
 	}
 }
 
