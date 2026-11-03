@@ -70,6 +70,12 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		return NewYemaptAdapter(doer, f.logger)
 	case "mteam":
 		return NewMTeamAdapter(doer, f.logger)
+	case "cola":
+		// §59.460: 可乐 reelcore 自研架构——M-Team 兼容面同构（x-api-key/
+		// search/genDlToken 同路径），实现复用 MTeamAdapter；架构语义独立
+		// （三面分离：www Web 外壳+automation 上传面/api.colapt.com 兼容面），
+		// 契约差异经 json.Number 双兼容吸收（§59.460）
+		return NewMTeamAdapter(doer, f.logger)
 	case "unit3d":
 		a := NewUnit3DAdapter(doer, f.logger)
 		if f.engine != nil {
@@ -119,6 +125,13 @@ var FrameworkDefaults = map[string]FrameworkDefault{
 		RequiresSideLoading: true,
 	},
 	"mteam": {
+		HashStrategy: "guid",
+		SizeStrategy: "enclosure",
+		IDStrategy:   "query_param",
+		IDPattern:    "id",
+	},
+	// §59.460: 可乐同 mteam 策略（M-Team 兼容面同构）
+	"cola": {
 		HashStrategy: "guid",
 		SizeStrategy: "enclosure",
 		IDStrategy:   "query_param",

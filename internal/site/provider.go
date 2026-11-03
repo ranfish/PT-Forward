@@ -531,7 +531,7 @@ func defaultPaths(framework string) model.SitePathsConfig {
 			Upload: "/api/torrent/upload",
 			RSS:    "/rss",
 		}
-	case "mteam":
+	case "mteam", "cola":
 		return model.SitePathsConfig{
 			Browse:     "/browse",
 			Detail:     "/detail/{id}",
@@ -565,7 +565,7 @@ func defaultPaths(framework string) model.SitePathsConfig {
 
 func defaultPublishConfig(framework string) model.SitePublishFullConfig {
 	switch framework {
-	case "mteam":
+	case "mteam", "cola":
 		return model.SitePublishFullConfig{
 			FormFields: map[string]string{
 				"category": "category",

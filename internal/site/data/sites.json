@@ -29931,7 +29931,7 @@
       "domain": "www.colapt.com",
       "name": "可乐",
       "base_url": "https://api.colapt.com",
-      "framework": "mteam",
+      "framework": "cola",
       "auth_type": "apikey",
       "download_mode": "",
       "is_source": false,

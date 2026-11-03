@@ -1499,7 +1499,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 	testURL := s.BaseURL
-	if s.Framework == "mteam" {
+	if s.Framework == "mteam" || s.Framework == "cola" {
 		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
 	}
 	req, err := http.NewRequest("POST", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
@@ -1641,6 +1641,10 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 		framework = "rousi"
 		confidence = 0.9
 		detail = "检测到 Rousi 标识"
+	case strings.Contains(bodyStr, "reelcore") || strings.Contains(bodyStr, "ReelCore"):
+		framework = "cola"
+		confidence = 0.9
+		detail = "检测到 ReelCore 标识（可乐）"
 	case strings.Contains(bodyStr, "Nexus"):
 		framework = "nexusphp"
 		confidence = 0.7
@@ -1655,7 +1659,7 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 		IDStrategy:   frameworkDefaultID(framework),
 	}
 	switch framework {
-	case "nexusphp", "mteam":
+	case "nexusphp", "mteam", "cola":
 		defaults.DownloadURLTemplate = s.BaseURL + "/download.php?id={id}&passkey={passkey}"
 	case "unit3d":
 		defaults.IDPattern = `\/torrent\/(\d+)`
