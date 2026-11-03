@@ -1041,11 +1041,11 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 		ev := &model.RSSTorrentEvent{
 			SourceRSS:     feedURL,
 			SiteName:      siteName,
-			TorrentID:     item.ID,
+			TorrentID:     item.ID.String(),
 			Title:         item.Name,
 			Size:          int64(item.Size),
 			InfoHash:      "",
-			DownloadURL:   resolveBaseURL(config) + "/download.php?id=" + item.ID,
+			DownloadURL:   resolveBaseURL(config) + "/download.php?id=" + item.ID.String(),
 			IsFree:        dr.Level == model.DiscountFree || dr.Level == model.Discount2xFree || dr.Level == model.Discount2x50,
 			DiscountLevel: dr.Level,
 			FreeEndAt:     dr.FreeEndAt,
@@ -1062,10 +1062,12 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 
 // mTeamSearchItem mirrors the search API item shape (subset we care about).
 type mTeamSearchItem struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Category string  `json:"category"`
-	Size     flexInt `json:"size"`
+	// §59.460 附四回归审核: json.Number 双兼容（searchViaAPI 同族第二处
+	// ——可乐 RSS API 链数字 ID 对纯 string unmarshal 失败白烧配额）
+	ID       json.Number `json:"id"`
+	Name     string      `json:"name"`
+	Category string      `json:"category"`
+	Size     flexInt     `json:"size"`
 	Status   struct {
 		Discount        string `json:"discount"`
 		DiscountEndTime string `json:"discountEndTime"`

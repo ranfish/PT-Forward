@@ -699,7 +699,10 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		var events []*model.RSSTorrentEvent
 		var apiMode bool
 
-		if mtAdapter != nil && !strings.Contains(url, "rss.m-team.cc") {
+		// §59.460 附四回归审核: 可乐跳过 API 模拟 feed——XML feed 是站方
+		// 官方通道（torrentrss.php passkey 独立配额），API 模式白烧 Key
+		// 60/min 共享配额（数字 ID unmarshal 已修但语义上仍应走 XML）。
+		if mtAdapter != nil && mtConfig.Framework != "cola" && !strings.Contains(url, "rss.m-team.cc") {
 			apiEvents, apiErr := mtAdapter.FetchItemsByAPI(ctx, mtConfig, url, sub.SiteName)
 			if apiErr != nil {
 				e.logger.Warn("mteam API fetch failed, falling back to RSS",
