@@ -36,7 +36,10 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	// §59.457: perPage 改版后被忽略（默认 100 全量）；page_size 实测生效
 	u := resolveBaseURL(config) + "/api/v1/torrents?page_size=20&page=1"
 	if keyword != "" {
-		u += "&search=" + url.QueryEscape(keyword)
+		// §59.457 附: 兼容层关键词参数名=keyword（PeerGo 源码 handleMoviePilotTorrentList
+		// 权威：r.URL.Query().Get("keyword")；旧 search= 被忽略返回最新全量——
+		// e2e 假阳性=Bluey 恰为最新第 3 条；keyword=Bluey 实测 total=3 精确过滤）
+		u += "&keyword=" + url.QueryEscape(keyword)
 	}
 	if opts != nil && opts.Category != "" {
 		u += "&category=" + opts.Category
