@@ -180,3 +180,29 @@ reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型—
 
 - search 结果促销字段 `discount`/`promotionRule`：MP 认识档位 FREE/PERCENT_50/PERCENT_70/_2X，**其它比例显示 NORMAL**（DetectDiscount 消费注意）
 - profile 返回中文等级名 `roleName`；`shareRate:999999`=占位值（计费下载 0+上传非 0=无限，非真实分享率）
+
+## 第四面：插件面 + 源码可得性探测（2026-11-03）
+
+### 源码结论：引擎闭源
+
+- **reelcore 主引擎未公开**（wiki 引用的 `internal/publication/*.go` 等为站方内部代码）
+- 官方 GitHub org `ReelCoreHQ` 仅 2 仓库：`reelcore-roadmap`（空壳 README）+ **`moviepilot-plugin-colapt`**（官方 MoviePilot 辅种插件，Python v0.10.5，MIT——**API 消费权威参考**，本地 `/tmp/opencode/cola-plugin`）
+
+### 插件面契约（www 主机 /api/v1/*，Cookie 认证）
+
+| 端点 | 用途 | 实测 |
+|---|---|---|
+| GET /api/v1/plugin/match?hashes=h1,h2 | **info_hash/source_info_hash 批量反查**（辅种核心） | ✓ 200（CC cookie 直用） |
+| GET /api/v1/plugin/match?keys=k1,k2 | 文件清单指纹反查（老站版本 400） | 未实测 |
+| POST /api/v1/plugin/sessions | 用户名+密码+图形验证码(+2FA) 换 session_token | 未实测（CC cookie 可绕） |
+| GET /api/v1/torrents/{id}/download | 下载 | 未实测 |
+| GET /api/v1/torrents/{id}/authorizations | 授权信息 | 未实测 |
+
+- **match 响应**：`{"checked":N,"matched":[{client_hash,via,torrent_id,…}],"unmatched":N,"content":[],"limit":500}`
+- **via 语义**：`source_info_hash`=客户端有同内容异站种子（可辅种）/`info_hash`=已是可乐种子（跳过）
+- 批量上限 **500 hash/请求**（插件保守用 100/批——CF/网关拒大 query）
+- **CC 浏览器 cookie（reelcore_session）直接可用**——无需密码+验证码换会话（2026-11-03 实测）→ PT-Forward 辅种/恢复链可用 hash 级反查
+
+### 关键知识：info.source 盖章差异
+
+可乐发布时把 `.torrent` 的 `info.source` 盖成 `[https://www.colapt.com] ColaPT`（M-Team 盖 `[kp.m-team.cc] M-Team - TP`）——**同内容跨站 info_hash 必然不同**（辅种 hash 比对陷阱）；插件做 source 替换/剥除重算 hash 归一化反查。PT-Forward 恢复链/VerifyExists 的 hash 比对需注意此语义（可乐下载的种子 hash≠源站 hash——announce 嵌 tracker+passkey 同理）。
