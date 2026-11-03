@@ -1,6 +1,11 @@
 package adapter
 
 import (
+	"strconv"
+	"time"
+	"os"
+	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/google/uuid"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -320,55 +325,68 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
+	// §59.458-⑤: description BBCode→Markdown 禁图变体（站方 4001 硬校验）
+	desc := description.BBCodeToMarkdownNoImage(req.Description)
+
 	payload := map[string]interface{}{
 		"torrent":     base64.StdEncoding.EncodeToString(req.TorrentData),
 		"title":       req.Title,
-		"category":    resolveField(req.FormFields, "cat", "category"),
-		"description": req.Description,
-		"subtitle":    req.Subtitle,
+		"description": desc,
+		// §59.458-⑥: 链接顶层 URL 双形态（站方 legacyExternalIdentifiers
+		// URL/编号任一——URL 直投零新域；优先豆瓣=站方规则）
+		"anonymous": req.Anonymous,
+		"price":     0,
 	}
-	if req.Anonymous {
-		payload["anonymous"] = true
+	if req.Subtitle != "" {
+		payload["subtitle"] = req.Subtitle
+	}
+	if req.IMDbLink != "" {
+		payload["imdb"] = req.IMDbLink
+	}
+	if req.DoubanLink != "" {
+		payload["douban"] = req.DoubanLink
 	}
 	if req.MediaInfo != "" {
 		payload["media_info"] = req.MediaInfo
 	}
+	if v := resolveField(req.FormFields, "cat", "category"); v != "" {
+		payload["category"] = v
+	}
 
+	// §59.458-①④: attributes 嵌套组装
 	attributes := map[string]interface{}{}
-	if v, ok := req.FormFields["resolution"]; ok && v != "" {
+	if v := req.FormFields["resolution"]; v != "" {
 		attributes["resolution"] = v
 	}
-	if v, ok := req.FormFields["source"]; ok && v != "" {
-		attributes["source"] = v
+	// medium 双槽分发（④矩阵——form_config value_mappings 配矩阵值：
+	// rt 集{remux,web-dl,hdtv,dvdrip}→release-type；其余→source）
+	if v := req.FormFields["medium"]; v != "" {
+		switch v {
+		case "remux", "web-dl", "hdtv", "dvdrip":
+			attributes["release-type"] = v
+		default:
+			attributes["source"] = v
+		}
 	}
-	if v, ok := req.FormFields["region"]; ok && v != "" {
+	// genre/region（executor §59.458-②③ 注入 ExtraFields——终态值直投）
+	if v := req.ExtraFields["rs_genre"]; v != "" {
+		var genres []string
+		if err := json.Unmarshal([]byte(v), &genres); err == nil && len(genres) > 0 {
+			attributes["genre"] = genres
+		}
+	}
+	if v := req.ExtraFields["rs_region"]; v != "" {
 		attributes["region"] = v
-	}
-	if v, ok := req.FormFields["genre"]; ok && v != "" {
-		attributes["genre"] = strings.Split(v, ",")
-	}
-	if v, ok := req.FormFields["format"]; ok && v != "" {
-		attributes["format"] = v
-	}
-	if v, ok := req.FormFields["platform"]; ok && v != "" {
-		attributes["platform"] = v
-	}
-	if req.IMDbLink != "" {
-		attributes["imdb"] = req.IMDbLink
-	}
-	if req.DoubanLink != "" {
-		attributes["douban"] = req.DoubanLink
-	}
-	if tmdb, ok := req.ExtraFields["tmdb_id"]; ok && tmdb != "" {
-		attributes["tmdb"] = tmdb
 	}
 	if len(attributes) > 0 {
 		payload["attributes"] = attributes
 	}
 
-	if len(req.Screenshots) > 0 {
-		images := make([]string, 0, len(req.Screenshots))
-		images = append(images, req.Screenshots...)
+	// §59.458 窄例外: images[0]=PTGen 封面（PosterURL 单图下载→5M 门→
+	// base64；失败降级警告不阻塞）；images[1:]=本地内容截图（路径形态
+	// 读文件 base64；URL 形态跳过——白名单禁图床下载）
+	images := rousiBuildImages(ctx, req, a.logger)
+	if len(images) > 0 {
 		payload["images"] = images
 	}
 
@@ -383,6 +401,9 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	// §59.458-⑦: 幂等头随机 UUID（retry 层同 req 重试自动同 key——
+	// 幂等头标准用法；infohash 去重最终防线）
+	httpReq.Header.Set("Idempotency-Key", uuid.New().String())
 	a.setAuthHeaders(httpReq, rousiCredential(config))
 
 	resp, err := a.doer.Client.Do(httpReq)
@@ -399,7 +420,10 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Data    struct {
-			UUID string `json:"UUID"`
+			ID       int64  `json:"id"`
+			UUID     string `json:"uuid"`
+			InfoHash string `json:"info_hash"`
+			Status   string `json:"status"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
@@ -410,13 +434,91 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("API 错误(code=%d): %s", result.Code, result.Message)}
 	}
 
-	uuid := result.Data.UUID
+	// §59.458-⑧: 201+pending/approved 均为提交成功（审核流站方行为）；
+	// TorrentID=数字 id（§9.4 数字权威——uuid 仍在响应不消费）
+	tid := strconv.FormatInt(result.Data.ID, 10)
 	return &model.PublishResponse{
 		Success:    true,
-		TorrentID:  uuid,
-		DetailURL:  resolveBaseURL(config) + "/torrent/" + uuid,
+		TorrentID:  tid,
+		DetailURL:  resolveBaseURL(config) + "/torrents/" + tid,
 		TargetSite: config.Domain,
 	}, nil
+}
+
+// rousiPosterClient §59.458: 封面下载独立 client（15s 超时+浏览器 UA——
+// 不走站点 doer：目标站代理配置不适用于外站图源）。
+var rousiPosterClient = &http.Client{Timeout: 15 * time.Second}
+
+// rousiBuildImages §59.458: images 组装——封面（ExtraFields["rs_poster"]
+// 单图窄例外下载；≤5M 站方门；失败警告降级不阻塞）+本地截图（路径形态
+// 读文件 base64；URL 形态跳过——内容截图不开放下载）。
+func rousiBuildImages(ctx context.Context, req *model.PublishRequest, logger *zap.Logger) []string {
+	images := make([]string, 0, len(req.Screenshots)+1)
+
+	if poster := req.ExtraFields["rs_poster"]; poster != "" {
+		if dataURL, ok := rousiDownloadImageAsDataURL(ctx, poster, logger); ok {
+			images = append(images, dataURL)
+		}
+	}
+	for _, shot := range req.Screenshots {
+		shot = strings.TrimSpace(shot)
+		if shot == "" {
+			continue
+		}
+		// 本地路径形态（内容截图——mpv 截图链产物）读文件 base64；
+		// URL 形态跳过（白名单：内容截图不开放图床下载）
+		if strings.HasPrefix(shot, "http://") || strings.HasPrefix(shot, "https://") {
+			continue
+		}
+		data, err := os.ReadFile(shot)
+		if err != nil {
+			if logger != nil {
+				logger.Warn("rousi screenshot read failed", zap.String("path", shot), zap.Error(err))
+			}
+			continue
+		}
+		if len(data) > 5<<20 {
+			continue
+		}
+		images = append(images, "data:image/jpeg;base64,"+base64.StdEncoding.EncodeToString(data))
+	}
+	return images
+}
+
+// rousiDownloadImageAsDataURL §59.458 窄例外: 封面单图下载→dataURL。
+// 失败/超限返回 ok=false（调用方降级——发布不因外站可用性失败）。
+func rousiDownloadImageAsDataURL(ctx context.Context, url string, logger *zap.Logger) (string, bool) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", false
+	}
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+	resp, err := rousiPosterClient.Do(req)
+	if err != nil {
+		if logger != nil {
+			logger.Warn("rousi poster download failed（降级无封面）", zap.String("url", url), zap.Error(err))
+		}
+		return "", false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		if logger != nil {
+			logger.Warn("rousi poster download non-200（降级无封面）", zap.String("url", url), zap.Int("status", resp.StatusCode))
+		}
+		return "", false
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 6<<20))
+	if err != nil || len(data) == 0 || len(data) > 5<<20 {
+		if logger != nil {
+			logger.Warn("rousi poster size gate（降级无封面）", zap.String("url", url), zap.Int("bytes", len(data)))
+		}
+		return "", false
+	}
+	mime := resp.Header.Get("Content-Type")
+	if mime == "" || mime == "application/octet-stream" {
+		mime = "image/jpeg"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), true
 }
 
 func (a *RousiAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {

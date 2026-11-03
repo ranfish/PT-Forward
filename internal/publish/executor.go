@@ -414,6 +414,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// tags 产物依赖（chnize/sub_hard 消费 chinese_subtitle）——城市注入
 	// 分两段：标签无关项在 jobs 段后（此处），标签依赖项在 tags 产出后
 	// （hdcityTagDependentFill）。
+	// §59.458: 肉丝特化注入（genre/region/poster——attributes 数据源；
+	// genre/region 非发布链标准域走 form 显示键+ExtraFields 双通道——
+	// form 键 DryRun 可见 §59.453 挂载教训；ExtraFields adapter 消费）。
+	if in.TargetSite == "肉丝" {
+		rousiPublishInject(form, meta)
+	}
 	if in.TargetSite == "城市" {
 		hdcityPrefill(form, cfg, meta, tp)
 		// codec 音频类切换（§2.7 编码-媒介对应表——音频类查 codec 域
@@ -639,6 +645,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 				pubReq.ExtraFields = map[string]string{}
 			}
 			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
+		}
+	}
+	// §59.458: 肉丝 ExtraFields 搬运（form 段注入的显示键→adapter
+	// 消费通道；genre=JSON 数组串/region=slug 终态/poster=URL）
+	if in.TargetSite == "肉丝" {
+		if pubReq.ExtraFields == nil {
+			pubReq.ExtraFields = map[string]string{}
+		}
+		for _, k := range []string{"rs_genre", "rs_region", "rs_poster"} {
+			if v := form[k]; v != "" {
+				pubReq.ExtraFields[k] = v
+			}
 		}
 	}
 
@@ -2208,6 +2226,83 @@ func mteamLabelsBits(tags []string) int {
 //
 // 标签依赖项（chnize/sub_hard/sub_soft/sub_incl）在 tags 产出后
 // hdcityTagDependentFill 处理。
+// rousiRegionSlug §59.458: 肉丝 region label→slug 全表（categories API
+// 2026-11-03 实时权威 18 项）。
+var rousiRegionSlug = map[string]string{
+	"大陆": "mainland-china", "香港": "hong-kong", "台湾": "taiwan",
+	"日本": "japan", "韩国": "south-korea", "美国": "usa", "英国": "uk",
+	"法国": "france", "德国": "germany", "意大利": "italy", "西班牙": "spain",
+	"俄罗斯": "russia", "新西兰": "new-zealand", "加拿大": "canada",
+	"印度": "india", "泰国": "thailand", "澳大利亚": "australia",
+	"其它": "other",
+}
+
+// rousiGenreSet §59.458: 站方 genre 词表（29 项中文——categories API
+// 权威；与豆瓣题材词表同源，实测 60 样本 214 词全命中）。
+var rousiGenreSet = map[string]bool{
+	"剧情": true, "喜剧": true, "动作": true, "爱情": true, "科幻": true,
+	"悬疑": true, "惊悚": true, "恐怖": true, "犯罪": true, "动画": true,
+	"奇幻": true, "冒险": true, "灾难": true, "战争": true, "传记": true,
+	"历史": true, "运动": true, "音乐": true, "歌舞": true, "家庭": true,
+	"儿童": true, "纪录": true, "短片": true, "真人秀": true, "脱口秀": true,
+	"西部": true, "武侠": true, "古装": true, "其它": true,
+}
+
+// rousiPublishInject §59.458-②③: 肉丝 attributes 数据源注入——
+// genre（PTGen 题材数组剥 miss 后 JSON；全空兜"其它"——站方必填）
+// +region（PTGen 产地 norm 三条+合拍首值优先（§59.391 葡萄先例同数据
+// 源同策略）+label→slug 映射；miss 兜 other）+poster（封面 URL——
+// adapter 窄例外下载 base64）。form 显示键（DryRun 可见）。
+func rousiPublishInject(form map[string]string, meta *model.TorrentMetadata) {
+	// genre
+	genres := []string{}
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+		for _, g := range src.Genre {
+			g = strings.TrimSpace(g)
+			if g != "" && rousiGenreSet[g] {
+				genres = append(genres, g)
+			}
+		}
+	}
+	if len(genres) == 0 {
+		genres = []string{"其它"}
+	}
+	if b, err := json.Marshal(genres); err == nil {
+		form["rs_genre"] = string(b)
+	}
+
+	// region（PTGen Region=[]string 合拍串形态——元素内再按 / 切）
+	region := "other"
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+	outer:
+		for _, raw := range src.Region {
+			for _, part := range strings.Split(raw, "/") {
+				w := strings.TrimSpace(part)
+				if w == "" {
+					continue
+				}
+				// norm 三条：中国大陆→大陆/中国香港→香港/中国台湾→台湾
+				switch {
+				case strings.HasPrefix(w, "中国大陆"):
+					w = "大陆"
+				case strings.HasPrefix(w, "中国香港"):
+					w = "香港"
+				case strings.HasPrefix(w, "中国台湾"):
+					w = "台湾"
+				}
+				if slug, ok := rousiRegionSlug[w]; ok {
+					region = slug
+					break outer // 首值优先——命中即止（§59.391 葡萄先例）
+				}
+			}
+		}
+	}
+	form["rs_region"] = region
+
+	// poster（封面 URL——adapter §59.458 窄例外下载）
+	form["rs_poster"] = meta.Poster
+}
+
 func hdcityPrefill(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile) {
 	if form == nil || cfg == nil || meta == nil {
 		return

@@ -1,6 +1,9 @@
 package adapter
 
 import (
+	"strings"
+	"os"
+	"path/filepath"
 	"context"
 	"encoding/json"
 	"errors"
@@ -547,9 +550,9 @@ func TestRousiAdapter_UploadTorrent_OK(t *testing.T) {
 		}
 		resp := map[string]interface{}{
 			"code":    0,
-			"message": "",
+			"message": "success",
 			"data": map[string]interface{}{
-				"UUID": "abc-123",
+				"id": 10264, "uuid": "rt-abc-123", "info_hash": "aa", "status": "pending",
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -572,10 +575,11 @@ func TestRousiAdapter_UploadTorrent_OK(t *testing.T) {
 	if !resp.Success {
 		t.Errorf("expected success, got: %s", resp.ErrorMessage)
 	}
-	if resp.TorrentID != "abc-123" {
-		t.Errorf("expected torrent ID abc-123, got %s", resp.TorrentID)
+	// §59.458-⑧: 数字 id 权威（uuid 不消费）；pending/approved 均成功
+	if resp.TorrentID != "10264" {
+		t.Errorf("expected torrent ID 10264, got %s", resp.TorrentID)
 	}
-	if resp.DetailURL != srv.URL+"/torrent/abc-123" {
+	if resp.DetailURL != srv.URL+"/torrents/10264" {
 		t.Errorf("unexpected detail URL: %s", resp.DetailURL)
 	}
 }
@@ -640,17 +644,27 @@ func TestRousiAdapter_UploadTorrent_WithAttributes(t *testing.T) {
 		if attrs["resolution"] != "1080p" {
 			t.Errorf("unexpected resolution: %v", attrs["resolution"])
 		}
-		if attrs["source"] != "blu-ray" {
-			t.Errorf("unexpected source: %v", attrs["source"])
+		// §59.458-②③: genre/region 从 ExtraFields 终态直投
+		genres, _ := attrs["genre"].([]interface{})
+		if len(genres) != 2 || genres[0] != "动画" {
+			t.Errorf("unexpected genre: %v", attrs["genre"])
 		}
-		if attrs["imdb"] != "https://www.imdb.com/title/tt1234567/" {
-			t.Errorf("unexpected imdb: %v", attrs["imdb"])
+		if attrs["region"] != "mainland-china" {
+			t.Errorf("unexpected region: %v", attrs["region"])
+		}
+		// §59.458-⑥: imdb/douban 顶层 URL（不进 attributes）
+		if body["imdb"] != "https://www.imdb.com/title/tt1234567/" {
+			t.Errorf("unexpected top-level imdb: %v", body["imdb"])
+		}
+		// §59.458-④: medium=web-dl → release-type（rt 集分流）
+		if attrs["release-type"] != "web-dl" {
+			t.Errorf("unexpected release-type: %v", attrs["release-type"])
 		}
 
 		resp := map[string]interface{}{
 			"code":    0,
-			"message": "",
-			"data":    map[string]interface{}{"UUID": "xyz-789"},
+			"message": "success",
+			"data":    map[string]interface{}{"id": 20001, "uuid": "rt-xyz-789", "status": "approved"},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(resp)
@@ -668,9 +682,13 @@ func TestRousiAdapter_UploadTorrent_WithAttributes(t *testing.T) {
 		FormFields: map[string]string{
 			"cat":        "movie",
 			"resolution": "1080p",
-			"source":     "blu-ray",
+			"medium":     "web-dl",
 		},
 		IMDbLink: "https://www.imdb.com/title/tt1234567/",
+		ExtraFields: map[string]string{
+			"rs_genre":  `["动画","喜剧"]`,
+			"rs_region": "mainland-china",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -678,8 +696,8 @@ func TestRousiAdapter_UploadTorrent_WithAttributes(t *testing.T) {
 	if !resp.Success {
 		t.Errorf("expected success, got: %s", resp.ErrorMessage)
 	}
-	if resp.TorrentID != "xyz-789" {
-		t.Errorf("expected torrent ID xyz-789, got %s", resp.TorrentID)
+	if resp.TorrentID != "20001" {
+		t.Errorf("expected torrent ID 20001, got %s", resp.TorrentID)
 	}
 }
 
@@ -730,25 +748,35 @@ func TestRousiAdapter_GetTorrentInfoHash_NotFound(t *testing.T) {
 
 func TestRousiAdapter_UploadWithImages(t *testing.T) {
 	var receivedBody map[string]interface{}
+	var gotIdemKey bool
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &receivedBody)
+		gotIdemKey = r.Header.Get("Idempotency-Key") != ""
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"code":0,"data":{"uuid":"img-test-uuid"}}`)
+		fmt.Fprintf(w, `{"code":0,"data":{"id":30001,"uuid":"img-test","status":"pending"}}`)
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewRousiAdapter(doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testpk"}
+	// 本地截图临时文件（mpv 截图链产物形态）
+	tmpShot := filepath.Join(t.TempDir(), "shot.png")
+	if err := os.WriteFile(tmpShot, []byte("\x89PNG-fake-image-data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "testkey"}
 	req := &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 		Title:       "Test With Images",
+		Description: "简介[img]https://img.example.com/1.png[/img]尾部",
 		IMDbLink:    "https://www.imdb.com/title/tt1234/",
 		DoubanLink:  "https://movie.douban.com/subject/5678/",
-		Screenshots: []string{"https://img.example.com/1.png", "https://img.example.com/2.png"},
+		// URL 形态跳过（白名单：内容截图不开放图床下载）
+		Screenshots: []string{"https://img.example.com/1.png", tmpShot},
 		ExtraFields: map[string]string{"tmdb_id": "12345"},
 	}
 
@@ -760,26 +788,41 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 		t.Errorf("expected success: %s", resp.ErrorMessage)
 	}
 
-	attrs, ok := receivedBody["attributes"].(map[string]interface{})
-	if !ok {
-		t.Fatal("expected attributes in payload")
+	// §59.458-⑦: 幂等头必在
+	if !gotIdemKey {
+		t.Error("expected Idempotency-Key header")
 	}
-	if attrs["imdb"] != "https://www.imdb.com/title/tt1234/" {
-		t.Errorf("expected imdb in attributes, got %v", attrs["imdb"])
+	// §59.458-⑥: 链接顶层 URL（不进 attributes；tmdb 定案不投）
+	if receivedBody["imdb"] != "https://www.imdb.com/title/tt1234/" {
+		t.Errorf("unexpected top-level imdb: %v", receivedBody["imdb"])
 	}
-	if attrs["douban"] != "https://movie.douban.com/subject/5678/" {
-		t.Errorf("expected douban in attributes, got %v", attrs["douban"])
+	if receivedBody["douban"] != "https://movie.douban.com/subject/5678/" {
+		t.Errorf("unexpected top-level douban: %v", receivedBody["douban"])
 	}
-	if attrs["tmdb"] != "12345" {
-		t.Errorf("expected tmdb in attributes, got %v", attrs["tmdb"])
+	if receivedBody["tmdb_id"] != nil {
+		t.Errorf("tmdb 不应投递: %v", receivedBody["tmdb_id"])
 	}
-
+	if receivedBody["attributes"] != nil {
+		if attrs, ok := receivedBody["attributes"].(map[string]interface{}); ok {
+			if attrs["imdb"] != nil || attrs["tmdb"] != nil {
+				t.Errorf("imdb/tmdb 不应进 attributes: %v", attrs)
+			}
+		}
+	}
+	// §59.458-⑤: description 禁图（[img] 剥除）
+	if desc, _ := receivedBody["description"].(string); strings.Contains(desc, "img.example.com") || strings.Contains(desc, "[img") {
+		t.Errorf("description 图未剥除: %q", desc)
+	}
+	// §59.458 窄例外: images=本地文件 base64（URL 跳过——1 张）
 	images, ok := receivedBody["images"].([]interface{})
 	if !ok {
 		t.Fatal("expected images in payload")
 	}
-	if len(images) != 2 {
-		t.Errorf("expected 2 images, got %d", len(images))
+	if len(images) != 1 {
+		t.Fatalf("expected 1 image（URL 跳过本地 1）, got %d", len(images))
+	}
+	if dataURL, _ := images[0].(string); !strings.HasPrefix(dataURL, "data:image/") {
+		t.Errorf("expected dataURL form, got %q", dataURL[:30])
 	}
 }
 
