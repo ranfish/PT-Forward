@@ -22858,7 +22858,13 @@
       "tracker_domains": [
         "rousi.pro"
       ],
-      "is_reseed_target": true
+      "is_reseed_target": true,
+      "groups": [
+        {
+          "name": "Rousi",
+          "is_official": true
+        }
+      ]
     },
     {
       "domain": "totheglory.im",
