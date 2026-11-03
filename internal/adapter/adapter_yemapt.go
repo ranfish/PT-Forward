@@ -460,12 +460,12 @@ func (a *YemaptAdapter) uploadViaOpenAPI(ctx context.Context, config *model.Site
 			}
 		}
 	}
-	// tags（FormFields["tags"]=逗号分隔数字值）
-	if v := req.FormFields["tags"]; v != "" {
-		for _, t := range strings.Split(v, ",") {
-			if t = strings.TrimSpace(t); t != "" {
-				fw.writeField("tagList", t)
-			}
+	// tags（§59.459 回归审核修正：tags 域走 TagArrayFields checkbox 数组
+	// 通道（executor 通用链）——非 FormFields；同名重复字段与野马数组
+	// 语义天然对齐（馒头 :1194 同款先例）
+	for _, kv := range req.TagArrayFields {
+		if kv.Key == "tagList" && kv.Value != "" {
+			fw.writeField("tagList", kv.Value)
 		}
 	}
 	// ④ 截图 URL 透传（≤20）
