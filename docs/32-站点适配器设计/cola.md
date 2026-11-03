@@ -146,3 +146,37 @@ reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型—
 | 节流 | Cloudflare 层（reset/超时） | 站方层（scope 校验/节流） |
 
 **混合形态警觉**（本案实战）：API 返回的下载 URL 指向 **www 主机** `/downloads/<hash>/<id>?exp&sig`——这是"API 签发的 Web 通道 URL"：对它带 x-api-key 头会触发 www 路由的 scope 校验（`api_key_scope_denied` 403），**无头裸 GET 即 200**（签名参数自含鉴权）。判断通道归属看 URL 主机+路径，不看它从哪个 API 拿到的。
+
+## wiki 权威规则（2026-11-03 实拉——/api/v1/wiki/moviepilot-setup，修订 2/2026-10-20）
+
+> wiki 页面=SPA 前端路由；内容走 **Web 面 JSON API `GET /api/v1/wiki/{slug}`**（cookie 认证，reelcore_session）。
+> 站方同时给出规则来源源码路径（internal/publication/publication.go 等——reelcore 源码可能可得，待挖）。
+
+### 限流定量（此前"节流"现象的数字真身）
+
+- **单 Key 60 次/分、突发 20**；全站机器请求 120 次/秒；超限 429 + `Retry-After`
+- 2026-11-03 实测吻合：序列实验连发远超突发 20 → api/www 双面挂（30s deadline/reset）
+
+### automation 发种面硬规则（发布链适配核心契约）
+
+| 规则 | 内容 | 错误码 |
+|---|---|---|
+| release_scope 结构 | movie/other 传 `null`；tv 必填 category/season/scope/episodes；anime 五键（多 anime_type）；variety 另一套；分类须与作品一致 | 400 scope_category_mismatch / invalid_release_scope |
+| 种子文件 | 只收**私有 v1** .torrent，≤4MiB，文件树深≤32/≤10000 文件；v2/hybrid 拒 | 400 invalid_torrent / 413 torrent_too_large |
+| 截图 | API 提交 **≥3 张**不同 http(s) 直链（≤20 不重复）；**豆瓣图（doubanio.com/imgN.douban.com）站方自动镜像到图床**，镜像失败可换图重试（发布链利好：豆瓣源截图可直投） | 400 invalid_screenshots / 422 image_mirror_failed |
+| info_hash 唯一 | 同 hash 仅一条；驳回≠作废可改后 resubmit（不占新额度）；换压制=换文件新 hash | 409 torrent_conflict |
+| 做种门 | 审核通过时实时查 swarm，seeders=0 不予通过（查询失败不拦） | 409 torrent_not_seeding |
+| 每日额度 | 按等级/用户组（可能不限量），Asia/Shanghai 零点切日 | 403 daily_publication_limit_reached |
+| 作品复用 | 站内已有作品标识必须复用，不许新建重复条目 | 409 media_reuse_required |
+| H&R 拦下载 | 未解决 H&R 违规禁下载 | 403 hr_download_restricted |
+
+### 凭据/通道规则（与 §摸底方法论 互证）
+
+- 兼容面只认 `X-API-Key`；**同时带 Cookie/Authorization/Origin → 判浏览器请求 401 api_key_required**（站方原文——与下载 URL 通道判定实证一致）
+- Key scope 权威名：兼容面=`mtorrent.compat`；发种面=automation（资格单独开通）
+- 站点地址只填主域（api.colapt.com 根路径 404——接口主机由客户端换算）
+
+### 兼容面补充契约
+
+- search 结果促销字段 `discount`/`promotionRule`：MP 认识档位 FREE/PERCENT_50/PERCENT_70/_2X，**其它比例显示 NORMAL**（DetectDiscount 消费注意）
+- profile 返回中文等级名 `roleName`；`shareRate:999999`=占位值（计费下载 0+上传非 0=无限，非真实分享率）
