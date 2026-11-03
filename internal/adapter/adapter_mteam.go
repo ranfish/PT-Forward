@@ -256,17 +256,24 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("构造下载请求失败", err)
 	}
-	a.setAPIHeaders(dlReq, config.APIKey)
+	// §59.460: 下载 URL 通道判定——按 URL 前缀（非签发来源）：
+	// ==resolveBaseURL（API 兼容面同域，M-Team 形态）带 API 头；
+	// 其它域（可乐 www /downloads Web 通道）无头——带 x-api-key 到非
+	// 兼容面路径触发 scope 校验（实测两种惩罚形态：403 api_key_scope_
+	// denied 响应 / CF 直接掐连接挂到超时），签名 URL 自含 exp+sig 鉴权，
+	// 无头裸 GET 即 200 真种子（站方 MoviePilot 对接文档同款：下载换票
+	// 之后的 GET 不带任何头）。
+	if strings.HasPrefix(tokenResp.Data, resolveBaseURL(config)+"/") {
+		a.setAPIHeaders(dlReq, config.APIKey)
+	}
 
 	dlResp, err := a.doer.Client.Do(dlReq)
 	if err != nil {
 		return nil, downloadError("下载种子失败", err)
 	}
 
-	// §59.460: 签名 URL 下载通道对 API 头敏感——可乐 www 主机 /downloads
-	// 路由把 x-api-key 头当 API scope 调用校验（api_key_scope_denied 403
-	// 实证）；签名 URL 自含 exp+sig 鉴权，无头裸 GET 即 200 真种子。
-	// 403 时无头重试一次（馒头带头 200 走原路径零变化）。
+	// §59.460: 兜底——万一 API 同域下载带头仍 403（scope 收紧等），
+	// 无头重试一次（签名 URL 自含鉴权；馒头常态带头 200 不触发）。
 	if dlResp.StatusCode == http.StatusForbidden {
 		drainBody(dlResp)
 		bareReq, bareErr := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
