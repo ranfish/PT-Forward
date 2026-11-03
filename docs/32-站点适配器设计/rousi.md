@@ -523,3 +523,111 @@ H&R 处理（包括但不限于）：记录 H&R 次数、警告、扣除魔力�
 - 明显破坏站点公平性与正常秩序
 - 自动化脚本、异常流量、异常行为
 - 其他未明确列出但被认定为不合理的行为
+
+---
+
+## 九、改版摸底（2026-11-03 · 七轮探针+PeerGo 源码情报）
+
+> 用户报告"肉丝近期改版"触发的摸底记录（未实施——讨论定案后另落）。
+> 摸底方法：实时探针（curl/临时 Go 程序——§59.338 真实组件法变体）
+> + **examples/PeerGo dev 分支源码分析**（2117 文件完整生产源码）。
+
+### 9.1 改版全貌
+
+| 维度 | 旧（本文档 §1-§8 记录） | 新（实测+源码） |
+|---|---|---|
+| 前端 | Vue SPA | **React 19.2.7**（Remix 生态 assets/v2/） |
+| 架构 | 自研单体 | **PeerGo 架构**（React Web+Go 主站+独立 Tracker+异步结算——README ADR 1372 行） |
+| 种子 ID | UUID | **数字 id**（如 10264；uuid/RouteID 仍在发布响应） |
+| 分类 id | 数字 1-11 | 字符串：`movies`（复数）/`anime`（原 animation）/`ebooks`（复数）/其余不变 |
+| 属性 value | 中文显示值 | **英文 slug**（`mainland-china`/`japan`/`2160p`/`sd`/`blu-ray`/`uhd-blu-ray`）+required 标记+select/multi-select 类型 |
+| 凭据 | Passkey 单凭据 | **三凭据分离**（见 §9.3） |
+
+### 9.2 双通道 API（机制根源）
+
+**MoviePilot 兼容层中间件**（源码 moviepilot_compatibility.go 注释原文：
+*"intercepts **the legacy Rousi API** used by MoviePilot and PT-depiler"*——
+dev 分支即肉丝站本体源码）：
+
+- 兼容层**仅在外部 `Authorization` 头出现时接管**路由 →
+  Bearer pgk_ Key 走旧契约 `{code,message,data}` 包裹（本文档 §1 记录的 API 形态）
+- 无 Authorization 头 → 走 PeerGo OpenAPI public-safe schema
+  新契约 `{items,limit,offset,total}`（无认证公开可访问）
+- 兼容层挂载在 same-origin enforcement **之前**（API-key 客户端豁免同源门
+  ——新端点 `/torrents/create` 的 403 origin_not_allowed 不影响旧 POST 通道）
+
+### 9.3 三凭据体系（PeerGo §10.2+实测印证）
+
+| 凭据 | 用途 | 形态/实测 |
+|---|---|---|
+| Web session cookie | 浏览器（capabilities/下载/RSS 订阅管理） | HttpOnly+CSRF 同源门 |
+| **pgk_ API Key** | 第三方 API+兼容层下载 | `pgk_` 前缀（用户提供实测可用；Bearer/X-Api-Key 头均可） |
+| **旧 32 hex passkey** | **tracker announce 专用**（PeerGo 铁律长期兼容） | .torrent 内 announce=`https://rousi.pro/tracker/{旧passkey}/announce` 实证 |
+
+### 9.4 各链路实测可用性
+
+| 链路 | 状态 | 通道（全部实测） |
+|---|---|---|
+| 搜索/列表 | ✅ | 公开无认证 `GET /api/v1/torrents?query=...`（**参数是 query 非 search**——search 疑被忽略恰逢最新种巧合，接入时须用 query+search_scope） |
+| 详情 | ✅ | 公开 `GET /api/v1/torrents/{id}`——**字段大丰收**：info_hash_v1/piece_count/piece_length_bytes/payload_size_bytes/file_count/external_identifiers(douban+imdb 编号)/facets/content_name/promotion/subtitle |
+| 下载 | ✅ | `GET /api/torrent/{id}/download/{pgk_key}`（兼容层路径——bencode 种子实收；OpenAPI 新端点 downloadTorrent 是 web-session 专用不适用） |
+| 分类/属性 | ✅ | Bearer `GET /api/v1/categories`（23.8KB 完整属性：slug+required+type——发布适配数据源） |
+| 发布 | ✅ 契约在 | `POST /api/v1/torrents` Bearer（空 body 实测 400 `{code:4001,"种子文件编码无效"}`——端点活着；完整契约见 §9.5） |
+| RSS | ✅ | **订阅令牌制**（用户确认管理页 /account/rss）：web-session 创建→一次性发 token→Feed=`/rss/{token}`+**feed 内每颗种自带免认证下载直链** `/rss/{token}/torrents/{id}/download`（源码 rss/service.go:293-396） |
+| 签到 | 🎁 | `POST /api/points/attendance`（Bearer）+`GET .../stats`——兼容层内福利 |
+| capabilities | 🔴 | `/api/v1/me/capabilities` 仅 web-session（pgk_ 不可查） |
+
+### 9.5 发布契约（源码级权威——handleLegacyTorrentUpload）
+
+```
+POST /api/v1/torrents（Authorization: Bearer {pgk_key}）
+{
+  "torrent": "<base64 .torrent>",       // 必填（4001 编码无效先验）
+  "title": "...", "subtitle": "...", "description": "...",
+  "category": "movies",                  // 字符串分类 id（§9.1 slug 表）
+  "attributes": {                        // decodeLegacyAttributes
+    "genre": ["剧情","动作"],            //   multi-select=数组
+    "region": "mainland-china",          //   select=slug 单值
+    "resolution": "2160p", "source": "blu-ray"
+  },
+  "media_info": "...",
+  "images": ["data:image/jpeg;base64,..."],   // ≤MaxTorrentScreenshots（旧文档 6 张）
+  "anonymous": false,
+  "imdb": "url 或空", "imdb_id": "tt...",     // URL/编号双形态任一
+  "tmdb": "...", "tmdb_id": "...",
+  "douban": "...", "douban_id": "...",
+  "price": 0                             // 0-100万付费种（新增）
+}
++ 头 Idempotency-Key: <uuid>            // 幂等发布（不传服务端自生成——重试零重复）
+→ 201 {code:0, message:"success", data:{id, uuid, info_hash, status}}
+错误码：4001 参数/种子编码 · 4002 图片数量 · 4006 图片编码大小 · 4008 分类属性
+```
+
+发布语义：submitTorrent="**提交进入审核**"（PeerGo 审核流——状态机
+submitted→review→published；LegacyUploadResult.Status 返回）。
+
+### 9.6 公开通道参数（OpenAPI torrents.yaml）
+
+- `query`（1-100 字符不区分大小写包含匹配 name+subtitle）+
+  `search_scope`(title_subtitle/title/subtitle)
+- `limit`(1-100 默认20)/`offset`(0-100万 稳定分页)
+- `category_id`（slug 形态）
+- `promotion` 枚举全集：`none`/`free`/`half_download`/
+  `double_upload_half_download`/`thirty_percent_download`
+- 详情 facets 值域：`release-type`（替代旧 source 字段名——web-dl 等 slug）
+
+### 9.7 对 PT-Forward 的影响面
+
+- **零存量影响**：29 库肉丝零快照/零订阅/零元数据（采集侧从未使用）、
+  is_source=0/is_target=0（发布适配从未做过）
+- **旧 API 兼容层完整保留**（站方主动维护——MoviePilot/PT-depiler 同源受益）
+  → RousiExtension 依赖的契约仍成立+幂等头/编号双形态/付费价/RSS 增强
+- **合规边界注记**：站规 §8.9"禁止自动化模拟客户端行为"指 BT 客户端伪装
+  作弊；API Key/RSS 订阅/MoviePilot 兼容层均为站方官方自动化通道（合规）
+
+### 9.8 待讨论议题（未定案）
+
+1. 接入方向：采集侧（源站）/目标站（发布）/双端/维持骨架
+2. 双凭据存储：sites 表新列 pgk API Key（旧 passkey 列=announce 继续用）
+3. RSS 接入：用户 /account/rss 创建订阅填 URL（现成 RSS 基建消费）
+4. 搜索参数用 query（非 search）+详情字段大丰收的采集适配收益
