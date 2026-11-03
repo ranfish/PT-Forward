@@ -18,6 +18,10 @@ func TestParseItemsRoushDiscountMetadata(t *testing.T) {
 <description>某片&#xA;优惠：免费（至 2026-11-05 03:28）</description>
 <guid>peergo:torrent:10254</guid>
 <enclosure url="https://rousi.pro/rss/TOKEN/torrents/10254/download" length="100" type="application/x-bittorrent"/></item>
+<item><title>NoPromo Movie 2026</title><link>https://rousi.pro/torrents/10255</link>
+<description>某片（无优惠行）</description>
+<guid>peergo:torrent:10255</guid>
+<enclosure url="https://rousi.pro/rss/TOKEN/torrents/10255/download" length="100" type="application/x-bittorrent"/></item>
 </channel></rss>`
 	var feed RSSFeed
 	if err := xml.Unmarshal([]byte(raw), &feed); err != nil {
@@ -27,8 +31,8 @@ func TestParseItemsRoushDiscountMetadata(t *testing.T) {
 	site := &model.Site{Name: "肉丝", Domain: "rousi.pro", IDStrategy: "path_segment", HashStrategy: "guid", SizeStrategy: "enclosure"}
 	sub := &model.RSSSubscription{Name: "t", SiteName: "肉丝"}
 	events := f.ParseItems(&feed, sub, site)
-	if len(events) != 2 {
-		t.Fatalf("events = %d want 2", len(events))
+	if len(events) != 3 {
+		t.Fatalf("events = %d want 3", len(events))
 	}
 	for _, ev := range events {
 		lv, _ := ev.Metadata["rss_discount_level"].(string)
@@ -39,5 +43,9 @@ func TestParseItemsRoushDiscountMetadata(t *testing.T) {
 	}
 	if lv, _ := events[1].Metadata["rss_discount_level"].(string); lv != string(model.DiscountFree) {
 		t.Errorf("item1 免费应 FREE got %q", lv)
+	}
+	// §59.456 附: PeerGo GUID 无优惠行=权威 NONE 短路（防 SPA 详情页垃圾检测）
+	if lv, _ := events[2].Metadata["rss_discount_level"].(string); lv != string(model.DiscountNone) {
+		t.Errorf("item2 PeerGo 无优惠应 NONE got %q", lv)
 	}
 }

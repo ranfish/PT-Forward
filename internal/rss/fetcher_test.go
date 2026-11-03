@@ -322,6 +322,8 @@ func TestDiscountFromRSSDescription(t *testing.T) {
 		{"无优惠行", "副标题\n大小：8.29 GB\n做种 11", "", nil},
 		{"NP 站常规 description", "【剧情】某电影 1080p 全一集", "", nil},
 		{"优惠无截止", "优惠：免费", string(model.DiscountFree), nil},
+		{"未知形态不干预", "优惠：详见页面说明", "", nil},
+		{"未知形态带时间不干预", "优惠：限时特惠（至 2026-11-05 03:28）", "", nil},
 	}
 	for _, c := range cases {
 		lv, end := discountFromRSSDescription(c.desc)
