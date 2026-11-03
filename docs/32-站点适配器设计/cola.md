@@ -6,7 +6,7 @@
 |------|-----|
 | 站点名称 | 可乐（ColaPT） |
 | 域名 | www.colapt.com（Web）/ api.colapt.com（API 兼容面）/ tracker.colapt.com（Tracker） |
-| 引擎 | reelcore（自研）+ **M-Team 兼容面**（MoviePilot v3 官方站点目录收录） |
+| 引擎 | reelcore（自研）。对外提供 **MoviePilot 兼容面**（接口协议与 MoviePilot 站点目录的 mTorrent schema 兼容——与 M-Team 站点本身无关联） |
 | 认证方式 | **`x-api-key` 头**（Key 前缀 `rcapi_`） |
 | ⚠ 认证禁忌 | 禁止同带 Cookie / Authorization / Origin——带了反被判浏览器请求拒绝 |
 | API Key 管理 | /account/tracker?tab=api（Web 登录态）；Key 只显示一次（仅存哈希）；按 scope 分能力 |
@@ -41,7 +41,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | 端点 | 用途 | 权限 | 实测（2026-11-03） |
 |---|---|---|---|
 | POST /api/member/profile | 用户资料 | Key 有效 | ✓ uid=907 ranfish |
-| POST /api/torrent/search | 关键词搜索 | catalog.read | ✓ M-Team 官方字段（id/name/smallDescr/size/category/imdb/status.discount） |
+| POST /api/torrent/search | 关键词搜索 | catalog.read | ✓（响应字段 id/name/smallDescr/size/category/imdb/status.discount） |
 | POST /api/torrent/genDlToken?id=N | 换下载票 | torrent.download | ✓（首试超时=节流，冷却后通） |
 | GET /downloads/<凭据>/<id> | 下载 .torrent | 凭票访问 | ✓ 7997B bencode |
 | POST /api/member/getUserTorrentList | 做种列表 | Key 有效 | 未实测 |
@@ -67,9 +67,9 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 
 ### 契约差异修复（2026-11-03 实施代码层，§59.460）
 
-reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型——兼容面的微妙处）：
+**PT-Forward 工程适配记录**：MTeamAdapter 复用时发现的响应类型差异（MTeamAdapter 原实现对齐 M-Team 响应形态，可乐实际响应为真数字——两站各自实现无关联，仅 PT-Forward 内部共用 adapter）：
 
-| 字段 | M-Team 官方 | reelcore（可乐） | 修法 |
+| 字段 | MTeamAdapter 原实现（M-Team 形态） | 可乐实际响应 | 修法 |
 |---|---|---|---|
 | search data[].id | 字符串 `"13573"` | 数字 `13573` | `json.Number` 双兼容 |
 | memberCount.shareRate 等 4 字段 | 字符串 `"999999"` | 数字 `999999` | `json.Number` 双兼容 |
@@ -112,7 +112,7 @@ reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型—
 ## 摸底时间线（2026-11-03）
 
 - profile → 200（uid=907 ranfish，2026-10-20 注册，上传 86MB）
-- search → 200（M-Team 官方字段；FREE 促销在 status.discount）
+- search → 200（FREE 促销在 status.discount）
 - genDlToken → 首试超时（节流）→ 冷却 30s 后 200（签名 URL exp+sig）
 - 下载 → 200 7997B bencode（announce=tracker.colapt.com+passkey）
 - detail → 403 api_key_scope_denied（兼容面外）
@@ -214,4 +214,4 @@ reelcore 与 M-Team 官方 API 的**字段类型差异**（同路径不同型—
 
 ### 关键知识：info.source 盖章差异
 
-可乐发布时把 `.torrent` 的 `info.source` 盖成 `[https://www.colapt.com] ColaPT`（M-Team 盖 `[kp.m-team.cc] M-Team - TP`）——**同内容跨站 info_hash 必然不同**（辅种 hash 比对陷阱）；插件做 source 替换/剥除重算 hash 归一化反查。PT-Forward 恢复链/VerifyExists 的 hash 比对需注意此语义（可乐下载的种子 hash≠源站 hash——announce 嵌 tracker+passkey 同理）。
+可乐发布时把 `.torrent` 的 `info.source` 盖成 `[https://www.colapt.com] ColaPT`——**同内容跨站 info_hash 必然不同**（辅种 hash 比对陷阱：可乐下载的种子 hash≠任何源站 hash，announce 嵌 tracker+passkey 同理）；官方插件做 source 替换/剥除重算 hash 归一化反查。PT-Forward 恢复链/VerifyExists 的 hash 比对需注意此语义。
