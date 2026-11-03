@@ -1043,5 +1043,18 @@
     "cookiecloud_domain": "zrpt.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+  },
+  "www.colapt.com": {
+    "domain": "www.colapt.com",
+    "name_cn": "可乐",
+    "framework": "mteam",
+    "auth_type": "apikey",
+    "cookiecloud_domain": "colapt.com",
+    "download_url_template": "",
+    "api_key_label": "API Key",
+    "api_key_hint": "rcapi_ 开头（API Key 页创建——搜索/下载需勾「兼容面（MoviePilot）」；上传需勾 automation 面；接口主机 api.colapt.com 由系统自动处理）",
+    "show_cookie": true,
+    "verification_status": "verified",
+    "special_notes": "reelcore 自研引擎+M-Team 兼容面；x-api-key 头（禁同带 Cookie/Authorization/Origin）；接口在 api.colapt.com 上传面在 www 主机 /api/v1/automation/*；tracker.colapt.com 专用 passkey 嵌 announce"
   }
 }
