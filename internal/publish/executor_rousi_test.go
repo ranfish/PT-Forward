@@ -47,3 +47,30 @@ func TestRousiPublishInject(t *testing.T) {
 		t.Errorf("usa: %q", form3["rs_region"])
 	}
 }
+
+// §59.459: 野马注入锚——regionList 多产区全投≤3 去重/译名/poster。
+func TestYemaPublishInject(t *testing.T) {
+	meta := &model.TorrentMetadata{
+		Poster: "https://img.example/p.jpg",
+		PTGenSourceJSON: `{"region": ["中国大陆 / 美国", "日本"], "translated_titles": "测试译名"}`,
+	}
+	form := map[string]string{}
+	yemaPublishInject(form, meta)
+	// 大陆→1 美国→4 日本→6（三产区全投）
+	if form["yema_regions"] != `["1","4","6"]` {
+		t.Errorf("regions: %q", form["yema_regions"])
+	}
+	if form["yema_translated"] != "测试译名" {
+		t.Errorf("translated: %q", form["yema_translated"])
+	}
+	if form["yema_poster"] != meta.Poster {
+		t.Errorf("poster: %q", form["yema_poster"])
+	}
+	// miss 产区不投
+	meta2 := &model.TorrentMetadata{PTGenSourceJSON: `{"region": ["伊朗"]}`}
+	form2 := map[string]string{}
+	yemaPublishInject(form2, meta2)
+	if form2["yema_regions"] != "" {
+		t.Errorf("miss regions 应空: %q", form2["yema_regions"])
+	}
+}

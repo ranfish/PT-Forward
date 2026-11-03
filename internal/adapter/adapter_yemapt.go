@@ -1,14 +1,18 @@
 package adapter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -383,7 +387,194 @@ func (a *YemaptAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Si
 }
 
 func (a *YemaptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	return a.GenericAdapter.UploadTorrent(ctx, config, req)
+	return a.uploadViaOpenAPI(ctx, config, req)
+}
+
+// uploadViaOpenAPI §59.459-①: 野马上传——POST /openApi/torrent/
+// uploadTorrent.json multipart（wiki 2026-08-13 权威）。认证=裸 AuthKey
+// （Authorization 无 Bearer）。level<6 候选制：success=提交成功（data=
+// 种子ID；是否直发由站方权限决定——审核是站方行为）。
+func (a *YemaptAdapter) uploadViaOpenAPI(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+	if len(req.TorrentData) == 0 {
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
+
+	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
+	if err != nil {
+		return nil, uploadError("创建表单文件字段失败", err)
+	}
+	if _, err := fileWriter.Write(req.TorrentData); err != nil {
+		return nil, networkError("写入种子数据失败", err)
+	}
+
+	// 必填五件：file ✓/showName/shortDesc/categoryId/uploadUserAnonymous
+	fw.writeField("showName", req.Title)
+	fw.writeField("shortDesc", yemaShortDesc(req))
+	if v := req.FormFields["categoryId"]; v != "" {
+		fw.writeField("categoryId", v)
+	}
+	// §59.422 匿名默认开启——野马 y/n 形态
+	if req.Anonymous {
+		fw.writeField("uploadUserAnonymous", "y")
+	} else {
+		fw.writeField("uploadUserAnonymous", "n")
+	}
+
+	// ⑤ 描述：BBCode→Markdown 禁图变体（野马同 Markdown+禁 data:image）
+	if req.Description != "" {
+		fw.writeField("longDesc", description.BBCodeToMarkdownNoImage(req.Description))
+	}
+	// ⑥ 编号：imdb 去 tt 前缀纯数字/douban 数字（从 URL 提取尾部编号）
+	if id := extractNumericID(req.IMDbLink, "tt"); id != "" {
+		fw.writeField("imdb", id)
+	}
+	if id := extractDoubanID(req.DoubanLink); id != "" {
+		fw.writeField("douban", id)
+	}
+	// ④ 封面 URL 直投（零网络透传）
+	if poster := req.ExtraFields["yema_poster"]; poster != "" {
+		fw.writeField("picture", poster)
+	}
+	if req.MediaInfo != "" {
+		fw.writeField("mediaInfo", req.MediaInfo)
+	}
+	// 质量槽（FormFields 数字值——executor 通用链产出）
+	for domain, field := range map[string]string{
+		"medium": "medium", "standard": "standard", "codec": "codec",
+		"audiocodec": "audiocodec", "team": "team",
+	} {
+		if v := req.FormFields[domain]; v != "" {
+			fw.writeField(field, v)
+		}
+	}
+	// ②③ regionList 数组（executor 特化注入——同名重复字段 ≤3）
+	if v := req.ExtraFields["yema_regions"]; v != "" {
+		var regions []string
+		if json.Unmarshal([]byte(v), &regions) == nil {
+			for _, r := range regions {
+				fw.writeField("regionList", r)
+			}
+		}
+	}
+	// tags（FormFields["tags"]=逗号分隔数字值）
+	if v := req.FormFields["tags"]; v != "" {
+		for _, t := range strings.Split(v, ",") {
+			if t = strings.TrimSpace(t); t != "" {
+				fw.writeField("tagList", t)
+			}
+		}
+	}
+	// ④ 截图 URL 透传（≤20）
+	for _, shot := range req.Screenshots {
+		if shot = strings.TrimSpace(shot); shot != "" {
+			fw.writeField("screenshotList", shot)
+		}
+	}
+	// HR 考察默认关（转种不开）
+	fw.writeField("hrPunishEnable", "false")
+
+	if err := writer.Close(); err != nil {
+		return nil, networkError("封装表单失败", err)
+	}
+
+	uploadURL := resolveBaseURL(config) + "/openApi/torrent/uploadTorrent.json"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
+	if err != nil {
+		return nil, networkError("构造请求失败", err)
+	}
+	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
+	// 裸 AuthKey（无 Bearer——wiki 明确）
+	httpReq.Header.Set("Authorization", config.APIKey)
+
+	resp, err := a.doer.Client.Do(httpReq)
+	if err != nil {
+		return nil, uploadError("上传请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Success      bool   `json:"success"`
+		ErrorCode    int    `json:"errorCode"`
+		ErrorMessage string `json:"errorMessage"`
+		Data         int64  `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, &model.AppError{Code: 15001, Message: "解析响应失败", Cause: err}
+	}
+	if !result.Success {
+		return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("上传失败(code=%d): %s", result.ErrorCode, result.ErrorMessage)}
+	}
+	// 候选制：success=提交成功（level<6 进审核流——data=种子ID 不变）
+	tid := strconv.FormatInt(result.Data, 10)
+	return &model.PublishResponse{
+		Success:    true,
+		TorrentID:  tid,
+		DetailURL:  resolveBaseURL(config) + "/torrent/detail/" + tid,
+		TargetSite: config.Domain,
+	}, nil
+}
+
+// yemaShortDesc §59.459-⑧: 副标题必填兜底链——副标题→PTGen 中文译名→
+// 标题（站方 ≤512 无换行）。
+func yemaShortDesc(req *model.PublishRequest) string {
+	for _, cand := range []string{req.Subtitle, req.ExtraFields["yema_translated"], req.Title} {
+		cand = strings.TrimSpace(strings.ReplaceAll(cand, "\n", " "))
+		if cand != "" {
+			if len([]rune(cand)) > 512 {
+				cand = string([]rune(cand)[:512])
+			}
+			return cand
+		}
+	}
+	return req.Title
+}
+
+// extractNumericID 从 IMDb URL/纯编号提取去 tt 前缀数字（野马要纯数字）。
+func extractNumericID(link, prefix string) string {
+	link = strings.TrimSpace(link)
+	if link == "" {
+		return ""
+	}
+	// 纯编号形态（tt0111161 / 0111161）直出
+	if strings.HasPrefix(link, prefix) && len(link) > len(prefix) && isAllDigits(link[len(prefix):]) {
+		return link[len(prefix):]
+	}
+	if isAllDigits(link) {
+		return link
+	}
+	// URL 形态取尾段编号（剥尾斜杠再取末段）
+	link = strings.TrimRight(link, "/")
+	if i := strings.LastIndex(link, "/"); i >= 0 {
+		tail := strings.TrimPrefix(link[i+1:], prefix)
+		if isAllDigits(tail) {
+			return tail
+		}
+	}
+	return ""
+}
+
+// extractDoubanID 豆瓣 URL/纯数字提取（subject/ 尾数字）。
+func extractDoubanID(link string) string {
+	return extractNumericID(link, "")
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *YemaptAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
