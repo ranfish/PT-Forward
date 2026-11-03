@@ -96,14 +96,13 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	return results, nil
 }
 
-// rousiCredential §59.457: 肉丝凭据选择——APIKey（pgk_，改版后 API/下载
-// 真源）优先，fallback Passkey（改版前旧形态/兼容）。config.APIKey 由
-// sites.api_key 列注入（provider :399），双凭据站全库首例。
+// rousiCredential §59.457 附五: 肉丝凭据=APIKey（pgk_）单源。Passkey
+// 已拆除（用户定案 2026-11-03：passkey=tracker 专用——PeerGo 源码
+// TrackerCredential "only to construct one authenticated announce URL"；
+// .torrent 下载时站方自动注入下载者 passkey，PT-Forward 全链只走
+// API 通道，fallback 旧 passkey 调新 API 恒 401 无意义）。
 func rousiCredential(config *model.SiteConfig) string {
-	if config.APIKey != "" {
-		return config.APIKey
-	}
-	return config.Passkey
+	return config.APIKey
 }
 
 func (a *RousiAdapter) setAuthHeaders(req *http.Request, passkey string) {

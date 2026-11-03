@@ -22737,7 +22737,7 @@
       "name": "肉丝",
       "base_url": "https://rousi.pro",
       "framework": "rousi",
-      "auth_type": "passkey",
+      "auth_type": "apikey",
       "download_mode": "passkey",
       "is_source": true,
       "is_target": false,

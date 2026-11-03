@@ -1474,6 +1474,30 @@ func isSPAShell(html string) bool {
 }
 
 func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, string) {
+	// §59.457 附五: 肉丝（PeerGo 兼容层）——Bearer pgk + GET torrents
+	// （POST BaseURL+x-api-key 对该站恒失败——auth_type=apikey 后需要真分支）
+	if s.Framework == "rousi" {
+		testURL := strings.TrimRight(s.BaseURL, "/") + "/api/v1/torrents?page_size=1"
+		req, err := http.NewRequest("GET", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+		if err != nil {
+			return false, "构造请求失败: " + err.Error()
+		}
+		req.Header.Set("Authorization", "Bearer "+s.APIKey)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "连接失败: " + err.Error()
+		}
+		defer func() { httpclient.DrainBody(resp) }()
+		if resp.StatusCode == http.StatusOK {
+			return true, "API Key 认证成功"
+		}
+		if resp.StatusCode == http.StatusUnauthorized {
+			return false, "API Key 无效（401）"
+		}
+		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	testURL := s.BaseURL
 	if s.Framework == "mteam" {
 		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
