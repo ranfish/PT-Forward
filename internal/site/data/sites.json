@@ -29926,6 +29926,23 @@
         "DSAudio"
       ],
       "is_reseed_target": false
+    },
+    {
+      "domain": "www.colapt.com",
+      "name": "可乐",
+      "base_url": "https://api.colapt.com",
+      "framework": "mteam",
+      "auth_type": "apikey",
+      "download_mode": "",
+      "is_source": false,
+      "is_target": false,
+      "cookiecloud_domain": "colapt.com",
+      "alternative_domains": "",
+      "tracker_domains": [
+        "tracker.colapt.com"
+      ],
+      "groups": [],
+      "form": {}
     }
   ],
   "exclusions": [
