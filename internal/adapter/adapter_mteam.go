@@ -1801,13 +1801,22 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	if err == nil {
 		defer func() { drainBody(peerResp) }()
 	}
-	// §59.460: myPeerStatistics 不在部分兼容面实现的端点集内（可乐
-	// scope_denied 403 实证）——非 200/读流失败时 fallback
-	// getUserTorrentList 翻页计数（行为驱动降级，主端点健康的站点零变化）。
+	// §59.460 附四: peer 统计端点名两形态——M-Team 为 myPeerStatistics；
+	// 可乐为简名 myPeerStatus（2026-11-04 实测 200 {code,data:{seeder:N}}，
+	// 无 size 字段——SeedingSize 留 0；此前代码误用全名形态对可乐恒
+	// 403）。三层降级：全名（M-Team 200 直用）→ 简名（可乐）→
+	// getUserTorrentList 翻页计数（终极兜底）。
 	if err != nil || peerResp.StatusCode != http.StatusOK {
+		if err == nil {
+			drainBody(peerResp)
+		}
 		if a.logger != nil {
-			a.logger.Warn("myPeerStatistics unavailable, fallback to getUserTorrentList",
+			a.logger.Warn("myPeerStatistics unavailable, trying myPeerStatus",
 				zap.Error(err))
+		}
+		if count, ok := a.seedingViaPeerStatus(ctx, config); ok {
+			stats.SeedingCount = count
+			return stats, nil
 		}
 		count, size := a.seedingViaUserTorrentList(ctx, config)
 		stats.SeedingCount = count
@@ -1838,6 +1847,36 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	return stats, nil
 }
 
+// seedingViaPeerStatus §59.460 附四: 可乐简名端点 POST /api/tracker/
+// myPeerStatus——响应 {code,data:{seeder:N}}（仅做种数无 size）。
+// 返回 ok=false 时调用方继续 getUserTorrentList 兜底。
+func (a *MTeamAdapter) seedingViaPeerStatus(ctx context.Context, config *model.SiteConfig) (int, bool) {
+	u := resolveBaseURL(config) + "/api/tracker/myPeerStatus"
+	req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
+	if err != nil {
+		return 0, false
+	}
+	a.setAPIHeaders(req, config.APIKey)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return 0, false
+	}
+	body, readErr := readBody(resp)
+	drainBody(resp)
+	if readErr != nil || resp.StatusCode != http.StatusOK {
+		return 0, false
+	}
+	var result struct {
+		Data struct {
+			Seeder flexInt `json:"seeder"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, false
+	}
+	return int(result.Data.Seeder), true
+}
+
 // seedingViaUserTorrentList §59.460: myPeerStatistics 不可用时的做种数
 // 降级通道——getUserTorrentList 翻页计数（可乐兼容面实测响应条目为
 // {torrent:{size,source}} 嵌套形态；M-Team 主端点健康不触发本函数）。
@@ -1862,7 +1901,9 @@ func (a *MTeamAdapter) seedingViaUserTorrentList(ctx context.Context, config *mo
 		}
 		body, readErr := readBody(resp)
 		drainBody(resp)
-		if readErr != nil {
+		// §59.460 附四: 非 200 静默零值缺陷修正（错误 JSON Unmarshal
+		// 成功空结构 → rows=0 被当"翻完了"返回——真实状态码显式短路）
+		if readErr != nil || resp.StatusCode != http.StatusOK {
 			return total, sizeSum
 		}
 		var result struct {

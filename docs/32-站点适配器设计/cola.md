@@ -46,7 +46,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 | POST /api/torrent/genDlToken?id=N | 换下载票 | torrent.download | ✓（首试超时=节流，冷却后通） |
 | GET /downloads/<凭据>/<id> | 下载 .torrent | 凭票访问 | ✓ 7997B bencode |
 | POST /api/member/getUserTorrentList | 做种列表 | Key 有效 | ✓ 200（v0.0.1324 实测，条目 `{torrent:{size,source}}`——做种数降级通道） |
-| POST /api/tracker/myPeerStatus | peer 状态 | Key 有效 | **✗ 403**（代码实测端点名 `myPeerStatistics` scope_denied；站方文档写 `myPeerStatus`——**端点名存疑**，复验时用站方名再试一发；当前 Stats 走 getUserTorrentList 降级不依赖此端点） |
+| POST /api/tracker/myPeerStatus | peer 状态 | Key 有效 | ✓ **2026-11-04 复验定案**：站方端点=简名 `myPeerStatus`（200 `{code,data:{seeder:N}}` 仅做种数）；代码误用全名 `myPeerStatistics` 恒 403——已改三层降级（全名 M-Team→简名可乐→getUserTorrentList 兜底，v0.0.1327） |
 | POST /api/msg/search · markRead | 站内信 | Key 有效 | — |
 | POST /api/subtitle/* | 字幕四件套 | catalog.read | 返回空（本站无字幕文件） |
 | ~~POST /api/torrent/detail~~ | **✗ 不在契约**（scope_denied 实证） | — | 已解决：Web 面 `GET /api/v1/torrents/{id}` 降级（v0.0.1324/1325，见 §获取链补全） |
@@ -275,6 +275,6 @@ RequiresSideLoading: true
 
 RSS feed 无优惠字段 → 走 adapter DetectDiscount → `/api/torrent/detail` 403 → **Web 面 promotion 降级**（v0.0.1325）：`GET /api/v1/torrents/{id}`（cookie）解析 `promotion.download:{num,den}`——num==0 → FREE/比例归 PERCENT 档/不认识回 NONE（站方全站免费期恒 FREE）。侧载链走 DownloadTorrent（genDlToken 通道已修——自动可用）。
 
-### 待明日冷启动复验（限流窗）
+### 冷启动复验收口（2026-11-04——四发全绿）
 
-①Download 端到端 ②DetectDiscount 降级链（promotion→FREE）③RSS 侧载真 hash——三发收口。
+①Download 端到端 ✓（1.7s/32894B/真 bencode）②DetectDiscount ✓（promotion→FREE 降级链实测）③RSS 侧载真 hash ✓（生产 bencode 边界解析=站方 Web detail 权威值 4a4a1f49…——前次"不一致"系探针手写边界 bug：字符串内 'e' 字符干扰 depth 计数，生产递归实现正确）④myPeerStatus 端点名定案 ✓（简名 200——三层降级实施+getUserTorrentList fallback 补 StatusCode 检查修非 200 静默零值缺陷）。**可乐获取链全通收官。**
