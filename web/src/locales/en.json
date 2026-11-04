@@ -1367,7 +1367,8 @@
     "githubTokenCleared": "GitHub Token cleared",
     "githubTokenClearFailed": "Clear failed",
     "rssFailAlertThreshold": "Subscription stall alert threshold (rounds)",
-    "rssFailAlertThresholdHint": "Status column turns red after N consecutive failed rounds (orange for 1~N-1)"
+    "rssFailAlertThresholdHint": "Status column turns red after N consecutive failed rounds (orange for 1~N-1)",
+    "screenshotFormat": "Screenshot Format"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",

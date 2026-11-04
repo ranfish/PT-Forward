@@ -1,18 +1,22 @@
 package adapter
 
 import (
-	"strconv"
-	"time"
-	"github.com/ranfish/pt-forward/internal/description"
-	"github.com/google/uuid"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/ranfish/pt-forward/internal/description"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 
@@ -458,6 +462,11 @@ var rousiPosterClient = &http.Client{Timeout: 15 * time.Second}
 // 保+截图取前 5）；逐张失败降级跳过（部分投递优于零投递）。
 func rousiBuildImages(ctx context.Context, req *model.PublishRequest, logger *zap.Logger) []string {
 	const maxImages = 6
+	// §59.462: 站方总计门 20MB（错误码 4006）——按最终 dataURL 编码后
+	// 字节计（base64 膨胀 4/3 已含）；超限从最后一张逐张丢弃。数学安全：
+	// 单张 5MB 门保证任何 3 张（1 封面+2 截图=站方最低要求）组合必然
+	// ≤15MB < 20MB——降级永不破最低要求。
+	const maxTotalBytes = 20 << 20
 	images := make([]string, 0, maxImages)
 
 	if poster := req.ExtraFields["rs_poster"]; poster != "" {
@@ -478,11 +487,31 @@ func rousiBuildImages(ctx context.Context, req *model.PublishRequest, logger *za
 			images = append(images, dataURL)
 		}
 	}
+	// 总计门：超限从尾部（最后一张截图）逐张丢弃
+	for totalLen(images) > maxTotalBytes && len(images) > 3 {
+		if logger != nil {
+			logger.Warn("rousi images total gate exceeded（丢弃最后一张）",
+				zap.Int("images", len(images)-1),
+				zap.Int("total_bytes", totalLen(images)))
+		}
+		images = images[:len(images)-1]
+	}
 	return images
 }
 
-// rousiDownloadImageAsDataURL §59.458 窄例外: 封面单图下载→dataURL。
+func totalLen(ss []string) int {
+	n := 0
+	for _, s := range ss {
+		n += len(s)
+	}
+	return n
+}
+
+// rousiDownloadImageAsDataURL §59.458 窄例外: 封面/截图单图下载→dataURL。
 // 失败/超限返回 ok=false（调用方降级——发布不因外站可用性失败）。
+// §59.462: 站方 API 明确要 JPEG data URL——png 输入（截图格式可选化后
+// Tab3 可能是 png 产物）内存转码 jpeg（q85 与旧默认一致）；jpeg 直通
+// 零开销（默认用户完全不经过转码路径）。
 func rousiDownloadImageAsDataURL(ctx context.Context, url string, logger *zap.Logger) (string, bool) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -503,8 +532,8 @@ func rousiDownloadImageAsDataURL(ctx context.Context, url string, logger *zap.Lo
 		}
 		return "", false
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 6<<20))
-	if err != nil || len(data) == 0 || len(data) > 5<<20 {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if err != nil || len(data) == 0 || len(data) > 6<<20 {
 		if logger != nil {
 			logger.Warn("rousi poster size gate（降级无封面）", zap.String("url", url), zap.Int("bytes", len(data)))
 		}
@@ -512,9 +541,50 @@ func rousiDownloadImageAsDataURL(ctx context.Context, url string, logger *zap.Lo
 	}
 	mime := resp.Header.Get("Content-Type")
 	if mime == "" || mime == "application/octet-stream" {
+		// Content-Type 缺失时魔数兜底（明确声明时信任服务器——避免对
+		// 声明 jpeg 的 body 做过严魔数校验误杀直通）
+		mime = sniffImageMIME(data)
+	}
+	// §59.462: png → jpeg 内存转码（站方 API 仅收 JPEG base64）——仅对
+	// 判定为 png 的输入（声明 png 或嗅探 png）；jpeg 声明直通零开销
+	if mime == "image/png" {
+		if jpegData, jErr := pngToJPEG(data, 85); jErr == nil {
+			data = jpegData
+			mime = "image/jpeg"
+		} else if logger != nil {
+			logger.Warn("rousi png→jpeg transcode failed（降级跳过）", zap.String("url", url), zap.Error(jErr))
+			return "", false
+		}
+	}
+	if !strings.HasPrefix(mime, "image/") {
 		mime = "image/jpeg"
 	}
 	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), true
+}
+
+// sniffImageMIME 魔数嗅探（Content-Type 缺失时的兜底判定）。
+func sniffImageMIME(data []byte) string {
+	if len(data) > 8 && data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G' {
+		return "image/png"
+	}
+	if len(data) > 3 && data[0] == 0xFF && data[1] == 0xD8 {
+		return "image/jpeg"
+	}
+	return "image/jpeg"
+}
+
+// pngToJPEG §59.462: png bytes → jpeg 编码（肉丝站方 API 仅收 JPEG；
+// 转码有损 q85 与旧 jpeg 默认一致——肉丝消费端画质回到 JPG 时代水平）。
+func pngToJPEG(pngData []byte, quality int) ([]byte, error) {
+	img, err := png.Decode(bytes.NewReader(pngData))
+	if err != nil {
+		return nil, fmt.Errorf("png decode: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
+		return nil, fmt.Errorf("jpeg encode: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 func (a *RousiAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {

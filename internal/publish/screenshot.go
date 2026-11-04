@@ -24,10 +24,21 @@ type ScreenshotEngine struct {
 	count       int
 	minInterval float64
 	quality     int
-	logger      *zap.Logger
+	// format §59.462: jpeg（默认）|png——mpv --vo-image-format 与产物
+	// 文件后缀的单一来源；png 时附 compression=9（zlib 拉满无损压缩）。
+	format string
+	logger *zap.Logger
 }
 
-func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int, logger *zap.Logger) *ScreenshotEngine {
+// shotExt 格式→文件后缀（单点）。
+func (e *ScreenshotEngine) shotExt() string {
+	if e.format == "png" {
+		return ".png"
+	}
+	return ".jpg"
+}
+
+func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int, format string, logger *zap.Logger) *ScreenshotEngine {
 	if mpvPath == "" {
 		mpvPath = "mpv"
 	}
@@ -43,12 +54,16 @@ func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int
 	if quality <= 0 {
 		quality = 85
 	}
+	if format != "png" {
+		format = "jpeg" // 空/未知值防御归 jpeg（存量语义）
+	}
 	return &ScreenshotEngine{
 		mpvPath:     mpvPath,
 		ffprobePath: "ffprobe",
 		count:       count,
 		minInterval: float64(minInterval),
 		quality:     quality,
+		format:      format,
 		logger:      logger,
 	}
 }
@@ -110,7 +125,7 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 
 	var paths []string
 	for i, ts := range points {
-		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d.jpg", i))
+		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d%s", i, e.shotExt()))
 		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.isMpegTS, info.fps, info.doviProfile, outPath)
 		if capErr != nil {
 			e.logger.Warn("screenshot capture failed",
@@ -333,10 +348,20 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 		"--frames="+strconv.Itoa(frames),
 		"--no-terminal",
 		"--no-config",
-		"--vo-image-format=jpg",
-		"--vo-image-jpeg-quality="+strconv.Itoa(e.quality),
 		"--vo-image-outdir="+outDir,
 	)
+	// §59.462: 格式参数化——png 无损（compression=9）|jpeg 现状（quality）
+	if e.format == "png" {
+		args = append(args,
+			"--vo-image-format=png",
+			"--vo-image-png-compression=9",
+		)
+	} else {
+		args = append(args,
+			"--vo-image-format=jpg",
+			"--vo-image-jpeg-quality="+strconv.Itoa(e.quality),
+		)
+	}
 
 	vfParts := []string{}
 	// §59.300 附十四/附十五：
@@ -401,10 +426,10 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	bestNum := -1
 	for _, ent := range entries {
 		name := ent.Name()
-		if !strings.HasSuffix(name, ".jpg") {
+		if !strings.HasSuffix(name, e.shotExt()) {
 			continue
 		}
-		base := strings.TrimSuffix(name, ".jpg")
+		base := strings.TrimSuffix(name, e.shotExt())
 		num, convErr := strconv.Atoi(base)
 		if convErr != nil {
 			continue
@@ -423,10 +448,10 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	// 低于 MinScreenshots 判"上传全失败"（普通盘/DoVi 盘同根）。
 	for _, ent := range entries {
 		name := ent.Name()
-		if filepath.Join(outDir, name) == best || !strings.HasSuffix(name, ".jpg") {
+		if filepath.Join(outDir, name) == best || !strings.HasSuffix(name, e.shotExt()) {
 			continue
 		}
-		base := strings.TrimSuffix(name, ".jpg")
+		base := strings.TrimSuffix(name, e.shotExt())
 		if _, convErr := strconv.Atoi(base); convErr != nil {
 			continue // 非数字编号命名（如 shot_000.jpg）不动
 		}

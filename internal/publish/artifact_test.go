@@ -5,7 +5,7 @@ import (
 )
 
 func TestGenerateTimePoints(t *testing.T) {
-	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
+	engine := NewScreenshotEngine("mpv", 5, 30, 85, "jpeg", nil)
 	points := engine.generateTimePoints(7200)
 
 	if len(points) != 5 {
@@ -26,7 +26,7 @@ func TestGenerateTimePoints(t *testing.T) {
 }
 
 func TestGenerateTimePoints_ShortVideo(t *testing.T) {
-	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
+	engine := NewScreenshotEngine("mpv", 5, 30, 85, "jpeg", nil)
 	points := engine.generateTimePoints(60)
 
 	if len(points) != 5 {
@@ -41,7 +41,7 @@ func TestGenerateTimePoints_ShortVideo(t *testing.T) {
 }
 
 func TestGenerateTimePoints_ZeroDuration(t *testing.T) {
-	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
+	engine := NewScreenshotEngine("mpv", 5, 30, 85, "jpeg", nil)
 	points := engine.generateTimePoints(0)
 
 	if len(points) != 5 {
@@ -56,7 +56,7 @@ func TestGenerateTimePoints_ZeroDuration(t *testing.T) {
 }
 
 func TestScreenshotEngineNotAvailable(t *testing.T) {
-	engine := NewScreenshotEngine("nonexistent_binary", 5, 30, 85, nil)
+	engine := NewScreenshotEngine("nonexistent_binary", 5, 30, 85, "jpeg", nil)
 	if engine.Available() {
 		t.Error("expected Available() to return false for nonexistent binary")
 	}
@@ -180,7 +180,7 @@ func TestContainsAny(t *testing.T) {
 }
 
 func TestProbeVideo_DetectsHDR(t *testing.T) {
-	_ = NewScreenshotEngine("mpv", 5, 30, 85, nil)
+	_ = NewScreenshotEngine("mpv", 5, 30, 85, "jpeg", nil)
 	info := &videoInfo{duration: 7507.5, isHDR: true}
 	if !info.isHDR {
 		t.Error("expected HDR detection")
@@ -193,7 +193,7 @@ func TestProbeVideo_DetectsHDR(t *testing.T) {
 }
 
 func TestEngineSelection_AlwaysMPV(t *testing.T) {
-	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
+	engine := NewScreenshotEngine("mpv", 5, 30, 85, "jpeg", nil)
 	engine.ffprobePath = "nonexistent_ffprobe"
 
 	// All videos use mpv regardless of HDR or subtitles

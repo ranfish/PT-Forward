@@ -28,6 +28,9 @@ const (
 	KeyScreenshotCount       = "screenshot_count"
 	KeyScreenshotMinInterval = "screenshot_min_interval"
 	KeyScreenshotJPEGQuality = "screenshot_jpeg_quality"
+	// KeyScreenshotFormat §59.462: 截图格式（jpeg|png——默认 jpeg 存量
+	// 零变化；海豹站规要 PNG 截图，用户按需切换）
+	KeyScreenshotFormat = "screenshot_format"
 	KeyScreenshotCacheDays   = "screenshot_cache_days" // §59.63: 截图链接缓存观察期（天，<=0 关闭）
 	// §59.137: 源站截图不可信站点（逗号分隔）——朋友站详情图为"资源原图 vs 站点压制"
 	// 对比图，非资源真实画面；特化站点采集层不落 screenshots 列，只走本地 mpv
@@ -73,6 +76,7 @@ var DefaultSeeds = map[string]string{
 	KeyScreenshotCount:       "6",
 	KeyScreenshotMinInterval: "60",
 	KeyScreenshotJPEGQuality: "85",
+		KeyScreenshotFormat:      "jpeg",
 	KeyScreenshotCacheDays:   "30",
 	KeyScreenshotSourceExcludedSites: "朋友",
 

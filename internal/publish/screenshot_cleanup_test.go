@@ -38,7 +38,7 @@ exit 0
 		t.Fatal(err)
 	}
 
-	eng := NewScreenshotEngine(script, 2, 1, 85, nil)
+	eng := NewScreenshotEngine(script, 2, 1, 85, "jpeg", nil)
 
 	ctx := context.Background()
 	// 模拟两次迭代写同一 tmpDir（与 engine.Capture 行为一致）

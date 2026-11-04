@@ -1344,7 +1344,8 @@
     "githubTokenCleared": "GitHub Token 已清除",
     "githubTokenClearFailed": "清除失败",
     "rssFailAlertThreshold": "订阅停摆告警阈值（轮）",
-    "rssFailAlertThresholdHint": "连续失败 ≥N 轮时订阅列表状态列变红（1~N-1 橙色）"
+    "rssFailAlertThresholdHint": "连续失败 ≥N 轮时订阅列表状态列变红（1~N-1 橙色）",
+    "screenshotFormat": "截图格式"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",
