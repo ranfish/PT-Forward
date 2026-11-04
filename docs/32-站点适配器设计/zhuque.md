@@ -440,3 +440,12 @@ Origin: https://zhuque.in
 ### 工具链差异（TNode 特殊性）
 
 选项是 **JSON API 非 HTML 表单**——formdiff/ParsePublishFormHTML 不适用；验证走"API 值集实时对照（零漂移实证）+单测锚+DryRun 借壳"三路。
+
+### DryRun 借壳验证（2026-11-04 · Mercy 馒头官种借壳——v0.0.1331）
+
+- **dry_run_ok 四槽全映射**：category=501（电影）/medium=306/resolution=404（2160p）/videoCoding=104（x265）——form_labels 人类可读全对
+- **medium=306 语义说明**：借壳 Mercy 判定终态 encode（§59.352 BDAV 历史案种子）——306+104（Encode+x265）=§59.380 压制联动正确工作（H/X 四分立站：encode 种联动 x265 ✓）
+- **tags 断链修复（野马同款第三站）**：Taglist 模式 applier 硬编码 Key="tagList" 写 TagArrayFields，TNodeAdapter 原读 FormFields["tags"] 恒空——修：adapter 消费 TagArrayFields（Key=tagList 的 Value 聚合逗号串"604,603,611"——站方单值字段形态）+FormFields 兜底
+- **tag_overrides 语义实证**：standard_key 形态（["tag.chinese_subtitle",...]→tags=[604,603,611]+labels=[中字,国语,杜比视界] 全对）非站方 value
+- **借壳环境**：PT0 torrent_dir=/tmp/opencode/rousi_td（肉丝轮配置沿用）+Mercy .torrent 从 TR@243 /home/docker/Transmission/config/torrents/ scp 回
+- **form_config.enabled 漏写实战**：migration143 漏 enabled 字段→DryRun"目标站未启用发布配置"（§59.318 单真相）——migration144 json_set 刷正+143 源码补
