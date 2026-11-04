@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"errors"
@@ -242,17 +243,26 @@ func TestGazelle_GetPreciseSLData_Web(t *testing.T) {
 }
 
 func TestGazelle_UploadTorrent_Success(t *testing.T) {
+	// §59.462: API 通道（api.php?action=upload）+ JSON 响应
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		_, _ = w.Write([]byte(`<html>success <a href="torrents.php?torrentid=555">view</a></html>`))
+		// 确认 api.php 通道+api_key
+		if !strings.Contains(r.URL.Path, "api.php") || r.URL.Query().Get("action") != "upload" {
+			t.Errorf("expected api.php?action=upload, got %s", r.URL.String())
+		}
+		if r.URL.Query().Get("api_key") == "" {
+			t.Error("expected api_key param")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":200,"response":{"torrent_id":555}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewGazelleAdapter(doer, zap.NewNop())
-	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "test-api-key"}
 
 	result, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{
 		TorrentData: []byte("d4:infod...e"),
@@ -279,14 +289,16 @@ func TestGazelle_UploadTorrent_EmptyData(t *testing.T) {
 }
 
 func TestGazelle_UploadTorrent_Fail(t *testing.T) {
+	// §59.462: API JSON 错误响应
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><span class="error">Duplicate torrent</span></html>`))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":400,"error":"bad id parameter"}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewGazelleAdapter(doer, zap.NewNop())
-	config := &model.SiteConfig{Domain: srv.URL}
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "test-api-key"}
 
 	result, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{TorrentData: []byte("data")})
 	if err == nil {
@@ -409,7 +421,6 @@ func TestGazelle_GetTorrentDetail_APIFull(t *testing.T) {
 		t.Errorf("mi/poster: %q %q", detail.MediaInfo[:min(20, len(detail.MediaInfo))], detail.PosterURL)
 	}
 }
-func min(a, b int) int { if a < b { return a }; return b }
 
 func TestGazelle_VerifyExists_Found(t *testing.T) {
 	// §59.462: SearchTorrents 改 browse AJAX——mock JSON 响应
