@@ -101,20 +101,27 @@ func TestGazelle_DownloadTorrent_Error(t *testing.T) {
 }
 
 func TestGazelle_GetTorrentDetail_API(t *testing.T) {
+	// §59.462: sections/ajax 实测结构（status+平铺 categoryName+版本四槽）
 	apiResp := map[string]interface{}{
+		"status": "success",
 		"response": map[string]interface{}{
 			"torrent": map[string]interface{}{
-				"filePath": "movie.mkv",
-				"size":     1073741824,
-				"infoHash": "AABBCCDDEEFF00112233445566778899aabbccdd",
-				"seeders":  10,
-				"leechers": 5,
+				"size":       1073741824,
+				"infoHash":   "AABBCCDDEEFF00112233445566778899aabbccdd",
+				"seeders":    10,
+				"leechers":   5,
+				"codec":      "x264",
+				"resolution": "1080p",
+				"container":  "MKV",
+				"processing": "Encode",
+				"source":     "Blu-ray",
+				"fileName":   "movie.mkv",
 			},
 			"group": map[string]interface{}{
-				"name": "Movie 2024",
-				"category": map[string]interface{}{
-					"name": "Movies",
-				},
+				"name":        "Movie 2024",
+				"subName":     "测试影片",
+				"year":        2024,
+				"categoryName": "Movies",
 			},
 		},
 	}
@@ -139,8 +146,9 @@ func TestGazelle_GetTorrentDetail_API(t *testing.T) {
 	if detail.Size != 1073741824 {
 		t.Errorf("size: %d", detail.Size)
 	}
-	if detail.Category != "Movies" {
-		t.Errorf("category: %s", detail.Category)
+	// §59.462: 实测结构无独立 Category 槽（纯电影站 Movies 恒定）——断言版本槽
+	if detail.Codec != "x264" || detail.Resolution != "1080p" || detail.ReleaseGroup != "Encode" {
+		t.Errorf("版本槽: codec=%q res=%q processing=%q", detail.Codec, detail.Resolution, detail.ReleaseGroup)
 	}
 }
 
@@ -296,9 +304,10 @@ func TestGazelle_UploadTorrent_Fail(t *testing.T) {
 func TestGazelle_GetTorrentInfoHash_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]interface{}{
+			"status": "success",
 			"response": map[string]interface{}{
-				"torrent": map[string]interface{}{"infoHash": "aaBBccDDeeFF00112233445566778899aaBBccDD", "size": 100, "filePath": "f"},
-				"group":   map[string]interface{}{"name": "T", "category": map[string]interface{}{"name": "M"}},
+				"torrent": map[string]interface{}{"infoHash": "aaBBccDDeeFF00112233445566778899aaBBccDD", "size": 100, "fileName": "f"},
+				"group":   map[string]interface{}{"name": "T", "year": 2024},
 			},
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -340,19 +349,28 @@ func TestResolveBase(t *testing.T) {
 
 func TestGazelle_GetTorrentDetail_APIFull(t *testing.T) {
 	apiResp := map[string]interface{}{
+		"status": "success",
 		"response": map[string]interface{}{
 			"torrent": map[string]interface{}{
-				"filePath": "movie.2024.bluray.mkv",
-				"size":     5368709120,
-				"infoHash": "11223344556677889900AABBCCDDEEFF00112233",
-				"seeders":  50,
-				"leechers": 15,
+				"size":       5368709120,
+				"infoHash":   "11223344556677889900AABBCCDDEEFF00112233",
+				"seeders":    50,
+				"leechers":   15,
+				"codec":      "H.265",
+				"resolution": "2160p",
+				"processing": "BD66",
+				"mediainfos": []string{"General - Complete name: movie.mkv"},
+				"fileName":   "movie.2024.bluray.mkv",
 			},
 			"group": map[string]interface{}{
-				"name": "Full API Movie",
-				"category": map[string]interface{}{
-					"name": "Movies",
-				},
+				"name":         "Full API Movie",
+				"subName":      "全字段影片",
+				"year":         2024,
+				"categoryName": "Movies",
+				"imdbId":       "tt1234567",
+				"doubanId":     "3592120",
+				"conver":       "https://ptpimg.me/cover.jpg",
+				"tags":         []string{"action", "drama"},
 			},
 		},
 	}
@@ -377,26 +395,32 @@ func TestGazelle_GetTorrentDetail_APIFull(t *testing.T) {
 	if detail.Size != 5368709120 {
 		t.Errorf("size: %d", detail.Size)
 	}
-	if detail.Category != "Movies" {
-		t.Errorf("category: %s", detail.Category)
-	}
 	if detail.InfoHash != "11223344556677889900aabbccddeeff00112233" {
 		t.Errorf("info_hash: %s", detail.InfoHash)
 	}
+	// §59.462 实测结构断言（双层全字段）
+	if detail.Subtitle == "" || detail.IMDbID != "tt1234567" || detail.DoubanID != "3592120" {
+		t.Errorf("双层字段: sub=%q imdb=%q douban=%q", detail.Subtitle, detail.IMDbID, detail.DoubanID)
+	}
+	if detail.Codec != "H.265" || detail.Resolution != "2160p" || detail.ReleaseGroup != "BD66" {
+		t.Errorf("版本槽: codec=%q res=%q processing=%q", detail.Codec, detail.Resolution, detail.ReleaseGroup)
+	}
+	if detail.MediaInfo == "" || detail.PosterURL != "https://ptpimg.me/cover.jpg" {
+		t.Errorf("mi/poster: %q %q", detail.MediaInfo[:min(20, len(detail.MediaInfo))], detail.PosterURL)
+	}
 }
+func min(a, b int) int { if a < b { return a }; return b }
 
 func TestGazelle_VerifyExists_Found(t *testing.T) {
+	// §59.462: SearchTorrents 改 browse AJAX——mock JSON 响应
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
-		</body></html>`))
+		_, _ = w.Write([]byte(`{"status":"success","response":{"results":[{"groupId":1,"groupName":"Found Torrent","groupYear":2024,"torrents":[{"torrentId":42,"size":1073741824,"seeders":3,"leechers":0}]}]}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewGazelleAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
-	config.Paths.Browse = "/torrents.php"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {
@@ -408,17 +432,15 @@ func TestGazelle_VerifyExists_Found(t *testing.T) {
 }
 
 func TestGazelle_VerifyExists_NotFound(t *testing.T) {
+	// §59.462: 组命中但 tid 不匹配（展平后无 42）
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
-		</body></html>`))
+		_, _ = w.Write([]byte(`{"status":"success","response":{"results":[{"groupId":1,"groupName":"Other","groupYear":2020,"torrents":[{"torrentId":99,"size":100,"seeders":1,"leechers":0}]}]}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewGazelleAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
-	config.Paths.Browse = "/torrents.php"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {

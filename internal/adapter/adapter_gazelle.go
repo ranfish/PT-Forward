@@ -103,7 +103,6 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", config.APIKey)
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
@@ -116,54 +115,84 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, err
 	}
+	return parseGazelleTorrentDetail(body)
+}
 
+// parseGazelleTorrentDetail §59.462: sections/ajax/torrent.php 响应解析
+// （2026-11-04 实测双层结构：group=影片级 name/subName/year/releaseType/
+// categoryId/categoryName/imdbId/doubanId/conver[封面]/tags + torrent=
+// 版本级 codec/resolution/container/processing/source/remasterTitle/
+// scene/size/seeders/freeTorrent/mediainfos[数组]/fileName/description）。
+func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 	var result struct {
+		Status   string `json:"status"`
 		Response struct {
-			Torrent struct {
-				FilePath    string `json:"filePath"`
-				Size        int64  `json:"size"`
-				InfoHash    string `json:"infoHash"`
-				Seeders     int    `json:"seeders"`
-				Leechers    int    `json:"leechers"`
-				Description string `json:"description"`
-				MediaInfo   string `json:"mediaInfo"`
-			} `json:"torrent"`
 			Group struct {
-				Name     string `json:"name"`
-				Category struct {
-					Name string `json:"name"`
-				} `json:"category"`
-				Tags []struct {
-					Name string `json:"name"`
-				} `json:"tags"`
+				Name        string   `json:"name"`
+				SubName     string   `json:"subName"`
+				Year        int      `json:"year"`
+				ReleaseType string   `json:"releaseType"`
+				CategoryID  int      `json:"categoryId"`
+				CategoryNm  string   `json:"categoryName"`
+				ImdbID      string   `json:"imdbId"`
+				DoubanID    string   `json:"doubanId"`
+				Conver      string   `json:"conver"`
+				Tags        []string `json:"tags"`
+				Desc        string   `json:"description"`
 			} `json:"group"`
+			Torrent struct {
+				InfoHash    string   `json:"infoHash"`
+				Size        int64    `json:"size"`
+				Seeders     int      `json:"seeders"`
+				Leechers    int      `json:"leechers"`
+				Snatched    int      `json:"snatched"`
+				Codec       string   `json:"codec"`
+				Resolution  string   `json:"resolution"`
+				Container   string   `json:"container"`
+				Processing  string   `json:"processing"`
+				Source      string   `json:"source"`
+				RemasterTtl string   `json:"remasterTitle"`
+				Description string   `json:"description"`
+				Mediainfos  []string `json:"mediainfos"`
+				FileName    string   `json:"fileName"`
+				FreeTorrent bool     `json:"freeTorrent"`
+			} `json:"torrent"`
 		} `json:"response"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
 		return nil, parseError("failed to parse API response", err)
 	}
-
-	t := result.Response.Torrent
-	g := result.Response.Group
-	detail := &model.TorrentDetail{
-		Title:       g.Name,
-		Size:        t.Size,
-		InfoHash:    strings.ToLower(t.InfoHash),
-		Category:    g.Category.Name,
-		Description: t.Description,
-		MediaInfo:   t.MediaInfo,
+	if result.Status != "success" {
+		return nil, parseError("API 返回状态: "+result.Status, nil)
 	}
-	for _, tag := range g.Tags {
-		if tag.Name != "" {
-			detail.Tags = append(detail.Tags, tag.Name)
-		}
+
+	g := result.Response.Group
+	t := result.Response.Torrent
+	detail := &model.TorrentDetail{
+		// Gazelle 双层：Title=组名（影片名）——种子名在 fileName（不重组）
+		Title:        g.Name,
+		Subtitle:     g.SubName,
+		Size:         t.Size,
+		InfoHash:     strings.ToLower(t.InfoHash),
+		Codec:        t.Codec,
+		Resolution:   t.Resolution,
+		Source:       t.Source,
+		ReleaseGroup: t.Processing, // processing 非制作组——版本处理（Encode/Remux/碟规格），暂放此槽供发布反查
+		Description:  t.Description,
+		Tags:         g.Tags,
+		PosterURL:    g.Conver,
+		IMDbID:       g.ImdbID,
+		DoubanID:     g.DoubanID,
+	}
+	if g.Year > 0 {
+		detail.Subtitle = fmt.Sprintf("%s (%d)", detail.Subtitle, g.Year)
+	}
+	// mediainfos 数组（多文件逐条）→ 取首条（单文件种子常态）
+	if len(t.Mediainfos) > 0 {
+		detail.MediaInfo = t.Mediainfos[0]
 	}
 	if t.Description != "" {
 		detail.Screenshots = extractScreenshotsFromBBCode(t.Description)
-		if len(detail.Screenshots) > 0 {
-			detail.PosterURL = detail.Screenshots[0]
-			detail.Screenshots = detail.Screenshots[1:]
-		}
 	}
 	return detail, nil
 }
@@ -585,6 +614,83 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 
 	return nil, &model.AppError{Code: 15001, Message: errMsg}
+}
+
+// SearchTorrents §59.462: browse AJAX 搜索（sections/ajax/browse.php——
+// 黄金规则"须通过 API"禁页面抓取，GenericAdapter 的 HTML 解析违规）。
+// 响应按组聚合（一组一条+torrents 数组）——展平为种子级结果（组内每颗
+// 一条，tid=种子 id）。searchstr 全文（组名/imdb/年份联合索引）。
+func (a *GazelleAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, _ *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	baseURL := resolveBaseURL(config)
+	u := baseURL + "/ajax.php?action=browse&searchstr=" + url.QueryEscape(keyword)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, searchError("搜索请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+	body, readErr := readBody(resp)
+	if readErr != nil {
+		return nil, readErr
+	}
+
+	var result struct {
+		Status   string `json:"status"`
+		Response struct {
+			Results []struct {
+				GroupID   int    `json:"groupId"`
+				GroupName string `json:"groupName"`
+				GroupYear int    `json:"groupYear"`
+				Torrents  []struct {
+					TorrentID interface{} `json:"torrentId"`
+					Size      interface{} `json:"size"`
+					Seeders   int         `json:"seeders"`
+					Leechers  int         `json:"leechers"`
+				} `json:"torrents"`
+			} `json:"results"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
+		return nil, parseError("解析搜索结果失败", err)
+	}
+	if result.Status != "success" {
+		return nil, parseError("搜索 API 状态: "+result.Status, nil)
+	}
+
+	var all []*model.SeedingSearchResult
+	for _, g := range result.Response.Results {
+		for _, t := range g.Torrents {
+			all = append(all, &model.SeedingSearchResult{
+				TorrentID: toStr(t.TorrentID),
+				Title:     fmt.Sprintf("%s (%d)", g.GroupName, g.GroupYear),
+				Size:      toInt64(t.Size),
+				Seeders:   t.Seeders,
+				Leechers:  t.Leechers,
+			})
+		}
+	}
+	return all, nil
+}
+
+// toStr interface{} → string（browse 响应 id 形态容错——数字或字符串）。
+func toStr(v interface{}) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		return strconv.FormatInt(int64(x), 10)
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	}
+	return ""
 }
 
 func (a *GazelleAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
