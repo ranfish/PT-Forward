@@ -57,6 +57,7 @@ func (g *PublishArtifactGenerator) currentScreenshotConfig() *screenshot.Config 
 	cfg.Count = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount)
 	cfg.MinInterval = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval)
 	cfg.JPEGQuality = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality)
+	cfg.Format = g.runtimeCfg.GetString(ctx, setting.KeyScreenshotFormat)
 	if cfg.MpvPath == "" {
 		cfg.MpvPath = "mpv"
 	}
@@ -69,7 +70,7 @@ func (g *PublishArtifactGenerator) currentScreenshotConfig() *screenshot.Config 
 // screenshotEngineNow 参数指纹变更时重建（幂等）
 func (g *PublishArtifactGenerator) screenshotEngineNow() *ScreenshotEngine {
 	cfg := g.currentScreenshotConfig()
-	sig := fmt.Sprintf("%s|%d|%d|%d", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality)
+	sig := fmt.Sprintf("%s|%d|%d|%d|%s", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, cfg.Format)
 	g.engineMu.RLock()
 	if g.engineSig == sig {
 		e := g.screenshotEngine
@@ -84,7 +85,7 @@ func (g *PublishArtifactGenerator) screenshotEngineNow() *ScreenshotEngine {
 	}
 	var engine *ScreenshotEngine
 	if cfg.MpvPath != "" {
-		engine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, g.logger)
+		engine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, cfg.Format, g.logger)
 	}
 	g.screenshotEngine = engine
 	g.engineSig = sig
@@ -95,8 +96,8 @@ func (g *PublishArtifactGenerator) rebuildEngine(cfg *screenshot.Config) {
 	g.engineMu.Lock()
 	defer g.engineMu.Unlock()
 	if cfg != nil && cfg.MpvPath != "" {
-		g.screenshotEngine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, g.logger)
-		g.engineSig = fmt.Sprintf("%s|%d|%d|%d", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality)
+		g.screenshotEngine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, cfg.Format, g.logger)
+		g.engineSig = fmt.Sprintf("%s|%d|%d|%d|%s", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, cfg.Format)
 	} else {
 		g.screenshotEngine = nil
 		g.engineSig = ""

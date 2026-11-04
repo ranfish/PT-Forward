@@ -602,6 +602,7 @@ func main() {
 		ssCfg.Count = runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount)
 		ssCfg.MinInterval = runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval)
 		ssCfg.JPEGQuality = runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality)
+		ssCfg.Format = runtimeCfg.GetString(ctx, setting.KeyScreenshotFormat)
 		if ssCfg.MpvPath == "" {
 			ssCfg.MpvPath = "mpv"
 		}

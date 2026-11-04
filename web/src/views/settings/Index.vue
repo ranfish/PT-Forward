@@ -107,6 +107,16 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item :label="t('settings.screenshotFormat')">
+              <a-select v-model:value="form.screenshotFormat" style="width: 100%">
+                <a-select-option value="jpeg">JPEG（默认）</a-select-option>
+                <a-select-option value="png">PNG（无损——部分站点要求）</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
 
         <a-divider>{{ t('settings.dataCleanup') }}</a-divider>
         <a-row :gutter="16">
@@ -234,6 +244,7 @@ const form = reactive({
   screenshotCount: 6,
   screenshotMinInterval: 60,
   screenshotJpegQuality: 85,
+  screenshotFormat: 'jpeg',
   cleanupTorrentEventDays: 30,
   cleanupPublishResultDays: 30,
   cleanupSeenRecordDays: 30,
@@ -287,6 +298,7 @@ async function fetchSettings() {
       screenshotCount: parseInt(data.screenshot_count) || 6,
       screenshotMinInterval: parseInt(data.screenshot_min_interval) || 60,
       screenshotJpegQuality: parseInt(data.screenshot_jpeg_quality) || 85,
+      screenshotFormat: data.screenshot_format === 'png' ? 'png' : 'jpeg',
       cleanupTorrentEventDays: parseInt(data.data_cleanup_torrent_event_days) || 30,
       cleanupPublishResultDays: parseInt(data.data_cleanup_publish_result_days) || 30,
       cleanupSeenRecordDays: parseInt(data.data_cleanup_seen_record_days) || 30,
@@ -351,6 +363,7 @@ async function saveSettings() {
       ['screenshot_count', String(form.screenshotCount)],
       ['screenshot_min_interval', String(form.screenshotMinInterval)],
       ['screenshot_jpeg_quality', String(form.screenshotJpegQuality)],
+      ['screenshot_format', form.screenshotFormat],
       ['data_cleanup_torrent_event_days', String(form.cleanupTorrentEventDays)],
       ['data_cleanup_publish_result_days', String(form.cleanupPublishResultDays)],
       ['data_cleanup_seen_record_days', String(form.cleanupSeenRecordDays)],
