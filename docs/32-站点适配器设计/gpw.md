@@ -551,3 +551,26 @@ AnimeBytes (AB), DEEPBASSNiNE (DB9), HDBits (HDB), Passthepopcorn (PTP), Redacte
 
 *数据来源: Playwright 采集 rules.php（12 章节）+ wiki.php（版本信息填写指南）+ upload.php（表单字段） (2026-04-22 / 2026-05-04 更新)*
 *文档创建: 2026-04-22，最后更新: 2026-05-04*
+
+---
+
+## 十三、目标站适配（2026-11-04 摸底实测+细化框架）
+
+### 第①刀 获取链实测（2026-11-04 全绿——ajax.php cookie 通道）
+
+| 链 | 端点 | 实测 |
+|---|---|---|
+| 用户态 | `ajax.php?action=index` | ✓ ranfish/ratio 123/**seedingCount 2195**/authkey/passkey（download 构造原料） |
+| **detail** | `ajax.php?action=torrent&hash=<info_hash>` | ✓ **hash 直查**（恢复/辅种重大利好）——响应双层：group（name/year/releaseType/**imdbId/doubanId**/imdbRating/tags/description/conver[封面 typo]）+torrent（infoHash/remasterTitle/scene/size/seeders/**freeTorrent/freeType**/**mediainfos 数组**/fileName） |
+| discount | detail 响应 freeTorrent/freeType 字段 | ✓（数据源实证——这颗 False） |
+| download | `torrents.php?action=download&id=&authkey=&torrent_pass=` | ✓ 179KB bencode（announce=tracker.greatposterwall.com） |
+
+### 开源 vs 实态 delta（已发现）
+
+1. **ajax.php 两套并存**：`sections/ajax/*`（Web AJAX——id/hash 参数+cookie session）与 `app/API/*`（`api.php` 入口——api_key+action+torrent_id/imdbID）。**两层参数不通用**（torrent_id 传给 ajax.php → bad id parameter——错误消息来自 sections/ajax 层校验）。GazelleAdapter 现用 sections/ajax 层（id 参数）正确
+2. 黄金规则限速 **10s/5req=30/min**（GlobalLimiter 默认桶 0.5RPS 恰好卡线——第③刀显式配 fetch_rps=0.4）
+3. form 资产（4 月采集）值集 ✓ 与源码 const.php 吻合；**字段名 _sel 后缀是采集器命名**——源码表单生成器权威为裸名（codec/resolution/source/processing/container/releasetype）
+
+### 细化框架（用户定案 2026-11-04）
+
+第②刀发布链重写拆四小刀：2a Group 查组链 / 2b 字段映射重写（音乐站形态→GPW 电影裸名+字符串值）/ 2c 剧组四件套（PTGen director→artists[] 同长四数组）/ 2d 三前置检查（subtitle_type+图床白名单+imdb 正则）。第③刀配置开闸+fetch_rps=0.4。第④刀 DryRun（2195 颗做种素材）。
