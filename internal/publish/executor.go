@@ -431,6 +431,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		if blocked, reason := gpwOnlyMovies(meta); blocked {
 			return failRec("ineligible", reason)
 		}
+		// 2d-② 截图三要件门 §59.462 附九（格式 PNG/图床白名单/≥3 张——
+		// 站规 2.2.1 硬性要求，质量门=拦截+行动指引文案；DryRun 同拦）
+		if blocked, reason := gpwScreenshotGate(parseScreenshotsCol(meta.Screenshots)); blocked {
+			return failRec("ineligible", reason)
+		}
 		// 翻译注入（三层通道：form 特化覆盖/ExtraFields gpw_/ExtraArtists+SubtitleLangs）
 		gpwExtra = map[string]string{}
 		gpwSize := e.gpwLookupSize(ctx, in.InfoHash)

@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"net/url"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -289,6 +290,60 @@ func gpwParsePTGen(src string) gpwPTGenFields {
 		return f
 	}
 	return gpwPTGenFields(d)
+}
+
+// gpwImageHostWhitelist §59.462 站规 2.2.1 图床白名单（rules.php?p=upload
+// 八域——gpw.md §一 权威）。匹配=host 等值或子域（img104.pixhost.to ∈
+// pixhost.to）。
+var gpwImageHostWhitelist = []string{
+	"kshare.club", "pixhost.to", "ptpimg.me",
+	"img.pterclub.net", "img.pterclub.com",
+	"yes.ilikeshots.club", "imgbox.com", "s3.pterclub.com",
+}
+
+// gpwHostAllowed host 白名单判定（等值或子域后缀）。
+func gpwHostAllowed(host, domain string) bool {
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
+// gpwScreenshotGate §59.462 附九: 站规 2.2.1 截图三要件门（质量门=拦截
+// 语义——摸底定案"预检 URL 后缀判+重截重审"还原：门是拦截+文案给行动
+// 路径，非 advisory 放行）：
+//  1. 数量 ≥3 张（原始分辨率要件由截图引擎天然满足——从视频截取）
+//  2. 格式 PNG（URL 后缀判——剥 query/fragment 后）
+//  3. 图床 ∈ 白名单八域（子域匹配）
+//
+// DryRun 同拦（§59.409 附二先例——预览可见拦截）。
+func gpwScreenshotGate(shots []string) (bool, string) {
+	if len(shots) < 3 {
+		return true, fmt.Sprintf("海豹站规 2.2.1：截图至少 3 张（当前 %d 张）——请先在 Tab3 生成截图", len(shots))
+	}
+	for _, raw := range shots {
+		u, err := url.Parse(strings.TrimSpace(raw))
+		if err != nil || u.Host == "" {
+			return true, "海豹站规 2.2.1：截图 URL 无法解析（" + raw + "）"
+		}
+		host := strings.ToLower(u.Hostname())
+		ok := false
+		for _, d := range gpwImageHostWhitelist {
+			if gpwHostAllowed(host, d) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return true, "海豹站规 2.2.1 图床白名单：" + host + " 不在八域内（kshare/pixhost/ptpimg/pterclub/ilikeshots/imgbox）——请更换图床配置后重截"
+		}
+		// 后缀判（剥 query/fragment）
+		path := u.Path
+		if i := strings.IndexAny(path, "?#"); i >= 0 {
+			path = path[:i]
+		}
+		if !strings.EqualFold(strings.ToLower(path[len(path)-4:]), ".png") {
+			return true, "海豹站规 2.2.1 要求 PNG 截图（" + path + " 为非 png）——设置→截图格式切 png→Tab3 重截→重发（重截后缓存自动写穿覆盖）"
+		}
+	}
+	return false, ""
 }
 
 // gpwBuildArtists PTGen 剧组→四件套（导演 1+演员 6——SplitPersonName

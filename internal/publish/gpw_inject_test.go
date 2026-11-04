@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -124,5 +125,40 @@ func TestGpwDiscSpec(t *testing.T) {
 				t.Errorf("size=%dGB got=%q want=%q", c.size/(1<<30), got, c.want)
 			}
 		})
+	}
+}
+
+// §59.462 附九: 截图三要件门锚——数量/格式/图床白名单（站规 2.2.1）。
+func TestGpwScreenshotGate(t *testing.T) {
+	png3 := []string{
+		"https://img104.pixhost.to/abc/shot1.png",
+		"https://ptpimg.me/shot2.png",
+		"https://img.pterclub.net/shot3.png?x=1", // query 剥除后判
+	}
+	if b, r := gpwScreenshotGate(png3); b {
+		t.Errorf("三要件全过应放行: %s", r)
+	}
+	// 数量门
+	if b, _ := gpwScreenshotGate(png3[:2]); !b {
+		t.Error("2 张应拦（<3）")
+	}
+	if b, _ := gpwScreenshotGate(nil); !b {
+		t.Error("0 张应拦")
+	}
+	// 格式门（jpeg → 拦+重截指引）
+	jpg := []string{"https://ptpimg.me/a.png", "https://ptpimg.me/b.png", "https://ptpimg.me/c.jpg"}
+	if b, r := gpwScreenshotGate(jpg); !b || !strings.Contains(r, "PNG") {
+		t.Errorf("jpeg 应拦+含指引: b=%v r=%q", b, r)
+	}
+	// 图床白名单门（非白名单域 → 拦）
+	bad := []string{"https://img.example.com/a.png", "https://ptpimg.me/b.png", "https://ptpimg.me/c.png"}
+	if b, r := gpwScreenshotGate(bad); !b || !strings.Contains(r, "白名单") {
+		t.Errorf("非白名单域应拦: b=%v r=%q", b, r)
+	}
+	// 子域匹配（img104.pixhost.to ∈ pixhost.to 已在 png3 首项）
+	// URL 不可解析
+	ugly := []string{"not-a-url", "https://ptpimg.me/b.png", "https://ptpimg.me/c.png"}
+	if b, _ := gpwScreenshotGate(ugly); !b {
+		t.Error("URL 不可解析应拦")
 	}
 }
