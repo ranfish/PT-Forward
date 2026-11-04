@@ -40,7 +40,7 @@ func init() {
 			updated_at = datetime('now')
 			WHERE domain = 'zhuque.in'
 			AND (is_target = 0 OR publish_form_config IS NULL OR publish_form_config = '')`,
-			`{"form_fields":{"type":"category","medium":"medium","codec":"videoCoding","standard":"resolution","tags":"tags"},
+			`{"enabled":true,"form_fields":{"type":"category","medium":"medium","codec":"videoCoding","standard":"resolution","tags":"tags"},
 			"value_mappings":{
 				"type":[
 					{"label":"电影","value":"501","standard_keys":["category.movie"]},
