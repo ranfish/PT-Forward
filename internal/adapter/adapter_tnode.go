@@ -393,7 +393,19 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		}
 	}
 
-	if tags, ok := req.FormFields["tags"]; ok {
+	// §59.461: tags 走 TagArrayFields 通道（executor 通用链真相源——
+	// Taglist 模式 applier 硬编码 Key="tagList"，FormFields["tags"] 恒空
+	// 野马同款断链）——朱雀站方形态是逗号分隔 ID 单值串，聚合 TagArrayFields
+	// 同名 KV 的 Value 为 "604,603,611"。
+	tagVals := make([]string, 0, 4)
+	for _, kv := range req.TagArrayFields {
+		if kv.Key == "tagList" && kv.Value != "" {
+			tagVals = append(tagVals, kv.Value)
+		}
+	}
+	if len(tagVals) > 0 {
+		fw.writeField("tags", strings.Join(tagVals, ","))
+	} else if tags, ok := req.FormFields["tags"]; ok {
 		fw.writeField("tags", tags)
 	}
 
