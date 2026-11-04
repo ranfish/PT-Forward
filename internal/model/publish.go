@@ -175,6 +175,15 @@ type PublishTask struct {
 func (PublishTask) TableName() string { return "publish_tasks" }
 
 // §33.1.9 — PublishRequest: 发种请求
+// PublishArtist §59.462: GazellePW 建组剧组条目（artists[]/importance[]/
+// artist_ids[]/artists_sub[] 四平行数组的单条）。
+type PublishArtist struct {
+	Name    string // 英文名（Latin）
+	SubName string // 中文名（CJK）
+	ID      string // 人物 IMDbID（nm 开头；空=站方按名建档）
+	Role    string // importance 数字（1 导演/2 编剧/3 制片/4 作曲/5 摄影/6 演员）
+}
+
 type PublishRequest struct {
 	TorrentData     []byte            `json:"-"`
 	FormFields      map[string]string `json:"form_fields"`
@@ -194,7 +203,12 @@ type PublishRequest struct {
 	DoubanLink      string            `json:"douban_link"`
 	Anonymous       bool              `json:"anonymous"`
 	ExtraFields     map[string]string `json:"extra_fields"`
-	SourceSite      string            `json:"source_site"`
+	// §59.462: 剧组四件套（GazellePW 建组平行数组——Name/ID/SubName+
+	// Role=importance 数字；Name=英文名 SubName=中文名 公共层拆分产物）
+	ExtraArtists []PublishArtist `json:"extra_artists,omitempty"`
+	// §59.462: 字幕语言码数组（GazellePW subtitles[]——chinese_simplified 等）
+	SubtitleLangs []string `json:"subtitle_langs,omitempty"`
+	SourceSite    string   `json:"source_site"`
 	SourceInfoHash  string            `json:"source_info_hash"`
 	SourceTorrentID string            `json:"source_torrent_id"`
 	ClientUID       uint             `json:"client_uid"`

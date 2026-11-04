@@ -448,10 +448,17 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 
 	baseURL := resolveBaseURL(config)
-	uploadURL := baseURL + "/upload.php"
-	if config.Paths.Upload != "" {
-		uploadURL = baseURL + config.Paths.Upload
+	// §59.462: GPW 发布走 api.php?action=upload（API 通道——黄金规则
+	// "须通过 API"+API Key 认证免 auth 字段）。Web upload.php 保留为
+	// API Key 缺失时的 cookie 降级（旧实现字段名已重写，此路径暂弃——
+	// GPW 配置要求 API Key）。
+	if config.APIKey == "" {
+		return nil, authError("海豹发布需要 API Key（站点设置 → API 区块获取）", nil)
 	}
+	uploadURL := baseURL + "/api.php?api_key=" + url.QueryEscape(config.APIKey) + "&action=upload"
+
+	// 2a 查组：ExtraFields[gpw_groupid] 命中 → 挂组；miss → 建组
+	groupID := req.ExtraFields["gpw_groupid"]
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -465,96 +472,100 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, networkError("写入种子数据失败", err)
 	}
 
-	if req.Title != "" {
-		fw.writeField("title", req.Title)
+	// ===== 2b-1 影片层（isNewGroup 时必填）=====
+	if groupID == "" {
+		// name=影片名（英文优先）/subname=中文/year/releasetype/tags/imdb
+		fw.writeField("name", firstNonEmpty(req.ExtraFields["gpw_name"], req.Title))
+		fw.writeField("subname", req.ExtraFields["gpw_subname"])
+		fw.writeField("year", req.ExtraFields["gpw_year"])
+		fw.writeField("releasetype", firstNonEmpty(req.ExtraFields["gpw_releasetype"], "1")) // 默认长片
+		if tags := req.ExtraFields["gpw_tags"]; tags != "" {
+			fw.writeField("tags", tags)
+		}
+		fw.writeField("imdb", firstNonEmpty(req.IMDbLink, req.ExtraFields["gpw_imdb"]))
+		// image=封面（白名单域 URL——executor Rehost 转投后）
+		if img := req.ExtraFields["gpw_image"]; img != "" {
+			fw.writeField("image", img)
+		}
+		// desc=组描述（PTGen 影片简介）
+		if d := req.ExtraFields["gpw_desc"]; d != "" {
+			fw.writeField("desc", d)
+		}
+
+		// ===== 2c 剧组四件套（平行数组——至少 1 导演）=====
+		for _, art := range req.ExtraArtists {
+			fw.writeField("artists[]", art.Name)
+			fw.writeField("importance[]", art.Role)
+			fw.writeField("artist_ids[]", art.ID)
+			fw.writeField("artists_sub[]", art.SubName)
+		}
+	} else {
+		fw.writeField("groupid", groupID)
 	}
-	if req.Subtitle != "" {
-		fw.writeField("subtitle", req.Subtitle)
+
+	// ===== 2b-2 版本层（表单裸名——§59.462 源码论证）=====
+	// source/codec/resolution/container/processing：经 executor 翻译层
+	// 填入 FormFields（标准键→GPW 字符串值）
+	if v := req.FormFields["source"]; v != "" {
+		fw.writeField("source", v)
 	}
+	if v := req.FormFields["codec"]; v != "" {
+		fw.writeField("codec", v)
+	}
+	if v := req.FormFields["resolution"]; v != "" {
+		fw.writeField("resolution", v)
+	}
+	if v := req.FormFields["container"]; v != "" {
+		fw.writeField("container", v)
+	}
+	if v := req.FormFields["processing"]; v != "" {
+		fw.writeField("processing", v)
+	}
+	// processing_other（碟规格——原盘时 processing=Untouched+规格双投）
+	if v := req.FormFields["processing_other"]; v != "" {
+		fw.writeField("processing_other", v)
+	}
+
+	// release_desc（种子描述——必填）
 	if req.Description != "" {
 		fw.writeField("release_desc", req.Description)
 	}
 
-	gazelleFields := map[string]string{
-		"cat":            "releasetype",
-		"medium_sel":     "media",
-		"codec_sel":      "format",
-		"audiocodec_sel": "bitrate",
-		"category":       "releasetype",
-		"medium":         "media",
-		"codec":          "format",
-		"audioCodec":     "bitrate",
+	// mediainfo[]（数组——单文件种子一条）
+	if req.MediaInfo != "" {
+		fw.writeField("mediainfo[]", req.MediaInfo)
 	}
-	for srcType, targetName := range gazelleFields {
-		if v, ok := req.FormFields[srcType]; ok {
-			fw.writeField(targetName, v)
+
+	// subtitle_type（1=混合/2=硬字/3=无字——必填 radio）
+	fw.writeField("subtitle_type", firstNonEmpty(req.ExtraFields["gpw_subtitle_type"], "3"))
+
+	// subtitles[]（语言码数组——chinese_simplified 等）
+	for _, sub := range req.SubtitleLangs {
+		if sub != "" {
+			fw.writeField("subtitles[]", sub)
 		}
 	}
 
-	if year, ok := req.ExtraFields["year"]; ok {
-		fw.writeField("year", year)
-	}
-	if recordLabel, ok := req.ExtraFields["record_label"]; ok {
-		fw.writeField("record_label", recordLabel)
-	}
-	if catalogueNumber, ok := req.ExtraFields["catalogue_number"]; ok {
-		fw.writeField("catalogue_number", catalogueNumber)
-	}
-	if image, ok := req.ExtraFields["image"]; ok {
-		fw.writeField("image", image)
-	}
-	if tags, ok := req.ExtraFields["tags"]; ok {
-		fw.writeField("tags", tags)
-	}
-	if albumDesc, ok := req.ExtraFields["album_desc"]; ok {
-		fw.writeField("album_desc", albumDesc)
+	// remaster_title（版本标签英文键——EditionInfo 映射后）
+	if v := req.ExtraFields["gpw_remaster_title"]; v != "" {
+		fw.writeField("remaster_title", v)
 	}
 
-	if remaster, ok := req.ExtraFields["remaster"]; ok && remaster == "true" {
-		fw.writeField("remaster", "true")
-		if ry, ok := req.ExtraFields["remaster_year"]; ok {
-			fw.writeField("remaster_year", ry)
-		}
-		if rt, ok := req.ExtraFields["remaster_title"]; ok {
-			fw.writeField("remaster_title", rt)
-		}
-		if rrl, ok := req.ExtraFields["remaster_record_label"]; ok {
-			fw.writeField("remaster_record_label", rrl)
-		}
-		if rcn, ok := req.ExtraFields["remaster_catalogue_number"]; ok {
-			fw.writeField("remaster_catalogue_number", rcn)
+	// ===== 特性 checkbox 族（§59.462——mergeAdvanceFeature 服务端合并）=====
+	for _, cb := range []string{"10_bit", "hdr10", "hdr10plus", "dolby_vision", "dolby_atmos", "dts_x", "chinese_dubbed", "special_effects_subtitles"} {
+		if req.ExtraFields["gpw_"+cb] == "1" {
+			fw.writeField(cb, "1")
 		}
 	}
 
-	if v, ok := req.ExtraFields["vanity_house"]; ok && v == "true" {
-		fw.writeField("vanity_house", "on")
-	}
-	if v, ok := req.ExtraFields["scene"]; ok && v == "true" {
-		fw.writeField("scene", "on")
-	}
-
-	for k, v := range req.FormFields {
-		switch k {
-		case "cat", "medium_sel", "codec_sel", "audiocodec_sel":
-			continue
-		}
-		fw.writeField(k, v)
-	}
-	for k, v := range req.ExtraFields {
-		switch k {
-		case "year", "record_label", "catalogue_number", "image", "tags",
-			"album_desc", "remaster", "remaster_year", "remaster_title",
-			"remaster_record_label", "remaster_catalogue_number",
-			"vanity_house", "scene":
-			continue
-		}
-		fw.writeField(k, v)
+	// anonymous（匿名发布——checkbox on/off）
+	if req.Anonymous {
+		fw.writeField("anonymous", "1")
 	}
 
 	if err := fw.hasError(); err != nil {
 		return nil, fmt.Errorf("write form field: %w", err)
 	}
-
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -564,7 +575,8 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
-	setCommonHeaders(httpReq, config.Cookie)
+	httpReq.Header.Set("Accept", "application/json")
+	setCommonHeaders(httpReq, "") // API 通道——免 cookie（api_key 认证）
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
@@ -576,45 +588,43 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, err
 	}
-	html := string(body)
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, classifySiteError(resp, "upload")
+	// 响应 JSON：{"status":200,"response":{"torrent_id":N}} 或错误
+	var result struct {
+		Status  int    `json:"status"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+		Response struct {
+			TorrentID interface{} `json:"torrent_id"`
+		} `json:"response"`
 	}
-
-	if idMatch := reGazelleTorrentID.FindStringSubmatch(html); len(idMatch) > 1 {
-		torrentID := idMatch[1]
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
+		return nil, parseError("解析上传响应失败: "+string(body[:min(200, len(body))]), err)
+	}
+	if result.Status == 200 {
+		tid := toStr(result.Response.TorrentID)
 		return &model.PublishResponse{
 			Success:    true,
-			TorrentID:  torrentID,
-			DetailURL:  baseURL + "/torrents.php?torrentid=" + torrentID,
+			TorrentID:  tid,
+			DetailURL:  baseURL + "/torrents.php?torrentid=" + tid,
 			TargetSite: config.Domain,
 		}, nil
 	}
-
-	if idMatch := reGazelleGroupID.FindStringSubmatch(html); len(idMatch) > 1 {
-		torrentID := idMatch[1]
-		return &model.PublishResponse{
-			Success:    true,
-			TorrentID:  torrentID,
-			DetailURL:  baseURL + "/torrents.php?id=" + torrentID,
-			TargetSite: config.Domain,
-		}, nil
-	}
-
-	if strings.Contains(html, "success") || strings.Contains(html, "成功") || strings.Contains(html, "uploaded") {
-		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
-	}
-
-	errMsg := "上传失败"
-	if m := reGazelleErrorClass.FindStringSubmatch(html); len(m) > 1 {
-		errMsg = strings.TrimSpace(m[1])
-	} else if m := reGazelleErrorP.FindStringSubmatch(html); len(m) > 1 {
-		errMsg = strings.TrimSpace(m[1])
-	}
-
+	errMsg := firstNonEmpty(result.Error, result.Message, fmt.Sprintf("HTTP %d", resp.StatusCode))
 	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
+
+// firstNonEmpty 首个非空串。
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func min(a, b int) int { if a < b { return a }; return b }
 
 // SearchTorrents §59.462: browse AJAX 搜索（sections/ajax/browse.php——
 // 黄金规则"须通过 API"禁页面抓取，GenericAdapter 的 HTML 解析违规）。
