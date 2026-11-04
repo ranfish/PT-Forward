@@ -54,33 +54,38 @@ func gpwPublishInject(cfg *model.PublishFormConfig, form map[string]string,
 	meta *model.TorrentMetadata, tp titleparser.TechProfile, size int64,
 	extra map[string]string, artists *[]model.PublishArtist, subLangs *[]string) {
 
-	// ===== 建组八字段 =====
-	extra["gpw_name"] = meta.EnglishTitle
-	extra["gpw_subname"] = meta.ChineseTitle
+	// ===== 建组八字段（§59.462 附七: PTGen JSON 直读 + 派生列优先 + tp 兜底
+	// 三层——DryRun 实证 meta 派生列填充率低（314 颗 movie 仅 2 颗
+	// english_title 非空）而 PTGen JSON 全在（§59.236 X 重构四键单源））=====
+	ptgen := gpwParsePTGen(meta.PTGenSourceJSON)
+	extra["gpw_name"] = gpwFirst(meta.EnglishTitle, ptgen.ForeignTitle, tp.MainTitle)
+	extra["gpw_subname"] = gpwFirst(meta.ChineseTitle, ptgen.ChineseTitle)
 	if tp.Year != "" {
 		extra["gpw_year"] = tp.Year
+	} else if ptgen.Year > 0 {
+		extra["gpw_year"] = fmt.Sprintf("%d", ptgen.Year)
 	}
 	// releasetype: concert→5 现场演出；其余→1 长片（短片简化定案）
 	extra["gpw_releasetype"] = "1"
 	if meta.Category == "category.concert" {
 		extra["gpw_releasetype"] = "5"
 	}
-	// tags: meta.Genre 中文→英文小写（action/comedy…）
-	if genres := gpwGenreTags(strings.Split(meta.Genre, ",")); len(genres) > 0 {
+	// tags: genre 中文→英文小写（派生列优先——string 逗号分隔；列空读
+	// PTGen genre 数组）
+	genres := gpwGenreTags(strings.Split(meta.Genre, ","))
+	if len(genres) == 0 {
+		genres = gpwGenreTags(ptgen.Genre)
+	}
+	if len(genres) > 0 {
 		extra["gpw_tags"] = strings.Join(genres, ",")
 	}
-	// imdb: meta.IMDbURL（URL 或 tt 均可——站方正则提取）
-	if meta.IMDbURL != "" {
-		extra["gpw_imdb"] = meta.IMDbURL
-	}
-	// desc: PTGen 影片简介
-	if meta.Description != "" {
-		extra["gpw_desc"] = meta.Description
-	}
-	// image: 封面 Rehost 转投（白名单域 URL——调用方 imageHostMgr 处理
-	// 此处只写占位标记，转投在 executor 层做——imageHostMgr 注入位）
+	// imdb: URL 或 tt 均可（站方正则提取）——列/PTGen URL/PTGen id 三层
+	extra["gpw_imdb"] = gpwFirst(meta.IMDbURL, ptgen.IMDbURL, ptgen.IMDbID)
+	// desc: PTGen 影片简介（列优先——列含簇合并产物）
+	extra["gpw_desc"] = gpwFirst(meta.Description, ptgen.Introduction)
+	// image: 封面（原始 dbposter——executor 层 Rehost 转投白名单域）
 	if meta.Poster != "" {
-		extra["gpw_image"] = meta.Poster // 原始 dbposter——executor Rehost 替换
+		extra["gpw_image"] = meta.Poster
 	}
 
 	// ===== 剧组四件套 =====
@@ -91,7 +96,7 @@ func gpwPublishInject(cfg *model.PublishFormConfig, form map[string]string,
 	// ===== 版本层特化 =====
 	// processing 特化：原盘→Untouched+碟规格（体积判）
 	if procField := cfg.FormFields["processing"]; procField != "" {
-		if tp.Specification != "" || isOriginalDisc(tp) {
+		if isOriginalDisc(tp) {
 			// 原盘族→Untouched+processing_other 碟规格
 			form[procField] = "Untouched"
 			if discSpec := gpwDiscSpec(size); discSpec != "" {
@@ -236,6 +241,47 @@ func gpwCheckboxFill(meta *model.TorrentMetadata, tp titleparser.TechProfile, ex
 	}
 }
 
+// gpwFirst 首个非空串（包内私有——adapter 层 firstNonEmpty 同语义）。
+func gpwFirst(ss ...string) string {
+	for _, x := range ss {
+		if x != "" {
+			return x
+		}
+	}
+	return ""
+}
+
+// gpwParsePTGen PTGen JSON 建组字段轻量解析（§59.462 附七——列空兜底源）。
+type gpwPTGenFields struct {
+	ChineseTitle string
+	ForeignTitle string
+	Introduction string
+	IMDbURL      string
+	IMDbID       string
+	Year         int
+	Genre        []string
+}
+
+func gpwParsePTGen(src string) gpwPTGenFields {
+	var f gpwPTGenFields
+	if src == "" {
+		return f
+	}
+	var d struct {
+		ChineseTitle string   `json:"chinese_title"`
+		ForeignTitle string   `json:"foreign_title"`
+		Introduction string   `json:"introduction"`
+		IMDbURL      string   `json:"imdb_url"`
+		IMDbID       string   `json:"imdb_id"`
+		Year         int      `json:"year"`
+		Genre        []string `json:"genre"`
+	}
+	if err := json.Unmarshal([]byte(src), &d); err != nil {
+		return f
+	}
+	return gpwPTGenFields(d)
+}
+
 // gpwBuildArtists PTGen 剧组→四件套（导演 1+演员 6——SplitPersonName
 // 拆分）。数据源：ptgen_source_json 的 director/cast 数组（§59.236 X
 // 重构四键 JSON 派生——运行时解析）。
@@ -275,9 +321,13 @@ func gpwBuildArtists(ptgenJSON string) []model.PublishArtist {
 	return out
 }
 
-// isOriginalDisc 原盘族判定（BDInfo 在场=原盘铁证——§59.319 FromBDInfo）。
+// isOriginalDisc 原盘族判定——MediumCanonicalOf 权威媒介判定的"原盘"
+// 后缀（§59.462 附七: 首版仅 FromBDInfo 铁证过窄——BDInfo 数据缺失的
+// 原盘（如借壳素材）恒 miss；标题启发式族（ST 连字符原盘写法）经
+// MediumCanonicalOf 统一单点覆盖，压制误判防护由其内部 hasReencodeMark
+// 保证）。
 func isOriginalDisc(tp titleparser.TechProfile) bool {
-	return tp.FromBDInfo
+	return strings.Contains(titleparser.MediumCanonicalOf(tp), "原盘")
 }
 
 // gpwLookupSize hash→snapshot size（碟规格判定数据源——§59.462）。
