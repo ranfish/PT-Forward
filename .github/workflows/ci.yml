@@ -106,4 +106,18 @@ jobs:
         run: rm -rf frontend/dist && cp -r web/dist frontend/dist
 
       - name: Build
-        run: CGO_ENABLED=1 go build -ldflags "-s -w" ./cmd/pt-forward/
+        run: CGO_ENABLED=1 go build -ldflags "-s -w" -o pt-forward-ci ./cmd/pt-forward/
+
+      # §59.463: ISA 防线（早期报警位）——CI 产物在 runner 直接构建，
+      # runner glibc 滚动升级会抬高基线（v0.0.1186 案：runner 升级致
+      # Release 资产 v3 化，pt4/33/35 NAS 老 CPU 全断 OTA）。此检查在
+      # PR/push 阶段暴露漂移（不等发版）。注意：CI 产物不发布（Release
+      # 走镜像提取链），本断言红=runner 环境变化预警。
+      - name: CPU baseline guard (x86-64-baseline only)
+        run: |
+          ISA=$(readelf -n pt-forward-ci | grep -oP 'x86 ISA needed: \K.*' || true)
+          echo "x86 ISA needed: ${ISA:-<无标记>}"
+          if [ "${ISA}" != "x86-64-baseline" ]; then
+            echo "::warning::CI runner 构建基线漂移: '${ISA}'（Release 走镜像链不受影响；此预警=runner 环境已变化 §59.463）"
+          fi
+
