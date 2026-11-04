@@ -1879,7 +1879,9 @@ func buildFormLabels(cfg *model.PublishFormConfig, form map[string]string) map[s
 	for field, value := range form {
 		domain, ok := fieldToDomain[field]
 		if !ok {
-			continue // 站方特有字段无域名（如 url_[r]）——保留原键展示
+			// 站方特有字段无域名（如 url_[r]/DryRun [gpw] 前缀预览键）——
+			// 跳过不进 formLabels（Form 主体仍原键可见，此处无需重复）
+			continue
 		}
 		dn := domainNames[domain]
 		if dn == "" {
