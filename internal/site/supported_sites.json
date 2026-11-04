@@ -188,7 +188,10 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "greatposterwall.com",
     "download_url_template": "torrents.php?action=download&id={id}&authkey={authkey}&torrent_pass={rsskey}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "api_key_label": "API Key",
+    "api_key_hint": "用户设置页（Settings）API 区块获取：灰色文本框即当前值；只有重置按钮时点重置后刷新显示新值。base64url 长串形态；发布链（api.php）认证用；获取链仍走 Cookie 通道",
+    "show_cookie": true
   },
   "hdarea.club": {
     "domain": "hdarea.club",
