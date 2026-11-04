@@ -66,3 +66,63 @@ func TestGpwPublishInject_PTGenFallback(t *testing.T) {
 		t.Errorf("processing_other: %q（67.5G→BD100）", form["processing_other"])
 	}
 }
+
+// §59.462 附八: 内容拦截分支锚——纯电影站放行族/拦截族/animation S/E 特判。
+func TestGpwOnlyMovies(t *testing.T) {
+	cases := []struct {
+		cat     string
+		title   string
+		blocked bool
+		desc    string
+	}{
+		{"category.movie", "Test 2020", false, "电影放行"},
+		{"category.concert", "Live 2019", false, "现场演出放行"},
+		{"category.short_film", "Short 2018", false, "短片放行"},
+		{"category.animation", "千与千寻 2001", false, "动画电影放行（无 S/E）"},
+		{"category.animation", "某动画 S01 2020", true, "动画剧拦截（S/E 信号）"},
+		{"category.tv_series", "Show S01", true, "剧集拦截"},
+		{"category.variety", "综艺 2023", true, "综艺拦截"},
+		{"", "Unknown 2020", true, "空类目拦截（宁拦勿错）"},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			blocked, _ := gpwOnlyMovies(&model.TorrentMetadata{Category: c.cat, Title: c.title})
+			if blocked != c.blocked {
+				t.Errorf("cat=%q title=%q blocked=%v want %v", c.cat, c.title, blocked, c.blocked)
+			}
+		})
+	}
+}
+
+// §59.462 附八: 碟规格边界值锚——size 门（<20GB 不投）+四档边界。
+func TestGpwDiscSpec(t *testing.T) {
+	gb := func(g float64) int64 { return int64(g * (1 << 30)) }
+	cases := []struct {
+		size int64
+		want string
+		desc string
+	}{
+		{0, "", "size=0（快照 miss）不投"},
+		{gb(1), "", "1GB（误判原盘防御）不投"},
+		{gb(19.9), "", "19.9GB 门内不投"},
+		{gb(20), "BD25", "20GB 门上（最小合法原盘）BD25"},
+		{gb(23), "BD25", "23GB（BD25 实体）BD25"},
+		{gb(25.5), "BD25", "25.5 边界 BD25"},
+		{gb(26), "BD50", "26GB BD50"},
+		{gb(50), "BD50", "50GB BD50"},
+		{gb(51), "BD50", "51 边界 BD50"},
+		{gb(52), "BD66", "52GB BD66"},
+		{gb(66), "BD66", "66GB BD66"},
+		{gb(67), "BD66", "67 边界 BD66"},
+		{gb(68), "BD100", "68GB BD100"},
+		{gb(100), "BD100", "100GB BD100"},
+		{gb(120), "BD100", "超规格取最近档 BD100"},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			if got := gpwDiscSpec(c.size); got != c.want {
+				t.Errorf("size=%dGB got=%q want=%q", c.size/(1<<30), got, c.want)
+			}
+		})
+	}
+}
