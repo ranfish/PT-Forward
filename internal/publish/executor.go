@@ -96,6 +96,11 @@ type ExecuteResult struct {
 
 // PublishExecutor 新发布执行器。
 type PublishExecutor struct {
+	// §59.462 刀⑤: 海豹翻译层 pending 产物（jobs 段产出→pubReq 构造段消费
+	// ——两段间的数据桥接；非并发字段——Execute 单调用生命周期内使用）
+	gpwPendingExtra   map[string]string
+	gpwPendingArtists []model.PublishArtist
+	gpwPendingSubs    []string
 	db       *gorm.DB
 	logger   *zap.Logger
 	pipe     *Pipeline
@@ -417,6 +422,29 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.458: 肉丝特化注入（genre/region/poster——attributes 数据源；
 	// genre/region 非发布链标准域走 form 显示键+ExtraFields 双通道——
 	// form 键 DryRun 可见 §59.453 挂载教训；ExtraFields adapter 消费）。
+	// §59.462 刀⑤: 海豹（GazellePW）发布翻译层——内容拦截+建组八字段+
+	// 版本层特化+剧组+subtitle_type+EditionInfo+8 特性 checkbox。
+	// 挂载模式：肉丝/野马同款站点特化（jobs 段后 DryRun 检查点前）。
+	if in.TargetSite == "海豹" {
+		// 2d-① 内容拦截（纯电影站——好学模式+animation S/E 特判）
+		if blocked, reason := gpwOnlyMovies(meta); blocked {
+			return failRec("ineligible", reason)
+		}
+		// 翻译注入（三层通道：form 特化覆盖/ExtraFields gpw_/ExtraArtists+SubtitleLangs）
+		gpwExtra := map[string]string{}
+		var gpwArtists []model.PublishArtist
+		var gpwSubs []string
+		gpwSize := e.gpwLookupSize(ctx, in.InfoHash)
+		gpwPublishInject(cfg, form, meta, tp, gpwSize, gpwExtra, &gpwArtists, &gpwSubs)
+		// DryRun 检查点输出（gpw_ 键进 form 便于预览）
+		for k, v := range gpwExtra {
+			form["[gpw]"+k] = v
+		}
+		e.gpwPendingExtra = gpwExtra
+		e.gpwPendingArtists = gpwArtists
+		e.gpwPendingSubs = gpwSubs
+	}
+
 	if in.TargetSite == "肉丝" {
 		rousiPublishInject(form, meta)
 	}
@@ -622,6 +650,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	pubReq := &model.PublishRequest{
 		TorrentData: torrentData,
 		FormFields:  form,
+		// §59.462 刀⑤: 海豹翻译层 pending 产物消费（jobs 段产出→此处注入）
+		ExtraArtists: e.gpwPendingArtists,
+		SubtitleLangs: e.gpwPendingSubs,
 		Title:       publishTitle,
 		Subtitle:    form[model.FieldDomainSmallDescr],
 		Description: form[cfg.FormFields[model.FieldDomainDescription]],
@@ -649,6 +680,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 				pubReq.ExtraFields = map[string]string{}
 			}
 			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
+		}
+	}
+	// §59.462 刀⑤: 海豹 pending ExtraFields 注入
+	if in.TargetSite == "海豹" && len(e.gpwPendingExtra) > 0 {
+		if pubReq.ExtraFields == nil {
+			pubReq.ExtraFields = map[string]string{}
+		}
+		for k, v := range e.gpwPendingExtra {
+			pubReq.ExtraFields[k] = v
 		}
 	}
 	// §59.458: 肉丝 ExtraFields 搬运（form 段注入的显示键→adapter
