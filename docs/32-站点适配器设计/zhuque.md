@@ -416,3 +416,27 @@ Origin: https://zhuque.in
 - 配置文件：`examples/PTNexus/server/configs/zhuque.yaml`
 - 发布器：`examples/PTNexus/server/internal/service/publish/publisher/sites/zhuque.go`
 - 站点数据：`examples/PTNexus/server/sites_data.json`（含 `-ZWEX` 后缀标识）
+
+---
+
+## 十二、目标站适配（2026-11-04 · v0.0.1330 摸底+开闸）
+
+### 摸底终态
+
+| 项 | 状态 |
+|---|---|
+| 发布链代码 | TNodeAdapter.UploadTorrent **已在**（162 行全套：CSRF/multipart/fieldMapping/响应解析） |
+| 凭证 | cookie 有效（CC socute ✓）；CSRF 链路实测通（页面 200+meta token 可取） |
+| 实时值集 | **零漂移**（option API 34 项五段=文档完全一致，2026-11-04 实测） |
+| 新发现 | **option API 也需 x-csrf-token 头**（不带回 400"请求异常"——TNode 全 API CSRF） |
+| tmdbid | **数据源缺口**：meta 全库 315 行 TMDbURL 填充率 0（PTGen 豆瓣系无 TMDb id）——方案 a 定案：先不填实测（外部反查违白名单铁律） |
+
+### form_config（migration143）
+
+- form_fields：`type→category / medium→medium / codec→videoCoding / standard→resolution / tags→tags`（文本字段 subtitle/note/mediainfo/screenshot 走 PublishRequest 顶层消费不进 form_fields——防 multipart 双写）
+- 映射要点：504 节目=[tv_shows(综艺·肉丝权威)+documentary]双键/DIY 302·304 label-only（§59.407 联动）/Remux 双键/Encode=[encode,bdrip]/H/X 四分立=§59.380 压制联动站完美匹配/tags 三绝不配（官方 601/禁转 602/分集 622）+六键配（Taglist 逗号串=野马 tagList 同构）
+- 开闸：is_target=1（幂等条件写）
+
+### 工具链差异（TNode 特殊性）
+
+选项是 **JSON API 非 HTML 表单**——formdiff/ParsePublishFormHTML 不适用；验证走"API 值集实时对照（零漂移实证）+单测锚+DryRun 借壳"三路。
