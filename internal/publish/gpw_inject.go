@@ -1,0 +1,288 @@
+package publish
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
+)
+
+// ═══════════════════════════════════════════════════════════════
+// §59.462 刀⑤: 海豹（GazellePW）发布翻译层——meta → gpw_ ExtraFields
+// 通道（adapter 消费）。挂载模式：幸运英语/肉丝/野马同款站点特化。
+// ═══════════════════════════════════════════════════════════════
+
+// gpwOnlyMovies §59.462 2d-①: 纯电影站内容拦截——禁剧集/综艺/体育/
+// MV/教程/动漫剧（站规 1.2 全族）。动画电影放行（S/E 特判——§59.424
+// 禁分集的 SeasonEpisode 判定复用：animation 无 S/E=电影形态）。
+func gpwOnlyMovies(meta *model.TorrentMetadata) (bool, string) {
+	cat := meta.Category
+	switch cat {
+	case "category.movie", "category.concert", "category.short_film":
+		return false, ""
+	case "category.animation":
+		// 动画电影 vs 动画剧：S/E 信号判（§59.424 同源——tp SeasonEpisode
+		// 非空=剧集形态拦截；空=电影形态放行）
+		if metaHasSeasonEpisode(meta) {
+			return true, "海豹纯电影站禁剧集（animation 含 S/E 信号=动画剧）"
+		}
+		return false, ""
+	default:
+		// tv_series/variety/sports/mv/music/education 等全拦
+		return true, fmt.Sprintf("海豹纯电影站禁此类型（%s）——仅收电影/短片/现场演出/电影集", cat)
+	}
+}
+
+// metaHasSeasonEpisode S/E 信号探（标题/副标题——§59.424 词形族）。
+// 简化实现：tp.SeasonEpisode 非空即剧集（调用方传 tp）。
+func metaHasSeasonEpisode(meta *model.TorrentMetadata) bool {
+	return titleparser.ParseTitleTech(meta.Title).SeasonEpisode != ""
+}
+
+// gpwPublishInject §59.462 刀⑤ 主注入——挂 executor jobs 段后 DryRun
+// 检查点前（§59.453 挂载教训）。三个输出通道：
+//   - form（GPW 六裸名槽——source/codec/resolution/container/processing
+//     经通用 jobs 链填入，此处只做 processing 特化覆盖+碟规格）
+//   - ExtraFields（gpw_ 前缀——建组八字段+subtitle_type+EditionInfo+8
+//     特性 checkbox）
+//   - ExtraArtists（剧组四件套）+SubtitleLangs
+func gpwPublishInject(cfg *model.PublishFormConfig, form map[string]string,
+	meta *model.TorrentMetadata, tp titleparser.TechProfile, size int64,
+	extra map[string]string, artists *[]model.PublishArtist, subLangs *[]string) {
+
+	// ===== 建组八字段 =====
+	extra["gpw_name"] = meta.EnglishTitle
+	extra["gpw_subname"] = meta.ChineseTitle
+	if tp.Year != "" {
+		extra["gpw_year"] = tp.Year
+	}
+	// releasetype: concert→5 现场演出；其余→1 长片（短片简化定案）
+	extra["gpw_releasetype"] = "1"
+	if meta.Category == "category.concert" {
+		extra["gpw_releasetype"] = "5"
+	}
+	// tags: meta.Genre 中文→英文小写（action/comedy…）
+	if genres := gpwGenreTags(strings.Split(meta.Genre, ",")); len(genres) > 0 {
+		extra["gpw_tags"] = strings.Join(genres, ",")
+	}
+	// imdb: meta.IMDbURL（URL 或 tt 均可——站方正则提取）
+	if meta.IMDbURL != "" {
+		extra["gpw_imdb"] = meta.IMDbURL
+	}
+	// desc: PTGen 影片简介
+	if meta.Description != "" {
+		extra["gpw_desc"] = meta.Description
+	}
+	// image: 封面 Rehost 转投（白名单域 URL——调用方 imageHostMgr 处理
+	// 此处只写占位标记，转投在 executor 层做——imageHostMgr 注入位）
+	if meta.Poster != "" {
+		extra["gpw_image"] = meta.Poster // 原始 dbposter——executor Rehost 替换
+	}
+
+	// ===== 剧组四件套 =====
+	if artists != nil {
+		*artists = gpwBuildArtists(meta.PTGenSourceJSON)
+	}
+
+	// ===== 版本层特化 =====
+	// processing 特化：原盘→Untouched+碟规格（体积判）
+	if procField := cfg.FormFields["processing"]; procField != "" {
+		if tp.Specification != "" || isOriginalDisc(tp) {
+			// 原盘族→Untouched+processing_other 碟规格
+			form[procField] = "Untouched"
+			if discSpec := gpwDiscSpec(size); discSpec != "" {
+				if poField := cfg.FormFields["processing_other"]; poField != "" {
+					form[poField] = discSpec
+				}
+			}
+		}
+		// Remux/Encode/WEB-DL 走通用链 standard_keys 直配（remux→Remux/
+		// encode→Encode/webdl→WEB+processing=---——form_config 已映射）
+	}
+
+	// ===== subtitle_type+subtitles[] =====
+	// 1=混合（MI 中文字幕轨）/2=硬字幕/3=无字幕（简化：有中字标签→1）
+	subType := "3" // 无字幕默认
+	hasZhSub := strings.Contains(meta.Tags, "chinese_subtitle") ||
+		strings.Contains(meta.Tags, "中字") ||
+		strings.Contains(meta.Tags, "中文")
+	if hasZhSub {
+		subType = "1"
+		extra["gpw_subtitle_type"] = subType
+		if subLangs != nil {
+			*subLangs = append(*subLangs, "chinese_simplified")
+		}
+	} else {
+		extra["gpw_subtitle_type"] = subType
+	}
+
+	// ===== EditionInfo→remaster_title 英文键 =====
+	if ek := gpwEditionKey(meta.EditionInfo); ek != "" {
+		extra["gpw_remaster_title"] = ek
+	}
+
+	// ===== 特性 checkbox 族（8 个——MI/标签判定）=====
+	gpwCheckboxFill(meta, tp, extra)
+}
+
+// gpwGenreTags 中文 genre→英文小写（站内存储形态——§59.462 B 项）。
+var gpwGenreMap = map[string]string{
+	"动作": "action", "冒险": "adventure", "动画": "animation", "艺术": "art",
+	"亚洲": "asian", "传记": "biography", "喜剧": "comedy", "犯罪": "crime",
+	"邪典": "cult", "纪录片": "documentary", "剧情": "drama", "实验": "experimental",
+	"家庭": "family", "奇幻": "fantasy", "黑色电影": "film_noir", "历史": "history",
+	"恐怖": "horror", "同性": "lgbt", "武侠": "martial_arts", "音乐": "music",
+	"音乐剧": "musical", "悬疑": "mystery", "演出": "performance", "政治": "political",
+	"爱情": "romance", "科幻": "sci_fi", "短片": "short", "默片": "silent",
+	"体育": "sport", "惊悚": "thriller", "战争": "war", "西部": "western",
+}
+
+func gpwGenreTags(genres []string) []string {
+	var out []string
+	for _, g := range genres {
+		if en, ok := gpwGenreMap[strings.TrimSpace(g)]; ok {
+			out = append(out, en)
+		}
+	}
+	return out
+}
+
+// gpwDiscSpec 体积→碟规格（原盘 processing_other——§59.462 体积判）。
+func gpwDiscSpec(size int64) string {
+	gib := float64(size) / (1 << 30)
+	switch {
+	case gib <= 25.5:
+		return "BD25"
+	case gib <= 51:
+		return "BD50"
+	case gib <= 67:
+		return "BD66"
+	case gib <= 101:
+		return "BD100"
+	default:
+		return "BD100" // >100GB 超规格边缘——取最近档
+	}
+}
+
+// gpwEditionKey EditionInfo→站方英文键（EditionInfo 类全集——确定性词
+// 才投：拿不准不投=原始版本，站方无校验拒收风险时默认不填）。
+var gpwEditionMap = map[string]string{
+	"director's cut": "director_s_cut",
+	"directors cut":  "director_s_cut",
+	"导演剪辑版":       "director_s_cut",
+	"extended":       "extended_edition",
+	"加长版":          "extended_edition",
+	"uncut":          "uncut",
+	"未删减":          "uncut",
+	"unrated":        "unrated",
+	"未分级":          "unrated",
+	"remaster":       "remaster",
+	"4k remaster":    "4k_remaster",
+	"4k重制":          "4k_remaster",
+	"criterion":      "the_criterion_collection",
+	"cc":             "the_criterion_collection",
+	"标准收藏":         "the_criterion_collection",
+}
+
+func gpwEditionKey(edition string) string {
+	lower := strings.ToLower(strings.TrimSpace(edition))
+	if lower == "" {
+		return ""
+	}
+	if k, ok := gpwEditionMap[lower]; ok {
+		return k
+	}
+	return "" // 拿不准不投（原始版本语义）
+}
+
+// gpwCheckboxFill 特性 checkbox 族（8 个——MI/标题/标签判定）。
+func gpwCheckboxFill(meta *model.TorrentMetadata, tp titleparser.TechProfile, extra map[string]string) {
+	// 视频特性（tp.HDR/tp.BitDepth）
+	if tp.BitDepth == "10bit" || tp.BitDepth == "10" {
+		extra["gpw_10_bit"] = "1"
+	}
+	hdrLower := strings.ToLower(tp.HDR)
+	if strings.Contains(hdrLower, "hdr10+") || strings.Contains(hdrLower, "hdr10plus") {
+		extra["gpw_hdr10plus"] = "1"
+	} else if strings.Contains(hdrLower, "hdr10") {
+		extra["gpw_hdr10"] = "1"
+	}
+	if strings.Contains(hdrLower, "dolby vision") || strings.Contains(hdrLower, "dovi") || strings.Contains(hdrLower, "dv") {
+		extra["gpw_dolby_vision"] = "1"
+	}
+
+	// 音频特性（MI AudioTechnology/tp）
+	miLower := strings.ToLower(meta.MediaInfo)
+	if strings.Contains(miLower, "dolby digital plus with dolby atmos") ||
+		strings.Contains(miLower, "eac3 Journal with dolby atmos") ||
+		strings.Contains(miLower, "ddp atmos") {
+		extra["gpw_dolby_atmos"] = "1"
+	}
+	if strings.Contains(miLower, "dts:x") || strings.Contains(miLower, "dts x") {
+		extra["gpw_dts_x"] = "1"
+	}
+
+	// 国配/特效字幕（标签推断——meta.Tags JSON 字符串串判）
+	if strings.Contains(meta.Tags, "chinese_audio") ||
+		strings.Contains(meta.Tags, "国语") || strings.Contains(meta.Tags, "国配") {
+		extra["gpw_chinese_dubbed"] = "1"
+	}
+	if strings.Contains(meta.Tags, "special_effects_subs") || strings.Contains(meta.Tags, "特效字幕") {
+		extra["gpw_special_effects_subtitles"] = "1"
+	}
+}
+
+// gpwBuildArtists PTGen 剧组→四件套（导演 1+演员 6——SplitPersonName
+// 拆分）。数据源：ptgen_source_json 的 director/cast 数组（§59.236 X
+// 重构四键 JSON 派生——运行时解析）。
+func gpwBuildArtists(ptgenJSON string) []model.PublishArtist {
+	if ptgenJSON == "" {
+		return nil
+	}
+	var src struct {
+		Director []string `json:"director"`
+		Cast     []struct {
+			Name string `json:"name"`
+		} `json:"cast"`
+	}
+	if err := json.Unmarshal([]byte(ptgenJSON), &src); err != nil {
+		return nil
+	}
+	var out []model.PublishArtist
+	for _, d := range src.Director {
+		pn := util.SplitPersonName(d)
+		if pn.Name != "" || pn.SubName != "" {
+			out = append(out, model.PublishArtist{
+				Name: pn.Name, SubName: pn.SubName, ID: "", Role: "1",
+			})
+		}
+	}
+	for i, a := range src.Cast {
+		if i >= 5 {
+			break
+		}
+		pn := util.SplitPersonName(a.Name)
+		if pn.Name != "" || pn.SubName != "" {
+			out = append(out, model.PublishArtist{
+				Name: pn.Name, SubName: pn.SubName, ID: "", Role: "6",
+			})
+		}
+	}
+	return out
+}
+
+// isOriginalDisc 原盘族判定（BDInfo 在场=原盘铁证——§59.319 FromBDInfo）。
+func isOriginalDisc(tp titleparser.TechProfile) bool {
+	return tp.FromBDInfo
+}
+
+// gpwLookupSize hash→snapshot size（碟规格判定数据源——§59.462）。
+func (e *PublishExecutor) gpwLookupSize(ctx context.Context, hash string) int64 {
+	var snap struct{ Size int64 }
+	e.db.WithContext(ctx).Raw("SELECT size FROM torrent_snapshots WHERE hash = ? LIMIT 1", hash).Scan(&snap)
+	return snap.Size
+}
