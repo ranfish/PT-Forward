@@ -96,11 +96,6 @@ type ExecuteResult struct {
 
 // PublishExecutor 新发布执行器。
 type PublishExecutor struct {
-	// §59.462 刀⑤: 海豹翻译层 pending 产物（jobs 段产出→pubReq 构造段消费
-	// ——两段间的数据桥接；非并发字段——Execute 单调用生命周期内使用）
-	gpwPendingExtra   map[string]string
-	gpwPendingArtists []model.PublishArtist
-	gpwPendingSubs    []string
 	db       *gorm.DB
 	logger   *zap.Logger
 	pipe     *Pipeline
@@ -425,24 +420,31 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.462 刀⑤: 海豹（GazellePW）发布翻译层——内容拦截+建组八字段+
 	// 版本层特化+剧组+subtitle_type+EditionInfo+8 特性 checkbox。
 	// 挂载模式：肉丝/野马同款站点特化（jobs 段后 DryRun 检查点前）。
+	// §59.462 附八: 产物走 Execute 局部变量（同函数内两段传递）——
+	// 旧 struct 字段桥接在批量并行/HTTP 并发下跨 goroutine 串数据
+	// （executor 单例）——回归审核 P1。
+	var gpwExtra map[string]string
+	var gpwArtists []model.PublishArtist
+	var gpwSubs []string
 	if in.TargetSite == "海豹" {
 		// 2d-① 内容拦截（纯电影站——好学模式+animation S/E 特判）
 		if blocked, reason := gpwOnlyMovies(meta); blocked {
 			return failRec("ineligible", reason)
 		}
 		// 翻译注入（三层通道：form 特化覆盖/ExtraFields gpw_/ExtraArtists+SubtitleLangs）
-		gpwExtra := map[string]string{}
-		var gpwArtists []model.PublishArtist
-		var gpwSubs []string
+		gpwExtra = map[string]string{}
 		gpwSize := e.gpwLookupSize(ctx, in.InfoHash)
 		gpwPublishInject(cfg, form, meta, tp, gpwSize, gpwExtra, &gpwArtists, &gpwSubs)
-		// DryRun 检查点输出（gpw_ 键进 form 便于预览）
+		// DryRun 检查点输出（gpw_ 键进 form 便于预览；§59.462 附八:
+		// 剧组/字幕数量一并预览——ExtraArtists/SubtitleLangs 不进 form
+		// 主体，无此键 DryRun 看不到剧组组装结果）
 		for k, v := range gpwExtra {
 			form["[gpw]"+k] = v
 		}
-		e.gpwPendingExtra = gpwExtra
-		e.gpwPendingArtists = gpwArtists
-		e.gpwPendingSubs = gpwSubs
+		form["[gpw]gpw_artists_n"] = strconv.Itoa(len(gpwArtists))
+		if len(gpwSubs) > 0 {
+			form["[gpw]gpw_subtitles"] = strings.Join(gpwSubs, ",")
+		}
 	}
 
 	if in.TargetSite == "肉丝" {
@@ -650,9 +652,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	pubReq := &model.PublishRequest{
 		TorrentData: torrentData,
 		FormFields:  form,
-		// §59.462 刀⑤: 海豹翻译层 pending 产物消费（jobs 段产出→此处注入）
-		ExtraArtists: e.gpwPendingArtists,
-		SubtitleLangs: e.gpwPendingSubs,
+		// §59.462 刀⑤: 海豹翻译层产物注入（jobs 段局部变量→此处消费）
+		ExtraArtists: gpwArtists,
+		SubtitleLangs: gpwSubs,
 		Title:       publishTitle,
 		Subtitle:    form[model.FieldDomainSmallDescr],
 		Description: form[cfg.FormFields[model.FieldDomainDescription]],
@@ -682,12 +684,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
 		}
 	}
-	// §59.462 刀⑤: 海豹 pending ExtraFields 注入
-	if in.TargetSite == "海豹" && len(e.gpwPendingExtra) > 0 {
+	// §59.462 刀⑤: 海豹 ExtraFields 注入（局部变量——非目标站恒 nil 零注入）
+	if in.TargetSite == "海豹" && len(gpwExtra) > 0 {
 		if pubReq.ExtraFields == nil {
 			pubReq.ExtraFields = map[string]string{}
 		}
-		for k, v := range e.gpwPendingExtra {
+		for k, v := range gpwExtra {
 			pubReq.ExtraFields[k] = v
 		}
 		// §59.462 附七: gpw_image Rehost 转投——源值=dbposter（豆瓣域，

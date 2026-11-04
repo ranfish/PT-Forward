@@ -157,8 +157,14 @@ func gpwGenreTags(genres []string) []string {
 }
 
 // gpwDiscSpec 体积→碟规格（原盘 processing_other——§59.462 体积判）。
+// §59.462 附八: size<=0（快照 miss/Scan 失败）或 <20GB（真原盘实体最小
+// BD25≈23GB——体积不足=误判原盘）返回空串不投——回归审核 P1：
+// 旧实现 size=0 时 gib=0≤25.5 错投 BD25。
 func gpwDiscSpec(size int64) string {
 	gib := float64(size) / (1 << 30)
+	if gib < 20 {
+		return ""
+	}
 	switch {
 	case gib <= 25.5:
 		return "BD25"
