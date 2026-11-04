@@ -32,7 +32,8 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 可乐是 **reelcore 自研架构**，与 M-Team 各自架构——**不混用 mteam 架构名**：
 
 - `framework: "cola"`（资产+migration142 存量刷正）
-- Factory：`case "cola"` → MTeamAdapter（**实现层同构复用**，架构语义独立）
+- **v0.0.1329 起：独立 `ColaAdapter`**（与 MTeamAdapter 平级，共享 `mtorrentCore` 协议层——可乐特化全部自有：Web 面 detail/promotion/myPeerStatus/搜索单轮；三列分层见 docs/31 §59.460 附五）
+- ~~Factory：`case "cola"` → MTeamAdapter（实现层同构复用）~~（历史形态，v0.0.1329 前）
 - 默认路径/发布配置/API Key 测试端点：cola 分支同 mteam 值；**RSS 策略表独立**（guid_regex+RequiresSideLoading——见 §RSS 通道契约，v0.0.1325 修正）
 - detect 特征判定：`reelcore` 字样 → cola（探测完备）
 - 前端架构标签：`Cola (ReelCore)`
