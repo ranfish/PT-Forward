@@ -690,6 +690,19 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		for k, v := range e.gpwPendingExtra {
 			pubReq.ExtraFields[k] = v
 		}
+		// §59.462 附七: gpw_image Rehost 转投——源值=dbposter（豆瓣域，
+		// 站方抓不到）→默认图床域（系统配置）。失败降级保留原 URL
+		// （图床故障不阻塞发布——肉丝同款降级语义）。DryRun 在此前已
+		// 返回——预览值为原始 URL（无网络动作）。
+		if src := pubReq.ExtraFields["gpw_image"]; src != "" &&
+			e.pipe != nil && e.pipe.imageHostMgr != nil {
+			if r, rErr := e.pipe.imageHostMgr.Rehost(ctx, src); rErr == nil && r != nil && r.URL != "" {
+				pubReq.ExtraFields["gpw_image"] = r.URL
+				e.logger.Info("gpw image rehosted", zap.String("to", r.URL))
+			} else {
+				e.logger.Warn("gpw image rehost failed（降级保留原 URL）", zap.Error(rErr))
+			}
+		}
 	}
 	// §59.458: 肉丝 ExtraFields 搬运（form 段注入的显示键→adapter
 	// 消费通道；genre=JSON 数组串/region=slug 终态/poster=URL）
