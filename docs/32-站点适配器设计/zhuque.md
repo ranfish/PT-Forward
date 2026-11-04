@@ -449,3 +449,9 @@ Origin: https://zhuque.in
 - **tag_overrides 语义实证**：standard_key 形态（["tag.chinese_subtitle",...]→tags=[604,603,611]+labels=[中字,国语,杜比视界] 全对）非站方 value
 - **借壳环境**：PT0 torrent_dir=/tmp/opencode/rousi_td（肉丝轮配置沿用）+Mercy .torrent 从 TR@243 /home/docker/Transmission/config/torrents/ scp 回
 - **form_config.enabled 漏写实战**：migration143 漏 enabled 字段→DryRun"目标站未启用发布配置"（§59.318 单真相）——migration144 json_set 刷正+143 源码补
+
+### tmdbid 定案补记（2026-11-04 用户定案+澄清）
+
+- **方案 a 定案**：首颗实测不填——站方审核放行则方案 c 无需立项
+- **豆影（doubaninfo）能力边界**：无 tmdbid 反查（实测功夫零 tmdb 字段+provider 零消费）；其 imdb_id 是**豆影自身兜底能力**——场景=较新影视只有 IMDb 无豆瓣条目时兜底提供 imdb 信息防空简介（正常种子自带 IMDb 链接是 PT 发布共识，非获取链刚需）
+- **方案 c 挂账**（若首颗被拒再立项）：获取链 TMDb find 反查（external_source=imdb_id+用户配 key 零内置——同 PTGen 端点模式；获取链位=白名单合规，发布链纯消费 meta.TMDbURL）
