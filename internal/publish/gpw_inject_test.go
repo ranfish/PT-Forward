@@ -11,7 +11,7 @@ import (
 // 填充率低（314 颗 movie 仅 2 颗 english_title 非空）而 PTGen JSON 全在。
 // 真实形态锚：Death Ship 1980（13城）——列全空+PTGen 全在的典型瘦行。
 func TestGpwPublishInject_PTGenFallback(t *testing.T) {
-	ptgenJSON := `{"chinese_title":"死亡船","foreign_title":"","translated_titles":"Death Ship","year":1980,` +
+	ptgenJSON := `{"chinese_title":"死亡船","foreign_title":"","translated_titles":"Death Ship","year":"1980",` +
 		`"genre":["悬疑","惊悚","恐怖","冒险"],"introduction":"简介","imdb_url":"https://www.imdb.com/title/tt0080603/","imdb_id":"tt0080603",` +
 		`"director":["艾尔文·拉考夫 Alvin Rakoff"],"cast":[{"name":"乔治·肯尼迪 George Kennedy"}]}`
 	meta := &model.TorrentMetadata{
