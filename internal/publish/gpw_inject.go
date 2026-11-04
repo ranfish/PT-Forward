@@ -62,8 +62,8 @@ func gpwPublishInject(cfg *model.PublishFormConfig, form map[string]string,
 	extra["gpw_subname"] = gpwFirst(meta.ChineseTitle, ptgen.ChineseTitle)
 	if tp.Year != "" {
 		extra["gpw_year"] = tp.Year
-	} else if ptgen.Year > 0 {
-		extra["gpw_year"] = fmt.Sprintf("%d", ptgen.Year)
+	} else if n, nErr := ptgen.Year.Int64(); nErr == nil && n > 0 {
+		extra["gpw_year"] = fmt.Sprintf("%d", n)
 	}
 	// releasetype: concert→5 现场演出；其余→1 长片（短片简化定案）
 	extra["gpw_releasetype"] = "1"
@@ -258,8 +258,11 @@ type gpwPTGenFields struct {
 	Introduction string
 	IMDbURL      string
 	IMDbID       string
-	Year         int
-	Genre        []string
+	// Year §59.462 附七: PTGen 实测 "year":"1980" 字符串形态（非数字）
+	// ——json.Number 双兼容（字符串/数字同解；int 形态遇字符串值
+	// Unmarshal 整体失败致全零值——诊断5 实证）。
+	Year  json.Number
+	Genre []string
 }
 
 func gpwParsePTGen(src string) gpwPTGenFields {
@@ -273,7 +276,7 @@ func gpwParsePTGen(src string) gpwPTGenFields {
 		Introduction string   `json:"introduction"`
 		IMDbURL      string   `json:"imdb_url"`
 		IMDbID       string   `json:"imdb_id"`
-		Year         int      `json:"year"`
+		Year         json.Number `json:"year"`
 		Genre        []string `json:"genre"`
 	}
 	if err := json.Unmarshal([]byte(src), &d); err != nil {
