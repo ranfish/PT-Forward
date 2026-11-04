@@ -15,29 +15,40 @@ jobs:
         with:
           fetch-depth: 0  # §59.281: 完整历史——git describe 取真 tag（浅克隆致版本号回退短 SHA bdc1f7b 外观案）
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install CGO dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcc libc6-dev
-
-      - name: Build frontend
+      # §59.463: Release 资产改从 Docker 镜像提取（镜像链构建——builder
+      # 钉死 golang:1.25-bookworm，产物 CPU 基线 x86-64-baseline）。
+      # 根因（pt4/pt33/pt35 三环境实证 2026-11-04）：旧链在 runner 直接
+      # CGO build，ubuntu-latest 滚动升级（v0.0.1186 起 10-26）后其 glibc
+      # crt 带 v3 note → 资产要求 AVX2 → NAS 老 CPU（J1900/J4125/D525
+      # ——PT 用户画像常态）ld.so 拒载 → OTA verify 拦截"CPU ISA level
+      # is lower than required"。镜像链环境固定恒 v1 + 两链产物 bit-for-bit
+      # 统一（"Release 装的还是镜像装的"排查维度消失）。
+      # 前端构建在镜像内完成（node:24-alpine stage）——无需 workflow 级
+      # setup-node/npm 步骤。
+      - name: Build image & extract binary
         run: |
-          cd web
-          npm ci
-          npm run build
-          rm -rf ../frontend/dist
-          cp -r dist ../frontend/dist
+          docker build \
+            --build-arg VERSION=${GITHUB_REF_NAME} \
+            -t pt-forward-release:${GITHUB_REF_NAME} \
+            .
+          docker create --name extract pt-forward-release:${GITHUB_REF_NAME}
+          docker cp extract:/usr/local/bin/pt-forward ./pt-forward-linux-amd64
+          docker rm extract
+          ls -la pt-forward-linux-amd64
+          ./pt-forward-linux-amd64 --version
 
-      - name: Build binary
+      # §59.463: ISA 防线——Release 产物必须 x86-64-baseline only（NAS 老
+      # CPU 兼容铁律——用户定案 v1 基线：pt35 D525 连 v2 都不满足）。基线
+      # 漂移（runner 滚动升级/依赖带入高基线）在此 fail——升基线必须人工
+      # 显式决策（改本断言+Dockerfile 同步），不允许被动漂移。
+      - name: CPU baseline guard (x86-64-baseline only)
         run: |
-          VERSION=${GITHUB_REF_NAME}
-          CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=${VERSION}" -o pt-forward-linux-amd64 ./cmd/pt-forward/
+          ISA=$(readelf -n pt-forward-linux-amd64 | grep -oP 'x86 ISA needed: \K.*' || true)
+          echo "x86 ISA needed: ${ISA:-<无标记>}"
+          if [ "${ISA}" != "x86-64-baseline" ]; then
+            echo "::error::Release 产物 CPU 基线漂移: '${ISA}'（预期 x86-64-baseline only——NAS 老 CPU 兼容铁律 §59.463）"
+            exit 1
+          fi
 
       - name: Generate SHA256
         run: sha256sum pt-forward-linux-amd64 > pt-forward-linux-amd64.sha256
