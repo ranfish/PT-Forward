@@ -71,11 +71,10 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 	case "mteam":
 		return NewMTeamAdapter(doer, f.logger)
 	case "cola":
-		// §59.460: 可乐 reelcore 自研架构——M-Team 兼容面同构（x-api-key/
-		// search/genDlToken 同路径），实现复用 MTeamAdapter；架构语义独立
-		// （三面分离：www Web 外壳+automation 上传面/api.colapt.com 兼容面），
-		// 契约差异经 json.Number 双兼容吸收（§59.460）
-		return NewMTeamAdapter(doer, f.logger)
+		// §59.460 附五（刀2）: 可乐独立架构 adapter——与 MTeamAdapter 平级，
+		// 共享 mtorrentCore 协议层（M-Team 兼容面契约）；可乐特化（Web 面
+		// 详情/promotion/myPeerStatus 简名/搜索单轮）全部在 ColaAdapter。
+		return NewColaAdapter(doer, f.logger)
 	case "unit3d":
 		a := NewUnit3DAdapter(doer, f.logger)
 		if f.engine != nil {

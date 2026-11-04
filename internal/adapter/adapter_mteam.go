@@ -63,6 +63,11 @@ func (f *flexInt) UnmarshalJSON(data []byte) error {
 
 type MTeamAdapter struct {
 	*GenericAdapter
+	// §59.460 附五（刀1）: 协议层经 mtorrentCore 组合
+	// （searchViaAPI/downloadViaAPI/setAPIHeaders/fetchProfile 由 core
+	// 提升供宿主调用）。doer/logger 显式声明遮蔽双 embed 同名提升
+	// （GenericAdapter 与 mtorrentCore 各持同实例——三份同引用）。
+	mtorrentCore
 	doer   *HTTPDoer
 	logger *zap.Logger
 }
@@ -70,6 +75,7 @@ type MTeamAdapter struct {
 func NewMTeamAdapter(doer *HTTPDoer, logger *zap.Logger) *MTeamAdapter {
 	return &MTeamAdapter{
 		GenericAdapter: NewGenericAdapter("mteam", doer, logger),
+		mtorrentCore:   mtorrentCore{doer: doer, logger: logger},
 		doer:           doer,
 		logger:         logger,
 	}
@@ -79,126 +85,9 @@ func (a *MTeamAdapter) Framework() string { return "mteam" }
 
 func (a *MTeamAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	if config.APIKey != "" {
-		return a.searchViaAPI(ctx, config, keyword)
+		return a.searchViaAPI(ctx, config, keyword, []string{"normal", "adult"})
 	}
 	return a.GenericAdapter.SearchTorrents(ctx, config, keyword, opts)
-}
-
-// searchViaAPI §59.222: 双模式搜索（normal + adult）——成人区不再被搜索层
-// 一刀切（3dsvr 六连案：mode:"normal" 硬编码致全站 97 站 0 结果）。
-// 成人内容限制移至发布业务层（SelectFetchSite/publishing 过滤），
-// 孤儿恢复/辅种不受限。adult 结果带 Adult 标记供下游消费。
-func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfig, keyword string) ([]*model.SeedingSearchResult, error) {
-	u := resolveBaseURL(config) + "/api/torrent/search"
-
-	var all []*model.SeedingSearchResult
-	for _, mode := range []string{"normal", "adult"} {
-		payload, _ := json.Marshal(map[string]interface{}{
-			"keyword":    keyword,
-			"mode":       mode,
-			"pageNumber": 1,
-			"pageSize":   20,
-		})
-
-		req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
-		if err != nil {
-			return nil, searchError("构造搜索请求失败", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		a.setAPIHeaders(req, config.APIKey)
-
-		resp, err := a.doer.Client.Do(req)
-		if err != nil {
-			if mode == "normal" {
-				return nil, searchError("搜索请求失败", err)
-			}
-			continue // adult 轮失败不阻断——降级 normal-only
-		}
-
-		body, readErr := readBody(resp)
-		drainBody(resp)
-		if readErr != nil && mode == "normal" {
-			return nil, readErr
-		}
-		if readErr != nil {
-			continue
-		}
-
-		var result struct {
-			Code json.Number `json:"code"`
-			Data struct {
-				Data []struct {
-					// §59.460: json.Number 双兼容（M-Team 官方字符串 id /
-					// 可乐 reelcore 数字 id——纯 string 在数字形态下 unmarshal 失败）
-					ID     json.Number `json:"id"`
-					Name   string      `json:"name"`
-					Size   flexInt     `json:"size"`
-					Status struct {
-						Seeders  flexInt `json:"seeders"`
-						Leechers flexInt `json:"leechers"`
-						Discount string  `json:"discount"`
-					} `json:"status"`
-				} `json:"data"`
-			} `json:"data"`
-		}
-		if err := json.Unmarshal(body, &result); err != nil {
-			if mode == "normal" {
-				return nil, parseError("解析搜索结果失败", err)
-			}
-			continue
-		}
-
-		// §59.224: API 业务错误码（code≠0）——返回错误进入退避重试链
-		// （savr 六连案：并发批量期 code=4 瞬时限流，单独重试即恢复——
-		//  此前返回空结果=合法空页，§59.219 空页重试偶尔能兜住但不可靠）。
-		// message 提取供日志+错误消息。
-		if result.Code.String() != "0" {
-			var errBody struct {
-				Message string `json:"message"`
-			}
-			_ = json.Unmarshal(body, &errBody)
-			if a.logger != nil {
-				a.logger.Warn("mteam search API error",
-					zap.String("mode", mode),
-					zap.String("keyword", keyword),
-					zap.String("code", result.Code.String()),
-					zap.String("message", errBody.Message))
-			}
-			if mode == "normal" {
-				return nil, &model.AppError{Code: 15002, Message: fmt.Sprintf("MTeam API error code=%s: %s", result.Code.String(), errBody.Message)}
-			}
-			// adult 轮 code≠0：记日志不阻断（降级 normal-only 结果）
-			continue
-		}
-		if a.logger != nil {
-			a.logger.Debug("mteam search resp",
-				zap.String("mode", mode),
-				zap.String("keyword", keyword),
-				zap.Int("body_bytes", len(body)),
-				zap.Int("parsed", len(result.Data.Data)))
-		}
-
-		for _, item := range result.Data.Data {
-			r := &model.SeedingSearchResult{
-				TorrentID: item.ID.String(),
-				Title:     item.Name,
-				Size:      int64(item.Size),
-				Seeders:   int(item.Status.Seeders),
-				Leechers:  int(item.Status.Leechers),
-			}
-			if mode == "adult" {
-				r.Adult = true
-			}
-			all = append(all, r)
-		}
-	}
-	return all, nil
-}
-
-func (a *MTeamAdapter) setAPIHeaders(req *http.Request, apiKey string) {
-	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
-	req.Header.Set("x-api-key", apiKey)
-	req.Header.Set("Accept", "application/json")
 }
 
 func (a *MTeamAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -214,94 +103,6 @@ func (a *MTeamAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 		return a.downloadViaAPI(ctx, config, torrentID)
 	}
 	return a.downloadViaWeb(ctx, config, torrentID)
-}
-
-func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	tokenURL := resolveBaseURL(config) + "/api/torrent/genDlToken"
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader("id="+torrentID))
-	if err != nil {
-		return nil, networkError("构造 genDlToken 请求失败", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	a.setAPIHeaders(req, config.APIKey)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, networkError("genDlToken 请求失败", err)
-	}
-	defer func() { drainBody(resp) }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, notFoundError("种子不存在或已被删除")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("genDlToken HTTP %d", resp.StatusCode), nil)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
-	if err != nil {
-		return nil, networkError("读取 genDlToken 响应失败", err)
-	}
-	var tokenResp struct {
-		Data string `json:"data"`
-	}
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return nil, parseError("解析 genDlToken 响应失败", err)
-	}
-	if tokenResp.Data == "" {
-		return nil, downloadError("genDlToken 返回空下载链接", nil)
-	}
-
-	dlReq, err := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
-	if err != nil {
-		return nil, networkError("构造下载请求失败", err)
-	}
-	// §59.460: 下载 URL 通道判定——按 URL 前缀（非签发来源）：
-	// ==resolveBaseURL（API 兼容面同域，M-Team 形态）带 API 头；
-	// 其它域（可乐 www /downloads Web 通道）无头——带 x-api-key 到非
-	// 兼容面路径触发 scope 校验（实测两种惩罚形态：403 api_key_scope_
-	// denied 响应 / CF 直接掐连接挂到超时），签名 URL 自含 exp+sig 鉴权，
-	// 无头裸 GET 即 200 真种子（站方 MoviePilot 对接文档同款：下载换票
-	// 之后的 GET 不带任何头）。
-	if strings.HasPrefix(tokenResp.Data, resolveBaseURL(config)+"/") {
-		a.setAPIHeaders(dlReq, config.APIKey)
-	}
-
-	dlResp, err := a.doer.Client.Do(dlReq)
-	if err != nil {
-		return nil, downloadError("下载种子失败", err)
-	}
-
-	// §59.460: 兜底——万一 API 同域下载带头仍 403（scope 收紧等），
-	// 无头重试一次（签名 URL 自含鉴权；馒头常态带头 200 不触发）。
-	if dlResp.StatusCode == http.StatusForbidden {
-		drainBody(dlResp)
-		bareReq, bareErr := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
-		if bareErr != nil {
-			return nil, networkError("构造无头下载请求失败", bareErr)
-		}
-		dlResp, err = a.doer.Client.Do(bareReq)
-		if err != nil {
-			return nil, downloadError("下载种子失败", err)
-		}
-	}
-	defer func() { drainBody(dlResp) }()
-
-	if dlResp.StatusCode == http.StatusNotFound {
-		return nil, notFoundError("种子不存在或已被删除")
-	}
-	if dlResp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024))
-	if err != nil {
-		return nil, downloadError("读取种子数据失败", err)
-	}
-	if len(data) == 0 {
-		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
-	}
-	return data, nil
 }
 
 func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -344,134 +145,6 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 		return a.detailViaAPI(ctx, config, torrentID)
 	}
 	return a.detailViaWeb(ctx, config, torrentID)
-}
-
-// discountViaWebPromotion §59.460 附三: Web 面详情 promotion 结构优惠
-// 解析——可乐实测 {accounting_applied, upload:{num,den}, download:{num,den}}：
-// download.num==0 → FREE；否则按 num/den 比例归 PERCENT 档（不认识的
-// 比例回 NONE——站方全站免费期恒 FREE）。
-func (a *MTeamAdapter) discountViaWebPromotion(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
-	host := config.Domain
-	if !strings.HasPrefix(host, "http") {
-		host = "https://" + host
-	}
-	u := strings.TrimRight(host, "/") + "/api/v1/torrents/" + url.PathEscape(torrentID)
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Cookie", config.Cookie)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("web promotion HTTP %d", resp.StatusCode), nil)
-	}
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-	var d struct {
-		Promotion struct {
-			Download struct {
-				Num json.Number `json:"num"`
-				Den json.Number `json:"den"`
-			} `json:"download"`
-		} `json:"promotion"`
-	}
-	if err := json.Unmarshal(body, &d); err != nil {
-		return nil, parseError("解析 Web 面优惠失败", err)
-	}
-	num, _ := d.Promotion.Download.Num.Int64()
-	den, _ := d.Promotion.Download.Den.Int64()
-	if den <= 0 {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
-	}
-	switch {
-	case num == 0:
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
-	case num*2 == den:
-		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
-	case num*10 == den*7:
-		return &model.DiscountResult{Level: model.DiscountPercent70}, nil
-	default:
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
-	}
-}
-
-// detailViaWebJSON §59.460: Web 面详情端点降级——GET
-// https://<domain>/api/v1/torrents/{id}（cookie 通道；可乐实测 12KB/45+
-// 字段完整覆盖 detail 需求：release_name/subtitle/size_bytes 字符串数字/
-// info_hash+source_info_hash/技术规格全套/完整 MI/screenshots/tags）。
-// Web 面判浏览器请求：带 cookie+浏览器 UA，禁止 x-api-key 混带。
-func (a *MTeamAdapter) detailViaWebJSON(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	host := config.Domain
-	if !strings.HasPrefix(host, "http") {
-		host = "https://" + host
-	}
-	u := strings.TrimRight(host, "/") + "/api/v1/torrents/" + url.PathEscape(torrentID)
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Cookie", config.Cookie)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("web detail HTTP %d", resp.StatusCode), nil)
-	}
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	var d struct {
-		ReleaseName  string      `json:"release_name"`
-		Subtitle     string      `json:"subtitle"`
-		SizeBytes    json.Number `json:"size_bytes"`
-		InfoHash     string      `json:"info_hash"`
-		VideoCodec   string      `json:"video_codec"`
-		Audio        []string    `json:"audio"`
-		Resolution   string      `json:"resolution"`
-		Source       string      `json:"source"`
-		ReleaseGroup string      `json:"release_group"`
-		MediaInfo    string      `json:"media_info"`
-		Screenshots  []string    `json:"screenshots"`
-		Tags         []string    `json:"tags"`
-	}
-	if err := json.Unmarshal(body, &d); err != nil {
-		return nil, parseError("解析 Web 面详情失败", err)
-	}
-	size, _ := d.SizeBytes.Int64()
-	audioCodec := ""
-	if len(d.Audio) > 0 {
-		audioCodec = d.Audio[0]
-	}
-	return &model.TorrentDetail{
-		Title:        d.ReleaseName,
-		Subtitle:     d.Subtitle,
-		Size:         size,
-		InfoHash:     strings.ToLower(d.InfoHash),
-		Codec:        d.VideoCodec,
-		AudioCodec:   audioCodec,
-		Resolution:   d.Resolution,
-		Source:       d.Source,
-		ReleaseGroup: d.ReleaseGroup,
-		MediaInfo:    d.MediaInfo,
-		Screenshots:  d.Screenshots,
-		Tags:         d.Tags,
-	}, nil
 }
 
 // mteamAdultCategories 馒头成人区 category 编码（mode=adult）。
@@ -733,16 +406,6 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, err
 	}
-	// §59.460: /api/torrent/detail 不在部分兼容面实现的端点集内（可乐
-	// scope_denied 403 实证）——降级 Web 面详情端点 GET /api/v1/torrents/
-	// {id}（cookie 通道，字段更全：info_hash+source_info_hash 双 hash/
-	// 完整 MI/文件树/审核状态机；M-Team detail 健康 200 不触发）。
-	if resp.StatusCode == http.StatusForbidden && config.Cookie != "" {
-		drainBody(resp)
-		if d, fbErr := a.detailViaWebJSON(ctx, config, torrentID); fbErr == nil {
-			return d, nil
-		}
-	}
 	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
@@ -906,15 +569,6 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
 		return nil, networkError("优惠检测请求失败", err)
-	}
-	// §59.460 附三: /api/torrent/detail 不在部分兼容面端点集（可乐 403）
-	// ——降级 Web 面详情 promotion 结构解析（download:{num,den} 分数：
-	// num==0 免费/否则按比例；M-Team detail 健康 200 不触发）。
-	if resp.StatusCode == http.StatusForbidden && config.Cookie != "" {
-		drainBody(resp)
-		if dr, fbErr := a.discountViaWebPromotion(ctx, config, torrentID); fbErr == nil {
-			return dr, nil
-		}
 	}
 	defer func() { drainBody(resp) }()
 
@@ -1737,58 +1391,21 @@ func (a *MTeamAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 }
 
 func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
-	u := resolveBaseURL(config) + "/api/member/profile"
-	req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
+	// §59.460 附五（刀1）: profile 段走 mtorrentCore（json.Number 双兼容
+	// 解析单点）；Role→等级名映射是馒头特有资产留宿主。
+	prof, err := a.fetchProfile(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	a.setAPIHeaders(req, config.APIKey)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
-
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		Message string `json:"message"`
-		Data    struct {
-			ID          flexInt `json:"id"`
-			Username    string  `json:"username"`
-			Role        flexInt `json:"role"`
-			MemberCount struct {
-				// §59.460: json.Number 双兼容（reelcore 真数字 shareRate=999999）
-				Uploaded   json.Number `json:"uploaded"`
-				Downloaded json.Number `json:"downloaded"`
-				Bonus      json.Number `json:"bonus"`
-				ShareRate  json.Number `json:"shareRate"`
-			} `json:"memberCount"`
-			MemberStatus struct {
-				LastLogin string `json:"lastLogin"`
-			} `json:"memberStatus"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("解析用户信息失败: %w", err)
-	}
-
 	stats := &model.UserStatsResult{
-		Username: result.Data.Username,
+		Username:      prof.Username,
+		UploadBytes:   prof.UploadBytes,
+		DownloadBytes: prof.DownloadBytes,
+		BonusPoints:   prof.Bonus,
+		Ratio:         prof.Ratio,
 	}
-	if className := a.resolveRoleName(ctx, config, int(result.Data.Role)); className != "" {
+	if className := a.resolveRoleName(ctx, config, prof.Role); className != "" {
 		stats.UserClass = className
-	}
-	stats.UploadBytes = parseSizeString(result.Data.MemberCount.Uploaded.String())
-	stats.DownloadBytes = parseSizeString(result.Data.MemberCount.Downloaded.String())
-	stats.BonusPoints, _ = strconv.ParseFloat(result.Data.MemberCount.Bonus.String(), 64)
-	stats.Ratio, _ = strconv.ParseFloat(result.Data.MemberCount.ShareRate.String(), 64)
-	if stats.Ratio == 0 && stats.DownloadBytes > 0 {
-		stats.Ratio = float64(stats.UploadBytes) / float64(stats.DownloadBytes)
 	}
 
 	peerURL := resolveBaseURL(config) + "/api/tracker/myPeerStatistics"
@@ -1800,31 +1417,11 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	a.setAPIHeaders(peerReq, config.APIKey)
 
 	peerResp, err := a.doer.Client.Do(peerReq)
-	if err == nil {
-		defer func() { drainBody(peerResp) }()
-	}
-	// §59.460 附四: peer 统计端点名两形态——M-Team 为 myPeerStatistics；
-	// 可乐为简名 myPeerStatus（2026-11-04 实测 200 {code,data:{seeder:N}}，
-	// 无 size 字段——SeedingSize 留 0；此前代码误用全名形态对可乐恒
-	// 403）。三层降级：全名（M-Team 200 直用）→ 简名（可乐）→
-	// getUserTorrentList 翻页计数（终极兜底）。
-	if err != nil || peerResp.StatusCode != http.StatusOK {
-		if err == nil {
-			drainBody(peerResp)
-		}
-		if a.logger != nil {
-			a.logger.Warn("myPeerStatistics unavailable, trying myPeerStatus",
-				zap.Error(err))
-		}
-		if count, ok := a.seedingViaPeerStatus(ctx, config); ok {
-			stats.SeedingCount = count
-			return stats, nil
-		}
-		count, size := a.seedingViaUserTorrentList(ctx, config)
-		stats.SeedingCount = count
-		stats.SeedingSize = size
+	if err != nil {
+		a.logger.Warn("myPeerStatistics request failed", zap.Error(err))
 		return stats, nil
 	}
+	defer func() { drainBody(peerResp) }()
 
 	peerBody, err := readBody(peerResp)
 	if err != nil {
@@ -1847,89 +1444,6 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	stats.SeedingCount = int(peerResult.Data.SeederCount)
 	stats.SeedingSize = int64(peerResult.Data.SeederSize)
 	return stats, nil
-}
-
-// seedingViaPeerStatus §59.460 附四: 可乐简名端点 POST /api/tracker/
-// myPeerStatus——响应 {code,data:{seeder:N}}（仅做种数无 size）。
-// 返回 ok=false 时调用方继续 getUserTorrentList 兜底。
-func (a *MTeamAdapter) seedingViaPeerStatus(ctx context.Context, config *model.SiteConfig) (int, bool) {
-	u := resolveBaseURL(config) + "/api/tracker/myPeerStatus"
-	req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
-	if err != nil {
-		return 0, false
-	}
-	a.setAPIHeaders(req, config.APIKey)
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return 0, false
-	}
-	body, readErr := readBody(resp)
-	drainBody(resp)
-	if readErr != nil || resp.StatusCode != http.StatusOK {
-		return 0, false
-	}
-	var result struct {
-		Data struct {
-			Seeder flexInt `json:"seeder"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return 0, false
-	}
-	return int(result.Data.Seeder), true
-}
-
-// seedingViaUserTorrentList §59.460: myPeerStatistics 不可用时的做种数
-// 降级通道——getUserTorrentList 翻页计数（可乐兼容面实测响应条目为
-// {torrent:{size,source}} 嵌套形态；M-Team 主端点健康不触发本函数）。
-func (a *MTeamAdapter) seedingViaUserTorrentList(ctx context.Context, config *model.SiteConfig) (int, int64) {
-	total, sizeSum := 0, int64(0)
-	const pageSize = 100
-	for page := 1; page <= 20; page++ {
-		payload, _ := json.Marshal(map[string]interface{}{
-			"pageNumber": page,
-			"pageSize":   pageSize,
-		})
-		u := resolveBaseURL(config) + "/api/member/getUserTorrentList"
-		req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
-		if err != nil {
-			return total, sizeSum
-		}
-		req.Header.Set("Content-Type", "application/json")
-		a.setAPIHeaders(req, config.APIKey)
-		resp, err := a.doer.Client.Do(req)
-		if err != nil {
-			return total, sizeSum
-		}
-		body, readErr := readBody(resp)
-		drainBody(resp)
-		// §59.460 附四: 非 200 静默零值缺陷修正（错误 JSON Unmarshal
-		// 成功空结构 → rows=0 被当"翻完了"返回——真实状态码显式短路）
-		if readErr != nil || resp.StatusCode != http.StatusOK {
-			return total, sizeSum
-		}
-		var result struct {
-			Data struct {
-				Data []struct {
-					Torrent struct {
-						Size flexInt `json:"size"`
-					} `json:"torrent"`
-				} `json:"data"`
-			} `json:"data"`
-		}
-		if err := json.Unmarshal(body, &result); err != nil {
-			return total, sizeSum
-		}
-		rows := result.Data.Data
-		for _, r := range rows {
-			total++
-			sizeSum += int64(r.Torrent.Size)
-		}
-		if len(rows) < pageSize {
-			return total, sizeSum
-		}
-	}
-	return total, sizeSum
 }
 
 var mteamRoleMap = map[int]string{
