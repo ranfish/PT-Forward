@@ -1304,6 +1304,9 @@ MusicMeta 17→22 字段（+BitDepth/SampleRate/Label/CatalogueNo/Edition）。
 （MDP/转种抽屉）；不融合 CrossSeedPanel（影视深耦合）。
 命名体系：MDP/种子获取页（历史 Tab1 称呼废弃）/转种抽屉。
 下一步：种子获取页重构讨论（本契约为验收标准）。
+**MDP 已实施（2026-11-05·§59.469 附六）**：MusicDetailPanel.vue 22 槽位
+六分区渲染+getSeed music 透出+两入口 probeMusicSeed 分流；B1-B3 预留
+槽位待后端 MusicMeta 扩展后自动点亮。
 
 ### 12.13 音乐域站点角色体系（2026-11-05 用户定案·§59.469）
 
