@@ -1249,6 +1249,30 @@ Gazelle 同构互转（API 对 API），我们场景异构——**自研路径�
 **tracker 集合方法论归位**：R8 删除时保留的 tracker 判归属，正确定义=
 **获取源路由**（不是 dupe 拦截）。
 
+### 12.10 获取链设计定案（2026-11-05 用户定案·实施起点）
+
+```
+L1 发现与路由：tracker 集合→站匹配→cookie 可达选源（辅种聚合多站冗余）
+L2 架构分流：NP→DOM 解析（NexusPHPAdapter 扩展）｜Gazelle→API（GazelleAdapter 扩展）
+L3 音乐字段抽取：站点特化抽取器（复用 12.9 两选·现有 adapter 基建音乐字段扩展）
+L4 元数据落库：音乐字段族（12.2 模型）——存储模型实施时定
+```
+
+**实施顺序（用户定案）**：皇后站 adapter 先行——结构化获取到数据后，
+再据数据形态讨论种子详情页重构。
+
+**详情页重构方向（用户倾向·初记）**：系统判断种子为音乐种后**走新的
+种子详情页**（区分影视种——非加 tab 方案）。判据待数据形态产出后细化
+（音乐分类/标题形态/tracker 站音乐属性）。
+
+**皇后 adapter 第一刀**：
+- 目标：新版详情页结构化获取（divtracklist/divnfo/结构化字段行/cover）
+- 复用：adapter_opencd.go extractOpenCDDetail（§56.34 老版）+NexusPHPAdapter
+  详情链
+- 产出字段：artist/album/标签双维/格式行（format+audio_mode）/媒介/
+  曲目列表/log 文本/封面 URL
+- 验证：真实种子端到端（新版 tid 样本）
+
 ## 十、特殊注意事项
 
 ### 10.1 发布页面路径
