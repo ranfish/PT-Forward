@@ -83,6 +83,7 @@ func decrypt(encKey, ciphertext string) (string, error) {
 func main() {
 	dbPath := flag.String("db", "", "SQLite DB 路径（默认从 DB_PATH 环境变量读取，再默认 data/pt-forward.db）")
 	domain := flag.String("domain", "", "站点域名（模糊匹配）")
+	client := flag.String("client", "", "下载器名称或 ID（解密 clients.password）")
 	flag.Parse()
 
 	if *dbPath == "" {
@@ -91,8 +92,8 @@ func main() {
 	if *dbPath == "" {
 		*dbPath = "data/pt-forward.db"
 	}
-	if *domain == "" {
-		fmt.Fprintln(os.Stderr, "用法: decrypt-cookie -domain <domain> [-db <path>]")
+	if *domain == "" && *client == "" {
+		fmt.Fprintln(os.Stderr, "用法: decrypt-cookie -domain <domain> | -client <name|id> [-db <path>]")
 		os.Exit(1)
 	}
 
@@ -103,22 +104,49 @@ func main() {
 	}
 	defer db.Close()
 
-	var encKey, encCookie string
+	var encKey string
 	err = db.QueryRow("SELECT value FROM system_settings WHERE key='encryption_key'").Scan(&encKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read encryption_key: %v\n", err)
 		os.Exit(1)
 	}
-	err = db.QueryRow("SELECT cookie FROM sites WHERE domain LIKE ?", "%"+*domain+"%").Scan(&encCookie)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read cookie for %s: %v\n", *domain, err)
-		os.Exit(1)
+
+	var ciphertext string
+	if *client != "" {
+		// clients.password（-client 收名称或数字 ID）
+		if isDigits(*client) {
+			err = db.QueryRow("SELECT password FROM clients WHERE id = ?", *client).Scan(&ciphertext)
+		} else {
+			err = db.QueryRow("SELECT password FROM clients WHERE name = ?", *client).Scan(&ciphertext)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read client password for %s: %v\n", *client, err)
+			os.Exit(1)
+		}
+	} else {
+		err = db.QueryRow("SELECT cookie FROM sites WHERE domain LIKE ?", "%"+*domain+"%").Scan(&ciphertext)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read cookie for %s: %v\n", *domain, err)
+			os.Exit(1)
+		}
 	}
 
-	plain, err := decrypt(encKey, encCookie)
+	plain, err := decrypt(encKey, ciphertext)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "decrypt: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Print(plain)
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
