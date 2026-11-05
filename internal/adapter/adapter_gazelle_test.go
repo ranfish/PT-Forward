@@ -153,12 +153,17 @@ func TestGazelle_GetTorrentDetail_API(t *testing.T) {
 	}
 }
 
-func TestGazelle_GetTorrentDetail_Web(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><title>Web Movie :: Site</title>
-		info_hash: aabbccddeeff00112233445566778899aabbccdd
-		<td>Size<td>1.5 GB</td></td>
-		</html>`))
+// §59.466 附: cookie-only 也走 detailViaAPI（ajax.php 认 cookie——海豚
+// 无 api.php 端点实证；旧 detailViaWeb HTML 弱解析已删——死代码清理）。
+func TestGazelle_GetTorrentDetail_CookieAPI(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "ajax.php") {
+			t.Errorf("应走 ajax.php API 路: %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"status":"success","response":{
+			"group":{"name":"Cookie Movie","year":2023,"categoryName":"Movies"},
+			"torrent":{"infoHash":"ABCDEF","size":100}
+		}}`))
 	}))
 	defer srv.Close()
 
@@ -170,7 +175,7 @@ func TestGazelle_GetTorrentDetail_Web(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detail.Title != "Web Movie" {
+	if detail.Title != "Cookie Movie" {
 		t.Errorf("title: %s", detail.Title)
 	}
 }
