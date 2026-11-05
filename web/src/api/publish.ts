@@ -164,6 +164,8 @@ export interface SeedListItem {
   fetched_at?: string
   fetched?: boolean
   status: string // forbidden / system_forbidden / no_mapping / reviewed / pending / incomplete / unfetched
+  // §59.469 附八: 音乐种行标记（SeedConfig 主入口"详情"按钮/MDP 分流）
+  is_music?: boolean
   // §59.131 ②: 簇口径增量字段（发布页一种多站）
   copy_count?: number
   sites?: string[]
