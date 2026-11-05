@@ -10,7 +10,7 @@
 | Tracker | `https://www.musopia.vip/announce.php`（**同域**·.torrent announce 铁证实证 2026-11-05；tracker_domains=["www.musopia.vip"] 配置正确） |
 | 官组体系 | **有**——原抓组 `ZHENGLIFAN@Musopia`（@后缀形态）+制作组字段行（制作组: Musopia）——NP 音乐官组形态（织梦 ZmMusic 同款）；非海豚式无官组 |
 | 特殊功能 | 保种区（🌱×N 已保护）·种子认领机制·歌词链接（/lyr） |
-| 素材现状 | **29 做种池零种**（seeding/metadata 0 行——纯新增源·适配后从站内拉） |
+| 素材现状 | **PT2 做种 131 颗**（2026-11-05 transmission 实测——⚠️ seeding_torrent_records 同步表 0 行：同步链未归属该站待查；种名含中文方括号变体"\[1994\] 许景淳 - xxx\[台湾\]"——标题解析新形态） |
 
 ---
 
