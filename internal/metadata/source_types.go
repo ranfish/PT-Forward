@@ -30,6 +30,9 @@ type DetailSourceJSON struct {
 	TMDbLink      string            `json:"tmdb_link"`
 	FetchedAt     time.Time         `json:"fetched_at"`
 	ExtractorInfo extract.Meta      `json:"extractor_info"`
+	// §59.466 L4: 音乐结构化元数据（detail_source_json 落库资产——
+	// 详情页重构/目标站发布消费；影视种恒 nil 零开销）。
+	Music *model.MusicMeta `json:"music,omitempty"`
 }
 
 // PTGenSourceJSON PTGen API 原始结果（内嵌 PTGenResult，字段不重复定义）。

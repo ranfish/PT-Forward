@@ -85,6 +85,8 @@ func DetailToSeed(detail *model.TorrentDetail) SeedData {
 		TMDbLink:     detail.TMDbURL,
 		InfoHash:     detail.InfoHash,
 		Size:         detail.Size,
+		// §59.466 L4: Music 落库通道（此前内存态丢弃——回归审核补记预言接入点）
+		Music: detail.Music,
 	}
 	seed.Intro.Body = detail.Description
 	seed.Intro.Poster = detail.PosterURL
