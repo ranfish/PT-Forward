@@ -1330,7 +1330,8 @@ music_source/music_target→新站接入评估（数据完整性/字段可满足
 NP 音乐专站·有官组（原抓组 ZHENGLIFAN@Musopia——修正"海豚无官组"
 语境的第三形态）·tracker 同域铁证·**Log score 字段行直读+转载自字段**
 （三源最强 OriginChain 源）·多维标签·抓轨 Log 独立区·**PT2 做种
-131 颗**（transmission 实测——同步表 0 行·同步链归属待查）。音乐源站候选（待评估清单：禁转实证/类型枚举后
+131 颗**（transmission 实测·快照命中素材入口通——流水账 0 行为设计
+非 bug：该表只记刷流经手种）。音乐源站候选（待评估清单：禁转实证/类型枚举后
 纳入 MusicSourceSites）。
 
 ## 十、特殊注意事项
