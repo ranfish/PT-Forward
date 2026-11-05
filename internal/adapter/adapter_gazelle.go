@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -18,9 +19,6 @@ import (
 )
 
 var (
-	reGazelleTitle      = regexp.MustCompile(`<title>([^<]+)</title>`)
-	reGazelleInfoHash   = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
-	reGazelleSize       = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
 	reGazelleSeeders    = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
 	reGazelleLeechers   = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
 	reGazelleTorrentID  = regexp.MustCompile(`torrents\.php\?torrentid=(\d+)`)
@@ -89,10 +87,10 @@ func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 }
 
 func (a *GazelleAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	if config.APIKey != "" {
-		return a.detailViaAPI(ctx, config, torrentID)
-	}
-	return a.detailViaWeb(ctx, config, torrentID)
+	// §59.466 附: ajax.php 认 cookie（Gazelle 标准）——APIKey 门槛放开
+	// （海豚无 api.php 端点·设置页无 Key 入口 2026-11-05 实证；海豹行为
+	// 不变——有 Key 时同样走此路，认证靠 cookie 头恒带）。
+	return a.detailViaAPI(ctx, config, torrentID)
 }
 
 func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -123,6 +121,13 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 // categoryId/categoryName/imdbId/doubanId/conver[封面]/tags + torrent=
 // 版本级 codec/resolution/container/processing/source/remasterTitle/
 // scene/size/seeders/freeTorrent/mediainfos[数组]/fileName/description）。
+//
+// §59.466 附: 海豚（DIC·音乐版 Gazelle）字段集扩展——音乐版响应多出
+// group.musicInfo[7 角色数组]/wikiImage/wikiBody/catalogueNumber/
+// recordLabel + torrent.media/format/encoding/remaster 族/hasLog/
+// logScore/logCount/logChecksum/hasCue/scene/fileList/filePath。
+// 两版字段经 json decode 天然兼容（缺字段=零值）；音乐特化填充由
+// musicInfo 在场门控（电影版无此 key——海豹零影响）。
 func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 	var result struct {
 		Status   string `json:"status"`
@@ -131,14 +136,28 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 				Name        string   `json:"name"`
 				SubName     string   `json:"subName"`
 				Year        int      `json:"year"`
-				ReleaseType string   `json:"releaseType"`
+				ReleaseType int      `json:"releaseType"`
 				CategoryID  int      `json:"categoryId"`
 				CategoryNm  string   `json:"categoryName"`
 				ImdbID      string   `json:"imdbId"`
 				DoubanID    string   `json:"doubanId"`
 				Conver      string   `json:"conver"`
+				WikiImage   string   `json:"wikiImage"`
+				WikiBody    string   `json:"wikiBody"`
+				CatalogueNo string   `json:"catalogueNumber"`
+				RecordLbl   string   `json:"recordLabel"`
 				Tags        []string `json:"tags"`
 				Desc        string   `json:"description"`
+				// musicInfo 音乐版专有（7 角色数组——在场即音乐种判定门）
+				MusicInfo *struct {
+					Artists   []gazelleArtist `json:"artists"`
+					With      []gazelleArtist `json:"with"`
+					Composers []gazelleArtist `json:"composers"`
+					Conductor []gazelleArtist `json:"conductor"`
+					DJ        []gazelleArtist `json:"dj"`
+					RemixedBy []gazelleArtist `json:"remixedBy"`
+					Producer  []gazelleArtist `json:"producer"`
+				} `json:"musicInfo"`
 			} `json:"group"`
 			Torrent struct {
 				InfoHash    string   `json:"infoHash"`
@@ -151,7 +170,22 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 				Container   string   `json:"container"`
 				Processing  string   `json:"processing"`
 				Source      string   `json:"source"`
+				Remastered  bool     `json:"remastered"`
+				RemasterYr  int      `json:"remasterYear"`
 				RemasterTtl string   `json:"remasterTitle"`
+				RemasterLbl string   `json:"remasterRecordLabel"`
+				RemasterCat string   `json:"remasterCatalogueNumber"`
+				Media       string   `json:"media"`
+				Format      string   `json:"format"`
+				Encoding    string   `json:"encoding"`
+				HasLog      bool     `json:"hasLog"`
+				LogScore    int      `json:"logScore"`
+				LogCount    int      `json:"logCount"`
+				LogChecksum int      `json:"logChecksum"`
+				HasCue      bool     `json:"hasCue"`
+				Scene       bool     `json:"scene"`
+				FileList    string   `json:"fileList"`
+				FilePath    string   `json:"filePath"`
 				Description string   `json:"description"`
 				Mediainfos  []string `json:"mediainfos"`
 				FileName    string   `json:"fileName"`
@@ -168,9 +202,17 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 
 	g := result.Response.Group
 	t := result.Response.Torrent
+
+	// Title：音乐种用 filePath（站方标准文件夹形态"嵐 - BRAVE (2019) [CD]
+	// [FLAC]"——最贴近种子名语义）；电影版保持组名。
+	// group.name/filePath 均可能 HTML 转义（中文 &#…; 形态——tid=12603 实证）。
+	title := html.UnescapeString(g.Name)
+	if g.MusicInfo != nil && t.FilePath != "" {
+		title = html.UnescapeString(t.FilePath)
+	}
 	detail := &model.TorrentDetail{
 		// Gazelle 双层：Title=组名（影片名）——种子名在 fileName（不重组）
-		Title:        g.Name,
+		Title:        title,
 		Subtitle:     g.SubName,
 		Size:         t.Size,
 		InfoHash:     strings.ToLower(t.InfoHash),
@@ -180,11 +222,12 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 		ReleaseGroup: t.Processing, // processing 非制作组——版本处理（Encode/Remux/碟规格），暂放此槽供发布反查
 		Description:  t.Description,
 		Tags:         g.Tags,
-		PosterURL:    g.Conver,
+		PosterURL:    firstNonEmpty(g.WikiImage, g.Conver),
 		IMDbID:       g.ImdbID,
 		DoubanID:     g.DoubanID,
 	}
-	if g.Year > 0 {
+	if g.Year > 0 && g.MusicInfo == nil {
+		// 年份拼副标：电影版行为保持（音乐版年份在 MusicMeta.Year——副标留给 remasterTitle）
 		detail.Subtitle = fmt.Sprintf("%s (%d)", detail.Subtitle, g.Year)
 	}
 	// mediainfos 数组（多文件逐条）→ 取首条（单文件种子常态）
@@ -194,52 +237,110 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 	if t.Description != "" {
 		detail.Screenshots = extractScreenshotsFromBBCode(t.Description)
 	}
+
+	// §59.466 附: 音乐种结构化元数据（musicInfo 在场=音乐版响应——电影版无此 key）
+	if g.MusicInfo != nil {
+		mm := &model.MusicMeta{
+			Album:     html.UnescapeString(g.Name),
+			Media:     t.Media,
+			Format:    t.Format,
+			LogScore:  t.LogScore,
+			HasLog:    t.HasLog,
+			HasCue:    t.HasCue,
+			ShareRule: "", // API 盲区："未允禁转"是 HTML 标记——发布侧另查
+			Origin:    "", // API 盲区：DIC"原创"概念无 API 字段
+		}
+		// 艺术家：主 artists + 客座 with（Gazelle 7 角色制——主/客座为
+		// 标题消费位，其余角色作曲/指挥/DJ 等留 wikiBody 查）
+		var names []string
+		for _, a := range g.MusicInfo.Artists {
+			if a.Name != "" {
+				names = append(names, html.UnescapeString(a.Name))
+			}
+		}
+		for _, a := range g.MusicInfo.With {
+			if a.Name != "" {
+				names = append(names, html.UnescapeString(a.Name))
+			}
+		}
+		mm.Artist = strings.Join(names, " / ")
+		// 发行类型枚举（RED wiki 权威）
+		mm.ReleaseType = gazelleReleaseTypes[g.ReleaseType]
+		// 年份：版本级 remasterYear 优先（重制版场景）fallback 组级
+		if t.RemasterYr > 0 {
+			mm.Year = fmt.Sprintf("%d", t.RemasterYr)
+		} else if g.Year > 0 {
+			mm.Year = fmt.Sprintf("%d", g.Year)
+		}
+		// 重制标题→副标槽（"2011 Remaster" 形态——常空）
+		if t.RemasterTtl != "" {
+			detail.Subtitle = t.RemasterTtl
+		}
+		// fileList→TrackList（音频过滤）+整分轨推断（>1=分轨/==1=整轨）
+		if tl, n := parseGazelleFileList(t.FileList); n > 0 {
+			mm.TrackList = tl
+			if n > 1 {
+				mm.AudioMode = "分轨"
+			} else {
+				mm.AudioMode = "整轨"
+			}
+		}
+		// 组描述（wikiBody HTML）→Description 兜底（版本级描述常空）
+		if detail.Description == "" && g.WikiBody != "" {
+			detail.Description = html.UnescapeString(g.WikiBody)
+		}
+		if mm.Artist != "" || mm.Album != "" || mm.Format != "" {
+			detail.Music = mm
+		}
+	}
 	return detail, nil
 }
 
-func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	baseURL := resolveBaseURL(config)
-	u := baseURL + "/torrents.php?torrentid=" + torrentID
+// gazelleArtist musicInfo 角色数组项。
+type gazelleArtist struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-	if err != nil {
-		return nil, err
-	}
-	setCommonHeaders(req, config.Cookie)
+// gazelleReleaseTypes Gazelle releaseType 枚举（RED wiki 权威·音乐版通用）。
+var gazelleReleaseTypes = map[int]string{
+	1: "Album", 3: "Soundtrack", 5: "EP", 6: "Anthology", 7: "Compilation",
+	9: "Single", 11: "Live album", 13: "Remix", 14: "Bootleg", 15: "Interview",
+	16: "Mixtape", 17: "Demo", 18: "Concert Recording", 19: "DJ Mix", 21: "Unknown",
+}
 
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
+// gazelleAudioExts 音频文件后缀（TrackList 过滤+整分轨推断依据）。
+var gazelleAudioExts = map[string]bool{
+	"flac": true, "mp3": true, "wav": true, "ape": true, "dff": true, "dsf": true,
+	"aiff": true, "alac": true, "ogg": true, "m4a": true, "wv": true, "tak": true,
+	"tta": true, "wma": true, "opus": true,
+}
 
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
+// parseGazelleFileList fileList 清洗："名{{{字节}}}|||名{{{字节}}}…" →
+// 音频文件名列表（剥 {{{}}}·过滤音频后缀·换行 join）+音频文件计数。
+func parseGazelleFileList(fileList string) (string, int) {
+	if fileList == "" {
+		return "", 0
 	}
-	html := string(body)
-
-	detail := &model.TorrentDetail{}
-	if m := reGazelleTitle.FindStringSubmatch(html); len(m) > 1 {
-		parts := strings.SplitN(m[1], " :: ", 2)
-		detail.Title = strings.TrimSpace(parts[0])
+	var tracks []string
+	for _, seg := range strings.Split(fileList, "|||") {
+		// 剥 {{{size}}} 尾
+		if i := strings.LastIndex(seg, "{{{"); i >= 0 {
+			seg = seg[:i]
+		}
+		seg = html.UnescapeString(strings.TrimSpace(seg))
+		if seg == "" {
+			continue
+		}
+		ext := ""
+		if i := strings.LastIndex(seg, "."); i >= 0 {
+			ext = strings.ToLower(seg[i+1:])
+		}
+		if gazelleAudioExts[ext] {
+			tracks = append(tracks, seg)
+		}
 	}
-	if m := reGazelleInfoHash.FindStringSubmatch(html); len(m) > 1 {
-		detail.InfoHash = strings.ToLower(m[1])
-	}
-	if m := reGazelleSize.FindStringSubmatch(html); len(m) > 1 {
-		detail.Size = parseSizeStr(m[1])
-	}
-
-	if imdbURL := reIMDbURL.FindString(html); imdbURL != "" {
-		detail.IMDbURL = imdbURL
-	}
-	if doubanURL := reDoubanURL.FindString(html); doubanURL != "" {
-		detail.DoubanURL = doubanURL
-	}
-	detail.Flags = extractFlagsFromStructured(detail.Title, "", detail.Tags)
-
-	return detail, nil
+	return strings.Join(tracks, "\n"), len(tracks)
 }
 
 func (a *GazelleAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {

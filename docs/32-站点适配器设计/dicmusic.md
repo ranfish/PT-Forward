@@ -469,3 +469,43 @@ V2 (VBR) / APS (VBR)
 *数据来源: upload.php HTML (1049行) + rules.php (完整上传规则 32000+ 字符) + Wiki 手把手发种教程 + Wiki 禁转/黑名单/垃圾/首发 (2026-04-22 补充)*
 *文档创建: 2026-04-16*
 *文档更新: 2026-04-22（补充完整上传规则 2.1-2.10、手把手发种教程、有损替代优先级、首种免惩机制、HDCD 禁止、WEB 来源要求）*
+
+
+---
+
+## 附、获取侧 API 摸底与音乐字段映射（2026-11-05 · §59.466 附）
+
+### API 通道定案
+
+- **api.php 端点不存在**（返回 HTML 页；设置页无 API Key 入口——实证）
+- **cookie 调 ajax.php = 唯一 API 路**（Gazelle 标准认证）
+- 发布侧预示：HTML 表单通道（与海豹 api.php 上传不同路——发布期处理）
+- fetch_rps=0.4（migration146·与海豹对齐）
+
+### ajax.php?action=torrent 双层结构（tid=9100/12603 实测）
+
+```
+group: name(专辑·HTML转义) year releaseType(枚举) wikiImage(封面·
+  外域图床) wikiBody(组描述 HTML) tags(英文小写) catalogueNumber
+  recordLabel musicInfo{artists/with/composers/conductor/dj/
+  remixedBy/producer——每项{id,name}}
+torrent: media format encoding remastered/remasterYear/remasterTitle/
+  remasterRecordLabel/remasterCatalogueNumber hasLog logScore(0-100
+  直读) logCount logChecksum hasCue scene fileList("名{{{字节}}}|||")
+  filePath(站方文件夹规范形态) infoHash size
+```
+
+### MusicMeta 映射（获取侧保真·发布翻译层归一）
+
+| MusicMeta | 源 | 备注 |
+|---|---|---|
+| Artist | musicInfo.artists+with join " / " | unescape |
+| Album | group.name | unescape（&#…; 形态实证） |
+| Title（detail） | filePath 优先 fallback 组名 | "嵐 - BRAVE (2019) [CD] [FLAC]" |
+| Format/Media | torrent.format/media | FLAC/CD |
+| Year | remasterYear 优先 fallback group.year | 版本级 |
+| ReleaseType | 枚举翻译（1=Album/9=Single…15 词表） | Gazelle 标准 |
+| LogScore/HasLog/HasCue | API 直读 | CD Dupe 仲裁核心 |
+| TrackList | fileList 清洗（音频 15 后缀过滤） | cue/log/jpg 排除 |
+| AudioMode | 音频计数推断（>1 分轨/==1 整轨） | |
+| ShareRule/Origin/OtherVersions/LogText/Genre | **API 盲区留空** | HTML 标记/torrentgroup/log 全文/tags 混维 |

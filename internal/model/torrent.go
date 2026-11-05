@@ -19,6 +19,12 @@ type MusicMeta struct {
 	OtherVersions string   `json:"other_versions,omitempty"` // 其它版本（Dupe 站内信号）
 	TrackList     string   `json:"track_list,omitempty"`     // 曲目列表（独立通道）
 	LogText       string   `json:"log_text,omitempty"`       // log 文本（独立通道）
+	// §59.466 附: 海豚 Gazelle 路扩展——API 直读信号（皇后源后续解析 log
+	// 文本得分行同填——两源归一消费：发布预检 R2/Dupe 仲裁）。
+	LogScore    int    `json:"log_score,omitempty"`    // Log 得分（0-100；CD 抓轨质量核心）
+	HasLog      bool   `json:"has_log,omitempty"`      // log 在场
+	HasCue      bool   `json:"has_cue,omitempty"`      // cue 在场
+	ReleaseType string `json:"release_type,omitempty"` // 发行类型（Album/EP/Single/Compilation…Gazelle 枚举）
 }
 
 type TorrentDetail struct {
