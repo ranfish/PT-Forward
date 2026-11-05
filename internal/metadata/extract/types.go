@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 // IntroData 简介分段（转载语义核心，PTGen 不产 Statement/Screenshots）。
@@ -74,6 +76,10 @@ type SeedData struct {
 
 	InfoHash string `json:"info_hash"`
 	Size     int64  `json:"size"`
+
+	// §59.466 L4: 音乐结构化元数据（皇后/海豚获取链产出——落库资产通道；
+	// 影视种恒 nil）。
+	Music *model.MusicMeta `json:"music,omitempty"`
 
 	// yaml 配置回显（保留 PTNexus 风格，便于调试与扩展）
 	SourceParams map[string]any `json:"source_params,omitempty"`

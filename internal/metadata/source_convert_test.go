@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,5 +166,58 @@ func TestMarshalDetailSource_RoundTrip(t *testing.T) {
 	}
 	if back.Title != original.Title || back.Type != original.Type {
 		t.Errorf("round-trip mismatch: %+v", back)
+	}
+}
+
+// §59.466 L4: Music 落库通道锚——真实皇后数据形态（tid=189504 端到端产物）
+// 双向转换 Round-trip：DetailToSeed→SeedToDetailSource→DetailSourceToSeed。
+func TestMusicMetaRoundTrip(t *testing.T) {
+	detail := &model.TorrentDetail{
+		Title: "I Solisti Ambrosiani - Giardini: 6 Sonatas",
+		Music: &model.MusicMeta{
+			Artist:     "I Solisti Ambrosiani",
+			Album:      "Giardini: 6 Sonatas for Violin & Continuo, Op. 1",
+			Genre:      "古典(Classical)",
+			Tags:       []string{"欧美", "古典(Classical)"},
+			Format:     "FLAC",
+			AudioMode:  "分轨",
+			Media:      "Web",
+			Year:       "2026",
+			ShareRule:  "欢迎转载",
+			Origin:     "转载",
+			LogScore:   100,
+			HasLog:     true,
+			ReleaseType: "Album",
+		},
+	}
+	seed := extract.DetailToSeed(detail)
+	if seed.Music == nil || seed.Music.Artist != "I Solisti Ambrosiani" {
+		t.Fatalf("DetailToSeed 应搬 Music: %+v", seed.Music)
+	}
+	src := SeedToDetailSource(seed, time.Now(), extract.Meta{})
+	if src.Music == nil || src.Music.ShareRule != "欢迎转载" || src.Music.LogScore != 100 {
+		t.Fatalf("SeedToDetailSource 应搬 Music: %+v", src.Music)
+	}
+	// JSON 序列化（落库形态）
+	b, err := json.Marshal(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"music":{`) || !strings.Contains(string(b), `"log_score":100`) {
+		t.Errorf("落库 JSON 应含 music: %.120s", string(b))
+	}
+	// 还原
+	var back DetailSourceJSON
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatal(err)
+	}
+	seed2 := DetailSourceToSeed(back)
+	if seed2.Music == nil || seed2.Music.Album != detail.Music.Album || seed2.Music.ReleaseType != "Album" {
+		t.Fatalf("Round-trip Music 应无损: %+v", seed2.Music)
+	}
+	// 影视种 nil 恒 nil（零开销）
+	plain := extract.DetailToSeed(&model.TorrentDetail{Title: "Movie"})
+	if plain.Music != nil {
+		t.Error("影视种 Music 应 nil")
 	}
 }

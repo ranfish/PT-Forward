@@ -30,6 +30,8 @@ func SeedToDetailSource(seed extract.SeedData, fetchedAt time.Time, meta extract
 		TMDbLink:      seed.TMDbLink,
 		FetchedAt:     fetchedAt,
 		ExtractorInfo: meta,
+		// §59.466 L4: Music 通道
+		Music: seed.Music,
 	}
 }
 
@@ -53,6 +55,8 @@ func DetailSourceToSeed(src DetailSourceJSON) extract.SeedData {
 		IMDbLink:     src.IMDbLink,
 		DoubanLink:   src.DoubanLink,
 		TMDbLink:     src.TMDbLink,
+		// §59.466 L4: Music 通道（还原）
+		Music: src.Music,
 	}
 }
 
