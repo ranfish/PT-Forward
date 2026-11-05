@@ -2846,8 +2846,9 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		// （D3 校验内建）→ IYUU 兜底。
 		// §59.234 ①: 组映射确定源站——搜索词附加组名（suffix 变参——
 		// 提取管道后追加；直接附加 name 会被提取层剥组名尾段）
-		// §59.469: 音乐链不追加——音乐种无组名（用户定案），且影视
-		// 尾段逻辑会把专辑段误提为"组"（Taylor Swift - 1989 (Deluxe)
+		// §59.469: 音乐链不追加——音乐种通常无组名（普通用户上传为主；
+		// 官组后缀少数存在：OpenCD/@Musopia——后缀非搜索必需词不影响命中），
+		// 且影视尾段逻辑会把专辑段误提为"组"（Taylor Swift - 1989 (Deluxe)
 		// (2014) → 组="1989 (Deluxe) (2014)"→keyword 重复拼接畸形）。
 		// §59.330 P4 补丁 b: 搜索分支同款子预算——搜索烧 25s 即释放，
 		// 簇 comment/IYUU 兜底继承剩余（活 ctx——243 实证搜索分支漏改）
