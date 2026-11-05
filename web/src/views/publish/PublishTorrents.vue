@@ -134,6 +134,9 @@
       @success="onPreviewSaved"
     />
 
+    <!-- §59.469 附六: MDP——音乐种详情抽屉（入口 probeMusicSeed 分流） -->
+    <MusicDetailPanel v-model:open="mdpOpen" :detail="mdpDetail" :preset="mdpPreset" />
+
     <a-modal
       v-model:open="declFilterOpen"
       title="声明过滤规则"
@@ -247,8 +250,9 @@
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import CrossSeedPanel from './CrossSeedPanel.vue'
+import MusicDetailPanel from './MusicDetailPanel.vue'
 import { message } from 'ant-design-vue'
-import { seedConfigApi, publishTorrentsApi, type SeedListItem } from '@/api/publish'
+import { seedConfigApi, publishTorrentsApi, type SeedDetail, type SeedListItem } from '@/api/publish'
 import { formatBytes, maskDomain } from '@/utils/format'
 import { CATEGORY_LABELS } from '@/generated/dict'
 import { categoryTagColor } from '@/utils/categoryDisplay'
@@ -413,7 +417,26 @@ const previewPanelOpen = ref(false)
 const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
 const previewDirect = ref(false)
 
-function previewSeed(record: SeedListItem) {
+// §59.469 附六: MDP 入口分流——音乐种开 MDP·其余走转种抽屉现状链
+const mdpOpen = ref(false)
+const mdpDetail = ref<SeedDetail | null>(null)
+const mdpPreset = ref<{ info_hash: string; name: string; size: number; client_id: number } | null>(null)
+
+async function previewSeed(record: SeedListItem) {
+  // 探测先行（方案 a）：getSeed 成功且 music 在场→MDP 纯渲染；
+  // 失败/不在场→转种抽屉（零破坏——影视行为不变）
+  const d = await seedConfigApi.probeMusicSeed(record.hash, record.client_id)
+  if (d) {
+    mdpDetail.value = d
+    mdpPreset.value = {
+      info_hash: record.hash,
+      name: record.name,
+      size: record.size,
+      client_id: record.client_id,
+    }
+    mdpOpen.value = true
+    return
+  }
   previewPreset.value = {
     info_hash: record.hash,
     name: record.name,

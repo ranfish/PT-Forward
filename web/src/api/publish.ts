@@ -106,6 +106,35 @@ export const publishDataApi = {
 }
 
 // §59.20 种子配置页 API
+// §59.469 附六: 音乐结构化元数据（契约 22 字段——17 现役+B1-B3 预留 5；
+// tag 对齐 model.MusicMeta·后端扩展后前端槽位自动点亮）
+export interface MusicMeta {
+  artist?: string
+  album?: string
+  genre?: string
+  tags?: string[]
+  format?: string
+  audio_mode?: string
+  media?: string
+  year?: string
+  share_rule?: string
+  origin?: string
+  other_versions?: string
+  track_list?: string
+  log_text?: string
+  log_score?: number
+  has_log?: boolean
+  has_cue?: boolean
+  release_type?: string
+  // B1-B3 预留（MusicMeta 17→22——bit_depth/sample_rate 海豚 MI 标题解析·
+  // label/catalogue_no/edition 海豚 remaster 现成；皇后/乌托邦按需）
+  bit_depth?: string
+  sample_rate?: string
+  label?: string
+  catalogue_no?: string
+  edition?: string
+}
+
 export interface SeedListItem {
   hash: string
   name: string
@@ -164,6 +193,9 @@ export interface SeedDetail {
   tag_labels?: string[] // §59.106: 后端权威显示名（与 tags 索引对齐）
   medium?: string // §59.108: 编辑表单媒介输入框数据源
   audio_tracks?: number
+  // §59.469 附六: MDP 消费——音乐结构化元数据（音乐种非 undefined；
+  // 入口分流判据+MDP 22 字段渲染）
+  music?: MusicMeta
   // §59.228: Tab1 三分区新键（PTGen 资产/帧率/媒介 canonical 单点）
   chinese_title?: string
   english_title?: string
@@ -217,8 +249,20 @@ export const seedConfigApi = {
   uniquePaths() {
     return client.get<ApiResponse<{ clients: Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }> }>>('/publish/seeds/unique-paths')
   },
-  getSeed(infoHash: string, clientId?: number) {
-    return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
+  getSeed(infoHash: string, clientId?: number | string) {
+    return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId !== undefined && clientId !== '' ? { client_id: clientId } : undefined })
+  },
+  // §59.469 附六: MDP 入口分流探测——getSeed 成功且 music 在场→返回完整
+  // detail（MDP 纯渲染消费·音乐场景总请求恒 1 次）；任何失败/不在场→
+  // null（调用方 fallback 转种抽屉现状链·零破坏——宁漏勿误同构）
+  async probeMusicSeed(infoHash: string, clientId?: number | string): Promise<SeedDetail | null> {
+    try {
+      const resp = await seedConfigApi.getSeed(infoHash, clientId)
+      const d = resp.data?.data
+      return d?.music ? d : null
+    } catch {
+      return null
+    }
   },
   putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string; reviewed?: boolean }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[]; reassembled_title?: string; rendered_description?: string; render_error?: string; title_incomplete?: boolean }>>(`/publish/seeds/${infoHash}`, data)

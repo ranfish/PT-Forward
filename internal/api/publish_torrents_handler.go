@@ -4505,6 +4505,12 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		result["genre"] = normalizeDomainValues("genre", src.Genre)
 	}
 
+	// §59.469 附六: MDP 消费——music 结构化元数据透出（音乐种非 nil·§59.466
+	// 落库资产；入口分流（music 在场→MDP）+MDP 22 字段渲染）
+	if src, err := metadata.UnmarshalDetailSource(meta.DetailSourceJSON); err == nil && src != nil && src.Music != nil {
+		result["music"] = src.Music
+	}
+
 	// §59.26: 返回 tags——双形态（§59.106: keys=canonical 供发布映射,
 	// labels=dict 显示名——前端已选区不依赖 bundle 内 dict 新旧, 新词条上线
 	// 旧缓存页面也不显示代码）
