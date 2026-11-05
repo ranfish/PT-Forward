@@ -1174,6 +1174,34 @@ canonical：艺人 - 专辑 [版本] 年份 - 格式 [位深 采样率] - [作�
 Gazelle 同构互转（API 对 API），我们场景异构——**自研路径确认**；
 语义层（字段族/流程/模板）以 GazelleSync 为参照。
 
+## 九-f、auto_feed 油猴脚本分析（2026-11-05·30766 行·音乐互转完整先例）
+
+**支持矩阵**：皇后目标站 ✓（plugin_upload 填充段 :14563）+音乐源站
+（皇后新版 DOM/RED/OPS/DIC Gazelle API/Jpopsuki/NP 系 kdescr）——
+**比 GazelleSync 更贴近的工程参照**（直接实现皇后目标）。
+
+**信息获取双通道**：
+- 详情页 DOM（NP+皇后新版）：divtracklist（曲目区）/divnfo（log 区）/
+  divdescr/cover/td:contains("专辑名称"/"艺术家名"/"标签列表")——**皇后新版
+  有结构化音乐字段行**
+- Gazelle API JSON（RED/OPS/DIC）：group.artists/fillForm(releaseJSON)
+
+**皇后目标填充工程细节（全部可参照）**：
+- share_rule 默认=3（欢迎转载）——**讨论点⑤的先例答案**
+- frname 直填源站名（name_dict：RED→Redacted/OPS→Orpheus/jpop→Jpopsuki）
+- **log 文本重建 .log 文件**：split('==logs==') 多 log→Blob/File→nfo1
+  fileInput 注入+#nfoadd 加行——与我们 R5 log 重建设计同款
+- 封面：descr 首 [img]→预览+addPoster 转存
+- standard/medium 下拉：源媒介文本 vs option 文本模糊匹配（弱——我们
+  standard_keys 映射更强）
+- descr 清洗：剥源站模板正则+剥 tracklist 防重复
+- 豆瓣搜索按钮（search.douban.com/music cat=1003）——**人工辅助不自动**
+  （与 PT-Gen 关闭结论互证 ✓）
+
+**皇后两种版面发现**（opencd_mode 0 新版/1 老版 kdescr）——之前摸的详情页
+全是老版；新版 DOM（divtracklist/divnfo/结构化字段行）待补摸——近期发布
+种子为新版（改版时点不明，新旧共存）。
+
 ## 十、特殊注意事项
 
 ### 10.1 发布页面路径
