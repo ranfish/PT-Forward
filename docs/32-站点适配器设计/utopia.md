@@ -83,6 +83,20 @@ R7（源站禁转必检）完全同构（站方背书）；且构成 **R7 禁转
 （12.5-b 讨论点⑥）的具体案例——乌托邦转载种的"转载自 URL"指向源头
 站，源头禁转约束传导（该 URL 兼具传递性检查线索价值）。
 
+### adapter 音乐特化实施（2026-11-05·§59.469 附五）
+
+**策略=enrich 模式**（`internal/adapter/adapter_utopia.go`）：基础版面=
+标准 NP（Engine 提取照走），音乐字段后处理 enrichUtopiaMusic 挂
+getTorrentDetailInner 两分支（内部域判定·非乌托邦零开销）。
+
+- 标题双形态解析：三段（官组·中段粘连）/四段（转载·保种区尾巴剥+
+  繁体分軌归一简体）；AudioMode 词表皇后同款词序
+- 字段行双/单引号 class 兼容；基本信息嵌套 b 键值串（nbsp 跳过）
+- 17 字段中 14 填：TrackList 不提（无结构化区·desc 原样）/
+  OtherVersions 站方无此字段/HasCue=副标题规格链 grep
+- 测试锚三枚：TestUtopiaOfficialMusicMeta（官组三段）/TestUtopiaTransfer
+  MusicMeta（转载四段+Origin URL）/TestUtopiaDomain
+
 ### 待摸遗留
 
 - ~~禁转种实证~~ ✓（2026-11-05 四路实证无禁转体系——上方节）

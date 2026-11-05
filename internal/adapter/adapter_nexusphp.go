@@ -379,6 +379,8 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 		if ok {
 			a.fillMediaFromRawBlock(html, detail)
 			a.fillPublishedAt(html, detail)
+			// §59.469 附五: 乌托邦音乐字段后处理（enrich 模式·内部域判定）
+			a.enrichUtopiaMusic(config, html, detail)
 			return detail, html, nil
 		}
 		if a.logger != nil {
@@ -390,6 +392,8 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	detail := a.legacyExtractDetail(html)
 	a.fillMediaFromRawBlock(html, detail)
 	a.fillPublishedAt(html, detail)
+	// §59.469 附五: 乌托邦音乐字段后处理（enrich 模式·内部域判定）
+	a.enrichUtopiaMusic(config, html, detail)
 	return detail, html, nil
 }
 
