@@ -166,6 +166,9 @@ export interface SeedListItem {
   status: string // forbidden / system_forbidden / no_mapping / reviewed / pending / incomplete / unfetched
   // §59.469 附八: 音乐种行标记（SeedConfig 主入口"详情"按钮/MDP 分流）
   is_music?: boolean
+  // §59.469 附九: 字段列音乐行红绿标（方案 1a·与审核门同构）
+  music_artist?: string
+  music_album?: string
   // §59.131 ②: 簇口径增量字段（发布页一种多站）
   copy_count?: number
   sites?: string[]

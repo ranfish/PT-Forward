@@ -3565,24 +3565,32 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// §59.469 附七: 音乐 hash 批量预查（音乐种审核门口径——classifySeedStatusLite
 	// 的 isMusicSeed 输入）。LIKE 模式与 detailSourceHasMusic 理论等价：Music
 	// 非 nil 序列化必有 "music":{ ·omitempty nil 不序列化 ·BBCode 文本出现该
-	// 模式概率≈0。只回 info_hash 单列——7615 行零 JSON 载入（metas 查询轻量化
+	// 模式概率≈0。只回轻量列——7615 行零 JSON 载入（metas 查询轻量化
 	// §59.29 不带 detail_source_json 列）。
-	var musicHashRows []struct{ InfoHash string }
-	musicHashSet := make(map[string]bool)
+	// §59.469 附九: 扩展 json_extract 取 artist/album（字段列音乐行三项红绿标
+	// 消费·与审核门方案 B 同构）。
+	type musicRow struct {
+		InfoHash string
+		Artist   string
+		Album    string
+	}
+	var musicRows []musicRow
+	musicMeta := make(map[string]musicRow)
 	if len(metas) > 0 {
 		hashes := make([]string, 0, len(metas))
 		for _, m := range metas {
 			hashes = append(hashes, m.InfoHash)
 		}
 		if err := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+			Select("info_hash, json_extract(detail_source_json, '$.music.artist') AS artist, json_extract(detail_source_json, '$.music.album') AS album").
 			Where("info_hash IN ? AND detail_source_json LIKE ?", hashes, `%"music":{%`).
-			Pluck("info_hash", &musicHashRows).Error; err != nil && h.logger != nil {
+			Scan(&musicRows).Error; err != nil && h.logger != nil {
 			// 降级语义：集合空=音乐种全按影视 9 字段判（现状行为·可接受）——
 			// 但不可静默（空态三问第 3 问）
 			h.logger.Warn("listSeeds music hash precheck failed, fallback to video gate", zap.Error(err))
 		}
-		for _, r := range musicHashRows {
-			musicHashSet[r.InfoHash] = true
+		for _, row := range musicRows {
+			musicMeta[row.InfoHash] = row
 		}
 	}
 
@@ -3758,11 +3766,20 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 
 		// 5 态标注（轻量：跳过 compliance）
 		// §59.469 附七: 音乐 hint（批量预查集·meta nil=unfetched 行恒 false）
-		isMusic := meta != nil && musicHashSet[meta.InfoHash]
+		mr := musicRow{}
+		if meta != nil {
+			mr = musicMeta[meta.InfoHash]
+		}
+		isMusic := mr.InfoHash != ""
 		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic)
 		item["status"] = status
 		// §59.469 附八: 音乐种行标记（SeedConfig 主入口按钮文案/分流消费）
 		item["is_music"] = isMusic
+		// §59.469 附九: artist/album（字段列音乐行红绿标·方案 1a）
+		if isMusic {
+			item["music_artist"] = mr.Artist
+			item["music_album"] = mr.Album
+		}
 
 		// §59.131 ②: 副本数 + 站点列表（簇内已有站点——发布页"已存在"标注数据源）
 		cc := copyCountByKey[fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)]

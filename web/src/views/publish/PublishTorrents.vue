@@ -111,9 +111,12 @@
         <template v-if="column.key === 'actions'">
           <a-space>
             <template v-if="record.reviewed">
-              <a-button type="primary" size="small" @click="openExecute(record)">选站发布</a-button>
+              <!-- §59.469 附九: 音乐种隐藏选站发布（音乐目标站适配未做·防误发影视链） -->
+              <a-button v-if="!record.is_music" type="primary" size="small" @click="openExecute(record)">选站发布</a-button>
               <a-button size="small" @click="previewSeed(record)">预览种子</a-button>
             </template>
+            <!-- §59.469 附九: 非 reviewed 音乐种显"预览种子"（MDP 只读·与 PublishData 同款） -->
+            <a-button v-else-if="record.is_music" size="small" @click="previewSeed(record)">预览种子</a-button>
             <a-button v-else size="small" @click="goRefine(record)">完善数据</a-button>
           </a-space>
         </template>

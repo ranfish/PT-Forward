@@ -166,7 +166,13 @@
         </template>
 
         <template v-else-if="column.key === 'fields'">
-          <div class="fields-cell">
+          <!-- §59.469 附九: 音乐行三项红绿标（与审核门方案 B 同构·title/artist/album） -->
+          <div v-if="record.is_music" class="fields-cell">
+            <span :class="record.title ? 'ck' : 'ck-miss'">标题</span>
+            <span :class="record.music_artist ? 'ck' : 'ck-miss'">艺术家</span>
+            <span :class="record.music_album ? 'ck' : 'ck-miss'">专辑</span>
+          </div>
+          <div v-else class="fields-cell">
             <span :class="record.title ? 'ck' : 'ck-miss'">标题</span>
             <span :class="record.poster ? 'ck' : 'ck-miss'">海报</span>
             <span :class="record.has_screenshots ? 'ck' : 'ck-miss'">截图</span>
