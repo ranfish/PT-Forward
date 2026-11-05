@@ -25,6 +25,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/comment"
 	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
@@ -2674,6 +2675,18 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 
 	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
 	clusterTargets := h.buildClusterTargets(ctx, clientUID, savePath, name, hash)
+
+	// §59.469 分流判定：S1（coverage∩音乐源站）∨ S2（标题音乐官组词）
+	// → 音乐链：输入过滤（coverage/簇限定音乐源站内）——选站引擎零改动
+	// 复用（五层自动在音乐源站空间工作；天空等影视站结构性出局）。
+	if isMusicSeedForRouting(name, coverageSites) {
+		coverageSites = filterToMusicSources(coverageSites)
+		clusterTargets = filterClusterToMusicSources(clusterTargets)
+		h.logger.Info("music chain routing",
+			zap.String("hash", hash),
+			zap.Int("coverage_music", len(coverageSites)),
+			zap.Int("cluster_music", len(clusterTargets)))
+	}
 
 	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets, hash)
 	if result.SourceSite == "" {
@@ -5861,4 +5874,47 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 		"failed":    len(records) - pushed,
 		"outcomes":  outcomes,
 	})
+}
+
+// isMusicSeedForRouting §59.469 音乐种分流判定（零误判设计）：
+// S1 = coverage 含音乐源站（纯音乐站无影视内容——逻辑必然）
+// S2 = 标题含音乐官组词 {OpenCD, @Musopia}（@锚形态保证零误命中；
+// 集散地救回场景——皇后官组种流转车站/劳改所/麒麟后 tracker 已非 open.cd）。
+// 宁漏勿误：漏判走影视链（music 空可接受）；误判影视种锁进音乐链不可接受。
+func isMusicSeedForRouting(title string, coverageSites []model.SiteCoverageCache) bool {
+	for _, c := range coverageSites {
+		if site.IsMusicSourceSite(c.SiteName) {
+			return true
+		}
+	}
+	// 词边界匹配：防 OpenCDX 类影视组名子串误命中（X 为词字符  不裂）
+	return musicOfficialGroupRe.MatchString(title)
+}
+
+// musicOfficialGroupRe §59.469 S2 音乐官组词：OpenCD（皇后官组）+
+// @Musopia（乌托邦原抓组 @锚——后缀形态天然词边界）。
+var musicOfficialGroupRe = regexp.MustCompile(`\bOpenCD\b|@Musopia`)
+
+// filterToMusicSources coverage 过滤为音乐源站子集（保留全状态行——
+// SelectFetchSite 内部按状态筛；S1 判定含 tracker-only 行）。
+func filterToMusicSources(sites []model.SiteCoverageCache) []model.SiteCoverageCache {
+	out := make([]model.SiteCoverageCache, 0, len(sites))
+	for _, c := range sites {
+		if site.IsMusicSourceSite(c.SiteName) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// filterClusterToMusicSources 簇直达候选过滤为音乐源站子集
+// （簇概念音乐链保留——限定音乐源站内直达）。
+func filterClusterToMusicSources(targets []comment.DirectTarget) []comment.DirectTarget {
+	out := make([]comment.DirectTarget, 0, len(targets))
+	for _, t := range targets {
+		if site.IsMusicSourceSite(t.SiteName) {
+			out = append(out, t)
+		}
+	}
+	return out
 }
