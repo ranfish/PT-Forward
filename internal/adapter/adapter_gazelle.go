@@ -19,8 +19,6 @@ import (
 )
 
 var (
-	reGazelleSeeders    = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
-	reGazelleLeechers   = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
 	reGazelleTorrentID  = regexp.MustCompile(`torrents\.php\?torrentid=(\d+)`)
 	reGazelleGroupID    = regexp.MustCompile(`torrents\.php\?id=(\d+)`)
 	reGazelleErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
@@ -473,10 +471,9 @@ func (a *GazelleAdapter) GetBatchSLData(ctx context.Context, config *model.SiteC
 }
 
 func (a *GazelleAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	if config.APIKey != "" {
-		return a.slViaAPI(ctx, config, torrentID)
-	}
-	return a.slViaWeb(ctx, config, torrentID)
+	// §59.466 附: 对齐 detail 分流——ajax.php 认 cookie 恒走 API
+	// （slViaWeb HTML 弱解析已删——海豚无 key 场景同样 API 可达）。
+	return a.slViaAPI(ctx, config, torrentID)
 }
 
 func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
@@ -510,37 +507,6 @@ func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig,
 		return nil, parseError("解析响应失败", err)
 	}
 	return &model.SLData{Seeders: result.Response.Torrent.Seeders, Leechers: result.Response.Torrent.Leechers}, nil
-}
-
-func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	baseURL := resolveBaseURL(config)
-	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/torrents.php?torrentid="+torrentID, nil)
-	if err != nil {
-		return nil, err
-	}
-	setCommonHeaders(req, config.Cookie)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
-
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-	html := string(body)
-	sl := &model.SLData{}
-
-	if m := reGazelleSeeders.FindStringSubmatch(html); len(m) > 1 {
-		sl.Seeders, _ = strconv.Atoi(m[1])
-	}
-	if m := reGazelleLeechers.FindStringSubmatch(html); len(m) > 1 {
-		sl.Leechers, _ = strconv.Atoi(m[1])
-	}
-
-	return sl, nil
 }
 
 func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
