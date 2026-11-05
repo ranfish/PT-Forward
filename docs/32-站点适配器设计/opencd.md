@@ -1161,6 +1161,19 @@ canonical：艺人 - 专辑 [版本] 年份 - 格式 [位深 采样率] - [作�
    抽样 ~37% 含皇后 tracker→推全量约 5300 颗不可转发、可用 ≈9000 颗
    （精确清点挂 R8 实施期按种实时判）。
 
+## 九-e、examples 目录音乐转载项目调研（2026-11-05·80+ 项目甄别）
+
+| 项目 | 价值 |
+|---|---|
+| **GazelleSync**（RED/OPS/NWCD/DIC 四站互转） | 最接近的完整先例：组层+版本层字段映射语义（与我们 12.2 模型对齐）/checkForDuplicate 流程/致谢模板（"Uploaded with GazelleSync… Many thanks to the original uploader!"）/wikiImage 跨站转存/HTML→BBCode（strip_tags） |
+| **PTNexus** global_mappings.yaml | **音乐分类归一词表 12 写法**（音乐/Music/HQ音乐/HQ Audio/无损音乐→category.music）+MV 维度——直接吸收进我们的音乐分类识别 |
+| easy-upload | DICMusic 支持（Gazelle 表单处理参考） |
+| 其它（gg-bot/PT-Plugin-Plus/MoviePilot 等） | 边缘/低价值 |
+
+**结论**：无现成"多源→皇后（NP 定制音乐版）"方案——GazelleSync 是
+Gazelle 同构互转（API 对 API），我们场景异构——**自研路径确认**；
+语义层（字段族/流程/模板）以 GazelleSync 为参照。
+
 ## 十、特殊注意事项
 
 ### 10.1 发布页面路径
