@@ -426,16 +426,21 @@ func (c *TRClient) GetTrackers(ctx context.Context, hash string) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("torrent-get rpc: %w", err)
 	}
-	var torrents []struct {
-		Trackers []struct {
-			Announce string `json:"announce"`
-		} `json:"trackers"`
+	// §59.469 附五: arguments 是 object（{"torrents":[...]}）非裸 array——
+	// 旧代码直接解 []struct 恒 decode error→§59.337 单颗补拉链静默跳过
+	// （transmission 下载器 tracker 行永远不写→S1 无从命中·许景淳案）
+	var wrap struct {
+		Torrents []struct {
+			Trackers []struct {
+				Announce string `json:"announce"`
+			} `json:"trackers"`
+		} `json:"torrents"`
 	}
-	if err := json.Unmarshal(resp.Arguments, &torrents); err != nil {
+	if err := json.Unmarshal(resp.Arguments, &wrap); err != nil {
 		return nil, fmt.Errorf("decode trackers: %w", err)
 	}
 	var urls []string
-	for _, t := range torrents {
+	for _, t := range wrap.Torrents {
 		for _, tr := range t.Trackers {
 			if tr.Announce != "" {
 				urls = append(urls, tr.Announce)
