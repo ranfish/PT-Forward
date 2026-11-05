@@ -195,8 +195,10 @@ func parseUtopiaMusicTitle(title string, mm *model.MusicMeta) {
 		mm.Year = s[last[0]:last[1]]
 		s = s[:last[0]] + s[last[1]:]
 	}
-	// Album=剩余（剥词残留多空格归一——保真原则：站方尾缀词如 tulipa 保留）
-	mm.Album = strings.Join(strings.Fields(s), " ")
+	// Album=剩余（剥词残留多空格归一——保真原则：站方尾缀词如 tulipa 保留；
+	// 尾部 " -" 分隔符残留剥除——种名内部含 " - " 时 join 残留·许景淳案）
+	mm.Album = strings.TrimSpace(strings.TrimSuffix(
+		strings.Join(strings.Fields(s), " "), "-"))
 }
 
 // extractUtopiaFields rowhead 字段行提取键值对（双/单引号 class 兼容）。
