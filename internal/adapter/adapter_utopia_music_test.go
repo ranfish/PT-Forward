@@ -3,6 +3,8 @@ package adapter
 import (
 	"strings"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 // §59.469 附五: 乌托邦音乐特化锚——双形态（官组三段/转载四段）+
@@ -135,5 +137,21 @@ func TestUtopiaDomain(t *testing.T) {
 		if isUtopiaDomain(d) {
 			t.Errorf("%s 不应判乌托邦域", d)
 		}
+	}
+}
+
+// 模式词后尾缀词形态（Enrique 种 tid=3168 实证："…FLAC 分轨 tulipa"——
+// TrimSuffix 剥不掉·任意位置删词修后 Album 不残留模式词）。
+func TestUtopiaTitleTrailingWord(t *testing.T) {
+	mm := &model.MusicMeta{}
+	parseUtopiaMusicTitle("Enrique Ugarte - Valse Musette 手风琴圆舞曲 1993 FLAC 分轨 tulipa - ZHENGLIFAN@Musopia", mm)
+	if mm.AudioMode != "分轨" {
+		t.Errorf("AudioMode = %q, want 分轨", mm.AudioMode)
+	}
+	if mm.Album != "Valse Musette 手风琴圆舞曲 tulipa" {
+		t.Errorf("Album = %q, want Valse Musette 手风琴圆舞曲 tulipa（尾缀词保真保留·模式词不残留）", mm.Album)
+	}
+	if mm.Year != "1993" || mm.Format != "FLAC" || mm.Artist != "Enrique Ugarte" {
+		t.Errorf("Artist/Year/Format = %q/%q/%q", mm.Artist, mm.Year, mm.Format)
 	}
 }
