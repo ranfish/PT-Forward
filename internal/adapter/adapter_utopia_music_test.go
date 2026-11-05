@@ -155,3 +155,13 @@ func TestUtopiaTitleTrailingWord(t *testing.T) {
 		t.Errorf("Artist/Year/Format = %q/%q/%q", mm.Artist, mm.Year, mm.Format)
 	}
 }
+
+// 种名内部含 " - " 的 join 残留（许景淳种 tid=11617 实证——Album 尾
+// " -" 分隔符残留剥除·内容保真不变）。
+func TestUtopiaTitleInnerDash(t *testing.T) {
+	mm := &model.MusicMeta{}
+	parseUtopiaMusicTitle("许景淳 - 路长情更长 - FLAC 分轨 - ZHENGLIFAN@Musopia", mm)
+	if mm.Album != "路长情更长" {
+		t.Errorf("Album = %q, want 路长情更长（尾 - 剥）", mm.Album)
+	}
+}
