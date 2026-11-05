@@ -165,3 +165,20 @@ func TestUtopiaTitleInnerDash(t *testing.T) {
 		t.Errorf("Album = %q, want 路长情更长（尾 - 剥）", mm.Album)
 	}
 }
+
+// 真实形态锚（许景淳种 tid=11617 h1 实测）：两段+年份格式连字符粘连
+// （"1994-FLAC"无空格连字符——split " - " 只出 2 段）。
+func TestUtopiaTitleRealForm(t *testing.T) {
+	mm := &model.MusicMeta{}
+	parseUtopiaMusicTitle("许景淳 - 路长情更长 1994-FLAC 分轨    [免费]", mm)
+	wants := map[string]string{
+		"Artist": "许景淳", "Album": "路长情更长", "Year": "1994",
+		"Format": "FLAC", "AudioMode": "分轨",
+	}
+	gots := map[string]string{"Artist": mm.Artist, "Album": mm.Album, "Year": mm.Year, "Format": mm.Format, "AudioMode": mm.AudioMode}
+	for k, w := range wants {
+		if gots[k] != w {
+			t.Errorf("%s = %q, want %q", k, gots[k], w)
+		}
+	}
+}
