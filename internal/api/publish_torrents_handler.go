@@ -2641,10 +2641,14 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// §59.337: tracker coverage 保证——批量入口不产生 tracker 行（写入只在
 	// 探测查询端点），新种子层选 ④ 空转。此处无 tracker 行时单颗补拉
 	// （GetTrackers 1 次 RPC + MatchAll + 写缓存 tid 空行）——L0 同口径。
+	// §59.469 附五: 补拉条件收窄——**未过期** tracker 行才算"已有"（过期行
+	// 触发重拉）。许景淳种实证：10-18 旧"我的PT"行（PT0 副本 mypt tracker
+	// 真实历史）10-19 已过期仍拦截补拉→PT2 副本的 musopia tracker 永远
+	// 进不来→S1 无从命中→音乐链漏判（错选星陨阁簇 tid）。
 	if h.coverage != nil {
 		hasTracker := false
 		for _, c := range coverageSites {
-			if c.Source == model.CoverageSourceTracker {
+			if c.Source == model.CoverageSourceTracker && c.ExpiresAt.After(time.Now()) {
 				hasTracker = true
 				break
 			}
