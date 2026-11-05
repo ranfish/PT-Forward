@@ -2679,7 +2679,8 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// §59.469 分流判定：S1（coverage∩音乐源站）∨ S2（标题音乐官组词）
 	// → 音乐链：输入过滤（coverage/簇限定音乐源站内）——选站引擎零改动
 	// 复用（五层自动在音乐源站空间工作；天空等影视站结构性出局）。
-	if isMusicSeedForRouting(name, coverageSites) {
+	musicRouting := isMusicSeedForRouting(name, coverageSites)
+	if musicRouting {
 		coverageSites = filterToMusicSources(coverageSites)
 		clusterTargets = filterClusterToMusicSources(clusterTargets)
 		h.logger.Info("music chain routing",
@@ -2845,10 +2846,17 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 		// （D3 校验内建）→ IYUU 兜底。
 		// §59.234 ①: 组映射确定源站——搜索词附加组名（suffix 变参——
 		// 提取管道后追加；直接附加 name 会被提取层剥组名尾段）
+		// §59.469: 音乐链不追加——音乐种无组名（用户定案），且影视
+		// 尾段逻辑会把专辑段误提为"组"（Taylor Swift - 1989 (Deluxe)
+		// (2014) → 组="1989 (Deluxe) (2014)"→keyword 重复拼接畸形）。
 		// §59.330 P4 补丁 b: 搜索分支同款子预算——搜索烧 25s 即释放，
 		// 簇 comment/IYUU 兜底继承剩余（活 ctx——243 实证搜索分支漏改）
+		searchSuffix := ""
+		if !musicRouting {
+			searchSuffix = h.canonicalGroupName(ctx, result.GroupName)
+		}
 		searchCtx, searchCancel := context.WithTimeout(fetchCtx, 25*time.Second)
-		meta, err = h.metadataFetcher.FetchAndStoreBySearch(searchCtx, hash, result.SourceSite, name, size, localMI, h.canonicalGroupName(ctx, result.GroupName))
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(searchCtx, hash, result.SourceSite, name, size, localMI, searchSuffix)
 		searchCancel()
 		if err == nil {
 			goto fetched
