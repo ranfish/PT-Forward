@@ -152,9 +152,9 @@ func TestUnmarshalLocalSource_Empty(t *testing.T) {
 
 func TestMarshalDetailSource_RoundTrip(t *testing.T) {
 	original := DetailSourceJSON{
-		Title:  "往返",
-		Type:   "电视剧",
-		Tags:   []string{"tag1"},
+		Title: "往返",
+		Type:  "电视剧",
+		Tags:  []string{"tag1"},
 	}
 	s := MarshalDetailSource(original)
 	if s == "" {
@@ -175,18 +175,18 @@ func TestMusicMetaRoundTrip(t *testing.T) {
 	detail := &model.TorrentDetail{
 		Title: "I Solisti Ambrosiani - Giardini: 6 Sonatas",
 		Music: &model.MusicMeta{
-			Artist:     "I Solisti Ambrosiani",
-			Album:      "Giardini: 6 Sonatas for Violin & Continuo, Op. 1",
-			Genre:      "古典(Classical)",
-			Tags:       []string{"欧美", "古典(Classical)"},
-			Format:     "FLAC",
-			AudioMode:  "分轨",
-			Media:      "Web",
-			Year:       "2026",
-			ShareRule:  "欢迎转载",
-			Origin:     "转载",
-			LogScore:   100,
-			HasLog:     true,
+			Artist:      "I Solisti Ambrosiani",
+			Album:       "Giardini: 6 Sonatas for Violin & Continuo, Op. 1",
+			Genre:       "古典(Classical)",
+			Tags:        []string{"欧美", "古典(Classical)"},
+			Format:      "FLAC",
+			AudioMode:   "分轨",
+			Media:       "Web",
+			Year:        "2026",
+			ShareRule:   "欢迎转载",
+			Origin:      "转载",
+			LogScore:    100,
+			HasLog:      true,
 			ReleaseType: "Album",
 		},
 	}
