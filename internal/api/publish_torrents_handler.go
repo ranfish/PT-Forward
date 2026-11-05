@@ -4067,7 +4067,11 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 	// 实为 -CMCT 官组种有映射——本地裸名误判被站方标题纠正）。
 	// 已获取种子用站方标题（meta.Title）重判映射——站方标题是权威
 	// （发布/审核消费的就是它）。
-	if h.sourceDetector != nil {
+	// §59.469 附七: 音乐种跳过组映射——音乐标题通常无组名（§59.469 定案
+	// 表述）·音乐链已定向音乐源站（coverage/簇判定）·组映射是影视获取通道
+	// 语义；不跳过则已审核音乐种恒 no_mapping（许景淳案：③ 早退优先于
+	// ④ reviewed——审核态被组映射遮蔽）。
+	if h.sourceDetector != nil && !isMusicSeed {
 		if meta == nil {
 			group := publish.ExtractGroupName(name)
 			if group == "" {
