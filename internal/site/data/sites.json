@@ -29883,7 +29883,7 @@
     },
     {
       "domain": "www.musopia.vip",
-      "name": "音乐乌托邦",
+      "name": "乌托邦",
       "base_url": "https://www.musopia.vip",
       "framework": "nexusphp",
       "auth_type": "cookie",
