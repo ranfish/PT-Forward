@@ -3562,6 +3562,30 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		metas = nil
 	}
 
+	// §59.469 附七: 音乐 hash 批量预查（音乐种审核门口径——classifySeedStatusLite
+	// 的 isMusicSeed 输入）。LIKE 模式与 detailSourceHasMusic 理论等价：Music
+	// 非 nil 序列化必有 "music":{ ·omitempty nil 不序列化 ·BBCode 文本出现该
+	// 模式概率≈0。只回 info_hash 单列——7615 行零 JSON 载入（metas 查询轻量化
+	// §59.29 不带 detail_source_json 列）。
+	var musicHashRows []struct{ InfoHash string }
+	musicHashSet := make(map[string]bool)
+	if len(metas) > 0 {
+		hashes := make([]string, 0, len(metas))
+		for _, m := range metas {
+			hashes = append(hashes, m.InfoHash)
+		}
+		if err := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+			Where("info_hash IN ? AND detail_source_json LIKE ?", hashes, `%"music":{%`).
+			Pluck("info_hash", &musicHashRows).Error; err != nil && h.logger != nil {
+			// 降级语义：集合空=音乐种全按影视 9 字段判（现状行为·可接受）——
+			// 但不可静默（空态三问第 3 问）
+			h.logger.Warn("listSeeds music hash precheck failed, fallback to video gate", zap.Error(err))
+		}
+		for _, r := range musicHashRows {
+			musicHashSet[r.InfoHash] = true
+		}
+	}
+
 	// 3. 按紧键三元组关联 metadata（§59.29: 同簇所有 hash 的 metadata 行，
 	// 解决去重保留行与 metadata 行 hash 不一致时丢数据 §59.28 H1）
 	// §59.38 修复: tripleByHash 域放宽到 (client,path) 全部活跃行（原 rawSnapshots
@@ -3733,7 +3757,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 
 		// 5 态标注（轻量：跳过 compliance）
-		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta)
+		// §59.469 附七: 音乐 hint（批量预查集·meta nil=unfetched 行恒 false）
+		isMusic := meta != nil && musicHashSet[meta.InfoHash]
+		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic)
 		item["status"] = status
 
 		// §59.131 ②: 副本数 + 站点列表（簇内已有站点——发布页"已存在"标注数据源）
@@ -4010,7 +4036,9 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 
 // classifySeedStatusLite §59.29: 轻量状态标注（跳过 compliance 的 per-row DB 查询）。
 // 全量循环用；compliance 由调用方对当前页（或筛选 system_forbidden 时对全量）补跑。
-func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, name string, meta *model.TorrentMetadata) string {
+// §59.469 附七: isMusicSeed 由列表层批量预查传入（metas 查询轻量化不带
+// detail_source_json 列·内部判定恒空——防列表/getSeed 审核门口径分裂）。
+func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, name string, meta *model.TorrentMetadata, isMusicSeed bool) string {
 	// ① flags 检查
 	if meta != nil && meta.Flags != "" {
 		var flags []string
@@ -4073,7 +4101,7 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 	}
 
 	// ⑤⑥ 9 字段校验
-	missing := h.checkRequiredFields(meta)
+	missing := h.checkRequiredFields(meta, isMusicSeed)
 	if len(missing) > 0 {
 		return "incomplete"
 	}
@@ -4130,11 +4158,39 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 	})
 }
 
+// detailSourceHasMusic §59.469 附七: 音乐种判定（单颗场景精确通道——
+// UnmarshalDetailSource 判 Music 非 nil）。列表批量场景走 listSeeds 的
+// LIKE 预查（等价性见该处注释）。
+func detailSourceHasMusic(detailSourceJSON string) bool {
+	if detailSourceJSON == "" {
+		return false
+	}
+	src, err := metadata.UnmarshalDetailSource(detailSourceJSON)
+	return err == nil && src != nil && src.Music != nil
+}
+
 // checkRequiredFields §59.20: 9 必需字段校验，返回缺失字段名列表。
-func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata) []string {
+// §59.469 附七: isMusicSeed=true 走音乐核心字段校验（title+artist+album
+// 三非空——质量门·fetch 后必在不挡路）；format/poster/description 不进门
+// （单源自足：乌托邦 desc 天然空）。免影视 9 字段（screenshots/mediainfo/
+// resolution/video_codec/release_group 音乐种天然没有——生产实证音乐种
+// 恒 review 不了→MDP 入口被挡死）。
+func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata, isMusicSeed bool) []string {
 	var missing []string
 	if meta.Title == "" {
 		missing = append(missing, "title")
+	}
+	if isMusicSeed {
+		if src, err := metadata.UnmarshalDetailSource(meta.DetailSourceJSON); err == nil && src != nil && src.Music != nil {
+			if src.Music.Artist == "" {
+				missing = append(missing, "artist")
+			}
+			if src.Music.Album == "" {
+				missing = append(missing, "album")
+			}
+			return missing
+		}
+		// Music 解析意外失败：回退影视 9 字段（宁严勿松）
 	}
 	if meta.Poster == "" {
 		missing = append(missing, "poster")
@@ -4495,7 +4551,8 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"medium_canonical": titleparser.MediumCanonicalOf(displayProfile),
 
 		// 状态
-		"missing_fields": h.checkRequiredFields(meta),
+		// §59.469 附七: 音乐种判定精确通道（meta 完整行·JSON 有值）
+		"missing_fields": h.checkRequiredFields(meta, detailSourceHasMusic(meta.DetailSourceJSON)),
 	}
 
 	// §59.75: 产地/类型（PTGen 源归一——region.us/genre.drama + label 双形态，
@@ -4630,7 +4687,8 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		meta.Screenshots = existingShots
 	}
 	meta.Description = pickNonEmpty(req.Description, meta.Description)
-	missing := h.checkRequiredFields(meta)
+	// §59.469 附七: 音乐种判定精确通道（meta 完整行·JSON 有值）
+	missing := h.checkRequiredFields(meta, detailSourceHasMusic(meta.DetailSourceJSON))
 	// §59.247: PUT 默认不碰 reviewed（保存≠审核——浏览预览/取消退出不
 	// 误审）；req.Reviewed=true 为显式审核通道（确认完成调用——带 9 字段
 	// 门槛：缺字段拒绝审核）。§59.20 自动审核在 §59.141 自动保存后语义错位。

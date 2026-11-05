@@ -23,6 +23,9 @@ import (
 // 基本信息值=嵌套 b 键值串。
 
 var (
+	// 页头封面（<img alt="cover"> 独立区——Engine 的 poster 从简介内图片
+	// 分类·乌托邦简介=免责声明无图恒空·§59.469 附七生产实证）
+	reUtopiaCover = regexp.MustCompile(`<img[^>]*alt="cover"[^>]*\ssrc="([^"]+)"`)
 	// 字段行：双/单引号 class 兼容（来源站点行单引号形态实证 tid=10072）
 	reUtopiaField = regexp.MustCompile(`(?s)<td class=["']rowhead[^"']*["'][^>]*>([^<：]+?)：?</td>\s*<td class=["']rowfollow["'][^>]*>(.*?)</td>`)
 	// 标签行值=span 串（每 span 一标签·多维：首发/官方/地区/流派中英混合）
@@ -54,6 +57,13 @@ func isUtopiaDomain(domain string) bool {
 func (a *NexusPHPAdapter) enrichUtopiaMusic(config *model.SiteConfig, rawHTML string, detail *model.TorrentDetail) {
 	if !isUtopiaDomain(config.Domain) || detail == nil {
 		return
+	}
+	// §59.469 附七: 页头封面回填（Engine 提取不到时——简介无图恒空；
+	// 防御 Engine 已提取场景不覆盖）
+	if detail.PosterURL == "" {
+		if m := reUtopiaCover.FindStringSubmatch(rawHTML); len(m) > 1 {
+			detail.PosterURL = m[1]
+		}
 	}
 	mm := buildUtopiaMusicMeta(rawHTML, detail.Title)
 	if mm != nil {
