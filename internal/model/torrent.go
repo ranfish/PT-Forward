@@ -3,6 +3,24 @@ package model
 import "time"
 
 // §33.1.22 — TorrentDetail: 种子详情
+// MusicMeta §59.466: 音乐种子结构化元数据（获取链 L3 音乐字段抽取承载——
+// 皇后新版结构化字段行/海豚 Gazelle musicInfo 等音乐源产出；影视种恒 nil）。
+type MusicMeta struct {
+	Artist        string   `json:"artist,omitempty"`         // 艺术家名
+	Album         string   `json:"album,omitempty"`          // 专辑名称
+	Genre         string   `json:"genre,omitempty"`          // 类别/流派
+	Tags          []string `json:"tags,omitempty"`           // 标签列表（地区+风格双维）
+	Format        string   `json:"format,omitempty"`         // 格式（FLAC/WAV/DFF/…）
+	AudioMode     string   `json:"audio_mode,omitempty"`     // 整轨/分轨
+	Media         string   `json:"media,omitempty"`          // 媒介（Web/CD/SACD/…）
+	Year          string   `json:"year,omitempty"`           // 发行年份
+	ShareRule     string   `json:"share_rule,omitempty"`     // 转载规则（欢迎转载…）
+	Origin        string   `json:"origin,omitempty"`         // 来自（转载/原创）
+	OtherVersions string   `json:"other_versions,omitempty"` // 其它版本（Dupe 站内信号）
+	TrackList     string   `json:"track_list,omitempty"`     // 曲目列表（独立通道）
+	LogText       string   `json:"log_text,omitempty"`       // log 文本（独立通道）
+}
+
 type TorrentDetail struct {
 	Title        string     `json:"title"`
 	// §59.162 keepfrds 禁转两态采集：列表页行原始文本（含 [禁转]/[ 限时禁转 ] 标记）
@@ -41,6 +59,8 @@ type TorrentDetail struct {
 	Size         int64      `json:"size"`
 	FileTree     []FileInfo `json:"file_tree"`
 	InfoHash     string     `json:"info_hash"`
+	// §59.466: 音乐结构化元数据（音乐种非 nil——获取链 L3 产出）
+	Music        *MusicMeta `json:"music,omitempty"`
 	UploadTime   time.Time  `json:"upload_time"`
 
 	// RawHTML 原始详情页 HTML（§56.13 接线：暴露给 Engine + PublicExtractor）。
