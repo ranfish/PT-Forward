@@ -1299,8 +1299,11 @@ MusicMeta 17→22 字段（+BitDepth/SampleRate/Label/CatalogueNo/Edition）。
 终版规则=1音频+cue→整轨/1音频无cue→分轨/多音频盘号每盘恰1→整轨(防御)
 /其它→分轨/无音频→留空（21609 颗全库验证·§59.467 ③）；TrackList/Tags
 展示原样+翻译层归一（④）；B4 OriginChain/B5 OfficialSet 挂账按需。
-详情页=音乐种新单页（不分 tab·只读起步·music 在场分流）。
-下一步：Tab1 重构讨论（本契约为验收标准）。
+详情页=**MDP**（MusicDetailPanel·音乐详情抽屉——用户定名）：b 方案
+平行组件（92% 抽屉同款规格·只读单页无 tab）+入口 music 在场分流
+（MDP/转种抽屉）；不融合 CrossSeedPanel（影视深耦合）。
+命名体系：MDP/种子获取页（历史 Tab1 称呼废弃）/转种抽屉。
+下一步：种子获取页重构讨论（本契约为验收标准）。
 
 ## 十、特殊注意事项
 
