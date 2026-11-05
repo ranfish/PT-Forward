@@ -228,22 +228,26 @@ func TestGazelle_GetPreciseSLData_API(t *testing.T) {
 	}
 }
 
-func TestGazelle_GetPreciseSLData_Web(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html>Seeders<td>15</td>Leechers<td>3</td></html>`))
+// §59.466 附: cookie-only 也走 slViaAPI（对齐 detail——slViaWeb 已删）。
+func TestGazelle_GetPreciseSLData_CookieAPI(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "ajax.php") {
+			t.Errorf("应走 ajax.php: %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"response":{"torrent":{"seeders":15,"leechers":3}}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewGazelleAdapter(doer, zap.NewNop())
-	config := &model.SiteConfig{Domain: srv.URL}
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
 
 	sl, err := a.GetPreciseSLData(context.Background(), config, "1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sl.Seeders != 15 {
-		t.Errorf("seeders: %d", sl.Seeders)
+	if sl.Seeders != 15 || sl.Leechers != 3 {
+		t.Errorf("sl: %+v", sl)
 	}
 }
 

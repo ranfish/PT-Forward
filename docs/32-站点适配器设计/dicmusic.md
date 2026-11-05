@@ -509,3 +509,14 @@ torrent: media format encoding remastered/remasterYear/remasterTitle/
 | TrackList | fileList 清洗（音频 15 后缀过滤） | cue/log/jpg 排除 |
 | AudioMode | 音频计数推断（>1 分轨/==1 整轨） | |
 | ShareRule/Origin/OtherVersions/LogText/Genre | **API 盲区留空** | HTML 标记/torrentgroup/log 全文/tags 混维 |
+
+
+### 术语约定（§59.466 附回归审议·防歧义）
+
+| 术语 | 含义 | 海豚状态 |
+|---|---|---|
+| api.php 通道 | Gazelle API Key 服务（RED/OPS/海豹形态） | **未启用**（设置页无 Key 入口+实测返回 HTML 页） |
+| ajax.php 通道 | cookie 认证的页面 AJAX（Gazelle 标准） | **可用**——获取链主通道 |
+| 字段盲区 | ajax 响应字段集边界（五项不透出） | ShareRule/Origin/OtherVersions/LogText/Genre |
+
+发布侧预示挂账同源于 api.php 未启用：海豚发布未来走 HTML 表单通道。
