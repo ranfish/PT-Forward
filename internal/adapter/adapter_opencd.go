@@ -215,9 +215,3 @@ func cleanOpenCDText(s string) string {
 func isOpenCDDomain(domain string) bool {
 	return strings.Contains(domain, "open.cd")
 }
-
-// 导出包装（离线驱动验证用 §59.338）
-func ExtractOpenCDDetailForTest(rawHTML string) *model.TorrentDetail { return extractOpenCDDetail(rawHTML) }
-
-// ExtractOpenCDFieldsForTest 导出包装。
-func ExtractOpenCDFieldsForTest(h string) map[string]string { return extractOpenCDFields(h) }
