@@ -3761,6 +3761,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		isMusic := meta != nil && musicHashSet[meta.InfoHash]
 		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic)
 		item["status"] = status
+		// §59.469 附八: 音乐种行标记（SeedConfig 主入口按钮文案/分流消费）
+		item["is_music"] = isMusic
 
 		// §59.131 ②: 副本数 + 站点列表（簇内已有站点——发布页"已存在"标注数据源）
 		cc := copyCountByKey[fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)]

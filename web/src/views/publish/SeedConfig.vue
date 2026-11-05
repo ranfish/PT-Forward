@@ -217,9 +217,9 @@
               v-if="canEdit(record.status)"
               size="small"
               type="link"
-              @click="openEdit(record)"
+              @click="record.is_music ? openMusicDetail(record) : openEdit(record)"
             >
-              编辑
+              {{ record.is_music ? '详情' : '编辑' }}
             </a-button>
           </a-space>
         </template>
@@ -232,6 +232,9 @@
       :preset-torrent="editPreset"
             @success="onEditSuccess"
     />
+
+    <!-- §59.469 附八: MDP——音乐种详情抽屉（主入口"详情"按钮） -->
+    <MusicDetailPanel v-model:open="mdpOpen" :detail="mdpDetail" :preset="mdpPreset" />
 
     <!-- Batch Fetch Panel -->
     <BatchFetchPanel
@@ -250,9 +253,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
+import MusicDetailPanel from './MusicDetailPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatBytes } from '@/utils/format'
-import { seedConfigApi, type SeedListItem } from '@/api/publish'
+import { seedConfigApi, type SeedDetail, type SeedListItem } from '@/api/publish'
 
 const route = useRoute()
 const router = useRouter()
@@ -507,6 +511,30 @@ function openEdit(item: SeedListItem) {
   editOpen.value = true
 }
 
+// ==================== 音乐种详情（§59.469 附八·方案 A） ====================
+// 列表 is_music 行"详情"按钮→probe 拿完整 detail→MDP（只读）。
+// probe 异常态（标记在但 detail 拿不到）=warning 不开——音乐种开影视
+// 转种抽屉是错·诚实降级。
+const mdpOpen = ref(false)
+const mdpDetail = ref<SeedDetail | null>(null)
+const mdpPreset = ref<{ info_hash: string; name: string; size: number; client_id: number } | null>(null)
+
+async function openMusicDetail(item: SeedListItem) {
+  const d = await seedConfigApi.probeMusicSeed(item.hash, item.client_id)
+  if (!d) {
+    message.warning('获取音乐详情失败：该种子音乐元数据不可用')
+    return
+  }
+  mdpDetail.value = d
+  mdpPreset.value = {
+    info_hash: item.hash,
+    name: item.name,
+    size: item.size,
+    client_id: item.client_id,
+  }
+  mdpOpen.value = true
+}
+
 function onEditSuccess() {
   fetchList()
 }
@@ -681,7 +709,12 @@ onMounted(async () => {
     if (q.focus === '1') {
       const row = tableData.value.find(it => it.name === String(q.name))
       if (row) {
-        openEdit(row)
+        // §59.469 附八: 音乐种深链同分流（详情→MDP）
+        if (row.is_music) {
+          openMusicDetail(row)
+        } else {
+          openEdit(row)
+        }
       } else {
         message.info('未定位到对应种子行，请手动查找')
       }
