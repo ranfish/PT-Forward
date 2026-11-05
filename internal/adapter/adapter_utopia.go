@@ -171,20 +171,21 @@ func parseUtopiaMusicTitle(title string, mm *model.MusicMeta) {
 	}
 	s := strings.TrimSpace(strings.Join(mid, " "))
 
-	// AudioMode（皇后词序：分轨→分軌→整轨→整軌·归一简体——"整分轨"
-	// 含"分轨"子串按皇后 21609 颗验证词序）
+	// AudioMode（皇后词序：分轨→分軌→整轨→整軌·归一简体；任意位置删词
+	// ——乌托邦标题自由度高，模式词后可能有尾缀词（Enrique 种"FLAC 分轨
+	// tulipa"实证——TrimSuffix 剥不掉致 Album 残留））
 	for _, seg := range []string{"分轨", "分軌", "整轨", "整軌"} {
-		if strings.Contains(s, seg) {
+		if idx := strings.Index(s, seg); idx >= 0 {
 			mm.AudioMode = string([]rune(seg)[:1]) + "轨" // 首字+轨（分軌→分轨）
-			s = strings.TrimSpace(strings.TrimSuffix(s, seg))
+			s = s[:idx] + " " + s[idx+len(seg):]
 			break
 		}
 	}
-	// Format（词表从长到短防 WAV/WavPack 前缀吞）
+	// Format（词表从长到短防 WAV/WavPack 前缀吞；任意位置删词）
 	for _, w := range utopiaFormatWords {
 		if idx := strings.Index(s, w); idx >= 0 {
 			mm.Format = w
-			s = strings.TrimSpace(s[:idx] + " " + s[idx+len(w):])
+			s = s[:idx] + " " + s[idx+len(w):]
 			break
 		}
 	}
@@ -192,9 +193,10 @@ func parseUtopiaMusicTitle(title string, mm *model.MusicMeta) {
 	if locs := reUtopiaYear.FindAllStringIndex(s, -1); len(locs) > 0 {
 		last := locs[len(locs)-1]
 		mm.Year = s[last[0]:last[1]]
-		s = strings.TrimSpace(s[:last[0]] + s[last[1]:])
+		s = s[:last[0]] + s[last[1]:]
 	}
-	mm.Album = strings.TrimSpace(s)
+	// Album=剩余（剥词残留多空格归一——保真原则：站方尾缀词如 tulipa 保留）
+	mm.Album = strings.Join(strings.Fields(s), " ")
 }
 
 // extractUtopiaFields rowhead 字段行提取键值对（双/单引号 class 兼容）。
