@@ -1202,6 +1202,32 @@ Gazelle 同构互转（API 对 API），我们场景异构——**自研路径�
 全是老版；新版 DOM（divtracklist/divnfo/结构化字段行）待补摸——近期发布
 种子为新版（改版时点不明，新旧共存）。
 
+### 皇后新版详情页结构（2026-11-05 补摸·2025/2026 种 8/8 全新版）
+
+近期种子全部新版（divtracklist/divnfo/divdescr/cover 类；kdescr 老版零）——
+与 auto_feed opencd_mode=0（新版默认）吻合。改版时点不明，新旧共存
+（老种子=老版面）。
+
+**结构化字段行**（td label：value——元数据消费点全覆盖）：
+```
+专辑名称：Giardini: 6 Sonatas for Violin & Continuo, Op. 1
+艺术家名：（古典多角色结构化）
+标签列表：欧美 | 古典(Classical)   ← 双维度标签结构化（站方官方形态）
+格式：FLAC 分轨                    ← 格式+整分轨合一行
+媒介：Web
+```
+- **divtracklist**：结构化曲目（编号+曲名+时长）
+- **divnfo**：log 独立区（Web 资源空 ✓ 规则吻合；有 log 种=文本）
+- **divdescr**：发布者自由模板（英文键值 Label/Catalog/Released/Genre/
+  Duration/Orchestra/Composer/Performer+来源链接；简介内也带曲目——
+  auto_feed 剥 tracklist 防重复的原因）
+- **cover**：attach 缩略图+onclick 原图（alt=原图文件名——auto_feed onclick
+  提取同款）
+
+**架构结论**：皇后新版详情=全结构化数据源——获取链（皇后源/辅种场景）
+可直接 DOM 解析全字段；格式行合体+标签双维=站方官方形态权威（我们
+发布消费的映射目标语义）。
+
 ## 十、特殊注意事项
 
 ### 10.1 发布页面路径
