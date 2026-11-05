@@ -510,7 +510,7 @@ func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
 		MediaInfo: "", SourceMediaInfo: "MI-FROM-SOURCE-SITE",
 		Resolution: "1080p", VideoCodec: "h265",
 	}
-	missing := h.checkRequiredFields(meta)
+	missing := h.checkRequiredFields(meta, false)
 	for _, m := range missing {
 		if m == "mediainfo" {
 			t.Errorf("仅源站 MI 不应判缺（本地优先+源站兜底设计口径）: %v", missing)
@@ -518,7 +518,7 @@ func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
 	}
 	// 双列皆空才判缺
 	meta.SourceMediaInfo = ""
-	missing2 := h.checkRequiredFields(meta)
+	missing2 := h.checkRequiredFields(meta, false)
 	found := false
 	for _, m := range missing2 {
 		if m == "mediainfo" {
@@ -534,13 +534,13 @@ func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
 		MediaInfo: "", SourceMediaInfo: "", BDInfo: "DISC INFO:\nQUICK SUMMARY:",
 		Resolution: "2160p", VideoCodec: "HEVC", AudioCodec: "DTS-HD MA",
 	}
-	for _, m := range h.checkRequiredFields(meta2) {
+	for _, m := range h.checkRequiredFields(meta2, false) {
 		if m == "mediainfo" {
 			t.Errorf("原盘仅 bd_info 不应判缺（三列口径）: %v", m)
 		}
 	}
-	if len(h.checkRequiredFields(meta2)) != 0 {
-		t.Errorf("原盘完整行应零缺失: %v", h.checkRequiredFields(meta2))
+	if len(h.checkRequiredFields(meta2, false)) != 0 {
+		t.Errorf("原盘完整行应零缺失: %v", h.checkRequiredFields(meta2, false))
 	}
 }
 

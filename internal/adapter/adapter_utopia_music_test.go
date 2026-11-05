@@ -182,3 +182,28 @@ func TestUtopiaTitleRealForm(t *testing.T) {
 		}
 	}
 }
+
+// §59.469 附七: 页头封面回填锚（<img alt="cover"> 独立区——Engine
+// 从简介内图片分类·乌托邦简介=免责声明无图恒空·生产实证 poster 空）。
+func TestUtopiaCoverBackfill(t *testing.T) {
+	html := `<img alt="cover" style="max-width:300px" src="https://img.musopia.vip/img/8da64c7b9c/14182/original.jpg" data-fallbacks="https://origin.picgo.net/x.jpg">
+<h1 id="top">陈慧娴 - 归来吧 1992 FLAC 分轨 - ZHENGLIFAN@Musopia</h1>`
+	// PosterURL 空 → 回填
+	d := &model.TorrentDetail{Title: "t"}
+	(&NexusPHPAdapter{}).enrichUtopiaMusic(&model.SiteConfig{Domain: "www.musopia.vip"}, html, d)
+	if d.PosterURL != "https://img.musopia.vip/img/8da64c7b9c/14182/original.jpg" {
+		t.Errorf("PosterURL = %q, want img.musopia 封面 URL", d.PosterURL)
+	}
+	// PosterURL 已有 → 不覆盖（防御 Engine 已提取）
+	d2 := &model.TorrentDetail{Title: "t", PosterURL: "https://exist.jpg"}
+	(&NexusPHPAdapter{}).enrichUtopiaMusic(&model.SiteConfig{Domain: "www.musopia.vip"}, html, d2)
+	if d2.PosterURL != "https://exist.jpg" {
+		t.Errorf("已有 PosterURL 不应覆盖, got %q", d2.PosterURL)
+	}
+	// 非乌托邦域 → 零动作
+	d3 := &model.TorrentDetail{Title: "t"}
+	(&NexusPHPAdapter{}).enrichUtopiaMusic(&model.SiteConfig{Domain: "open.cd"}, html, d3)
+	if d3.PosterURL != "" || d3.Music != nil {
+		t.Errorf("非乌托邦域应零动作, got poster=%q music=%v", d3.PosterURL, d3.Music)
+	}
+}

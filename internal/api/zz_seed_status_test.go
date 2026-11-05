@@ -47,7 +47,7 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 			&model.TorrentMetadata{Title: "Movie 2020 1080p-UNKNOWNGRP", SiteName: "站"}, "no_mapping"},
 	}
 	for _, c := range cases {
-		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta)
+		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta, false)
 		if got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
