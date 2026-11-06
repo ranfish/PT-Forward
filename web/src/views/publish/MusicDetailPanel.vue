@@ -18,6 +18,17 @@
           <a-tag v-if="detail?.site_name" color="blue">{{ detail.site_name }}</a-tag>
         </div>
         <div class="mdp-header-right">
+          <!-- §59.475: 审核按钮——发布流程依赖 reviewed（音乐门=title+artist+album） -->
+          <a-tag v-if="isReviewed" color="green" style="margin-right: 8px">✓ 已审核</a-tag>
+          <a-button
+            v-else
+            type="primary"
+            size="small"
+            :loading="reviewLoading"
+            @click="confirmReview"
+          >
+            确认完成
+          </a-button>
           <a-button size="small" @click="handleClose">关闭</a-button>
         </div>
       </div>
@@ -163,9 +174,10 @@
 // 只读单页无 tab·契约 22 字段（§59.467 全景图）六分区渲染；
 // 纯渲染零请求（detail prop=入口层 probeMusicSeed 结果直接传入——
 // 音乐场景总请求恒 1 次·§59.469 附六方案 a）。
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { formatBytes } from '@/utils/format'
-import type { SeedDetail } from '@/api/publish'
+import { seedConfigApi, type SeedDetail } from '@/api/publish'
 
 const props = defineProps<{
   open: boolean
@@ -173,7 +185,7 @@ const props = defineProps<{
   preset: { info_hash: string; name: string; size: number; client_id: number } | null
 }>()
 
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'reviewed'): void }>()
 
 const music = computed(() => props.detail?.music ?? null)
 
@@ -191,6 +203,27 @@ const fallbackPoster = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy
 
 function handleClose() {
   emit('update:open', false)
+}
+
+// §59.475: 确认完成=审核（PUT reviewed=true·音乐门=title+artist+album）
+const reviewLoading = ref(false)
+const localReviewed = ref(false)
+const isReviewed = computed(() => props.detail?.reviewed || localReviewed.value)
+
+async function confirmReview() {
+  const hash = props.preset?.info_hash
+  if (!hash) return
+  reviewLoading.value = true
+  try {
+    await seedConfigApi.putSeed(hash, { reviewed: true })
+    localReviewed.value = true
+    message.success('审核完成')
+    emit('reviewed')
+  } catch (e: unknown) {
+    message.error('审核失败: ' + (e as Error).message)
+  } finally {
+    reviewLoading.value = false
+  }
 }
 </script>
 
