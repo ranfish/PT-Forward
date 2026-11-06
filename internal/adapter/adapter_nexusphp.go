@@ -57,6 +57,10 @@ var (
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
 	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details?\.php\?(?:id|group_id)=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
+	// §59.473: 海胆组行双层链接（group_id=N&torrent_id=M）——优先于
+	// altLink（altLink 捕组 id 会错投 tid·海胆搜索行实证）。仅含
+	// torrent_id 参数的行命中·其它站零影响。
+	reNexusGroupTorrentLink = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?details?\.php\?group_id=\d+&(?:amp;)?torrent_id=(\d+)["'][^>]*>(.*?)</a>`)
 	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?(?:rowfollow|[^"']*torrent-info-text-size)["']?[^>]*>\s*([\d.]+)\s*(?:&nbsp;)?\s*(?:<br\s*/?>)?\s*(?:&nbsp;)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
@@ -1664,6 +1668,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 	}
 
 	detailMatches := detailLinkRe.FindAllStringSubmatchIndex(html, -1)
+	if len(detailMatches) == 0 {
+		// §59.473: 海胆组行双层（group_id&torrent_id）优先于 altLink——
+		// altLink 对该形态捕组 id 错投 tid
+		detailMatches = reNexusGroupTorrentLink.FindAllStringSubmatchIndex(html, -1)
+	}
 	if len(detailMatches) == 0 {
 		detailMatches = altDetailLinkRe.FindAllStringSubmatchIndex(html, -1)
 	}

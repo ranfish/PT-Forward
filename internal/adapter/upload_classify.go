@@ -22,6 +22,12 @@ var reUploadDetailID = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail|torren
 // 实战：普通形态首个命中是推荐位种子 53342 而非新种 53505）
 var reUploadNewID = regexp.MustCompile(`[^a-zA-Z0-9_]details\.php\?id=(\d+)&uploaded=1`)
 
+// §59.473: 海胆式成功页——h1 发布成功门（标签形态防提示语误含）
+var reUploadSuccessH1 = regexp.MustCompile(`(?is)<h1[^>]*>[^<]*发布成功`)
+
+// §59.473: 组页 download 链接（种子 tid 承载——尾取=最新版本）
+var reUploadDownloadID = regexp.MustCompile(`download\.php\?id=(\d+)`)
+
 // classifyUploadHTML 上传响应 HTML 判定（公共单点）。
 // 判定序（§59.159）：existed 重定向 > 已存在文本（stderr 200 页——幸运实测形态）
 // > 详情 ID（词边界）> 成功文案 > 失败（返回 nil，errMsg 由调用方兜底）。
@@ -60,6 +66,23 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 			DetailURL:  detailBase + "/details.php?id=" + m[1],
 			TargetSite: site,
 			IDSource:   "success_page", // 成功页 uploaded=1 权威链接
+		}
+	}
+	// ③ §59.473: 海胆式 200 直渲组详情页成功页（NP 引擎+组展示层）——站方
+	// 上传成功后 200 直渲新种组详情页（<h1>发布成功</h1> + <title>详情·非 NP
+	// 标准 302）。tid=组页 download.php?id= 尾取（组内版本按 tid 升序——
+	// 最新在末尾·组 50655 六版本实证；多版本组常态 ×5-12——单命中门不足）。
+	// h1 标签形态门（防"发布成功后…"提示语误含）。
+	if reUploadSuccessH1.MatchString(html) {
+		if dms := reUploadDownloadID.FindAllStringSubmatch(html, -1); len(dms) > 0 {
+			last := dms[len(dms)-1]
+			return &model.PublishResponse{
+				Success:    true,
+				TorrentID:  last[1],
+				DetailURL:  detailBase + "/details.php?id=" + last[1],
+				TargetSite: site,
+				IDSource:   "success_page_render", // 组页渲染尾取——推种前 VerifyExists 复核
+			}
 		}
 	}
 	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {

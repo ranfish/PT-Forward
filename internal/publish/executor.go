@@ -831,6 +831,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			}
 		}
 		if upErr != nil {
+			// §59.473: 复查通道失效站（海胆 pieces-hash 404）超时兜底文案——
+			// 引导手动核验（超时≠失败·站方可能已入库）
+			if isUploadTimeoutErr(upErr) {
+				return failRec("failed", fmt.Sprintf("上传超时且站方复查不可用（%v）——超时≠失败，请上站核验是否已发布后再决定重试", upErr))
+			}
 			return failRec("failed", fmt.Sprintf("上传失败: %v", upErr))
 		}
 	}
