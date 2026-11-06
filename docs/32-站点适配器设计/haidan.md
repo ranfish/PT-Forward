@@ -475,3 +475,15 @@ adapter.SkipTeam = true // Use team_suffix text field instead
   字段+tags=[国语,中字]；压制种 401/7 Encode/**12 DTS-HDMA**/
   1 4K/**team_suffix=FRDS 文本框**/tags=[中字,外语]）。
 - 遗留：首颗真实发布（剧集种 season/episode 预览人工填）。
+
+## §59.472 季/集/合集三字段（2026-11-06·From S04 案）
+
+站方表单：`season`（第几季）+ `episode`（第几集）+ `collages`（多季剧集/
+电影合集 checkbox value=1）。**站方语义**：季 0=不区分季（国产剧常态）·
+集 0=全季·多季勾合集·剧集四类（电视剧/综艺/动画/纪录片）必填季集。
+
+与我们 §59.424 的语义冲突：S04 纯季包=我们合集形态放行 vs 站方要求
+季集信息（season=4 episode=0=全季即合规）。注入映射（executor
+haidanSeasonEpisodeInject）：S04→4/0·跨季→0/0+勾 collages·S04E01→
+4/1·无季信号剧集→0/0·电影类不填。跨季判定 haidanCrossSeasonRe
+`^S\d{1,2}-S?\d{1,2}$`（S01-S02/S01-02/S1-2 三形态·集区间不误判）。
