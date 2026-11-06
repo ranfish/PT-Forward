@@ -160,7 +160,11 @@
 ### 1.3 缺失字段
 
 - `technical_info` — 无 MediaInfo/BDInfo 专用字段
-- `processing_sel` — 无地区选择
+- ~~`processing_sel` — 无地区选择~~ **修正（§59.471）**：62 站摸底漏记——
+  表单实有 `region_sel[4]`（地区·必填 17 项）+ `style_sel[4][]`（风格·
+  必填 19 项）两条件字段（依附 type 401 电影分支——[4] 后缀·当时表单
+  diff 未触发分支盲区）。2026-11-06 migration149 补配+映射路由+兜底
+  （region miss→28 其他地区/style miss→6 剧情·用户定案）。
 - 分辨率缺少 SD 选项
 
 ---
