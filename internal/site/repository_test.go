@@ -56,7 +56,10 @@ func TestRepository_GetByDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := repo.GetByDomain(ctx, "test.com")
+	got, err := repo.GetByDomain(ctx, "test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got == nil {
 		t.Fatal("expected site, got nil")
 	}
@@ -64,7 +67,10 @@ func TestRepository_GetByDomain(t *testing.T) {
 		t.Errorf("expected test.com, got %s", got.Domain)
 	}
 
-	byName := repo.GetByDomain(ctx, "Test")
+	byName, err := repo.GetByDomain(ctx, "Test")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if byName == nil {
 		t.Fatal("expected site by name, got nil")
 	}
@@ -72,7 +78,10 @@ func TestRepository_GetByDomain(t *testing.T) {
 		t.Errorf("expected test.com by name, got %s", byName.Domain)
 	}
 
-	missing := repo.GetByDomain(ctx, "nope.com")
+	missing, err := repo.GetByDomain(ctx, "nope.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if missing != nil {
 		t.Error("expected nil for missing domain")
 	}

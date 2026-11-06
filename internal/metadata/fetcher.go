@@ -79,7 +79,12 @@ func (f *Fetcher) SetEngine(_ *extract.Engine) {}
 // 会抢跑调用方降级链（The.Boys 实锤: 朋友抖动 → 克隆 iyuu_cache 覆盖源站语义，
 // 簇内 zmpt/青蛙等 comment 直达凭证全浪费）。直达失败必须原样报错。
 func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) {
-	meta, err := f.FetchFromSiteNoFallback(ctx, infoHash, siteName, torrentID)
+	// §59.476 先验后存：原路径 FetchFromSiteNoFallback 内嵌 store 在 D3
+	// 之前——标题不相关拒绝时行已落库（12 环境 Tiesto 串种案：车站 tid
+	// 跨站撞号·韩剧元数据污染音乐 hash 名下且残留）。重构=fetchFromSite
+	// 裸取 → D3/hash 终审 → 通过才 store。FetchFromSiteNoFallback 保持
+	// 原语义（其它调用方零变化）。
+	meta, err := f.fetchFromSite(ctx, infoHash, siteName, torrentID, "rss_detail")
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +102,7 @@ func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, t
 				meta.FetchSource = "hash_verified"
 				meta.TorrentRawName = tm.Name // §59.252 C：原始名落库
 			} else {
-				f.logger.Warn("direct fetch title mismatch (D3 reject)",
+				f.logger.Warn("direct fetch title mismatch (D3 reject, row NOT stored)",
 					zap.String("site", siteName),
 					zap.String("torrent_id", torrentID),
 					zap.String("source", sourceName[:min(len(sourceName), 50)]),
@@ -105,6 +110,9 @@ func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, t
 				return nil, fmt.Errorf("直达标题不相关（D3 拒绝, tid=%s）", torrentID)
 			}
 		}
+	}
+	if err := f.store(ctx, meta); err != nil {
+		return nil, fmt.Errorf("store metadata: %w", err)
 	}
 	return meta, nil
 }

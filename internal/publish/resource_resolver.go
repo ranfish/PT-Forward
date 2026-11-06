@@ -8,6 +8,7 @@ package publish
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
@@ -97,6 +98,13 @@ func (rr *ResourceResolver) ResolveResource(ctx context.Context, infoHash string
 func selectSourceMetaRow(metas []model.TorrentMetadata) *model.TorrentMetadata {
 	if len(metas) == 0 {
 		return nil
+	}
+	// §59.476: music 在场行优先（与 handler selectSourceMeta 同款——
+	// LIKE '"music":{' 模式与 api.detailSourceHasMusic 理论等价）。
+	for i := range metas {
+		if strings.Contains(metas[i].DetailSourceJSON, `"music":{`) {
+			return &metas[i]
+		}
 	}
 	// §59.171: 确定性排序（与 handler selectSourceMeta 同款）——排序即选择：
 	// 权威行（非 cluster）优先 → 新者优先 → 小 id 优先。原 updated_at 全量扫描

@@ -91,7 +91,10 @@ func (p *Provider) applyOverridesToInfo(ctx context.Context, siteName string, in
 }
 
 func (p *Provider) GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error) {
-	site := p.repo.GetByDomain(ctx, domain)
+	site, gerr := p.repo.GetByDomain(ctx, domain)
+	if gerr != nil {
+		return nil, fmt.Errorf("query site %s: %w", domain, gerr)
+	}
 	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
@@ -165,7 +168,10 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 }
 
 func (p *Provider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
-	site := p.repo.GetByDomain(ctx, domain)
+	site, gerr := p.repo.GetByDomain(ctx, domain)
+	if gerr != nil {
+		return nil, fmt.Errorf("query site %s: %w", domain, gerr)
+	}
 	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
@@ -198,7 +204,10 @@ func (p *Provider) GetAdapter(ctx context.Context, domain string) (model.SiteAda
 	}
 	p.mu.RUnlock()
 
-	site := p.repo.GetByDomain(ctx, domain)
+	site, gerr := p.repo.GetByDomain(ctx, domain)
+	if gerr != nil {
+		return nil, fmt.Errorf("query site %s: %w", domain, gerr)
+	}
 	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
@@ -352,7 +361,10 @@ func (p *Provider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model
 }
 
 func (p *Provider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
-	site := p.repo.GetByDomain(ctx, domain)
+	site, gerr := p.repo.GetByDomain(ctx, domain)
+	if gerr != nil {
+		return nil, fmt.Errorf("query site %s: %w", domain, gerr)
+	}
 	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}

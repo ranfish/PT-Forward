@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -90,6 +91,34 @@ func TestMusicFallbackSites(t *testing.T) {
 	}
 }
 
+// §59.476 Fix 3: selectSourceMeta music 在场行优先——Tiesto 串种案
+// （车站影视行完爆音乐行）终态回归锚。
+func TestSelectSourceMetaMusicFirst(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+
+	metas := []model.TorrentMetadata{
+		{InfoHash: "h1", SiteName: "车站", Title: "Dream to You S01 1080p friDay WEB-DL H.264-CHDWEB",
+			Resolution: "1080p", VideoCodec: "H.264", FetchSource: "rss_detail", UpdatedAt: parseTimeLater()},
+		{InfoHash: "h1", SiteName: "皇后", Title: "Tiesto Collection 2012 FLAC",
+			FetchSource: "rss_detail", DetailSourceJSON: `{"music":{"artist":"Tiesto"}}`},
+	}
+	got := h.selectSourceMeta(metas)
+	if got.SiteName != "皇后" {
+		t.Errorf("music 行应优先, got %s", got.SiteName)
+	}
+
+	// 影视簇（无 music 行）→ 原排序语义不变（权威/新者优先）
+	videoMetas := []model.TorrentMetadata{
+		{InfoHash: "h2", SiteName: "天空", Title: "Movie 1080p", UpdatedAt: parseTimeLater()},
+		{InfoHash: "h2", SiteName: "末日", Title: "Movie 1080p", UpdatedAt: parseTimeEarly()},
+	}
+	got = h.selectSourceMeta(videoMetas)
+	if got.SiteName != "天空" {
+		t.Errorf("影视簇排序语义应保持（新者优先）, got %s", got.SiteName)
+	}
+}
+
 // §59.476 S2+ 词表推导：release_group_mappings 音乐源站行 → 词表
 // （集成锚——migration 151 种子行 + 推导链）。
 func TestMusicOfficialGroupWords(t *testing.T) {
@@ -134,3 +163,5 @@ func publishMusicWords(t *testing.T, db *gorm.DB) []string {
 	return publish.MusicOfficialGroupWords(context.Background(), db)
 }
 
+func parseTimeLater() time.Time { return time.Now() }
+func parseTimeEarly() time.Time { return time.Now().Add(-24 * time.Hour) }
