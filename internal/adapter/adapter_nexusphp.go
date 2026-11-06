@@ -1225,8 +1225,14 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	// §59.159: 重定向 existed=1 捕获（NP 重复上传 302 details.php?id=N&existed=1 形态；
 	// 幸运实测为 200 失败页形态——双形态兼容，transport 继承站点代理）
 	existingID, finalID := "", ""
+	// §59.470: 上传专用超时 120s——慢站 takeupload 站方处理可 >30s（南洋案
+	// 实证：09:42:57 发起→站方 09:43:44 完成入库，但 doer 默认 30s 超时先到
+	// →假失败+人工重试险重复发布）。浅拷贝共享 Transport（连接池/smart dial
+	// 复用）·快站零影响（超时是上限非等待——响应即返回；真死连接由 Transport
+	// 层 dial 超时快失败）。
+	uploadTimeout := 120 * time.Second
 	redirectClient := &http.Client{
-		Timeout:   a.doer.Client.Timeout,
+		Timeout:   uploadTimeout,
 		Transport: a.doer.Client.Transport,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			id := req.URL.Query().Get("id")
