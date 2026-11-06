@@ -23,13 +23,26 @@ var musicSourceSites = map[string]bool{
 	"乌托邦": true,
 }
 
-// MusicSourceSites 返回音乐源站名单。
-func MusicSourceSites() []string {
-	out := make([]string, 0, len(musicSourceSites))
-	for name := range musicSourceSites {
-		out = append(out, name)
+// musicSourceSitesOrdered §59.476: 音乐源站素材量序（皇后 12742 →
+// 海豚 8264 → 乌托邦 131·§59.466）——确定性迭代（map 无序）：位置3
+// 换 hash 候选序 + 兜底站首选共用。与 musicSourceSites 键集必须同步
+// （init 校验防漂移）。
+var musicSourceSitesOrdered = []string{"皇后", "海豚", "乌托邦"}
+
+func init() {
+	if len(musicSourceSites) != len(musicSourceSitesOrdered) {
+		panic("music source sites: map/ordered list out of sync")
 	}
-	return out
+	for _, s := range musicSourceSitesOrdered {
+		if !musicSourceSites[s] {
+			panic("music source sites: ordered list entry not in map: " + s)
+		}
+	}
+}
+
+// MusicSourceSites 返回音乐源站名单（素材量序·§59.476 确定性）。
+func MusicSourceSites() []string {
+	return append([]string(nil), musicSourceSitesOrdered...)
 }
 
 // IsMusicSourceSite 判定站点是否音乐源站（S1 判定/音乐链选站消费口）。

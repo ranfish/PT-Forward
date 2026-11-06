@@ -2486,11 +2486,15 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
 
+		// §59.476 位置3: 代表 hash 换簇内音乐源站副本（辅种代表→皇后副本
+		// →S1 天然命中）。影视簇/无音乐副本原样。name/savePath 簇内恒同。
+		fetchHash, fetchSize := h.resolveMusicReplicaHash(ctx, clientUID, item.Hash, item.Size)
+
 		// §59.61 第 4 步: 簇内已有完整数据（先前副本获取后传播）→ 跳过（同簇去重:
 		// 站点数据/MI/截图各一次；显式单种子获取不受影响）
-		if h.hasCompleteMetadata(ctx, item.Hash) {
+		if h.hasCompleteMetadata(ctx, fetchHash) {
 			h.logger.Info("cluster skip: metadata exists",
-				zap.String("hash", item.Hash[:min(10, len(item.Hash))]))
+				zap.String("hash", fetchHash[:min(10, len(fetchHash))]))
 			h.batchFetch.mu.Lock()
 			h.batchFetch.done++
 			h.batchFetch.items[i].Status = "done"
@@ -2506,7 +2510,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 		type fetchResult struct{ err error }
 		fetchDone := make(chan fetchResult, 1)
 		go func() {
-			fetchDone <- fetchResult{h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)}
+			fetchDone <- fetchResult{h.fetchSingleTorrent(ctx, clientUID, fetchHash, item.Name, fetchSize, item.SavePath, isLocal)}
 		}()
 		var err error
 		select {
@@ -2600,7 +2604,9 @@ func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientU
 		item := h.batchFetch.items[i]
 		h.batchFetch.mu.Unlock()
 
-		err := h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
+		// §59.476 位置3: deferred 重试同款换 hash（首轮已换·幂等）
+		retryHash, retrySize := h.resolveMusicReplicaHash(ctx, clientUID, item.Hash, item.Size)
+		err := h.fetchSingleTorrent(ctx, clientUID, retryHash, item.Name, retrySize, item.SavePath, isLocal)
 		retried++
 
 		h.batchFetch.mu.Lock()
@@ -2680,10 +2686,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
 	clusterTargets := h.buildClusterTargets(ctx, clientUID, savePath, name, hash)
 
-	// §59.469 分流判定：S1（coverage∩音乐源站）∨ S2（标题音乐官组词）
-	// → 音乐链：输入过滤（coverage/簇限定音乐源站内）——选站引擎零改动
-	// 复用（五层自动在音乐源站空间工作；天空等影视站结构性出局）。
-	musicRouting := isMusicSeedForRouting(name, coverageSites)
+	// §59.469+§59.476 分流判定：S1（coverage∩音乐源站）∨ S2+（标题音乐
+	// 官组词·映射表推导词表+组位/否决闸）→ 音乐链：输入过滤（coverage/簇
+	// 限定音乐源站内）——选站引擎零改动复用（五层自动在音乐源站空间工作；
+	// 天空等影视站结构性出局）。
+	musicRouting := h.isMusicSeedForRouting(ctx, name, coverageSites)
 	if musicRouting {
 		coverageSites = filterToMusicSources(coverageSites)
 		clusterTargets = filterClusterToMusicSources(clusterTargets)
@@ -2695,7 +2702,23 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 
 	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets, hash)
 	if result.SourceSite == "" {
-		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
+		// §59.476 音乐链兜底站：纯流转种（S2+ 判音乐·五层证据全 miss——
+		// coverage/簇 comment 均无音乐源站·集散地场景）synth 首选音乐源站
+		// → 走 ①b 搜索分支（§59.474 音乐管道+验证层把关）+完整降级链。
+		// 单站 synth（goto 不能跳变量声明区·结构限制）——皇后素材 12742
+		// 覆盖绝大多数·全 miss 干净失败（宁漏勿误）。影视链保持原语义。
+		if musicRouting {
+			if ms := h.musicFallbackSites(ctx); len(ms) > 0 {
+				result.SourceSite = ms[0]
+				result.AutoDetected = true
+				h.logger.Info("music fallback site synthesized",
+					zap.String("hash", hash[:min(10, len(hash))]),
+					zap.String("site", ms[0]))
+			}
+		}
+		if result.SourceSite == "" {
+			return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
+		}
 	}
 	// §59.222: 发布链成人内容防线——馒头的成人区不可作为发布源（搜索层
 	// 双模式开放给孤儿恢复/辅种，此处按站点名单过滤）。馒头 detail 的
@@ -4902,6 +4925,11 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
+	// §59.476 位置3: 单种入口同款换 hash——簇内音乐源站副本优先
+	// （皇后副本）→ S1 天然命中音乐链。name/savePath 簇内恒同·快照
+	// 从换后 hash 读（size 对齐该副本）。
+	infoHash, _ = h.resolveMusicReplicaHash(r.Context(), clientUID, infoHash, 0)
+
 	var snap model.TorrentSnapshot
 	if err := h.db.WithContext(r.Context()).Where("hash = ? AND client_uid = ?", infoHash, clientUID).First(&snap).Error; err != nil {
 		Error(w, http.StatusNotFound, 40401, "快照中未找到该种子")
@@ -5988,24 +6016,110 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 	})
 }
 
-// isMusicSeedForRouting §59.469 音乐种分流判定（零误判设计）：
+// isMusicSeedForRouting §59.469+§59.476 音乐种分流判定：
 // S1 = coverage 含音乐源站（纯音乐站无影视内容——逻辑必然）
-// S2 = 标题含音乐官组词 {OpenCD, @Musopia}（@锚形态保证零误命中；
-// 集散地救回场景——皇后官组种流转车站/劳改所/麒麟后 tracker 已非 open.cd）。
-// 宁漏勿误：漏判走影视链（music 空可接受）；误判影视种锁进音乐链不可接受。
-func isMusicSeedForRouting(title string, coverageSites []model.SiteCoverageCache) bool {
+// S2+ = 标题含音乐官组词（词表=release_group_mappings 音乐源站行推导·
+//       §59.476 扩表 {OpenCD,LLM,TSxD,KHQ,Musopia}·见到即判·否决闸见
+//       musicTitleMatch）。
+// 宁漏勿误：漏判走影视链（music 空可接受）；误判影视种锁进音乐链不可
+// 接受（误判成本=音乐链搜索无果·干净失败可重试）。
+func (h *PublishTorrentsHandler) isMusicSeedForRouting(ctx context.Context, title string, coverageSites []model.SiteCoverageCache) bool {
 	for _, c := range coverageSites {
 		if site.IsMusicSourceSite(c.SiteName) {
 			return true
 		}
 	}
-	// 词边界匹配：防 OpenCDX 类影视组名子串误命中（X 为词字符  不裂）
-	return musicOfficialGroupRe.MatchString(title)
+	if h == nil || h.db == nil {
+		return false
+	}
+	return musicTitleMatch(title, publish.MusicOfficialGroupWords(ctx, h.db))
 }
 
-// musicOfficialGroupRe §59.469 S2 音乐官组词：OpenCD（皇后官组）+
-// @Musopia（乌托邦原抓组 @锚——后缀形态天然词边界）。
-var musicOfficialGroupRe = regexp.MustCompile(`\bOpenCD\b|@Musopia`)
+// musicTitleMatch §59.476 S2+ 标题官组词判定（纯函数·DB 无关可测）。
+//
+// 匹配序（用户定案"见到即判"+廉价否决）：
+//  1. 组位恒过（权威形态·括号外）：@锚（最后 @ 后首词）∨ 尾段（最后 -
+//     段首词·容忍 spec 后缀 "OpenCD 16bit 44.1kHz" 与装饰 "-Rosebudx@OpenCD🌱"）
+//  2. 非组位 word-boundary 命中 ∧ 无影视技术词（ParseTitleTech
+//     Resolution ∨ VideoCodec——仅视频专属词·Medium 排除：SACD/CD 是
+//     音乐媒介）→ 音乐
+//  3. 非组位命中 ∧ 影视技术词在场 → 否决（AI 纪录片类内容词 LLM 假阳性
+//     拦截——PT 影视标题必带分辨率/编码·音乐标题必不带·两域无交集）
+func musicTitleMatch(title string, words []string) bool {
+	if title == "" || len(words) == 0 {
+		return false
+	}
+	bare := stripBracketSegments(title)
+	tp := titleparser.ParseTitleTech(title)
+	veto := tp.Resolution != "" || tp.VideoCodec != ""
+	for _, w := range words {
+		if w == "" {
+			continue
+		}
+		// ① @锚（括号外）
+		if i := strings.LastIndex(bare, "@"); i >= 0 && i+1 < len(bare) {
+			if firstWordToken(bare[i+1:]) == w {
+				return true
+			}
+		}
+		// ② 尾段（括号外·首词容忍 spec 后缀）
+		if i := strings.LastIndex(bare, "-"); i >= 0 && i+1 < len(bare) {
+			if firstWordToken(bare[i+1:]) == w {
+				return true
+			}
+		}
+		// ③ 非组位见到即判（否决闸：影视技术词在场 → 本词否决·续查下词）
+		if veto {
+			continue
+		}
+		if wordBoundaryHit(bare, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// wordBoundaryHit §59.476: word-boundary 精确词命中（大小写敏感·
+// 防 OpenCDX 类子串误命中——X 为词字符不裂词）。
+func wordBoundaryHit(s, word string) bool {
+	return regexp.MustCompile(`\b` + regexp.QuoteMeta(word) + `\b`).MatchString(s)
+}
+
+// firstWordToken §59.476: 段首词提取——剥前导空白/连接符后取首个
+// [A-Za-z0-9]+ 词（emoji/中文不在词字符类·"OpenCD🌱"→"OpenCD"）。
+func firstWordToken(s string) string {
+	s = strings.TrimLeft(s, " \t‑–—―﹣")
+	if m := regexp.MustCompile(`^[A-Za-z0-9]+`).FindString(s); m != "" {
+		return m
+	}
+	return ""
+}
+
+// stripBracketSegments §59.476: 剥全部括号段（组名"必定在括号外"——
+// 用户权威定义）。栈式扫描：任一开括号入栈·配对闭括号出栈·栈空保留。
+// 未配对开括号后内容全部丢弃（防御·罕见）。
+func stripBracketSegments(s string) string {
+	var b strings.Builder
+	var stack []rune
+	pairs := map[rune]rune{']': '[', '}': '{', ')': '(', '）': '（', '】': '【'}
+	for _, r := range s {
+		switch r {
+		case '[', '{', '(', '（', '【':
+			stack = append(stack, r)
+		default:
+			if closer, ok := pairs[r]; ok {
+				if len(stack) > 0 && stack[len(stack)-1] == closer {
+					stack = stack[:len(stack)-1]
+				}
+				continue // 闭括号（配对弹出/孤立）均不入输出
+			}
+			if len(stack) == 0 {
+				b.WriteRune(r)
+			}
+		}
+	}
+	return b.String()
+}
 
 // filterToMusicSources coverage 过滤为音乐源站子集（保留全状态行——
 // SelectFetchSite 内部按状态筛；S1 判定含 tracker-only 行）。
@@ -6029,4 +6143,111 @@ func filterClusterToMusicSources(targets []comment.DirectTarget) []comment.Direc
 		}
 	}
 	return out
+}
+
+// musicFallbackSites §59.476 音乐链兜底站序：fetch_priority∩音乐源站
+// （配置内按序）优先 → 其余按素材量序（皇后→海豚→乌托邦）。仅返回
+// enabled 且有凭证（cookie/api_key）的站——与 SelectFetchSite 各层同门槛。
+func (h *PublishTorrentsHandler) musicFallbackSites(ctx context.Context) []string {
+	if h == nil || h.db == nil {
+		return nil
+	}
+	var enabled []model.Site
+	h.db.WithContext(ctx).
+		Where("name IN ? AND enabled = ? AND (cookie != '' OR api_key != '')", site.MusicSourceSites(), true).
+		Find(&enabled)
+	if len(enabled) == 0 {
+		return nil
+	}
+	enabledSet := map[string]bool{}
+	for _, s := range enabled {
+		enabledSet[s.Name] = true
+	}
+	var out []string
+	for _, p := range publish.FetchPriorityList(ctx, h.db) {
+		if enabledSet[p] && site.IsMusicSourceSite(p) && !containsStr(out, p) {
+			out = append(out, p)
+		}
+	}
+	for _, m := range site.MusicSourceSites() {
+		if enabledSet[m] && !containsStr(out, m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func containsStr(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveMusicReplicaHash §59.476 位置3: 簇内音乐源站副本优先——批量/
+// 单种取数入口把代表 hash 换成音乐源站 tracker 副本（素材量序皇后→
+// 海豚→乌托邦）→ S1 天然命中·路由逻辑零改动（fetchSingleTorrent 不变）。
+// 影视簇/无音乐源站副本/快照缺失 → 原样返回（零变化）。size 一并对齐
+// （同簇同内容·verify 层微差容忍 §59.474；副本快照 size 缺失回退原值）。
+//
+// 案（12 环境实证）：Gwyneth 簇代表 b5967ea3（pterclub 辅种）→ 换
+// a901d2bf（tracker.open.cd）→ 单种路径两次全对的音乐链成为批量默认。
+func (h *PublishTorrentsHandler) resolveMusicReplicaHash(ctx context.Context, clientUID uint, hash string, size int64) (string, int64) {
+	if h == nil || h.db == nil || clientUID == 0 || hash == "" {
+		return hash, size
+	}
+	var ck struct{ SavePath, Name string }
+	if err := h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Select("save_path, name").
+		Where("hash = ? AND client_uid = ? AND is_hidden = 0 AND name != ''", hash, clientUID).
+		Row().Scan(&ck.SavePath, &ck.Name); err != nil || ck.Name == "" {
+		return hash, size
+	}
+	type repRow struct {
+		Hash          string
+		Size          int64
+		TrackerDomain string
+	}
+	var reps []repRow
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Select("hash, size, tracker_domain").
+		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND tracker_domain != ''",
+			clientUID, ck.SavePath, ck.Name).
+		Scan(&reps)
+	if len(reps) == 0 {
+		return hash, size
+	}
+	// 音乐源站 tracker 匹配器（复用 TrackerMatcher 域名语义·含 alt 域）
+	var musicSites []model.Site
+	h.db.WithContext(ctx).Where("name IN ?", site.MusicSourceSites()).Find(&musicSites)
+	if len(musicSites) == 0 {
+		return hash, size
+	}
+	matcher := site.NewTrackerMatcherFromSites(musicSites)
+	rank := map[string]int{}
+	for i, s := range site.MusicSourceSites() {
+		rank[s] = i
+	}
+	bestHash, bestSize, bestRank := "", size, 1<<30
+	for _, r := range reps {
+		hit := matcher.Match("http://" + r.TrackerDomain + "/")
+		if hit == "" {
+			continue
+		}
+		if rk, ok := rank[hit]; ok && rk < bestRank {
+			bestRank, bestHash, bestSize = rk, r.Hash, r.Size
+		}
+	}
+	if bestHash == "" || bestHash == hash {
+		return hash, size
+	}
+	if bestSize <= 0 {
+		bestSize = size
+	}
+	h.logger.Info("music replica hash swapped",
+		zap.String("from", hash[:min(10, len(hash))]),
+		zap.String("to", bestHash[:min(10, len(bestHash))]))
+	return bestHash, bestSize
 }

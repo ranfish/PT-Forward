@@ -118,3 +118,21 @@ func FetchPriorityList(ctx context.Context, db *gorm.DB) []string {
 	}
 	return priority
 }
+
+// MusicOfficialGroupWords §59.476: 音乐官组词表——release_group_mappings
+// WHERE site ∈ 音乐源站 推导（单一真相源：映射行新增音乐官组自动进
+// S2+ 判定词表·零代码）。排序稳定（group_name 字典序）。DB 异常容错
+// 返回 nil（判定退化 S1——宁漏勿误）。
+func MusicOfficialGroupWords(ctx context.Context, db *gorm.DB) []string {
+	if db == nil {
+		return nil
+	}
+	var words []string
+	if err := db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+		Where("site_name IN ?", site.MusicSourceSites()).
+		Order("group_name").
+		Pluck("group_name", &words).Error; err != nil {
+		return nil
+	}
+	return words
+}
