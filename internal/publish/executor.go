@@ -406,6 +406,17 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 				"类型映射缺失：站点表单要求 type（%s），元数据 category=%q 无对应选项——检查站点发布表单配置 type 域映射", tf, meta.Category))
 		}
 	}
+	// §59.471 附: region/style 必填域同款 fail-fast（回归审核补——配置异常
+	// （兜底项被手改删除）时静默不发→站方"请选择地区"错误循环重蹈；正常
+	// 路径有兜底（28/6）不会触发）。
+	for _, domain := range []string{model.FieldDomainRegion, model.FieldDomainStyle} {
+		if f, ok := cfg.FormFields[domain]; ok && f != "" {
+			if _, filled := form[f]; !filled {
+				return failRec("failed", fmt.Sprintf(
+					"%s 映射缺失：站点表单要求必填域 %s（%s）但映射不出（含兜底）——检查站点发布表单配置 %s 域 value_mappings（含兜底项）", domain, domain, f, domain))
+			}
+		}
+	}
 
 	// §59.453: 好学 410 纪录片特别通道四槽注入（年级恒其它/版本恒其它/
 	// 年份三级链/格式容器判定——用户逐点定案；jobs 通用链零配键 miss 不填
@@ -870,6 +881,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			SavePath:  rv.SavePath,
 		}
 		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
+			// §59.471 附: 推种分支消息与超时复查消息拼接（非覆盖——
+			// 回归审核发现 AlreadyExist/Error 分支整串替换会丢"上传超时
+			// 但站方复查确认已发布"的语义线索）
+			mergeMsg := func(m string) string {
+				if timeoutRecheckMsg != "" {
+					return timeoutRecheckMsg + "；" + m
+				}
+				return m
+			}
 			switch {
 			case pr.Success:
 				if uploadedStatus == "uploaded_existing" {
@@ -880,10 +900,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			case pr.AlreadyExist:
 				// 下载器已有同种（人工先行导入/跨链重复）——辅种语义达成
 				result.Status = "pushed_existing"
-				result.Message = "下载器已有该种子（已做种）"
+				result.Message = mergeMsg("下载器已有该种子（已做种）")
 			default:
 				if pr.Error != nil {
-					result.Message = "加种失败: " + pr.Error.Error()
+					result.Message = mergeMsg("加种失败: " + pr.Error.Error())
 				}
 			}
 		}
