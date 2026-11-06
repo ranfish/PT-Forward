@@ -260,10 +260,15 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	// §59.474: 可选第三变参=isMusicSeed（音乐链统一管道——keyword
 	// 用 ExtractMusicSearchKeyword 替代影视提取·groupName 置空·
 	// 两轮搜索：保年版主搜→0 结果→剥年版 fallback）
-	// 变参为 []string——约定值 "music" 标记音乐链
+	// §59.477 P2: "music" 标志改 slices.Contains 位置无关——原读变参
+	// 第三位 [2]（musicFetchArgs 两参调用形态 [localMI,"music"] 恒 miss·
+	// ④直达分支同站搜索音乐管道静默失效）
 	isMusicSeed := false
-	if len(sourceLocalMI) > 2 && sourceLocalMI[2] == "music" {
-		isMusicSeed = true
+	for _, v := range sourceLocalMI {
+		if v == "music" {
+			isMusicSeed = true
+			break
+		}
 	}
 	if infoHash == "" || siteName == "" || torrentName == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_name are required")
@@ -351,8 +356,20 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	// ValidateInjection 独立兜底（§59.25），不受此放宽影响。
 	// §59.36 修订: 仲裁确定性出局（arbitratedOut）时跳过——loose 的 skipAudio
 	// 豁免（降级②路径）只服务"源 MI 不可得"场景，不得推翻 MI 仲裁判定。
+	// §59.477: 音乐走独立宽松轮（SearchAndVerifyMusicLoose）——视频的
+	// size 全豁免对音乐是毒害（"元数据与版本无关"=视频假设·音乐跨专辑=
+	// 不同内容：Prince 专辑匹配 "[The 100 Greatest...]"案/Vol.41 分卷匹配
+	// 61GB 全集案——29 离线驱动实证）。音乐门=标题强匹配+size 带 [0.25x,4x]。
 	if match == nil && size > 0 && !arbitratedOut {
-		if m := reseed.SearchAndVerifyLoose(ctx, adapter, config, keyword, groupName, torrentName); m != nil {
+		if isMusicSeed {
+			if m := reseed.SearchAndVerifyMusicLoose(ctx, adapter, config, keyword, torrentName, size); m != nil {
+				match = m
+				f.logger.Info("FetchAndStoreBySearch: music loose match (strong title + size band)",
+					zap.String("site", siteName),
+					zap.String("torrent_id", m.TorrentID),
+					zap.String("matched_title", m.Title))
+			}
+		} else if m := reseed.SearchAndVerifyLoose(ctx, adapter, config, keyword, groupName, torrentName); m != nil {
 			match = m
 			f.logger.Info("FetchAndStoreBySearch: loose match (size skipped)",
 				zap.String("site", siteName),
