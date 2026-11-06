@@ -2,6 +2,7 @@ package site
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
@@ -35,12 +36,19 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.Site, error) 
 	return &site, nil
 }
 
-func (r *Repository) GetByDomain(ctx context.Context, ident string) *model.Site {
+// GetByDomain §59.476: 域名/站名查站点。未找到 → (nil, nil)；查询错误
+// （ctx 超时等）→ (nil, err) 透传——原版吞错伪装 not-found（12 环境
+// "站点不存在: 不可羊" 实为 ctx deadline·两实证·误导诊断）。
+func (r *Repository) GetByDomain(ctx context.Context, ident string) (*model.Site, error) {
 	var site model.Site
-	if err := r.db.WithContext(ctx).Where("domain = ? OR name = ?", ident, ident).First(&site).Error; err != nil {
-		return nil
+	err := r.db.WithContext(ctx).Where("domain = ? OR name = ?", ident, ident).First(&site).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return &site
+	return &site, nil
 }
 
 func (r *Repository) GetByName(ctx context.Context, name string) (*model.Site, error) {

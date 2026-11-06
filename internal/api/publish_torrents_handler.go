@@ -4053,6 +4053,14 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 	if len(metas) == 0 {
 		return nil
 	}
+	// §59.476: music 在场行优先（缺口④第二例实锤——12 环境 Tiesto 簇三行
+	// 竞争·车站韩剧串种行（影视字段全）完爆音乐行·MDP/展示恒错）。
+	// 音乐字段仅音乐链产出（皇后纯音乐站+验证层双保证）→ 影视簇 no-op。
+	for i := range metas {
+		if detailSourceHasMusic(metas[i].DetailSourceJSON) {
+			return &metas[i]
+		}
+	}
 	// §59.171: 确定性排序——排序即选择（权威行=非 cluster 传播副本优先 → 新者优先
 	// → 小 id 优先）。消除无序查询抽签（PT31 MI 红叉实锤：item hash 挂着有 MI 的
 	// 源行，却选中 cluster 空行）。原 best=updated_at 全量扫描已被废弃：传播会
