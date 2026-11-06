@@ -35,6 +35,24 @@ description: 'PT-Forward 基础设施备忘：mpv 编译（源码/编译脚本/D
 - 用法：`cookiecloud -domain <domain> -json`
 - 需设置环境变量：`COOKIECLOUD_URL` / `COOKIECLOUD_UUID` / `COOKIECLOUD_PASSWORD`
 
+## 临时凭证文件清理铁律（§59.472 附·三次违规后机制化）
+
+**探针/诊断类任务收尾固定动作**（不靠记忆——固化命令）：
+
+```bash
+# 任务结束即执行（保留正在运行的后续任务依赖的文件）：
+rm -f /tmp/opencode/*_cookie.txt /tmp/opencode/*-cookie.txt \
+      /tmp/opencode/*_token.txt /tmp/opencode/*token*.txt /tmp/opencode/tok.txt \
+      /tmp/opencode/*_pwd*.txt /tmp/opencode/*pwd*.txt \
+      /tmp/opencode/*_enckey*.txt /tmp/opencode/*apikey*.txt /tmp/opencode/gh-token.txt \
+      /tmp/opencode/*_ck.txt /tmp/opencode/*.db
+```
+
+- **例外**：正在运行的后续任务依赖的文件（如后台验证在用的 cookie）——任务真正收尾时随最终报告一起清
+- **生产 DB 副本**（docker cp 出来的 .db）：用完即删（可达 GB 级·含全部站点密文凭证+加密 key 同库）
+- **脚本内嵌凭证**：`grep -lE "c_secure|passkey=|pass=|密码" *.js *.sh` 扫残留——命中即删
+- 历史教训：/tmp/opencode 曾累积 40+ 站 cookie、5 个明文密码、加密 key、GitHub token、2.4GB 生产 DB 副本（几十轮会话从未清理——2026-11-06 大扫除销账）
+
 ## Playwright 采集注意事项
 
 - 脚本必须用 CJS 格式（`require` + `async function main()`），不能用 `.mjs` 的 `import` + top-level await
