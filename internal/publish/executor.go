@@ -375,6 +375,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, model.FieldDomainAudiocodec, tp.AudioCodec, tp.AudioTechnology)},
 		{model.FieldDomainMedium, e.mediumMappingOf(cfg, in.TargetSite, meta, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
+		// §59.471: 地区/风格（HDVideo 必填——站特化路由+兜底；其它站未配
+		// value_mappings 域时 lookup nil 跳过零影响）
+		{model.FieldDomainRegion, e.regionMappingOf(cfg, in.TargetSite, meta)},
+		{model.FieldDomainStyle, e.styleMappingOf(cfg, in.TargetSite, meta)},
 	}
 	for _, j := range jobs {
 		if j.match == nil {
@@ -3282,4 +3286,68 @@ func isUploadTimeoutErr(err error) bool {
 		strings.Contains(s, "context deadline exceeded") ||
 		strings.Contains(s, "Timeout exceeded") ||
 		strings.Contains(s, "timeout")
+}
+
+// ptgenRegionGenreWords §59.471: PTGen 产区/风格词提取（region/style 域
+// 数据源——HDVideo 必填两域消费）。
+func ptgenRegionGenreWords(meta *model.TorrentMetadata, domain string) []string {
+	if meta == nil || meta.PTGenSourceJSON == "" {
+		return nil
+	}
+	src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON)
+	if err != nil || src == nil {
+		return nil
+	}
+	if domain == model.FieldDomainRegion {
+		return src.Region
+	}
+	return src.Genre
+}
+
+// fallbackByValue §59.471: 域内按站方值找兜底项（region miss→"28"其他地区
+// /style miss→"6"剧情——用户定案 a+c·碟粉 410 兜底同族先例）。
+func fallbackByValue(mappings []model.FormValueMapping, value string) *model.FormValueMapping {
+	for i := range mappings {
+		if mappings[i].Value == value {
+			return &mappings[i]
+		}
+	}
+	return nil
+}
+
+// regionMappingOf §59.471: 地区槽映射——PTGen 产区词 canonical 化后按
+// standard_keys 匹配（港台双键承接·朱雀先例）；miss 兜底"28"其他地区
+// （HDVideo 站方值·当前唯一配置 region 域的站）。未配置域返回 nil 跳过。
+func (e *PublishExecutor) regionMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	mappings := cfg.ValueMappings[model.FieldDomainRegion]
+	if len(mappings) == 0 {
+		return nil
+	}
+	_ = siteName
+	for _, raw := range ptgenRegionGenreWords(meta, model.FieldDomainRegion) {
+		if k := titleparser.LookupDictKey("region", raw); k != "" {
+			if m := e.lookupByStdKey(cfg, model.FieldDomainRegion, k); m != nil {
+				return m
+			}
+		}
+	}
+	return fallbackByValue(mappings, "28")
+}
+
+// styleMappingOf §59.471: 风格槽映射——PTGen 类型词 canonical 化匹配；
+// miss 兜底"6"剧情（最泛）。style_sel[4][] 多选形态单值勾选（首命中）。
+func (e *PublishExecutor) styleMappingOf(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata) *model.FormValueMapping {
+	mappings := cfg.ValueMappings[model.FieldDomainStyle]
+	if len(mappings) == 0 {
+		return nil
+	}
+	_ = siteName
+	for _, raw := range ptgenRegionGenreWords(meta, model.FieldDomainStyle) {
+		if k := titleparser.LookupDictKey("genre", raw); k != "" {
+			if m := e.lookupByStdKey(cfg, model.FieldDomainStyle, k); m != nil {
+				return m
+			}
+		}
+	}
+	return fallbackByValue(mappings, "6")
 }
