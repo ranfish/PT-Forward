@@ -396,6 +396,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			form[fn] = "yes"
 		}
 	}
+	// §59.472: 海胆季/集/合集注入（未配置 season 键的站零动作）
+	haidanSeasonEpisodeInject(form, cfg, meta, &tp)
 	// §59.289 fail-fast: 站方表单要求 type（FormFields 有域）但映射不出
 	// （元数据 category 无对应选项）——注定失败的上传不发出去，本地精准
 	// 拒发（修道院纪录片单复数错位案：type 不发→站方 Invalid integer
@@ -3370,4 +3372,57 @@ func (e *PublishExecutor) styleMappingOf(cfg *model.PublishFormConfig, siteName 
 		}
 	}
 	return fallbackByValue(mappings, "6")
+}
+
+// haidanSeasonEpisodeInject §59.472: 海胆季/集/合集三字段注入（From S04 案——
+// 纯季包 §59.424 合集形态放行但海胆站方要求剧集类必填季集信息·集数 0=全季）。
+// 数据源 tp.SeasonEpisode 归一终态（§59.424 同源——挂载点同在归一后）：
+//   S04 纯季 → season=4 episode=0（全季）；S01-S02 跨季 → 0/0+勾合集；
+//   S04E01 单集（eps=1 全集豁免形态）→ season=4 episode=1；
+//   剧集类无季信号（国产剧）→ 0/0（站方语义：不区分季+全季）；
+//   电影等范围外（§59.424 豁免类）→ 不填（站方仅剧集类要求）。
+// 未配置 season 键（其它站）零动作。
+func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp *titleparser.TechProfile) {
+	sf, hasSeason := cfg.FormFields[model.FieldDomainSeason]
+	if !hasSeason || sf == "" {
+		return
+	}
+	// 剧集类判定（站方提示四类=电视剧/综艺/动画/纪录片——§59.424 同范围）
+	switch meta.Category {
+	case "category.tv_series", "category.animation", "category.tv_shows", "category.documentary", "category.documentaries":
+	default:
+		return // 电影/音乐等——站方不要求
+	}
+	se := ""
+	if tp != nil {
+		se = tp.SeasonEpisode
+	}
+	season, episode := "0", "0" // 默认：不区分季+全季（国产剧全集形态）
+	collages := false
+	trimLead0 := func(x string) string {
+		t := strings.TrimLeft(x, "0")
+		if t == "" {
+			return "0"
+		}
+		return t
+	}
+	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil {
+		// S04E01 单集形态（§59.424 全集豁免放行——整部一集）——剥前导零
+		season, episode = trimLead0(strings.TrimPrefix(m[1], "S")), trimLead0(m[2])
+	} else if strings.Contains(se, "-S") || (len(se) > 4 && strings.Contains(se[3:], "-")) {
+		// S01-S02 跨季——多季=站方合集
+		collages = true
+	} else if m := regexp.MustCompile(`^S(\d{1,2})$`).FindStringSubmatch(se); m != nil {
+		// S04 纯季——全季（episode=0）——剥前导零
+		season = trimLead0(m[1])
+	}
+	form[sf] = season
+	if ef, ok := cfg.FormFields[model.FieldDomainEpisode]; ok && ef != "" {
+		form[ef] = episode
+	}
+	if collages {
+		if cf, ok := cfg.FormFields[model.FieldDomainCollages]; ok && cf != "" {
+			form[cf] = "1"
+		}
+	}
 }

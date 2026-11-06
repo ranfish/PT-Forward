@@ -59,6 +59,9 @@ const (
 	FieldDomainOffer       = "offer"    // §59.421: 候选发布（checkbox value=yes——语义由 Offer 承载，域记录存在性；站方字段名两形态优堡 asoffer/家园 offers——form_fields 映射承载）
 	FieldDomainRegion      = "region"   // §59.471: 地区单选（HDVideo region_sel[4] 必填——适配遗漏补）
 	FieldDomainStyle       = "style"    // §59.471: 风格多选（HDVideo style_sel[4][] 必填——适配遗漏补）
+	FieldDomainSeason      = "season"   // §59.472: 季数（海胆 text——剧集类必填·0=不区分季）
+	FieldDomainEpisode     = "episode"  // §59.472: 集数（海胆 text——0=全季）
+	FieldDomainCollages    = "collages" // §59.472: 合集 checkbox（海胆·多季/多部电影勾选·value=1）
 	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
