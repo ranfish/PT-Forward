@@ -60,3 +60,28 @@ func TestHaidanSeasonEpisodeInject(t *testing.T) {
 		}
 	})
 }
+
+// §59.471 回归审核补锚：跨季判定边界（首版手写条件 S1-2 漏判 +
+// S01E02-03 集区间误判——正则化后锚定）。
+func TestHaidanCrossSeasonEdge(t *testing.T) {
+	cases := []struct {
+		se   string
+		want string // collages 期望值
+	}{
+		{"S01-S02", "1"},   // 标准跨季
+		{"S01-02", "1"},    // 尾季无 S 短形态
+		{"S1-2", "1"},      // 单位数跨季（首版漏判形态）
+		{"S04E02-03", ""},  // 集区间（首版误判形态——非跨季）
+		{"S04", ""},        // 纯季不勾
+	}
+	for _, c := range cases {
+		form := map[string]string{}
+		cfg := &model.PublishFormConfig{FormFields: map[string]string{
+			model.FieldDomainSeason: "season", model.FieldDomainEpisode: "episode", model.FieldDomainCollages: "collages",
+		}}
+		haidanSeasonEpisodeInject(form, cfg, &model.TorrentMetadata{Category: "category.tv_series"}, &titleparser.TechProfile{SeasonEpisode: c.se})
+		if got := form["collages"]; got != c.want {
+			t.Errorf("se=%q collages=%q, want %q", c.se, got, c.want)
+		}
+	}
+}

@@ -2014,6 +2014,10 @@ var seasonPackFormRe = regexp.MustCompile(`^S\d{1,2}(-S?\d{1,2})?$`)
 // singleEpisodeRe §59.424: 单集形态（S01E02——无区间后缀）。
 var singleEpisodeRe = regexp.MustCompile(`^(S\d{1,2})E(\d{1,4})$`)
 
+// haidanCrossSeasonRe §59.472: 跨季形态（S01-S02 / S01-02 尾季无 S 短形态·
+// 单位数 S1-2）——海胆 collages 合集勾选判定。
+var haidanCrossSeasonRe = regexp.MustCompile(`^S\d{1,2}-S?\d{1,2}$`)
+
 // episodeReleaseBlocked §59.424: 系统级禁发剧集分集（用户定案——所有
 // 站点仅允许合集/完结/全集形态发布；与"转存发布禁勾首发"同层行为铁律，
 // 纯代码规则零配置）。
@@ -3409,8 +3413,10 @@ func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormCon
 	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil {
 		// S04E01 单集形态（§59.424 全集豁免放行——整部一集）——剥前导零
 		season, episode = trimLead0(strings.TrimPrefix(m[1], "S")), trimLead0(m[2])
-	} else if strings.Contains(se, "-S") || (len(se) > 4 && strings.Contains(se[3:], "-")) {
-		// S01-S02 跨季——多季=站方合集
+	} else if haidanCrossSeasonRe.MatchString(se) {
+		// S01-S02 / S01-02 跨季——多季=站方合集（§59.471 回归审核修正：
+		// 首版手写 Contains 条件 S1-2 单位数漏判 + S01E02-03 集区间误判——
+		// 正则对齐 §59.424 seasonPackFormRe 形态域）
 		collages = true
 	} else if m := regexp.MustCompile(`^S(\d{1,2})$`).FindStringSubmatch(se); m != nil {
 		// S04 纯季——全季（episode=0）——剥前导零
