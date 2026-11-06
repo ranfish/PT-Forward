@@ -10,18 +10,20 @@
 package publish
 
 import (
-	"strconv"
-	"github.com/ranfish/pt-forward/internal/metadata"
-	"github.com/ranfish/pt-forward/internal/ptgen"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/metadata"
+	"github.com/ranfish/pt-forward/internal/ptgen"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -780,8 +782,40 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
+	timeoutRecheckMsg := ""
 	if upErr != nil {
-		return failRec("failed", fmt.Sprintf("上传失败: %v", upErr))
+		// §59.470: 超时≠失败——站方可能已完成入库（南洋案实证：30s 超时但
+		// 站方 09:43 实际入库 tid=225756·记录假失败+人工重试险重复发布）。
+		// 超时类错误先站方复查（复用 pieces-hash dedup 通道）·查到同内容种
+		// →按站上已有处理（uploaded_existing 语义·推种+pushed_existing）；
+		// 复查无 → 真 failed。
+		if isUploadTimeoutErr(upErr) {
+			// 复查子 ctx：上传已耗尽外层预算大部分——WithoutCancel 保 trace
+			// 值+去取消，再派生独立预算（复查=一次 pieces-hash 查询 60s 足够）
+			recheckCtx, recheckCancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second)
+			dup, dupMsg, mTID := e.pipe.dedupByPiecesHashFull(recheckCtx, adapter, siteConfig, torrentData)
+			recheckCancel()
+			if dup && mTID > 0 {
+				tidShown := fmt.Sprintf("%d", mTID)
+				if e.logger != nil {
+					e.logger.Info("upload timeout but site recheck hit (treat as existing)",
+						zap.String("site", in.TargetSite),
+						zap.String("tid", tidShown),
+						zap.Error(upErr))
+				}
+				timeoutRecheckMsg = "上传超时但站方复查确认已发布（tid=" + tidShown + "）: " + dupMsg
+				resp = &model.PublishResponse{
+					Success:    true,
+					IsExisting: true,
+					TorrentID:  tidShown,
+					DetailURL:  detailURLOf(siteConfig, tidShown),
+				}
+				upErr = nil
+			}
+		}
+		if upErr != nil {
+			return failRec("failed", fmt.Sprintf("上传失败: %v", upErr))
+		}
 	}
 	if !resp.Success {
 		// §59.159 回归审核：优先消费 ErrorMessage（已存在等语义化失败信息——
@@ -817,6 +851,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		Status: uploadedStatus,
 		Upload: resp,
 		TargetTorrentURL: resp.DetailURL,
+	}
+	// §59.470: 超时复查命中场景的消息注入（uploaded_existing 语义正常路径无 message）
+	if timeoutRecheckMsg != "" {
+		result.Message = timeoutRecheckMsg
 	}
 	if e.pipe.pusher != nil {
 		pushReq := &pusher.PushRequest{
@@ -3229,3 +3267,19 @@ func hduptTVMediumOption(cfg *model.PublishFormConfig, siteName string, meta *mo
 	return nil
 }
 
+
+// isUploadTimeoutErr §59.470: 上传超时类错误判定——超时≠失败（站方可能
+// 已完成入库·南洋案实证），触发站方复查通道。
+func isUploadTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	s := err.Error()
+	return strings.Contains(s, "Client.Timeout") ||
+		strings.Contains(s, "context deadline exceeded") ||
+		strings.Contains(s, "Timeout exceeded") ||
+		strings.Contains(s, "timeout")
+}
