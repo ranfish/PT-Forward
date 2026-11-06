@@ -57,6 +57,8 @@ const (
 	FieldDomainDoubanID    = "douban_id" // §59.399: 豆瓣编号形态（学校站 doubanid=24773958——subject/ 尾部编号提取）
 	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
 	FieldDomainOffer       = "offer"    // §59.421: 候选发布（checkbox value=yes——语义由 Offer 承载，域记录存在性；站方字段名两形态优堡 asoffer/家园 offers——form_fields 映射承载）
+	FieldDomainRegion      = "region"   // §59.471: 地区单选（HDVideo region_sel[4] 必填——适配遗漏补）
+	FieldDomainStyle       = "style"    // §59.471: 风格多选（HDVideo style_sel[4][] 必填——适配遗漏补）
 	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
