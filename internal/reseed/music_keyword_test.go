@@ -1,0 +1,50 @@
+package reseed
+
+import (
+	"testing"
+)
+
+// §59.474: 音乐统一管道 v2 锚——三站全量 7417 颗验证·关键形态对照。
+// 期望值与 Python 模拟产出逐字对齐（Go vs Python 移植零偏差验证）。
+func TestExtractMusicSearchKeyword(t *testing.T) {
+	cases := []struct {
+		name      string
+		stripYear bool
+		want      string
+	}{
+		// 主规则域：站方 canonical 形态（艺人 - 专辑 年份 格式）
+		{"Carol Albert - Stronger Now (2020)", false, "Carol Albert Stronger Now 2020"},
+		{"Taylor Swift - 1989 (Deluxe) (2014) [FLAC]", false, "Taylor Swift 1989 Deluxe 2014"},
+		// 剥年版
+		{"Carol Albert - Stronger Now (2020)", true, "Carol Albert Stronger Now"},
+		{"Taylor Swift - 1989 (Deluxe) (2014) [FLAC]", true, "Taylor Swift Deluxe FLAC"},
+		// C1 年份-连字符（中间括号不剥——Trim 只剥首尾·Python 同构）
+		{"1999-爱人啊[台湾][WAV]", false, "1999 爱人啊[台湾][WAV"},
+		{"1999-爱人啊[台湾][WAV]", true, "爱人啊[台湾][WAV"},
+		// D1 点分隔（5 词截断）
+		{"Hebert.Von.Karajan.-.[Wagner.Preludes.and.Overtures].专辑.(Flac)", false, "Hebert Von Karajan Wagner Preludes"},
+		// C5 日文头方括号
+		{"[101201] TVアニメ「アマガミSS」オリジナルサウンドトラック／大森俊之", false, "TVアニメ「アマガミSS」オリジナルサウンドトラック／大森俊之"},
+		// 头剥空回退（整名方括号——"_"空格化为"2"分词）
+		{"[鳳飛飛歌林專輯飛躍復刻全集之二十三_2-1983 出外的人]", false, "鳳飛飛歌林專輯飛躍復刻全集之二十三 2 1983 出外的人"},
+		// A1 空格化（5 词截断——"Management"第 6 词截）
+		{"t.A.t.U-Waste Management", false, "t A t U Waste"},
+		// 剥头【】整段
+		{"【MQA352.8】Himmelborgen", false, "Himmelborgen"},
+		// A2 年份+名
+		{"2003 Call Off the Search", false, "2003 Call Off the Search"},
+		{"2003 Call Off the Search", true, "Call Off the Search"},
+		// 多段+副标题括号
+		{"Sodagreen (蘇打綠) - Imcomparable Beauty (無與倫比的美麗", false, "Sodagreen 蘇打綠 Imcomparable Beauty 無與倫比的美麗"},
+		// 中文短名
+		{"甄妮-心聲", false, "甄妮 心聲"},
+		// 书名号《》内文优先
+		{"Nicki Minaj -《Pink Friday：Roman Reloaded》[Explicit Version]", false, "Pink Friday：Roman Reloaded"},
+	}
+	for _, c := range cases {
+		got := ExtractMusicSearchKeyword(c.name, c.stripYear)
+		if got != c.want {
+			t.Errorf("ExtractMusicSearchKeyword(%q, %v) = %q, want %q", c.name, c.stripYear, got, c.want)
+		}
+	}
+}

@@ -2830,7 +2830,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			h.logger.Info("IYUU coverage exhausted, trying same-site search",
 				zap.String("hash", hash[:min(10, len(hash))]),
 				zap.Error(err))
-			meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
+			meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, h.musicFetchArgs(musicRouting, localMI)...)
 			if err != nil {
 				// §59.337: 链尾瞬态聚合——全链（直达/簇/IYUU/搜索）任一瞬态
 				// 即 deferred（deferred 语义不因链尾位置变化丢失）。
@@ -2861,7 +2861,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 			searchSuffix = h.canonicalGroupName(ctx, result.GroupName)
 		}
 		searchCtx, searchCancel := context.WithTimeout(fetchCtx, 25*time.Second)
-		meta, err = h.metadataFetcher.FetchAndStoreBySearch(searchCtx, hash, result.SourceSite, name, size, localMI, searchSuffix)
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(searchCtx, hash, result.SourceSite, name, size, h.musicFetchArgs(musicRouting, localMI, searchSuffix)...)
 		searchCancel()
 		if err == nil {
 			goto fetched
@@ -4179,6 +4179,18 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 		"match":               strings.EqualFold(meta.InfoHash, req.ExpectHash),
 		"info_hash_no_source": noSrc,
 	})
+}
+
+
+
+// musicFetchArgs §59.474: 音乐链 FetchAndStoreBySearch 变参构造——
+// 影视：[localMI, suffix]；音乐：[localMI, suffix, "music"]（isMusicSeed
+// 约定值·fetcher 内解析）。
+func (h *PublishTorrentsHandler) musicFetchArgs(musicRouting bool, args ...string) []string {
+	if !musicRouting {
+		return args
+	}
+	return append(args, "music")
 }
 
 // detailSourceHasMusic §59.469 附七: 音乐种判定（单颗场景精确通道——

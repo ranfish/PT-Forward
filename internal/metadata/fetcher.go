@@ -249,6 +249,14 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	if len(sourceLocalMI) > 1 {
 		keywordGroupSuffix = sourceLocalMI[1]
 	}
+	// §59.474: 可选第三变参=isMusicSeed（音乐链统一管道——keyword
+	// 用 ExtractMusicSearchKeyword 替代影视提取·groupName 置空·
+	// 两轮搜索：保年版主搜→0 结果→剥年版 fallback）
+	// 变参为 []string——约定值 "music" 标记音乐链
+	isMusicSeed := false
+	if len(sourceLocalMI) > 2 && sourceLocalMI[2] == "music" {
+		isMusicSeed = true
+	}
 	if infoHash == "" || siteName == "" || torrentName == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_name are required")
 	}
@@ -265,19 +273,41 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 		return nil, fmt.Errorf("get adapter for %s: %w", siteName, err)
 	}
 
-	keyword := reseed.ExtractSearchKeyword(torrentName)
-	groupName := reseed.ExtractGroupName(torrentName)
+	keyword := ""
+	groupName := ""
+	if isMusicSeed {
+		// §59.474: 音乐统一管道 v2——groupName 置空（验证层 4 处
+		// groupName!="" 前置已证安全·门2 跳过）；keyword 走保年版
+		// 主搜·0 结果 fallback 剥年版（§59.474 两轮设计）
+		groupName = ""
+		keyword = reseed.ExtractMusicSearchKeyword(torrentName, false)
+		if keyword == "" {
+			keyword = reseed.ExtractSearchKeyword(torrentName)
+		}
+	} else {
+		keyword = reseed.ExtractSearchKeyword(torrentName)
+		groupName = reseed.ExtractGroupName(torrentName)
+	}
 	if keyword == "" {
 		return nil, fmt.Errorf("cannot extract search keyword from title: %s", torrentName)
 	}
-	// §59.234 ①: 组名后缀追加（已含不重复）
-	if keywordGroupSuffix != "" && !strings.Contains(strings.ToUpper(keyword), strings.ToUpper(keywordGroupSuffix)) {
+	// §59.234 ①: 组名后缀追加（已含不重复·音乐链 groupNameSuffix 恒空）
+	if !isMusicSeed && keywordGroupSuffix != "" && !strings.Contains(strings.ToUpper(keyword), strings.ToUpper(keywordGroupSuffix)) {
 		keyword = keyword + " " + keywordGroupSuffix
 	}
 
 	match, allResults, err := reseed.SearchAndVerifyMatchWithResults(ctx, adapter, config, keyword, groupName, size, torrentName)
 	if err != nil {
 		return nil, fmt.Errorf("L2 search failed on %s: %w", siteName, err)
+	}
+
+	// §59.474: 音乐两轮——保年版 0 结果→剥年版 fallback 重搜
+	if match == nil && isMusicSeed {
+		if stripKW := reseed.ExtractMusicSearchKeyword(torrentName, true); stripKW != "" && stripKW != keyword {
+			if m2, _, err2 := reseed.SearchAndVerifyMatchWithResults(ctx, adapter, config, stripKW, "", size, torrentName); err2 == nil && m2 != nil {
+				match = m2
+			}
+		}
 	}
 
 	// §59.36 修订: 主轮 + loose 轮的音频冲突候选收集（组名/相关性/其余字段全过，
