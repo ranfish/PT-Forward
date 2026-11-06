@@ -17,7 +17,15 @@ func TestExtractMusicSearchKeyword(t *testing.T) {
 		{"Taylor Swift - 1989 (Deluxe) (2014) [FLAC]", false, "Taylor Swift 1989 Deluxe 2014"},
 		// 剥年版
 		{"Carol Albert - Stronger Now (2020)", true, "Carol Albert Stronger Now"},
-		{"Taylor Swift - 1989 (Deluxe) (2014) [FLAC]", true, "Taylor Swift Deluxe FLAC"},
+		// §59.477 修订: FLAC 入规格词剥除集（皇后标题恒带·非判别词·
+		// 剥除=关键词更宽召回更稳）——原锚 "Taylor Swift Deluxe FLAC"
+		{"Taylor Swift - 1989 (Deluxe) (2014) [FLAC]", true, "Taylor Swift Deluxe"},
+		// §59.477 A类: & 入分隔符集（皇后带 & 必零结果·12 环境用户实测）
+		{"Iggy & the Stooges - Jesus Loves the Stooges (1995) {BCD114} [FLAC]", false, "Iggy the Stooges Jesus Loves"},
+		{"Pollini - Piano Sonatas Nos.20&21 2021 FLAC", false, "Pollini Piano Sonatas Nos 20"},
+		// §59.477 B类: Scene 形态清洗——目录号+规格词剥除（主体=Artist+Track）
+		{"Sydro-Synaptic_Overload-(KSR043)-16BIT-WEB-FLAC-2025-TR", false, "Sydro Synaptic Overload"},
+		{"Sambassadeur-New_Moon-(LAB070)-CDEP-FLAC-2005-MANDY", false, "Sambassadeur New Moon"},
 		// C1 年份-连字符（中间括号不剥——Trim 只剥首尾·Python 同构）
 		{"1999-爱人啊[台湾][WAV]", false, "1999 爱人啊[台湾][WAV"},
 		{"1999-爱人啊[台湾][WAV]", true, "爱人啊[台湾][WAV"},

@@ -3547,7 +3547,9 @@ func hasResolutionToken(s string) bool {
 // 仅按 组名 + 标题相关性 + TechProfile 冲突校验。适用站内同资源重发
 // （REPACK 替换）导致 size 与本地不一致的场景。禁止用于注入决策
 // （注入必须走 VerifyMatchWithTruncationCheckAndSource + ValidateInjection）。
-func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName, sourceTitle string) *L2MatchResult {
+// searchRoundsLoose §59.30/§59.477: 宽松轮关键词渐进降级 rounds——
+// 候选筛选由 pick 注入（视频 loosePick / 音乐 musicLoosePick）。
+func searchRoundsLoose(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword string, pick func([]*model.SeedingSearchResult) *L2MatchResult) *L2MatchResult {
 	if keyword == "" {
 		return nil
 	}
@@ -3600,11 +3602,100 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 		if err != nil || len(results) == 0 {
 			continue
 		}
-		if m := loosePick(results, groupName, sourceTitle); m != nil {
+		if m := pick(results); m != nil {
 			return m
 		}
 	}
 	return nil
+}
+
+// SearchAndVerifyLoose §59.30 宽松降级（视频）——size 豁免·标题相关性
+// 放宽。"元数据与版本无关"假设=视频语义（同作品不同版本）。
+func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName, sourceTitle string) *L2MatchResult {
+	return searchRoundsLoose(ctx, adapter, config, keyword, func(results []*model.SeedingSearchResult) *L2MatchResult {
+		return loosePick(results, groupName, sourceTitle)
+	})
+}
+
+// SearchAndVerifyMusicLoose §59.477 音乐宽松轮——关键词降级 rounds 复用
+// （§59.30 同款），pick 换音乐门：
+//  1. 标题强匹配：词边界命中 ≥max(2, 过半词)——防 any-word 子串伪命中
+//     （"time"⊆"Times" 单词放行 Prince 案实证）；CJK 段 ≥2 字任一命中
+//     （中文专辑名）等价强匹配
+//  2. size 带 [0.25x, 4x]：同专辑格式变体（FLAC/MP3 双版）放行·
+//     跨专辑/分卷拒绝（61GB 源×Vol.41 0.36GB=170x 案）
+//  3. 无锚词（无有效词且无 CJK）不进宽松——宁漏勿误
+//
+// 视频 SearchAndVerifyLoose 原样零触碰。
+func SearchAndVerifyMusicLoose(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, sourceTitle string, sourceSize int64) *L2MatchResult {
+	return searchRoundsLoose(ctx, adapter, config, keyword, func(results []*model.SeedingSearchResult) *L2MatchResult {
+		return musicLoosePick(results, sourceTitle, sourceSize)
+	})
+}
+
+// musicLoosePick §59.477 音乐宽松轮候选筛选（纯函数可测）。
+func musicLoosePick(results []*model.SeedingSearchResult, sourceTitle string, sourceSize int64) *L2MatchResult {
+	words := extractMeaningfulTitleWords(sourceTitle, "")
+	cjk := extractCJKSubstrings(sourceTitle)
+	if len(words) == 0 && len(cjk) == 0 {
+		return nil // 无锚词不进宽松（宁漏勿误）
+	}
+	for _, r := range results {
+		if r.TorrentID == "" || r.Size <= 0 {
+			continue
+		}
+		// size 带 [0.25x, 4x]（源与候选双向）
+		if sourceSize > 0 {
+			if r.Size*4 < sourceSize || r.Size > sourceSize*4 {
+				continue
+			}
+		}
+		if !musicTitleStrongMatch(words, cjk, r.Title) {
+			continue
+		}
+		return &L2MatchResult{TorrentID: r.TorrentID, Title: r.Title, Size: r.Size}
+	}
+	return nil
+}
+
+// musicTitleStrongMatch §59.477 音乐标题强匹配：词边界（防子串伪命中）
+// + 命中数阈值 max(2, 过半)；CJK 段 ≥2 字任一命中等价强匹配。
+func musicTitleStrongMatch(words []string, cjk []string, candidateTitle string) bool {
+	candLower := strings.ToLower(candidateTitle)
+	if len(words) > 0 {
+		need := max(2, (len(words)+1)/2)
+		hits := 0
+		for _, w := range words {
+			if wordBoundaryIn(w, candLower) {
+				hits++
+			}
+		}
+		if hits >= need {
+			return true
+		}
+	}
+	for _, s := range cjk {
+		if len([]rune(s)) >= 2 && strings.Contains(candidateTitle, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// wordBoundaryIn §59.477: 词边界包含（w 已小写）——"time" 不命中
+// "Times"（边界）·命中 "time" 独立词形。
+func wordBoundaryIn(w, lowerText string) bool {
+	if w == "" {
+		return false
+	}
+	return regexp.MustCompile(`\b` + regexp.QuoteMeta(w) + `\b`).MatchString(lowerText)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // stripCJKParenNote §59.217: CJK 后挂括号注记剥离（半角/全角括号，
@@ -6218,8 +6309,9 @@ func ExtractMusicSearchKeyword(name string, stripYear bool) string {
 	if m := regexp.MustCompile(`《([^》]+)》`).FindStringSubmatch(s); m != nil {
 		s = m[1]
 	}
-	// ② 分隔符空格化
-	s = regexp.MustCompile(`[-–_\.．]+`).ReplaceAllString(s, " ")
+	// ② 分隔符空格化（§59.477 A类: & 入分隔符集——皇后带 & 必零结果·
+	// "Iggy & the"→"Iggy the"·"Nos.20&21"→"Nos 20 21"·对齐 §59.192 影视语义）
+	s = regexp.MustCompile(`[-–_\.．&]+`).ReplaceAllString(s, " ")
 	// ③ token 清洗
 	var out []string
 	for _, t := range strings.Fields(s) {
@@ -6230,10 +6322,29 @@ func ExtractMusicSearchKeyword(name string, stripYear bool) string {
 		if stripYear && regexp.MustCompile(`^(19|20)\d{2}$`).MatchString(t) {
 			continue
 		}
+		// §59.477 B类: Scene 形态清洗——目录号（≥2 大写字母+≥2 数字·
+		// KSR043/LAB070）与规格词（16BIT/\d+BIT·CDEP·EP·WEB·Single·
+		// 音频格式）非标题主体（主体=Artist+Track）。Scene 命名序
+		// [Artist]-[Track]-[(目录号)]-[规格]-[年份]-[组]：**首见即截断**
+		// （后续 token 全是元数据·保留下游 AND 零结果风险——皇后站方
+		// 改 canonical 名即零命中）；canonical 名无此形态零影响
+		// （用户七案实测：Sydro/Sambassadeur 案）。
+		if musicCatalogNoRe.MatchString(t) || musicSpecTokenRe.MatchString(t) {
+			break
+		}
 		out = append(out, t)
 	}
 	return strings.Join(out[:min(5, len(out))], " ")
 }
+
+// musicCatalogNoRe §59.477: Scene 目录号——全大写字母 2-6 + 数字 2-6
+// （KSR043/LAB070/PHCP2035 形态族）。标题主体不含此形态。
+var musicCatalogNoRe = regexp.MustCompile(`^[A-Z]{2,6}\d{2,6}$`)
+
+// musicSpecTokenRe §59.477: 规格/载体词——\d+BIT（16BIT/24BIT）·
+// CDEP/EP/WEB/Single·音频格式（FLAC/WAV/APE/ALAC/MP3/M4A——皇后标题
+// 恒带 FLAC 非判别词·剥除=关键词更宽=召回更稳·验证层过滤）。
+var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a)$`)
 
 func min(a, b int) int {
 	if a < b {
