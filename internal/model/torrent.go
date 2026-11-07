@@ -25,10 +25,18 @@ type MusicMeta struct {
 	HasLog      bool   `json:"has_log,omitempty"`      // log 在场
 	HasCue      bool   `json:"has_cue,omitempty"`      // cue 在场
 	ReleaseType string `json:"release_type,omitempty"` // 发行类型（Album/EP/Single/Compilation…Gazelle 枚举）
+	// §59.485: 海豚原创族标记（action=torrentgroup 补采——detail API 盲区）。
+	// R7 判定锚：VH∨scene → 拦（原创作品/Scene 发布）；双 false → 转载可转
+	// （海豚规则：禁转标记仅原创资源可用——转载种无权禁转）。
+	IsVanityHouse bool `json:"is_vanity_house,omitempty"` // 原创作品（自己/授权代表发布）
+	IsScene        bool `json:"is_scene,omitempty"`        // Scene 发布
 }
 
 type TorrentDetail struct {
-	Title        string     `json:"title"`
+	Title string `json:"title"`
+	// §59.485: Gazelle 组 ID 透出（海豚 torrentgroup 补采锚——海豹发布
+	// 查组挂组同字段语义；NP 站零值不受影响）
+	GroupID string `json:"group_id,omitempty"`
 	// §59.162 keepfrds 禁转两态采集：列表页行原始文本（含 [禁转]/[ 限时禁转 ] 标记）
 	// 与详情页发布时间原文（"由 xx 发布于20时46分前"——相对时间，天档以上=超 24h 窗）
 	RawListRow  string     `json:"raw_list_row,omitempty"`

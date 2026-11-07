@@ -26,8 +26,14 @@ var (
 	reOpenCDTrack = regexp.MustCompile(`(?s)<div id="divtracklist"[^>]*>(.*?)</div>`)
 	reOpenCDNFO   = regexp.MustCompile(`(?s)<div id="divnfo"[^>]*>(.*?)</div>`)
 	// 封面：优先 onclick="Previewurl('path')"，fallback 到 src
-	reOpenCDCover = regexp.MustCompile(`(?s)<div class="cover"[^>]*>.*?onclick="Previewurl\('([^']+)'\)"`)
-	reOpenCDCoverSrc = regexp.MustCompile(`(?s)<div class="cover"[^>]*>.*?<img[^>]*src="([^"]+)"`)
+	// §59.485: 封面正则重写（v0 正则双缺陷——新版面 img 单引号不匹配+
+	// .*? 跨区误捕 pic/trans.gif 污染 9 簇实证；老版面无 div.cover 零通道）：
+	//   新版面（plugin_details）：<div class="cover"><img src='外域图床'/>
+	//   老版面（details）：无 div.cover·封面=kdescr 简介首图
+	//     （onclick Previewurl 指原图·src 为 .thumb.jpg 缩略——原图优先）
+	reOpenCDCoverImg = regexp.MustCompile(`<div class="cover"[^>]*>\s*<img[^>]*src=['"]([^'"]+)['"]`)
+	reOpenCDOldCoverURL = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*onclick=['"]Previewurl\('([^']+)'\)['"]`)
+	reOpenCDOldCoverSrc = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*src=['"]([^'"]+)['"]`)
 	// 字段行：<td class="rowtitle">字段名：</td><td ...>值</td>
 	reOpenCDField = regexp.MustCompile(`(?s)<td class="rowtitle"[^>]*>([^<：]+)：?</td>\s*<td[^>]*>(.*?)</td>`)
 	// §59.466: <a> 内文本反锚提取（tooltip data-options 属性含 jQuery('<div></div>')
@@ -52,13 +58,8 @@ func extractOpenCDDetail(rawHTML string) *model.TorrentDetail {
 		detail.Subtitle = cleanOpenCDText(m[1])
 	}
 
-	// 封面
-	coverURL := ""
-	if m := reOpenCDCover.FindStringSubmatch(rawHTML); len(m) > 1 {
-		coverURL = m[1]
-	} else if m := reOpenCDCoverSrc.FindStringSubmatch(rawHTML); len(m) > 1 {
-		coverURL = m[1]
-	}
+	// 封面（§59.485: 双版面通道——trans.gif 占位防御）
+	coverURL := extractOpenCDCover(rawHTML)
 
 	// 简介（拼接：封面 + 专辑介绍 + 曲目列表 + EAC/LOG）
 	var descParts []string
@@ -156,12 +157,34 @@ func extractOpenCDDetail(rawHTML string) *model.TorrentDetail {
 		detail.Music = mm
 	}
 
-	// 截图/海报：用封面
-	if coverURL != "" {
-		detail.Screenshots = []string{coverURL}
-	}
+	// §59.485: 封面入 PosterURL 正槽（原塞 Screenshots[0] 槽位语义错——
+	// 封面≠截图·且 fetcher Poster: detail.PosterURL 落库链 0/181 断点根治）
+	detail.PosterURL = coverURL
 
 	return detail
+}
+
+// extractOpenCDCover 双版面封面提取（§59.485）：
+// 新版面 div.cover 直接子 img（单/双引号）优先；
+// 老版面 kdescr 简介首图（Previewurl 原图优先·thumb src 兜底）；
+// trans.gif 站方占位图防御（跳过——非真封面）。
+func extractOpenCDCover(rawHTML string) string {
+	candidates := []string{}
+	if m := reOpenCDCoverImg.FindStringSubmatch(rawHTML); len(m) > 1 {
+		candidates = append(candidates, m[1])
+	}
+	if m := reOpenCDOldCoverURL.FindStringSubmatch(rawHTML); len(m) > 1 {
+		candidates = append(candidates, m[1])
+	}
+	if m := reOpenCDOldCoverSrc.FindStringSubmatch(rawHTML); len(m) > 1 {
+		candidates = append(candidates, m[1])
+	}
+	for _, c := range candidates {
+		if c != "" && !strings.Contains(c, "trans.gif") {
+			return c
+		}
+	}
+	return ""
 }
 
 // extractOpenCDFields 从 rowtitle 字段行提取键值对。
