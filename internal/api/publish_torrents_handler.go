@@ -4695,6 +4695,8 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 
 // putSeedRequest §59.89: PUT /publish/seeds 请求体（提升命名——buildPutSeedUpdates 测试锚）。
 type putSeedRequest struct {
+	Force bool `json:"force"` // §59.484: 强制审核——MDP 详情页 missing_fields 非空时
+	// 用户显式确认"站方源数据固有缺口"后旁路审核门（大合集老种 album 空案）
 	Poster      string   `json:"poster"`
 	Screenshots []string `json:"screenshots"`
 	Description string   `json:"description"`
@@ -4787,8 +4789,8 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	// 误审）；req.Reviewed=true 为显式审核通道（确认完成调用——带 9 字段
 	// 门槛：缺字段拒绝审核）。§59.20 自动审核在 §59.141 自动保存后语义错位。
 	if req.Reviewed {
-		if len(missing) > 0 {
-			Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("审核失败：仍缺 %d 个字段: %s", len(missing), strings.Join(missing, ", ")))
+		if len(missing) > 0 && !req.Force {
+			Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("审核失败：仍缺 %d 个字段: %s（如确认站方源数据未提供·可 force=true 强制审核）", len(missing), strings.Join(missing, ", ")))
 			return
 		}
 		updates["reviewed"] = true
