@@ -552,6 +552,8 @@ func main() {
 	publishPipeline.SetPusher(torrentPusher)
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider, settingsRepo)
+	// §59.485: 音乐封面转存图床注入（获取链资产固化）
+	metadataFetcher.SetImageHostManager(imageHostMgr)
 	// §56.13 方案 B: Engine 已在前面注入到 adapter.Factory（line 244），
 	// fetcher 不再需要 SetEngine（adapter 内部已用 Engine 提取）。
 	publishPipeline.SetMetadataFetcher(metadataFetcher)

@@ -99,7 +99,66 @@ getTorrentDetailInner 两分支（内部域判定·非乌托邦零开销）。
 
 ### 待摸遗留
 
-- ~~禁转种实证~~ ✓（2026-11-05 四路实证无禁转体系——上方节）
+- ~~禁转种实证~~ ✓（2026-11-05 四路实证无禁转体系——上方节；**修正：
+  upload tags[4] 值 1=禁转——发种人自主标记面存在（站方不强制）**）
 - 类型枚举全集（HQ Audio 之外：LP/SACD…分类树）
-- 发布侧（表单/值集——音乐目标站适配期）
+- ~~发布侧（表单/值集——音乐目标站适配期）~~ ✓（2026-11-07 摸底——下方节）
 - RSS/搜索全量形态（素材=0·适配时摸）
+
+---
+
+## 二、发布侧摸底（2026-11-07·§59.485 音乐发布链第一站）
+
+### 发布资格
+
+- User 级：仅周六 12:00 ~ 周日 23:59 可发布；Power User+ 直发
+- uplver=yes 匿名发布（§59.485 定案：系统级默认匿名——music/影视统一）
+- 出站开放（"独占"资源除外）·入站要求上游非禁转（forums topicid=3
+  ——与我们 R7 同构）
+
+### 表单契约（takeupload.php·multipart·§59.485 九定案）
+
+| 字段 | 值集/规范 | 定案 |
+|---|---|---|
+| file | .torrent | 必填 |
+| name | 四段式 `歌手 - 专辑 年份 - 格式 分轨 - 来源`（来源可省）站方例：`Henry Mancini - Essential Henry Mancini 2024 - FLAC 分轨 - Redacted` | MusicMeta 重组·album 空标题中段兜底·AudioMode 简繁归一·有官组填组名段无则省 |
+| descr | 简介 | `[quote]转载{源站}资源，感谢[/quote]`+[img]pixhost 封面[/img]+正文（剥首图+截 LOG 段——log 走 logtexts 独立通道） |
+| type | 408 HQ Audio（种子区）/406·403（特别区 MV） | 音乐恒 408 |
+| medium_sel[4] | 8 CD/9 SACD/10 DVD/11 VCD/12 Other | Media 值映射 |
+| audiocodec_sel[4] | 19 值（1 FLAC/8 PCM/WAV/11 DSD/DSF/16 Hi-Res PCM…） | Format 值映射 |
+| team_sel[4] | 3 Musopia（官组）/5 Other/HDS/CHD/WiKi | 组名识别→命中选·其它 Other（MusopiaBAK 不配——淘汰组） |
+| language_id | 13 值（40 纯音乐/41 华语/42 欧美/43 日韩…） | 地区推导 |
+| tags[4][] | 44 checkbox（**1 禁转/2 首发**/6 港台/4 大陆/5 欧美/7 日韩/流派 9-43/30 Redacted/31 OpenCD/36 Orpheus/37 Jpopsuki/47·44 加速） | 流派+地区+来源站（有官组才打）；禁转(1)恒不勾（R7 上游拦）·首发(2)恒不勾（铁律）·加速恒不勾 |
+| small_descr | 副标题 | 规格链 `{Format} / Lossless / {Media} / Log (%) / Cue`（缺项跳过·对齐海豚同款形态） |
+| logfiles[] | .log 文件多选 | 不用（文本通道） |
+| logtexts[] | 动态 textarea·每框一张 CD | LogText EAC/XLD 头拆 CD·剥皇后 Score 标注行·段数超种内 .log 数站方自动忽略（守恒律） |
+| rip_score | number | LogScore 直通+LogText Score 行兜底 |
+| resource_count | 合集填·单资源留空 | 首版留空（定案） |
+| nfo | NFO 文件 | 不传 |
+
+### log 数量守恒律（站方深度定制）
+
+站方前端 POST /api/parse_torrent.php 服务端解析 .torrent → log_count；
+上传 log（文件+文本）总数 ≤ 种内 .log 文件数——超出服务端忽略；种内
+无 .log 传了全忽略。
+
+### 官种副标题实证（三颗 ZHENGLIFAN@Musopia）
+
+副标题恒=「内嵌专辑封面」——官组模板文案（音频文件 tag 内嵌图·文件
+层信息·与转发无关·页面无此数据）。我们转发副标题=规格链（转载种
+实践实证：`FLAC / Lossless / CD / Log (100%) / Cue`）。
+
+### 结构化音乐数据库
+
+站方有艺术家/唱片公司/专辑/曲子/作品/音轨/歌词/乐队独立页+
+logcheck.php 日志评分体系（log 质量站内评分输入——缺 log 不违规
+但评分吃亏）。
+
+### 预检与 R7
+
+- 预检最小集（定案）：R7 禁转拦+reviewed 门·站方特有要求（频谱图
+  /log 强制）零实证不预实施——首颗观察
+- R7 矩阵：皇后=ShareRule 文本/海豚=VH∨scene 拦·双 false 放
+  （§59.485 torrentgroup 补采）/乌托邦=放
+- 站方规则页：rules.php 空模板·forums 参数 GET 被拦（空壳响应）
+  ——无集中版规·规范=表单提示+已发种实践

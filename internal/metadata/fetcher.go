@@ -1,8 +1,10 @@
 package metadata
 
 import (
+	"regexp"
 	"sync"
-	"github.com/ranfish/pt-forward/internal/fingerprint"
+		"github.com/ranfish/pt-forward/internal/imagehost"
+"github.com/ranfish/pt-forward/internal/fingerprint"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,7 +40,18 @@ type Fetcher struct {
 	// §59.341 ②（方案 a）: PTGen 可行性回调——IYUU 候选循环内
 	// "获取成功但 PTGen 不可行"换下一候选（与 handler 簇循环同判定）。
 	// nil 时不过滤（未装配）。
-	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool}
+	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool
+
+	// §59.485: 音乐封面转存图床（唯一白名单 pixhost·其余全转存——
+	// 系统资产单一化；nil=未注入跳过）
+	imageHostMgr *imagehost.Manager
+}
+
+// SetImageHostManager §59.485: 音乐封面转存图床注入（pipeline 同款
+// Setter 模式——main 组装处调用）。
+func (f *Fetcher) SetImageHostManager(mgr *imagehost.Manager) {
+	f.imageHostMgr = mgr
+}
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
 	return &Fetcher{
@@ -484,6 +497,9 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 	if len(fetchLocalMI) > 0 {
 		buildLocalMI = fetchLocalMI[0]
 	}
+	// §59.485: 音乐封面转存单点（三站统一——detail 完成后落库前；
+	// 仅音乐种∧封面非空∧非 pixhost 域触发·失败降级保留原 URL）
+	f.rehostMusicCover(ctx, detail, siteCfg)
 	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta, buildLocalMI)
 	meta.FetchSource = fetchSource
 	return meta, nil
@@ -880,4 +896,50 @@ func (f *Fetcher) PersistCoverageHit(ctx context.Context, infoHash, siteName, to
 	f.persistCoverageHits(ctx, infoHash, []model.CoverageHit{
 		{SiteName: siteName, TorrentID: torrentID, Source: model.CoverageSourceIYUU},
 	})
+}
+
+// rehostMusicCover §59.485: 音乐封面转存 pixhost（系统资产固化）。
+// 唯一白名单=pixhost 系（用户定案：资产单一化——不依赖任何站点图床
+// 寿命·跨站通用·与影视截图"上传图床→URL 落库"同构）：
+//   已在 pixhost → 跳过（幂等·皇后新版面原生 pixhost 零成本）
+//   相对路径（皇后 attachments/ 站内附件）→ 绝对化后转存
+//   其余一切外域（musopia/picgo/免费床）→ 转存
+// 失败降级：保留原 URL+Warn（发布链消费时发现非 pixhost 再试——刀 2）。
+// 影视种零触碰（Music 在场门控——发布现场下载零持久化铁律不变）。
+func (f *Fetcher) rehostMusicCover(ctx context.Context, detail *model.TorrentDetail, siteCfg *model.SiteConfig) {
+	if f.imageHostMgr == nil || detail == nil || detail.Music == nil || detail.PosterURL == "" {
+		return
+	}
+	if isPixhostURL(detail.PosterURL) {
+		return
+	}
+	sourceURL := detail.PosterURL
+	if !strings.Contains(sourceURL, "://") {
+		// 相对路径绝对化（attachments/... → https://domain/attachments/...）
+		scheme := "https"
+		domain := siteCfg.Domain
+		if domain == "" {
+			domain = siteCfg.BaseURL
+		}
+		sourceURL = strings.TrimSuffix(scheme+"://"+strings.TrimPrefix(domain, "https://"), "/") + "/" + strings.TrimPrefix(sourceURL, "/")
+	}
+	result, err := f.imageHostMgr.RehostWithFallback(ctx, sourceURL)
+	if err != nil || result == nil || result.URL == "" {
+		if f.logger != nil {
+			f.logger.Warn("§59.485 音乐封面转存失败·保留原 URL（发布链可重试）",
+				zap.String("source", sourceURL), zap.Error(err))
+		}
+		return
+	}
+	detail.PosterURL = result.URL
+}
+
+// isPixhostURL §59.485: pixhost 系判定（pixhost.to 及子域）。
+func isPixhostURL(u string) bool {
+	m := regexp.MustCompile(`^https?://([^/]+)`).FindStringSubmatch(u)
+	if len(m) < 2 {
+		return false
+	}
+	host := strings.ToLower(m[1])
+	return host == "pixhost.to" || strings.HasSuffix(host, ".pixhost.to")
 }

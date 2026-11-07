@@ -596,3 +596,116 @@ func TestGazelle_DetectHR_NotFound(t *testing.T) {
 		t.Error("expected HasHR=false")
 	}
 }
+
+// §59.485: 海豚 torrentgroup 标记补采——detail（action=torrent）响应不含
+// group.vanityHouse（原创族标记盲区）·补一次 action=torrentgroup 双标记
+// 落 MusicMeta（R7 判定锚：VH∨scene→拦·双 false→转载可转）。
+func TestGazelle_GetTorrentDetail_GroupFlags(t *testing.T) {
+	detailResp := map[string]interface{}{
+		"status": "success",
+		"response": map[string]interface{}{
+			"group": map[string]interface{}{
+				"id":     151775,
+				"name":   "Test Album",
+				"year":   2024,
+				"wikiImage": "https://pic.example/cover.jpg",
+				"musicInfo": map[string]interface{}{
+					"artists": []map[string]interface{}{{"id": 1, "name": "Artist"}},
+				},
+			},
+			"torrent": map[string]interface{}{
+				"infoHash": "AABBCCDDEEFF00112233445566778899aabbccdd",
+				"size":     1073741824,
+				"format":   "FLAC",
+				"media":    "CD",
+				"hasLog":   true,
+				"logScore": 100,
+				"hasCue":   true,
+			},
+		},
+	}
+	tgResp := map[string]interface{}{
+		"status": "success",
+		"response": map[string]interface{}{
+			"group": map[string]interface{}{"vanityHouse": true},
+			"torrents": []map[string]interface{}{
+				{"id": 9100, "scene": false},
+				{"id": 9101, "scene": true},
+			},
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.RawQuery, "action=torrentgroup") {
+			_ = json.NewEncoder(w).Encode(tgResp)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(detailResp)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "c=1"}
+
+	detail, err := a.GetTorrentDetail(context.Background(), config, "9100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.GroupID != "151775" {
+		t.Errorf("GroupID 透出: %q", detail.GroupID)
+	}
+	if detail.Music == nil {
+		t.Fatal("music nil")
+	}
+	if !detail.Music.IsVanityHouse {
+		t.Errorf("IsVanityHouse 应为 true（torrentgroup 组级）")
+	}
+	if detail.Music.IsScene {
+		t.Errorf("IsScene 应为 false（tid=9100 的 torrents 行 scene=false）")
+	}
+	if detail.Music.ShareRule == "" || !strings.Contains(detail.Music.ShareRule, "Vanity House") {
+		t.Errorf("ShareRule 语义化: %q", detail.Music.ShareRule)
+	}
+}
+
+// §59.485: 双 false（转载种）——ShareRule=转载可转语义。
+func TestGazelle_GetTorrentDetail_GroupFlagsTransfer(t *testing.T) {
+	detailResp := map[string]interface{}{
+		"status": "success",
+		"response": map[string]interface{}{
+			"group": map[string]interface{}{
+				"id":         200,
+				"name":       "Transfer Album",
+				"musicInfo":  map[string]interface{}{"artists": []map[string]interface{}{{"id": 1, "name": "A"}}},
+			},
+			"torrent": map[string]interface{}{"format": "FLAC"},
+		},
+	}
+	tgResp := map[string]interface{}{
+		"status":   "success",
+		"response": map[string]interface{}{
+			"group":    map[string]interface{}{"vanityHouse": false},
+			"torrents": []map[string]interface{}{{"id": 300, "scene": false}},
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.RawQuery, "action=torrentgroup") {
+			_ = json.NewEncoder(w).Encode(tgResp)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(detailResp)
+	}))
+	defer srv.Close()
+
+	a := NewGazelleAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	detail, err := a.GetTorrentDetail(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "c=1"}, "300")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Music.IsVanityHouse || detail.Music.IsScene {
+		t.Errorf("转载种双 false: VH=%v scene=%v", detail.Music.IsVanityHouse, detail.Music.IsScene)
+	}
+	if !strings.Contains(detail.Music.ShareRule, "转载") {
+		t.Errorf("ShareRule 转载语义: %q", detail.Music.ShareRule)
+	}
+}

@@ -62,9 +62,10 @@ func TestExtractOpenCDDetail(t *testing.T) {
 		t.Error("Source should not be empty")
 	}
 
-	// 封面/海报
-	if len(detail.Screenshots) == 0 {
-		t.Error("Screenshots should not be empty")
+	// 封面/海报 §59.485: 封面槽位语义修正——入 PosterURL 正槽
+	// （原塞 Screenshots[0] 槽位语义错+fetcher 落库断点 0/181 根治）
+	if detail.PosterURL == "" {
+		t.Error("PosterURL should not be empty（封面入正槽）")
 	}
 }
 

@@ -88,7 +88,77 @@ func (a *GazelleAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 	// §59.466 附: ajax.php 认 cookie（Gazelle 标准）——APIKey 门槛放开
 	// （海豚无 api.php 端点·设置页无 Key 入口 2026-11-05 实证；海豹行为
 	// 不变——有 Key 时同样走此路，认证靠 cookie 头恒带）。
-	return a.detailViaAPI(ctx, config, torrentID)
+	detail, err := a.detailViaAPI(ctx, config, torrentID)
+	if err != nil || detail == nil {
+		return detail, err
+	}
+	// §59.485: 海豚标记补采（action=torrentgroup——detail API 盲区：
+	// group.vanityHouse+torrent.scene 原创族标记·R7 判定锚）。失败
+	// 容错不阻塞主链（Warn 日志·标记缺省=false 视作转载可转——获取
+	// 侧保真·发布侧 R7 消费时缺省态由该源单独定案）。
+	a.enrichGazelleGroupFlags(ctx, config, detail, torrentID)
+	return detail, nil
+}
+
+// enrichGazelleGroupFlags §59.485: torrentgroup 补采——海豚原创族标记。
+// action=torrent 响应 torrent 层有 scene 但无 vanityHouse；action=
+// torrentgroup 响应 group.vanityHouse（组级 VH）+torrents[].scene 全。
+// 一次补查双标记落 MusicMeta.IsVanityHouse/IsScene + ShareRule 语义化。
+func (a *GazelleAdapter) enrichGazelleGroupFlags(ctx context.Context, config *model.SiteConfig, detail *model.TorrentDetail, torrentID string) {
+	if detail == nil || detail.Music == nil || detail.GroupID == "" {
+		return
+	}
+	baseURL := resolveBaseURL(config)
+	u := baseURL + "/ajax.php?action=torrentgroup&id=" + url.QueryEscape(detail.GroupID)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		if a.logger != nil {
+			a.logger.Warn("gazelle: torrentgroup 补采失败（不阻塞主链）", zap.Error(err))
+		}
+		return
+	}
+	defer func() { drainBody(resp) }()
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+	var result struct {
+		Status   string `json:"status"`
+		Response struct {
+			Group struct {
+				VanityHouse bool `json:"vanityHouse"`
+			} `json:"group"`
+			Torrents []struct {
+				ID    int64 `json:"id"`
+				Scene bool  `json:"scene"`
+			} `json:"torrents"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil || result.Status != "success" {
+		return
+	}
+	mm := detail.Music
+	mm.IsVanityHouse = result.Response.Group.VanityHouse
+	for _, t := range result.Response.Torrents {
+		if fmt.Sprintf("%d", t.ID) == torrentID {
+			mm.IsScene = t.Scene
+			break
+		}
+	}
+	// ShareRule 语义化（发布层 R7/展示层直读）
+	switch {
+	case mm.IsVanityHouse:
+		mm.ShareRule = "原创作品（Vanity House）——禁转"
+	case mm.IsScene:
+		mm.ShareRule = "Scene 发布——禁转"
+	default:
+		mm.ShareRule = "转载资源（站方规则：禁转标记仅原创可用——转载可转）"
+	}
 }
 
 func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -131,6 +201,7 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 		Status   string `json:"status"`
 		Response struct {
 			Group struct {
+				ID          int64    `json:"id"`
 				Name        string   `json:"name"`
 				SubName     string   `json:"subName"`
 				Year        int      `json:"year"`
@@ -221,6 +292,8 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 		Description:  t.Description,
 		Tags:         g.Tags,
 		PosterURL:    firstNonEmpty(g.WikiImage, g.Conver),
+		// §59.485: 组 ID 透出（海豚 torrentgroup 补采锚）
+		GroupID:      fmt.Sprintf("%d", g.ID),
 		IMDbID:       g.ImdbID,
 		DoubanID:     g.DoubanID,
 	}
