@@ -185,7 +185,7 @@
 // 只读单页无 tab·契约 22 字段（§59.467 全景图）六分区渲染；
 // 纯渲染零请求（detail prop=入口层 probeMusicSeed 结果直接传入——
 // 音乐场景总请求恒 1 次·§59.469 附六方案 a）。
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { formatBytes } from '@/utils/format'
 import { seedConfigApi, type SeedDetail } from '@/api/publish'
@@ -219,6 +219,10 @@ function handleClose() {
 // §59.475: 确认完成=审核（PUT reviewed=true·音乐门=title+artist+album）
 const reviewLoading = ref(false)
 const localReviewed = ref(false)
+// §59.484 回归审核修：切换种子时重置 localReviewed——同一抽屉实例不重建·
+// 审核上一颗的 true 残留导致下一颗误显示"已审核"（用户实测：审核 A →
+// 点开 B 显示绿"已审核"·刷新才恢复红"强制审核通过"）
+watch(() => props.preset?.info_hash, () => { localReviewed.value = false })
 const isReviewed = computed(() => props.detail?.reviewed || localReviewed.value)
 
 async function confirmReview() {
