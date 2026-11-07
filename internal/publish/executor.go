@@ -293,6 +293,17 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return failRec("failed", fmt.Sprintf("导出数据非 bencode 种子（首字节 %q）——路径/内容异常", torrentData[0]))
 	}
 
+	// §59.485 刀2: 音乐种独立发布分支——表单语义/标题组装与影视链完全
+	// 不同（type=408 恒定/name 四段式/无 MI 无截图·影视标题重组对音乐
+	// 必挂"MI 缺失"）。提前分流·影视链零触碰。目标站收口：音乐种当前
+	// 仅乌托邦（§59.469 附九前端门的后端单点）。
+	if mm := musicMetaOfMeta(meta); mm != nil {
+		if in.TargetSite != "乌托邦" {
+			return failRec("ineligible", "音乐种目标站未适配（当前仅乌托邦）——音乐发布链 §59.485")
+		}
+		return e.executeMusicPublish(ctx, in, meta, rv, cfg, torrentData, mm)
+	}
+
 	// ④ 域值组装（DB 供给——value_mappings 反查）
 	// §59.159 用户定案"发布=填满上传页所有内容"：表单键必须是**站方字段名**
 	// （FormFields 映射）——此前用域常量做键（imdb_url=…），站方 input name 是 url → 投递丢失
