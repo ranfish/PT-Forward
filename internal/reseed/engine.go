@@ -6332,19 +6332,44 @@ func ExtractMusicSearchKeyword(name string, stripYear bool) string {
 		if musicCatalogNoRe.MatchString(t) || musicSpecTokenRe.MatchString(t) {
 			break
 		}
+		// §59.478: 字母数字粘连拆分（§59.206 视频语义继承·音乐漏继承第
+		// 三族）——"60SACD"→["60","SACD"]：皇后标题 "60 SACD"（空格形态）
+		// 对粘连 token 的 AND Contains 必 miss（RCA 案实证）。**仅纯 ASCII
+		// 字母数字 token**（含 CJK/全角字符的整体 token 不拆——日文标题
+		// 「アマガミSS」案：拆分组提取会摧毁 CJK 主体只留 ASCII 碎片）。
+		// 拆后子词续走目录号/规格词清洗。
+		if musicPureAlnumRe.MatchString(t) {
+			if subs := musicGluedSplitRe.FindAllString(t, -1); len(subs) > 1 {
+				for _, st := range subs {
+					if st == "" || musicCatalogNoRe.MatchString(st) || musicSpecTokenRe.MatchString(st) {
+						continue
+					}
+					out = append(out, st)
+				}
+				continue
+			}
+		}
 		out = append(out, t)
 	}
 	return strings.Join(out[:min(5, len(out))], " ")
 }
 
+// musicPureAlnumRe §59.478: 纯 ASCII 字母数字 token 判定（粘连拆分的前置门）。
+var musicPureAlnumRe = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+
+// musicGluedSplitRe §59.478: 字母/数字边界切分（RE2 无 lookaround·
+// FindAllString 分组提取两形态段）。
+var musicGluedSplitRe = regexp.MustCompile(`[A-Za-z]+|\d+`)
+
 // musicCatalogNoRe §59.477: Scene 目录号——全大写字母 2-6 + 数字 2-6
 // （KSR043/LAB070/PHCP2035 形态族）。标题主体不含此形态。
 var musicCatalogNoRe = regexp.MustCompile(`^[A-Z]{2,6}\d{2,6}$`)
 
-// musicSpecTokenRe §59.477: 规格/载体词——\d+BIT（16BIT/24BIT）·
+// musicSpecTokenRe §59.477/§59.478: 规格/载体词——\d+BIT（16BIT/24BIT）·
 // CDEP/EP/WEB/Single·音频格式（FLAC/WAV/APE/ALAC/MP3/M4A——皇后标题
-// 恒带 FLAC 非判别词·剥除=关键词更宽=召回更稳·验证层过滤）。
-var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a)$`)
+// 恒带 FLAC 非判别词·剥除=关键词更宽=召回更稳·验证层过滤）·
+// SACD/ISO（§59.478 RCA 案：SACD-ISO 载体对形态）。
+var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a|sacd|iso)$`)
 
 func min(a, b int) int {
 	if a < b {

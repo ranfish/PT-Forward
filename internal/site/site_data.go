@@ -125,6 +125,15 @@ func SeedSites(db *gorm.DB) error {
 				return siteError(ErrSiteSeed, fmt.Sprintf("update supports_pieces_hash_api %s", s.Domain), err)
 			}
 		}
+		// §59.478: 同步 details_url_template（仅 DB 为空时填充·不覆盖用户
+		// 自定义——v0.0.271 title_format 同款自愈；皇后老种详情页案）
+		if existing.DetailsURLTemplate == "" {
+			if supp, ok := GetSupportedSite(s.Domain); ok && supp.DetailsURLTemplate != "" {
+				if err := db.Model(&existing).Update("details_url_template", supp.DetailsURLTemplate).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update details_url_template %s", s.Domain), err)
+				}
+			}
+		}
 		continue
 	}
 
@@ -136,6 +145,12 @@ func SeedSites(db *gorm.DB) error {
 		downloadTpl := defs.DownloadURLTemplate
 		if supp, ok := GetSupportedSite(s.Domain); ok && supp.DownloadURLTemplate != "" {
 			downloadTpl = supp.DownloadURLTemplate
+		}
+		// §59.478: 详情页模板（皇后 plugin_details.php——老种 details.php
+		// 直出旧版面·extractOpenCDDetail 解析真空；plugin_details 新老通吃）
+		detailsTpl := ""
+		if supp, ok := GetSupportedSite(s.Domain); ok {
+			detailsTpl = supp.DetailsURLTemplate
 		}
 
 		site := &model.Site{
@@ -151,6 +166,7 @@ func SeedSites(db *gorm.DB) error {
 			CookieCloudDomain:  s.CookieCloudDomain,
 			AlternativeDomains: s.AlternativeDomains,
 			TrackerDomains:     trackerDomainsJSON,
+			DetailsURLTemplate: detailsTpl,
 
 			HashStrategy:        defs.HashStrategy,
 			SizeStrategy:        defs.SizeStrategy,

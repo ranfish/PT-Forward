@@ -16,7 +16,10 @@ type SupportedSite struct {
 	AuthType            string            `json:"auth_type"`
 	CookiecloudDomain   string            `json:"cookiecloud_domain"`
 	DownloadURLTemplate string            `json:"download_url_template"`
-	PasskeyLabel        string            `json:"passkey_label,omitempty"`
+	// §59.478: 详情页 URL 模板（空=框架默认 /details.php?id={id}·
+	// 皇后 plugin_details.php 老种新版面案）
+	DetailsURLTemplate string            `json:"details_url_template,omitempty"`
+	PasskeyLabel       string            `json:"passkey_label,omitempty"`
 	PasskeyHint         string            `json:"passkey_hint,omitempty"`
 	APIKeyLabel         string            `json:"api_key_label,omitempty"`
 	APIKeyHint          string            `json:"api_key_hint,omitempty"`

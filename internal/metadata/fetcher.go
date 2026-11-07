@@ -11,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -215,7 +216,7 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrent
 			zap.String("info_hash", infoHash),
 			zap.Error(err))
 
-		meta = f.fetchWithIYUUFallback(ctx, infoHash, []string{siteName}, fetchLocalMI)
+		meta = f.fetchWithIYUUFallback(ctx, infoHash, []string{siteName}, sourceLocalMI...)
 		if meta == nil {
 			return nil, fmt.Errorf("all fetch attempts failed: primary=%w", err)
 		}
@@ -615,6 +616,28 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 		Limit(5).
 		Find(&caches).Error; err != nil || len(caches) == 0 {
 		return nil
+	}
+	// §59.478: 音乐链 IYUU 兜底限定音乐源站——非音乐站的同内容种（红豆饭案）
+	// 只产影视形态数据（无 music 字段·必然不完整）。标记位与 BySearch 同约定
+	// （slices.Contains 位置无关）。
+	isMusic := false
+	for _, v := range localMIOpt {
+		if v == "music" {
+			isMusic = true
+			break
+		}
+	}
+	if isMusic {
+		filtered := make([]model.SiteCoverageCache, 0, len(caches))
+		for _, c := range caches {
+			if site.IsMusicSourceSite(c.SiteName) {
+				filtered = append(filtered, c)
+			}
+		}
+		if len(filtered) == 0 {
+			return nil
+		}
+		caches = filtered
 	}
 
 	var lastErr error
