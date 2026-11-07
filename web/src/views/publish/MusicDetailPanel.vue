@@ -20,6 +20,17 @@
         <div class="mdp-header-right">
           <!-- §59.475: 审核按钮——发布流程依赖 reviewed（音乐门=title+artist+album） -->
           <a-tag v-if="isReviewed" color="green" style="margin-right: 8px">✓ 已审核</a-tag>
+          <!-- §59.484: missing_fields 非空变形为"强制审核"（站方源数据缺口·用户显式放行） -->
+          <a-button
+            v-else-if="hasMissingFields"
+            type="primary"
+            size="small"
+            danger
+            :loading="reviewLoading"
+            @click="forceReview"
+          >
+            强制审核通过
+          </a-button>
           <a-button
             v-else
             type="primary"
@@ -175,7 +186,7 @@
 // 纯渲染零请求（detail prop=入口层 probeMusicSeed 结果直接传入——
 // 音乐场景总请求恒 1 次·§59.469 附六方案 a）。
 import { computed, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { formatBytes } from '@/utils/format'
 import { seedConfigApi, type SeedDetail } from '@/api/publish'
 
@@ -224,6 +235,39 @@ async function confirmReview() {
   } finally {
     reviewLoading.value = false
   }
+}
+
+// §59.484: 强制审核——missing_fields 非空（站方源数据固有缺口·大合集
+// 老种 album 空案）用户确认后 force=true 旁路审核门
+const hasMissingFields = computed(() => {
+  const missing = props.detail?.missing_fields
+  return Array.isArray(missing) && missing.length > 0
+})
+
+async function forceReview() {
+  const hash = props.preset?.info_hash
+  if (!hash) return
+  const missing = props.detail?.missing_fields || []
+  Modal.confirm({
+    title: '强制审核通过',
+    content: `以下字段缺失：${missing.join('、')}——请确认站方源数据本身未提供（大合集老种常见）。强制通过后此种子进入可发布状态。`,
+    okText: '强制通过',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      reviewLoading.value = true
+      try {
+        await seedConfigApi.putSeed(hash, { reviewed: true, force: true })
+        localReviewed.value = true
+        message.success('强制审核通过')
+        emit('reviewed')
+      } catch (e: unknown) {
+        message.error('强制审核失败: ' + (e as Error).message)
+      } finally {
+        reviewLoading.value = false
+      }
+    },
+  })
 }
 </script>
 

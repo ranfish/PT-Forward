@@ -269,7 +269,7 @@ export const seedConfigApi = {
       return null
     }
   },
-  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string; reviewed?: boolean }) {
+  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string; reviewed?: boolean; force?: boolean }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[]; reassembled_title?: string; rendered_description?: string; render_error?: string; title_incomplete?: boolean }>>(`/publish/seeds/${infoHash}`, data)
   },
   // §59.479: force=true 批量重获（禁转/无映射视图——绕过簇跳过+强刷 PTGen）
