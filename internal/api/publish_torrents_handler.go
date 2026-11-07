@@ -4058,6 +4058,15 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 	if len(metas) == 0 {
 		return nil
 	}
+	// §59.171: 确定性排序——排序即选择（权威行=非 cluster 传播副本优先 → 新者优先
+	// → 小 id 优先）。消除无序查询抽签（PT31 MI 红叉实锤：item hash 挂着有 MI 的
+	// 源行，却选中 cluster 空行）。原 best=updated_at 全量扫描已被废弃：传播会
+	// bump 副本 updated_at（reviewed/截图二波），"最新"常是副本行——权威优先级
+	// 必须高于新旧。
+	// §59.481: 排序前置到 music-first 之前——音乐行集合内仍按权威序选（原
+	// 无序扫首个音乐行=簇传播副本与权威源行抽签·Ultimate Box Set 案展示
+	// 家园副本行而非皇后源行）。
+	model.SortMetasAuthoritative(metas)
 	// §59.476: music 在场行优先（缺口④第二例实锤——12 环境 Tiesto 簇三行
 	// 竞争·车站韩剧串种行（影视字段全）完爆音乐行·MDP/展示恒错）。
 	// 音乐字段仅音乐链产出（皇后纯音乐站+验证层双保证）→ 影视簇 no-op。
@@ -4066,12 +4075,6 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 			return &metas[i]
 		}
 	}
-	// §59.171: 确定性排序——排序即选择（权威行=非 cluster 传播副本优先 → 新者优先
-	// → 小 id 优先）。消除无序查询抽签（PT31 MI 红叉实锤：item hash 挂着有 MI 的
-	// 源行，却选中 cluster 空行）。原 best=updated_at 全量扫描已被废弃：传播会
-	// bump 副本 updated_at（reviewed/截图二波），"最新"常是副本行——权威优先级
-	// 必须高于新旧。
-	model.SortMetasAuthoritative(metas)
 	ctx := context.Background()
 	best := &metas[0]
 	// 尝试找制作组映射命中行（排序后首个命中=权威最新的匹配行）

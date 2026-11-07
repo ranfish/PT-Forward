@@ -165,3 +165,21 @@ func publishMusicWords(t *testing.T, db *gorm.DB) []string {
 
 func parseTimeLater() time.Time { return time.Now() }
 func parseTimeEarly() time.Time { return time.Now().Add(-24 * time.Hour) }
+
+// §59.481: music-first 在权威序内选——簇传播副本（音乐数据已传播）与
+// 权威源行并存时选权威源行（Ultimate Box Set 案：展示家园副本→皇后源行）。
+func TestSelectSourceMetaMusicAuthoritativeOrder(t *testing.T) {
+	h := &PublishTorrentsHandler{}
+	metas := []model.TorrentMetadata{
+		// 簇传播副本（音乐数据已从源行传播而来·site 标签是旧站）
+		{InfoHash: "h1", SiteName: "家园", Title: "群星 - Decca Box Set",
+			FetchSource: "cluster", DetailSourceJSON: `{"music":{"artist":"群星"}}`},
+		// 权威源行（皇后真取）
+		{InfoHash: "h1", SiteName: "皇后", Title: "Various Artists - Decca Box Set",
+			FetchSource: "rss_detail", DetailSourceJSON: `{"music":{"artist":"Various Artists"}}`},
+	}
+	got := h.selectSourceMeta(metas)
+	if got.SiteName != "皇后" {
+		t.Errorf("音乐行集合内应选权威源行 皇后, got %s（簇传播副本）", got.SiteName)
+	}
+}
