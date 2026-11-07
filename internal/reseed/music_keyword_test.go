@@ -79,3 +79,22 @@ func TestExtractMusicSearchKeywordGlued(t *testing.T) {
 		}
 	}
 }
+
+// §59.480: VA 缩写剥除锚（Ultimate Box Set 案——用户实测带 VA 零结果·
+// 剥除后 "The Ultimate Box Set Series" 命中 tid=123139）。
+func TestExtractMusicSearchKeywordAbbrev(t *testing.T) {
+	cases := []struct {
+		name      string
+		stripYear bool
+		want      string
+	}{
+		// VA 剥除后 cap5 保住 Series（原 cap 被 VA 占位截断丢词）
+		{"VA - The Ultimate Box Set Series 2008 FLAC", false, "The Ultimate Box Set Series"},
+		{"VA - 精选合集 2020", false, "精选合集 2020"}, // VA 通用剥除（皇后全称形态·非歧视词）
+	}
+	for _, c := range cases {
+		if got := ExtractMusicSearchKeyword(c.name, c.stripYear); got != c.want {
+			t.Errorf("ExtractMusicSearchKeyword(%q, %v) = %q, want %q", c.name, c.stripYear, got, c.want)
+		}
+	}
+}
