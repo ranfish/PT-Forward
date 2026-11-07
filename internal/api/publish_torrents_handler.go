@@ -6288,29 +6288,71 @@ func (h *PublishTorrentsHandler) resolveMusicReplicaHash(ctx context.Context, cl
 	return bestHash, bestSize
 }
 
-// siblingTitleCandidates §59.482 刀7: 簇全域兄弟 coverage tid 候选——
+// siblingTitleCandidates §59.482 刀7/§59.483 双通道: 簇全域兄弟候选——
 // 【不加音乐源站过滤】（与 §59.478 缓存路径的本质差异：桥只取兄弟站的
-// 标题词·数据仍从音乐源站取——龙PT 给词·皇后给数据）。按置信度降序
-// 限 2 候选（成本上界：≤2 兄弟详情+≤2 皇后搜索）。
-func (h *PublishTorrentsHandler) siblingTitleCandidates(ctx context.Context, clientUID uint, savePath, name string, excludeSites []string) []model.SiteCoverageCache {
+// 标题词·数据仍从音乐源站取——龙PT 给词·皇后给数据）。
+// 通道① coverage tid 行（需 coverage 已丰富·按需触发非自动）
+// 通道② 簇 comment 解析（零网络成本·快照同步即生效——School Rumble
+//        转发案：新副本 coverage tid 未丰富但 comment 立即可用）
+// 合并去重·限 4 候选（成本上界：≤4 兄弟详情+≤4 音乐源站搜索）。
+// 输出轻量 struct（统一两通道类型——桥循环只消费 SiteName/TorrentID）。
+type siblingCandidate struct {
+	SiteName   string
+	TorrentID  string
+}
+
+func (h *PublishTorrentsHandler) siblingTitleCandidates(ctx context.Context, clientUID uint, savePath, name, selfHash string, excludeSites []string) []siblingCandidate {
 	if h.db == nil || clientUID == 0 || savePath == "" || name == "" {
 		return nil
 	}
+	seen := make(map[string]bool) // "site:tid" 去重
+	excl := make(map[string]bool, len(excludeSites))
+	for _, s := range excludeSites {
+		excl[s] = true
+	}
+	var out []siblingCandidate
+
+	// 通道② 簇 comment 解析（优先——零成本·新副本即生效）
+	// §59.483: buildClusterTargets 自建（外层 clusterTargets 已被音乐
+	// 过滤重赋值·原始未过滤版本不可达——桥内自建保持自洽）
+	for _, tgt := range h.buildClusterTargets(ctx, clientUID, savePath, name, selfHash) {
+		if tgt.TorrentID == "" || tgt.SiteName == "" || excl[tgt.SiteName] {
+			continue
+		}
+		key := tgt.SiteName + ":" + tgt.TorrentID
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, siblingCandidate{SiteName: tgt.SiteName, TorrentID: tgt.TorrentID})
+		}
+	}
+
+	// 通道① coverage tid 行
 	var hashes []string
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0", clientUID, savePath, name).
 		Pluck("hash", &hashes)
-	if len(hashes) == 0 {
-		return nil
+	if len(hashes) > 0 {
+		q := h.db.WithContext(ctx).
+			Where("info_hash IN ? AND status = ? AND torrent_id != ''",
+				hashes, model.CoverageConfirmedHas)
+		if len(excludeSites) > 0 {
+			q = q.Where("site_name NOT IN ?", excludeSites)
+		}
+		var covs []model.SiteCoverageCache
+		q.Order("confidence DESC").Limit(2).Find(&covs)
+		for _, c := range covs {
+			key := c.SiteName + ":" + c.TorrentID
+			if !seen[key] {
+				seen[key] = true
+				out = append(out, siblingCandidate{SiteName: c.SiteName, TorrentID: c.TorrentID})
+			}
+		}
 	}
-	q := h.db.WithContext(ctx).
-		Where("info_hash IN ? AND status = ? AND torrent_id != ''",
-			hashes, model.CoverageConfirmedHas)
-	if len(excludeSites) > 0 {
-		q = q.Where("site_name NOT IN ?", excludeSites)
+
+	// 限 4（通道② ≤2 comment + 通道① ≤2 coverage）
+	if len(out) > 4 {
+		out = out[:4]
 	}
-	var out []model.SiteCoverageCache
-	q.Order("confidence DESC").Limit(2).Find(&out)
 	return out
 }
 
@@ -6341,7 +6383,7 @@ func (h *PublishTorrentsHandler) musicSiblingTitleBridge(ctx context.Context, cl
 	if h.siteProvider == nil || h.metadataFetcher == nil || musicSite == "" {
 		return nil
 	}
-	for _, cand := range h.siblingTitleCandidates(ctx, clientUID, savePath, name, excludeSites) {
+	for _, cand := range h.siblingTitleCandidates(ctx, clientUID, savePath, name, hash, excludeSites) {
 		config, err := h.siteProvider.GetSiteConfig(ctx, cand.SiteName)
 		if err != nil || config == nil {
 			continue
