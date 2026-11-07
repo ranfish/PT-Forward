@@ -130,36 +130,3 @@ func TestNormalizeCategoryRousiSlugs(t *testing.T) {
 	}
 }
 
-// §59.480: IYUU 实时兜底锚——缓存候选空时实时查询+coverage 回写。
-// fetchFromSite 无 provider 必败（候选尝试失败不阻断回写断言）。
-func TestIYUULiveFallbackPersists(t *testing.T) {
-	if testing.Short() {
-		t.Skip("需要 DB")
-	}
-	db := noFBDB(t)
-	f := NewFetcher(db, zap.NewNop(), nil, nil)
-	f.SetIYUULiveQuery(func(ctx context.Context, infoHash string) []model.CoverageHit {
-		return []model.CoverageHit{
-			{SiteName: "皇后", TorrentID: "165449", Source: "iyuu"},
-			{SiteName: "家园", TorrentID: "999", Source: "iyuu"},
-		}
-	})
-	meta, _ := f.FetchAndStoreIYUU(context.Background(), "kc50th0000000000000000000000000000000000", nil)
-	if meta != nil {
-		t.Fatalf("无 provider 应失败, got %+v", meta)
-	}
-	var n int64
-	db.Model(&model.SiteCoverageCache{}).
-		Where("info_hash = ? AND torrent_id != ''", "kc50th0000000000000000000000000000000000").
-		Count(&n)
-	if n != 2 {
-		t.Errorf("实时命中应回写 2 行 coverage, got %d", n)
-	}
-	var qn int64
-	db.Model(&model.SiteCoverageCache{}).
-		Where("info_hash = ? AND site_name = ? AND torrent_id = ?", "kc50th0000000000000000000000000000000000", "皇后", "165449").
-		Count(&qn)
-	if qn != 1 {
-		t.Errorf("皇后 tid=165449 行应在场（KC 50th 案）, got %d", qn)
-	}
-}

@@ -53,6 +53,7 @@ type MetadataFetcherProvider interface {
 	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) // §59.61 D3
 	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)         // §59.65 直取
 	FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites []string, sourceLocalMI ...string) (*model.TorrentMetadata, error) // §59.65 IYUU 末位兜底（§59.337 变参排除集；§59.348 切片化+互斥门信号）
+	PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string) // §59.482 刀7 簇兄弟标题桥 coverage 回写
 }
 
 type PublishPipeline interface {

@@ -552,8 +552,6 @@ func main() {
 	publishPipeline.SetPusher(torrentPusher)
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider, settingsRepo)
-	// §59.480: IYUU 实时查询注入——获取链兜底（缩写/异形名簇 hash 直达）
-	metadataFetcher.SetIYUULiveQuery(reseedEngine.QueryIYUULive)
 	// §56.13 方案 B: Engine 已在前面注入到 adapter.Factory（line 244），
 	// fetcher 不再需要 SetEngine（adapter 内部已用 Engine 提取）。
 	publishPipeline.SetMetadataFetcher(metadataFetcher)

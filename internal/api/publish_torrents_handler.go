@@ -2849,6 +2849,17 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 					zap.String("site", meta.SiteName))
 				goto fetched
 			}
+			// §59.482 刀7: 簇兄弟标题桥——IYUU 缓存空后的音乐链第三兜底
+			// （§59.480 实时段回退·IYUU 配额保护·影视链零触碰）
+			if musicRouting {
+				if m := h.musicSiblingTitleBridge(fetchCtx, clientUID, savePath, name, hash, size, result.SourceSite, triedSites); m != nil {
+					meta, err = m, nil
+					h.logger.Info("music sibling title bridge hit",
+						zap.String("hash", hash[:min(10, len(hash))]),
+						zap.String("site", m.SiteName))
+					goto fetched
+				}
+			}
 			if isTransientFetchErr(err) {
 				transientSeen = true
 			}
@@ -2928,6 +2939,15 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 				zap.Strings("tried_sites", triedSites),
 				zap.Error(err))
 			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, triedSites, h.musicFetchArgs(musicRouting, localMI)...)
+			// §59.482 刀7: 同款桥（①b 分支）
+			if err != nil && musicRouting {
+				if m := h.musicSiblingTitleBridge(fetchCtx, clientUID, savePath, name, hash, size, result.SourceSite, triedSites); m != nil {
+					meta, err = m, nil
+					h.logger.Info("music sibling title bridge hit",
+						zap.String("hash", hash[:min(10, len(hash))]),
+						zap.String("site", m.SiteName))
+				}
+			}
 		}
 	}
 	if err != nil {
@@ -6266,4 +6286,88 @@ func (h *PublishTorrentsHandler) resolveMusicReplicaHash(ctx context.Context, cl
 		zap.String("from", hash[:min(10, len(hash))]),
 		zap.String("to", bestHash[:min(10, len(bestHash))]))
 	return bestHash, bestSize
+}
+
+// siblingTitleCandidates §59.482 刀7: 簇全域兄弟 coverage tid 候选——
+// 【不加音乐源站过滤】（与 §59.478 缓存路径的本质差异：桥只取兄弟站的
+// 标题词·数据仍从音乐源站取——龙PT 给词·皇后给数据）。按置信度降序
+// 限 2 候选（成本上界：≤2 兄弟详情+≤2 皇后搜索）。
+func (h *PublishTorrentsHandler) siblingTitleCandidates(ctx context.Context, clientUID uint, savePath, name string, excludeSites []string) []model.SiteCoverageCache {
+	if h.db == nil || clientUID == 0 || savePath == "" || name == "" {
+		return nil
+	}
+	var hashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0", clientUID, savePath, name).
+		Pluck("hash", &hashes)
+	if len(hashes) == 0 {
+		return nil
+	}
+	q := h.db.WithContext(ctx).
+		Where("info_hash IN ? AND status = ? AND torrent_id != ''",
+			hashes, model.CoverageConfirmedHas)
+	if len(excludeSites) > 0 {
+		q = q.Where("site_name NOT IN ?", excludeSites)
+	}
+	var out []model.SiteCoverageCache
+	q.Order("confidence DESC").Limit(2).Find(&out)
+	return out
+}
+
+// siblingKeywordUsable §59.482 刀7: 兄弟标题→音乐关键词+同词守卫——
+// 与主搜已试关键词相同则跳过（同词再搜=白烧请求）。
+func siblingKeywordUsable(originalName, siblingTitle string) (string, bool) {
+	if siblingTitle == "" || siblingTitle == originalName {
+		return "", false
+	}
+	kw := reseed.ExtractMusicSearchKeyword(siblingTitle, false)
+	if kw == "" {
+		return "", false
+	}
+	tried := reseed.ExtractMusicSearchKeyword(originalName, false)
+	if kw == tried {
+		return "", false
+	}
+	return kw, true
+}
+
+// musicSiblingTitleBridge §59.482 刀7: 簇兄弟标题桥——音乐链搜索 miss
+// + IYUU 缓存空后的第三兜底（§59.480 实时段回退后的异形名救援通道）：
+// 兄弟站仅取标题（GetTorrentDetail 直调零落库——红豆饭数据污染防御）
+// → 音乐关键词管道 → 音乐源站搜索（全验证链把关）→ musicY 落库 +
+// coverage 回写（未来缓存直达）。KC 50th 案实证：龙PT tid=416 标题
+// "Various Artists - Heaven & Earth 2019" → 皇后 tid=165449。
+func (h *PublishTorrentsHandler) musicSiblingTitleBridge(ctx context.Context, clientUID uint, savePath, name, hash string, size int64, musicSite string, excludeSites []string) *model.TorrentMetadata {
+	if h.siteProvider == nil || h.metadataFetcher == nil || musicSite == "" {
+		return nil
+	}
+	for _, cand := range h.siblingTitleCandidates(ctx, clientUID, savePath, name, excludeSites) {
+		config, err := h.siteProvider.GetSiteConfig(ctx, cand.SiteName)
+		if err != nil || config == nil {
+			continue
+		}
+		adapter, err := h.siteProvider.GetAdapter(ctx, cand.SiteName)
+		if err != nil || adapter == nil {
+			continue
+		}
+		detail, err := adapter.GetTorrentDetail(ctx, config, cand.TorrentID)
+		if err != nil || detail == nil || detail.Title == "" {
+			continue
+		}
+		kw, ok := siblingKeywordUsable(name, detail.Title)
+		if !ok {
+			continue
+		}
+		h.logger.Info("music sibling title bridge: searching with sibling title",
+			zap.String("hash", hash[:min(10, len(hash))]),
+			zap.String("sibling_site", cand.SiteName),
+			zap.String("keyword", kw))
+		meta, err := h.metadataFetcher.FetchAndStoreBySearch(ctx, hash, musicSite, detail.Title, size, "", "", "music")
+		if err == nil && meta != nil {
+			// coverage 回写：未来重获走缓存直达（§59.482 闭环 3）
+			h.metadataFetcher.PersistCoverageHit(ctx, hash, musicSite, meta.TorrentID)
+			return meta
+		}
+	}
+	return nil
 }
