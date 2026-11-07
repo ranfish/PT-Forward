@@ -38,7 +38,9 @@ type Fetcher struct {
 	// §59.341 ②（方案 a）: PTGen 可行性回调——IYUU 候选循环内
 	// "获取成功但 PTGen 不可行"换下一候选（与 handler 簇循环同判定）。
 	// nil 时不过滤（未装配）。
-	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool
+	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool	// §59.480: IYUU 实时查询注入（辅种引擎 QueryIYUULive 开放）——
+	// 缓存候选空/全败时兜底。nil=未注入（原生为）。
+	iyuuLive func(ctx context.Context, infoHash string) []model.CoverageHit
 }
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
@@ -48,6 +50,12 @@ func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvide
 		siteProvider: siteProvider,
 		settingsRepo: settingsRepo,
 	}
+}
+
+// SetIYUULiveQuery §59.480: 注入 IYUU 实时查询（main 装配——辅种引擎
+// QueryIYUULive·缩写/异形名簇 hash 直达兜底）。
+func (f *Fetcher) SetIYUULiveQuery(fn func(ctx context.Context, infoHash string) []model.CoverageHit) {
+	f.iyuuLive = fn
 }
 
 // isSourceScreenshotExcluded §59.137: 源站截图不可信判定——朋友站详情图为
@@ -605,18 +613,6 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 	if len(localMIOpt) > 0 {
 		localMI = localMIOpt[0]
 	}
-	var caches []model.SiteCoverageCache
-	q := f.db.WithContext(ctx).
-		Where("info_hash = ? AND status = ? AND torrent_id != ''",
-			infoHash, model.CoverageConfirmedHas)
-	if len(excludeSites) > 0 {
-		q = q.Where("site_name NOT IN ?", excludeSites)
-	}
-	if err := q.Order("confidence DESC").
-		Limit(5).
-		Find(&caches).Error; err != nil || len(caches) == 0 {
-		return nil
-	}
 	// §59.478: 音乐链 IYUU 兜底限定音乐源站——非音乐站的同内容种（红豆饭案）
 	// 只产影视形态数据（无 music 字段·必然不完整）。标记位与 BySearch 同约定
 	// （slices.Contains 位置无关）。
@@ -627,19 +623,60 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 			break
 		}
 	}
-	if isMusic {
-		filtered := make([]model.SiteCoverageCache, 0, len(caches))
-		for _, c := range caches {
-			if site.IsMusicSourceSite(c.SiteName) {
-				filtered = append(filtered, c)
-			}
+
+	var caches []model.SiteCoverageCache
+	q := f.db.WithContext(ctx).
+		Where("info_hash = ? AND status = ? AND torrent_id != ''",
+			infoHash, model.CoverageConfirmedHas)
+	if len(excludeSites) > 0 {
+		q = q.Where("site_name NOT IN ?", excludeSites)
+	}
+	if err := q.Order("confidence DESC").
+		Limit(5).
+		Find(&caches).Error; err == nil && len(caches) > 0 {
+		if m := f.tryCoverageCandidates(ctx, infoHash, caches, localMI); m != nil {
+			return m
 		}
-		if len(filtered) == 0 {
-			return nil
-		}
-		caches = filtered
 	}
 
+	// §59.480: IYUU 实时兜底——缓存候选空/全败时单 hash 实时查询
+	// （IYUU=hash→(站,tid) 映射服务·辅种引擎同名能力开放给获取链）。
+	// 根治缩写/异形名簇：KC 50th 案下载器名与皇后标题零词重叠不可搜
+	// （tid=165449 用户 hash 实锚）·hash 直达无需词形。命中回写
+	// coverage（下次走缓存·单次成本）。
+	if f.iyuuLive != nil {
+		hits := f.iyuuLive(ctx, infoHash)
+		if len(hits) > 0 {
+			f.persistIYUULiveHits(ctx, infoHash, hits)
+			live := make([]model.SiteCoverageCache, 0, len(hits))
+			excl := make(map[string]bool, len(excludeSites))
+			for _, s := range excludeSites {
+				excl[s] = true
+			}
+			for _, h := range hits {
+				if excl[h.SiteName] {
+					continue
+				}
+				if isMusic && !site.IsMusicSourceSite(h.SiteName) {
+					continue
+				}
+				live = append(live, model.SiteCoverageCache{
+					InfoHash: infoHash, SiteName: h.SiteName,
+					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceIYUU,
+					TorrentID: h.TorrentID, Confidence: 1.0,
+				})
+			}
+			if m := f.tryCoverageCandidates(ctx, infoHash, live, localMI); m != nil {
+				return m
+			}
+		}
+	}
+	return nil
+}
+
+// tryCoverageCandidates 逐站直达候选（§59.65 原循环体抽取——缓存/实时
+// 候选共用；失败续试·PTGen 不可行续试·首个可行返回）。
+func (f *Fetcher) tryCoverageCandidates(ctx context.Context, infoHash string, caches []model.SiteCoverageCache, localMI string) *model.TorrentMetadata {
 	var lastErr error
 	for _, c := range caches {
 		f.logger.Debug("trying IYUU fallback site",
@@ -664,9 +701,30 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 		}
 		return meta
 	}
-	_ = lastErr // §59.330 P4 补丁：供调用方分类（见 FetchAndStoreIYUU）——见下
+	_ = lastErr // §59.330 P4 补丁：供调用方分类（见 FetchAndStoreIYUU）
 	f.lastIYUUErr = lastErr
 	return nil
+}
+
+// persistIYUULiveHits §59.480: 实时命中回写 coverage 缓存（source=iyuu·
+// confirmed_has·24h TTL——与 QuerySingleCoverage 消费方同款形态）。
+func (f *Fetcher) persistIYUULiveHits(ctx context.Context, infoHash string, hits []model.CoverageHit) {
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+	for _, h := range hits {
+		if h.SiteName == "" || h.TorrentID == "" {
+			continue
+		}
+		row := model.SiteCoverageCache{
+			InfoHash: infoHash, SiteName: h.SiteName,
+			Status: model.CoverageConfirmedHas, Source: model.CoverageSourceIYUU,
+			TorrentID: h.TorrentID, Confidence: 1.0,
+			QueriedAt: now, ExpiresAt: ttl,
+		}
+		f.db.WithContext(ctx).
+			Where("info_hash = ? AND site_name = ?", infoHash, h.SiteName).
+			Assign(&row).FirstOrCreate(&row)
+	}
 }
 
 // localMI §59.348 C 互斥门：非空=本地已判定非原盘——detail.BDInfo 拒收。

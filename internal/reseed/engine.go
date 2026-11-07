@@ -5698,29 +5698,40 @@ func (e *Engine) getOrComputePiecesHash(ctx context.Context, infoHash string, cl
 	return fp2.PiecesHash
 }
 
+// QueryIYUULive §59.480: IYUU 实时查询单 hash（仅 IYUU 段——获取链
+// 兜底消费·无 pieces_hash 依赖）。缩写/异形名簇的根治通道：KC 50th 案
+// 下载器名与皇后标题零词重叠不可搜·IYUU hash→(站,tid) 直达。
+func (e *Engine) QueryIYUULive(ctx context.Context, infoHash string) []model.CoverageHit {
+	if e.iyuuService == nil || infoHash == "" {
+		return nil
+	}
+	sidMap := e.preloadIYUUSiteMappings(ctx)
+	results, err := e.iyuuService.QueryReseed(ctx, []string{infoHash})
+	if err != nil {
+		return nil
+	}
+	var hits []model.CoverageHit
+	for _, r := range results {
+		for _, t := range r.Targets {
+			if siteName, ok := sidMap[t.Sid]; ok && siteName != "" {
+				hits = append(hits, model.CoverageHit{
+					SiteName:  siteName,
+					TorrentID: strconv.Itoa(t.TorrentID),
+					Source:    "iyuu",
+				})
+			}
+		}
+	}
+	return hits
+}
+
 // QuerySingleCoverage 查询单个种子的覆盖状态（IYUU + pieces_hash API）。
 // 复用辅种引擎的查询方法，结果供覆盖查询写入 site_coverage_cache。
 func (e *Engine) QuerySingleCoverage(ctx context.Context, infoHash string, client model.DownloaderClient) []model.CoverageHit {
 	var hits []model.CoverageHit
 
-	// IYUU 查询
-	if e.iyuuService != nil {
-		sidMap := e.preloadIYUUSiteMappings(ctx)
-		results, err := e.iyuuService.QueryReseed(ctx, []string{infoHash})
-		if err == nil {
-			for _, r := range results {
-				for _, t := range r.Targets {
-					if siteName, ok := sidMap[t.Sid]; ok && siteName != "" {
-						hits = append(hits, model.CoverageHit{
-							SiteName:  siteName,
-							TorrentID: strconv.Itoa(t.TorrentID),
-							Source:    "iyuu",
-						})
-					}
-				}
-			}
-		}
-	}
+	// IYUU 查询（§59.480 复用 QueryIYUULive 单点）
+	hits = append(hits, e.QueryIYUULive(ctx, infoHash)...)
 
 	// pieces_hash 获取
 	piecesHash := e.getOrComputePiecesHash(ctx, infoHash, client)
@@ -6332,6 +6343,13 @@ func ExtractMusicSearchKeyword(name string, stripYear bool) string {
 		if musicCatalogNoRe.MatchString(t) || musicSpecTokenRe.MatchString(t) {
 			break
 		}
+		// §59.480: 艺人缩写剥除（strip-continue·非 Scene 截断）——
+		// "VA"=Various Artists 缩写·皇后 canonical 全称形态 AND 必零
+		// （Ultimate Box Set 案用户实测：带 VA 零结果·剥除后命中）。
+		// 剥除不截断（VA 常在首位——截断会摧毁关键词主体）。
+		if musicAbbrevTokenRe.MatchString(t) {
+			continue
+		}
 		// §59.478: 字母数字粘连拆分（§59.206 视频语义继承·音乐漏继承第
 		// 三族）——"60SACD"→["60","SACD"]：皇后标题 "60 SACD"（空格形态）
 		// 对粘连 token 的 AND Contains 必 miss（RCA 案实证）。**仅纯 ASCII
@@ -6356,6 +6374,11 @@ func ExtractMusicSearchKeyword(name string, stripYear bool) string {
 
 // musicPureAlnumRe §59.478: 纯 ASCII 字母数字 token 判定（粘连拆分的前置门）。
 var musicPureAlnumRe = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+
+// musicAbbrevTokenRe §59.480: 艺人缩写词（strip-continue 语义）——
+// VA（Various Artists·大小写不敏感精确词）。与 spec 词的 break 语义
+// 相反：VA 常居词首·截断会摧毁主体。
+var musicAbbrevTokenRe = regexp.MustCompile(`(?i)^va$`)
 
 // musicGluedSplitRe §59.478: 字母/数字边界切分（RE2 无 lookaround·
 // FindAllString 分组提取两形态段）。
