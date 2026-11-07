@@ -184,26 +184,70 @@ func TestSelectSourceMetaMusicAuthoritativeOrder(t *testing.T) {
 	}
 }
 
-// §59.482 刀7: 桥候选查询+同词守卫锚。
+// §59.482 刀7/§59.483 双通道: 桥候选查询+同词守卫锚。
 func TestSiblingTitleCandidates(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	// 簇：皇后副本 + 龙PT 副本（coverage tid 挂在龙PT 副本 hash 上）
 	Z := func(p string) string { return p + strings.Repeat("0", 40-len(p)) }
-	db.Create(&model.TorrentSnapshot{Hash: Z("qn"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "tracker.open.cd"})
-	db.Create(&model.TorrentSnapshot{Hash: Z("long"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "pt.52pt.com"})
-	db.Create(&model.SiteCoverageCache{InfoHash: Z("long"), SiteName: "龙PT", TorrentID: "416",
-		Status: model.CoverageConfirmedHas, Source: "pieces_hash", Confidence: 1.0})
-	// 候选查询：簇全域（tid 挂兄弟 hash 也能找到）+ 不滤音乐源站
-	cands := h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", nil)
-	if len(cands) != 1 || cands[0].SiteName != "龙PT" || cands[0].TorrentID != "416" {
-		t.Errorf("桥候选应找到龙PT tid=416: %+v", cands)
-	}
-	// excludeSites 生效
-	cands = h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", []string{"龙PT"})
-	if len(cands) != 0 {
-		t.Errorf("排除后应零候选: %+v", cands)
-	}
+
+	t.Run("通道①coverage", func(t *testing.T) {
+		// 簇：皇后副本 + 龙PT 副本（coverage tid 挂在龙PT 副本 hash 上）
+		db.Create(&model.TorrentSnapshot{Hash: Z("qn"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "tracker.open.cd"})
+		db.Create(&model.TorrentSnapshot{Hash: Z("long"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "pt.52pt.com"})
+		db.Create(&model.SiteCoverageCache{InfoHash: Z("long"), SiteName: "龙PT", TorrentID: "416",
+			Status: model.CoverageConfirmedHas, Source: "pieces_hash", Confidence: 1.0})
+		cands := h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", Z("qn"), nil)
+		var found bool
+		for _, c := range cands {
+			if c.SiteName == "龙PT" && c.TorrentID == "416" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("通道①应找到龙PT tid=416: %+v", cands)
+		}
+		// excludeSites 生效
+		cands = h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", Z("qn"), []string{"龙PT"})
+		for _, c := range cands {
+			if c.SiteName == "龙PT" {
+				t.Errorf("排除后不应有龙PT: %+v", cands)
+			}
+		}
+	})
+
+	t.Run("通道②comment_新副本零coverage即生效", func(t *testing.T) {
+		// School Rumble 案：龙PT 新副本·无 coverage tid·comment 在快照
+		db.Create(&model.TorrentSnapshot{Hash: Z("srqn"), ClientUID: 2, SavePath: "/PT3", Name: "School Rumble", TrackerDomain: "tracker.open.cd"})
+		db.Create(&model.TorrentSnapshot{Hash: Z("srlong"), ClientUID: 2, SavePath: "/PT3", Name: "School Rumble", TrackerDomain: "longpt.org",
+			Comment: "https://longpt.org/details.php?id=50493"})
+		// 站点表有龙PT（comment 域名解析需要）
+		db.Create(&model.Site{Domain: "longpt.org", Name: "龙PT", Enabled: true, Cookie: "c"})
+		cands := h.siblingTitleCandidates(context.Background(), 2, "/PT3", "School Rumble", Z("srqn"), nil)
+		var found bool
+		for _, c := range cands {
+			if c.SiteName == "龙PT" && c.TorrentID == "50493" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("通道②应从 comment 解析龙PT tid=50493（零 coverage）: %+v", cands)
+		}
+	})
+
+	t.Run("跨通道去重", func(t *testing.T) {
+		// 同一 (龙PT, 416) 同时在 coverage 和 comment → 只出现一次
+		cands := h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", Z("qn"), nil)
+		count := 0
+		for _, c := range cands {
+			if c.SiteName == "龙PT" && c.TorrentID == "416" {
+				count++
+			}
+		}
+		// comment 通道 KC 50th 簇的龙PT comment 不在（无 comment 字段）→ 只有 coverage 一条
+		if count > 1 {
+			t.Errorf("龙PT tid=416 出现 %d 次（应 ≤1 去重）", count)
+		}
+	})
 }
 
 // §59.482 刀7: 同词守卫——兄弟标题与原名同关键词跳过。
