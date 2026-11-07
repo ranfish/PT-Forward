@@ -38,10 +38,7 @@ type Fetcher struct {
 	// §59.341 ②（方案 a）: PTGen 可行性回调——IYUU 候选循环内
 	// "获取成功但 PTGen 不可行"换下一候选（与 handler 簇循环同判定）。
 	// nil 时不过滤（未装配）。
-	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool	// §59.480: IYUU 实时查询注入（辅种引擎 QueryIYUULive 开放）——
-	// 缓存候选空/全败时兜底。nil=未注入（原生为）。
-	iyuuLive func(ctx context.Context, infoHash string) []model.CoverageHit
-}
+	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool}
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
 	return &Fetcher{
@@ -50,12 +47,6 @@ func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvide
 		siteProvider: siteProvider,
 		settingsRepo: settingsRepo,
 	}
-}
-
-// SetIYUULiveQuery §59.480: 注入 IYUU 实时查询（main 装配——辅种引擎
-// QueryIYUULive·缩写/异形名簇 hash 直达兜底）。
-func (f *Fetcher) SetIYUULiveQuery(fn func(ctx context.Context, infoHash string) []model.CoverageHit) {
-	f.iyuuLive = fn
 }
 
 // isSourceScreenshotExcluded §59.137: 源站截图不可信判定——朋友站详情图为
@@ -633,45 +624,25 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash string, ex
 	}
 	if err := q.Order("confidence DESC").
 		Limit(5).
-		Find(&caches).Error; err == nil && len(caches) > 0 {
-		if m := f.tryCoverageCandidates(ctx, infoHash, caches, localMI); m != nil {
-			return m
-		}
+		Find(&caches).Error; err != nil || len(caches) == 0 {
+		return nil
 	}
-
-	// §59.480: IYUU 实时兜底——缓存候选空/全败时单 hash 实时查询
-	// （IYUU=hash→(站,tid) 映射服务·辅种引擎同名能力开放给获取链）。
-	// 根治缩写/异形名簇：KC 50th 案下载器名与皇后标题零词重叠不可搜
-	// （tid=165449 用户 hash 实锚）·hash 直达无需词形。命中回写
-	// coverage（下次走缓存·单次成本）。
-	if f.iyuuLive != nil {
-		hits := f.iyuuLive(ctx, infoHash)
-		if len(hits) > 0 {
-			f.persistIYUULiveHits(ctx, infoHash, hits)
-			live := make([]model.SiteCoverageCache, 0, len(hits))
-			excl := make(map[string]bool, len(excludeSites))
-			for _, s := range excludeSites {
-				excl[s] = true
-			}
-			for _, h := range hits {
-				if excl[h.SiteName] {
-					continue
-				}
-				if isMusic && !site.IsMusicSourceSite(h.SiteName) {
-					continue
-				}
-				live = append(live, model.SiteCoverageCache{
-					InfoHash: infoHash, SiteName: h.SiteName,
-					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceIYUU,
-					TorrentID: h.TorrentID, Confidence: 1.0,
-				})
-			}
-			if m := f.tryCoverageCandidates(ctx, infoHash, live, localMI); m != nil {
-				return m
+	// §59.478: 音乐链缓存候选限定音乐源站——非音乐站同内容种（红豆饭案）
+	// 只产影视形态数据。§59.482 复核恢复：§59.480 实时段重构时此块被
+	// 误删（isMusic 无消费暴露）——v0.0.1366/1367 两版静默回归。
+	if isMusic {
+		filtered := make([]model.SiteCoverageCache, 0, len(caches))
+		for _, c := range caches {
+			if site.IsMusicSourceSite(c.SiteName) {
+				filtered = append(filtered, c)
 			}
 		}
+		if len(filtered) == 0 {
+			return nil
+		}
+		caches = filtered
 	}
-	return nil
+	return f.tryCoverageCandidates(ctx, infoHash, caches, localMI)
 }
 
 // tryCoverageCandidates 逐站直达候选（§59.65 原循环体抽取——缓存/实时
@@ -706,9 +677,10 @@ func (f *Fetcher) tryCoverageCandidates(ctx context.Context, infoHash string, ca
 	return nil
 }
 
-// persistIYUULiveHits §59.480: 实时命中回写 coverage 缓存（source=iyuu·
-// confirmed_has·24h TTL——与 QuerySingleCoverage 消费方同款形态）。
-func (f *Fetcher) persistIYUULiveHits(ctx context.Context, infoHash string, hits []model.CoverageHit) {
+// persistCoverageHits §59.480→§59.482: 覆盖命中回写 coverage 缓存
+// （source=iyuu·confirmed_has·24h TTL）。§59.482 实时段回退后由
+// handler 簇兄弟标题桥成功路径消费（皇后 tid 直达缓存化）。
+func (f *Fetcher) persistCoverageHits(ctx context.Context, infoHash string, hits []model.CoverageHit) {
 	now := time.Now()
 	ttl := now.Add(24 * time.Hour)
 	for _, h := range hits {
@@ -897,4 +869,15 @@ func containsFlag(flags []string, f string) bool {
 		}
 	}
 	return false
+}
+
+// PersistCoverageHit §59.482 刀7: 单命中回写（handler 簇兄弟标题桥成功
+// 路径消费——皇后 tid 缓存化·未来重获直达）。
+func (f *Fetcher) PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string) {
+	if infoHash == "" || siteName == "" || torrentID == "" {
+		return
+	}
+	f.persistCoverageHits(ctx, infoHash, []model.CoverageHit{
+		{SiteName: siteName, TorrentID: torrentID, Source: model.CoverageSourceIYUU},
+	})
 }

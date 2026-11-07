@@ -183,3 +183,47 @@ func TestSelectSourceMetaMusicAuthoritativeOrder(t *testing.T) {
 		t.Errorf("音乐行集合内应选权威源行 皇后, got %s（簇传播副本）", got.SiteName)
 	}
 }
+
+// §59.482 刀7: 桥候选查询+同词守卫锚。
+func TestSiblingTitleCandidates(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	// 簇：皇后副本 + 龙PT 副本（coverage tid 挂在龙PT 副本 hash 上）
+	Z := func(p string) string { return p + strings.Repeat("0", 40-len(p)) }
+	db.Create(&model.TorrentSnapshot{Hash: Z("qn"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "tracker.open.cd"})
+	db.Create(&model.TorrentSnapshot{Hash: Z("long"), ClientUID: 2, SavePath: "/PT2", Name: "KC 50th", TrackerDomain: "pt.52pt.com"})
+	db.Create(&model.SiteCoverageCache{InfoHash: Z("long"), SiteName: "龙PT", TorrentID: "416",
+		Status: model.CoverageConfirmedHas, Source: "pieces_hash", Confidence: 1.0})
+	// 候选查询：簇全域（tid 挂兄弟 hash 也能找到）+ 不滤音乐源站
+	cands := h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", nil)
+	if len(cands) != 1 || cands[0].SiteName != "龙PT" || cands[0].TorrentID != "416" {
+		t.Errorf("桥候选应找到龙PT tid=416: %+v", cands)
+	}
+	// excludeSites 生效
+	cands = h.siblingTitleCandidates(context.Background(), 2, "/PT2", "KC 50th", []string{"龙PT"})
+	if len(cands) != 0 {
+		t.Errorf("排除后应零候选: %+v", cands)
+	}
+}
+
+// §59.482 刀7: 同词守卫——兄弟标题与原名同关键词跳过。
+func TestSiblingKeywordUsable(t *testing.T) {
+	// KC 案：龙PT 标题产出不同关键词 ✓（& 分隔+FLAC 剥+2019 保留）
+	if kw, ok := siblingKeywordUsable("KC 50th", "Various Artists - Heaven & Earth 2019-FLAC 整軌"); !ok {
+		t.Error("KC 案兄弟标题应可用")
+	} else if kw != "Various Artists Heaven Earth 2019" {
+		t.Errorf("KC 案关键词: %q", kw)
+	}
+	// 同词（兄弟标题与原名产出相同关键词）→ 跳过（年份保留态下
+	// "…2020" 与 "…2020 FLAC" 产出不同词——用真同词形态测）
+	if _, ok := siblingKeywordUsable("Carol Albert - Stronger Now 2020", "Carol Albert - Stronger Now 2020 FLAC"); ok {
+		t.Error("同词应跳过（白烧请求防御）")
+	}
+	// 空标题/同名
+	if _, ok := siblingKeywordUsable("X", ""); ok {
+		t.Error("空标题应跳过")
+	}
+	if _, ok := siblingKeywordUsable("Some Name", "Some Name"); ok {
+		t.Error("同名应跳过")
+	}
+}
