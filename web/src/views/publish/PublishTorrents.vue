@@ -111,8 +111,9 @@
         <template v-if="column.key === 'actions'">
           <a-space>
             <template v-if="record.reviewed">
-              <!-- §59.469 附九: 音乐种隐藏选站发布（音乐目标站适配未做·防误发影视链） -->
-              <a-button v-if="!record.is_music" type="primary" size="small" @click="openExecute(record)">选站发布</a-button>
+              <!-- §59.469 附九→§59.485 刀3: 音乐种放开选站发布（乌托邦已适配——
+                   modal 内目标站过滤为乌托邦 only·后端 executor 双重收口） -->
+              <a-button type="primary" size="small" @click="openExecute(record)">选站发布</a-button>
               <a-button size="small" @click="previewSeed(record)">预览种子</a-button>
             </template>
             <!-- §59.469 附九: 非 reviewed 音乐种显"预览种子"（MDP 只读·与 PublishData 同款） -->
@@ -127,6 +128,7 @@
       v-model:open="executeOpen"
       :info-hash="executeHash"
       :seed-name="executeName"
+      :is-music="executeIsMusic"
       @done="fetchList"
     />
 
@@ -409,9 +411,12 @@ import PublishExecuteModal from './PublishExecuteModal.vue'
 const executeOpen = ref(false)
 const executeHash = ref('')
 const executeName = ref('')
-function openExecute(record: { hash?: string; name?: string }) {
+// §59.485 刀3: 音乐种标记透传（modal 目标站过滤=乌托邦 only）
+const executeIsMusic = ref(false)
+function openExecute(record: { hash?: string; name?: string; is_music?: boolean }) {
   executeHash.value = record.hash || ''
   executeName.value = record.name || ''
+  executeIsMusic.value = !!record.is_music
   executeOpen.value = true
 }
 

@@ -96,7 +96,7 @@ import { message } from 'ant-design-vue'
 import client from '@/api/client'
 import { executeApi, formConfigApi, type ExecuteResult, type PublishTarget } from '@/api/formConfig'
 
-const props = defineProps<{ open: boolean; infoHash: string; seedName?: string }>()
+const props = defineProps<{ open: boolean; infoHash: string; seedName?: string; isMusic?: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'done'): void }>()
 
 const targets = ref<PublishTarget[]>([])
@@ -104,7 +104,12 @@ const conditionalTagOptions = ref<{ label: string; value: string }[]>([])
 const selectedSites = ref<string[]>([])
 
 // §59.166: SiteTiles 公共组件（has_pre_audit→hasPreAudit 适配）
-const tileSites = computed(() => targets.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit })))
+// §59.485 刀3: 音乐种目标站过滤——乌托邦 only（唯一音乐目标站·后端
+// executor 分流双重收口·前端过滤为体验层防选错站）
+const tileSites = computed(() => {
+  const list = props.isMusic ? targets.value.filter(t => t.name === '乌托邦') : targets.value
+  return list.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit }))
+})
 const batchResults = ref<Array<{ site: string; status: string; message?: string; url?: string }> | null>(null)
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
