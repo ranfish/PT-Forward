@@ -2343,6 +2343,10 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 
 	var req struct {
 		ClientUID uint `json:"clientId"`
+		// §59.479: force=true 批量重获——绕过 hasCompleteMetadata 簇跳过
+		// + forcePTGen 强刷（§59.173）。来源：禁转/无映射筛选视图「批量重获」
+		// 按钮（该视图行多为已获取簇·常规批量获取会被簇跳过全部 no-op）。
+		Force bool `json:"force"`
 		Items     []struct {
 			Hash     string `json:"hash"`
 			Name     string `json:"name"`
@@ -2375,7 +2379,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 	h.batchFetch.mu.Unlock()
 
-	go h.runBatchFetch(req.ClientUID, req.Items)
+	go h.runBatchFetch(req.ClientUID, req.Items, req.Force)
 
 	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
 }
@@ -2455,7 +2459,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	Name     string `json:"name"`
 	Size     int64  `json:"size"`
 	SavePath string `json:"savePath"`
-}) {
+}, force bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			h.logger.Error("runBatchFetch panic", zap.Any("panic", r))
@@ -2492,7 +2496,8 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 
 		// §59.61 第 4 步: 簇内已有完整数据（先前副本获取后传播）→ 跳过（同簇去重:
 		// 站点数据/MI/截图各一次；显式单种子获取不受影响）
-		if h.hasCompleteMetadata(ctx, fetchHash) {
+		// §59.479: force（批量重获）绕过——禁转/无映射视图的重获诉求即重取
+		if !force && h.hasCompleteMetadata(ctx, fetchHash) {
 			h.logger.Info("cluster skip: metadata exists",
 				zap.String("hash", fetchHash[:min(10, len(fetchHash))]))
 			h.batchFetch.mu.Lock()
@@ -2510,7 +2515,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 		type fetchResult struct{ err error }
 		fetchDone := make(chan fetchResult, 1)
 		go func() {
-			fetchDone <- fetchResult{h.fetchSingleTorrent(ctx, clientUID, fetchHash, item.Name, fetchSize, item.SavePath, isLocal)}
+			fetchDone <- fetchResult{h.fetchSingleTorrent(ctx, clientUID, fetchHash, item.Name, fetchSize, item.SavePath, isLocal, force)}
 		}()
 		var err error
 		select {
@@ -2547,7 +2552,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	// §59.330 P4: deferred 二轮（L2 探测式——等全部冻结状态归零，上限 5min；
 	// RSS 轮询会反复触碰冻结窗，固定等待不稳）。二轮仍瞬态失败转 failed
 	// （错误信息标注瞬态类建议重跑——N1 定案）。
-	h.retryDeferredBatch(ctx, clientUID, isLocal)
+	h.retryDeferredBatch(ctx, clientUID, isLocal, force)
 }
 
 // isTransientFetchErr §59.330 P4: 瞬态错误分类——冻结/熔断/超时/限流类
@@ -2568,7 +2573,7 @@ func isTransientFetchErr(err error) bool {
 
 // retryDeferredBatch §59.330 P4: deferred 集探测式二轮——等冻结状态归零
 // （上限 5min）后重试一轮；仍瞬态失败转 failed（标注建议重跑）。
-func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientUID uint, isLocal bool) {
+func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientUID uint, isLocal bool, force bool) {
 	h.batchFetch.mu.Lock()
 	deferred := make([]int, 0)
 	for i := range h.batchFetch.items {
@@ -2606,7 +2611,7 @@ func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientU
 
 		// §59.476 位置3: deferred 重试同款换 hash（首轮已换·幂等）
 		retryHash, retrySize := h.resolveMusicReplicaHash(ctx, clientUID, item.Hash, item.Size)
-		err := h.fetchSingleTorrent(ctx, clientUID, retryHash, item.Name, retrySize, item.SavePath, isLocal)
+		err := h.fetchSingleTorrent(ctx, clientUID, retryHash, item.Name, retrySize, item.SavePath, isLocal, force)
 		retried++
 
 		h.batchFetch.mu.Lock()

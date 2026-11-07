@@ -81,7 +81,16 @@
           :loading="batchFetchActive"
           @click="showBatchFetch = true"
         >
-          <PlusOutlined /> 获取数据
+          <PlusOutlined /> 获取未配置
+        </a-button>
+        <!-- §59.479 C: 问题视图批量重获——当前筛选行集带入弹窗强刷重取
+             （常规批量获取会被簇跳过 no-op；单行重获的批量形态） -->
+        <a-button
+          v-if="filterClient && filterPath && statusFilter === 'issues' && tableData.length > 0"
+          :loading="batchFetchActive"
+          @click="openBatchRefetch"
+        >
+          <ReloadOutlined /> 批量重获（{{ tableData.length }}）
         </a-button>
       </div>
     </div>
@@ -189,7 +198,9 @@
               danger
               :loading="purgingSet.has(`${record.client_id}|${record.name}`)"
               @click="purgeObserving(record)"
-            >立即清理</a-button>
+            >
+              立即清理
+            </a-button>
           </a-space>
           <a-space v-else :size="0">
             <a-button
@@ -232,11 +243,11 @@
       </template>
     </a-table>
 
-<!-- Edit Panel -->
+    <!-- Edit Panel -->
     <CrossSeedPanel
       v-model:open="editOpen"
       :preset-torrent="editPreset"
-            @success="onEditSuccess"
+      @success="onEditSuccess"
     />
 
     <!-- §59.469 附八: MDP——音乐种详情抽屉（主入口"详情"按钮） -->
@@ -248,6 +259,7 @@
       v-model:open="showBatchFetch"
       :client-id="filterClient"
       :save-path="filterPath"
+      :refetch-items="batchRefetchItems"
       @completed="onBatchFetchCompleted"
     />
   </div>
@@ -379,6 +391,18 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(50)
 const batchFetchActive = ref(false)
+
+// §59.479 C: 打开批量重获——当前筛选页行集带入（确认动作在弹窗内点「开始重获」）
+function openBatchRefetch() {
+  batchRefetchItems.value = tableData.value
+    .filter(it => it.hash && !it.hash.includes('|'))
+    .map(it => ({ hash: it.hash, name: it.name, size: it.size, savePath: it.save_path }))
+  if (!batchRefetchItems.value.length) {
+    message.warning('当前视图无可重获行')
+    return
+  }
+  showBatchFetch.value = true
+}
 
 async function fetchList() {
   loading.value = true
@@ -682,6 +706,9 @@ async function clearSingle(item: SeedListItem) {
 // ==================== 批量获取 ====================
 
 const showBatchFetch = ref(false)
+// §59.479: 批量重获行集（null=常规未配置模式；关闭弹窗即清空回落）
+const batchRefetchItems = ref<Array<{ hash: string; name: string; size: number; savePath: string }> | null>(null)
+watch(showBatchFetch, v => { if (!v) batchRefetchItems.value = null })
 
 function onBatchFetchCompleted() {
   showBatchFetch.value = false

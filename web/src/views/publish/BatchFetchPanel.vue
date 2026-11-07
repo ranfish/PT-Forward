@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="获取种子数据"
+    :title="refetchMode ? '批量重获（强刷）' : '批量获取未配置种子'"
     width="900px"
     :footer="null"
     destroy-on-close
@@ -19,8 +19,8 @@
         allow-clear
       />
       <a-button size="small" @click="openPriorityDialog">获取优先级</a-button>
-      <a-button v-if="torrents.length > 0" size="small" @click="loadUnconfigured">刷新</a-button>
-      <a-tag v-if="torrents.length > 0" color="blue">{{ torrents.length }} 个未配置</a-tag>
+      <a-button v-if="torrents.length > 0 && !refetchMode" size="small" @click="loadUnconfigured">刷新</a-button>
+      <a-tag v-if="torrents.length > 0" color="blue">{{ refetchMode ? torrents.length + ' 行待重获' : torrents.length + ' 个未配置' }}</a-tag>
     </div>
 
     <!-- 进度条 -->
@@ -85,7 +85,7 @@
       </template>
     </a-table>
 
-    <a-empty v-else-if="!loading" description="无未配置种子（全部已获取或无快照）" />
+    <a-empty v-else-if="!loading" :description="refetchMode ? '无待重获行' : '无未配置种子（全部已获取或无快照）'" />
 
     <!-- 优先级设置弹窗 -->
     <a-modal
@@ -121,7 +121,7 @@
         :disabled="selectedHashes.length === 0"
         @click="startBatchFetch"
       >
-        获取数据（{{ selectedHashes.length }}）
+        {{ refetchMode ? '开始重获（强刷·' + selectedHashes.length + '）' : '获取数据（' + selectedHashes.length + '）' }}
       </a-button>
     </div>
   </a-modal>
@@ -137,6 +137,9 @@ const props = defineProps<{
   open: boolean
   clientId?: number
   savePath?: string
+  // §59.479: 重获模式——带入行集（禁转/无映射筛选视图「批量重获」）；
+  // 非空时跳过未配置加载·全选·force 强刷（绕过簇跳过）
+  refetchItems?: Array<{ hash: string; name: string; size: number; savePath: string }> | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
@@ -150,6 +153,9 @@ interface UnconfiguredTorrent {
   clientId: number
   savePath: string
 }
+
+// §59.479: 重获模式判定（带入行集非空即重获）
+const refetchMode = computed(() => Array.isArray(props.refetchItems) && props.refetchItems!.length > 0)
 
 const torrents = ref<UnconfiguredTorrent[]>([])
 const loading = ref(false)
@@ -211,6 +217,12 @@ watch(() => props.open, async (val) => {
       }
     } catch { /* 查询失败按全新弹窗处理 */ }
     reset()
+    if (refetchMode.value) {
+      // §59.479: 重获模式——带入行集全选（跳过未配置加载）
+      torrents.value = (props.refetchItems || []).map(it => ({ hash: it.hash, name: it.name, size: it.size, clientId: props.clientId || 0, savePath: it.savePath }))
+      selectedHashes.value = torrents.value.map(t => t.hash)
+      return
+    }
     await loadUnconfigured()
   }
 })
@@ -249,7 +261,7 @@ async function startBatchFetch() {
     .map(t => ({ hash: t.hash, name: t.name, size: t.size, savePath: t.savePath }))
 
   try {
-    await seedConfigApi.batchFetch(items, props.clientId || 0)
+    await seedConfigApi.batchFetch(items, props.clientId || 0, refetchMode.value)
     fetching.value = true
     fetchDone.value = false
     progress.value = { active: true, total: items.length, done: 0, failed: 0, items: [] }
@@ -287,7 +299,7 @@ function pollProgress() {
         const success = (data?.done || 0) - (data?.failed || 0)
         message.success(`获取完成: ${success} 成功${(data?.failed || 0) > 0 ? ', ' + data.failed + ' 失败' : ''}`)
         emit('completed')
-        await loadUnconfigured()
+        if (!refetchMode.value) await loadUnconfigured()
       }
     } catch {
       if (fetching.value) pollProgress()

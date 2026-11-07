@@ -272,8 +272,9 @@ export const seedConfigApi = {
   putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string; reviewed?: boolean }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[]; reassembled_title?: string; rendered_description?: string; render_error?: string; title_incomplete?: boolean }>>(`/publish/seeds/${infoHash}`, data)
   },
-  batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: number) {
-    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId })
+  // §59.479: force=true 批量重获（禁转/无映射视图——绕过簇跳过+强刷 PTGen）
+  batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: number, force = false) {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId, force })
   },
   batchFetchProgress() {
     return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
