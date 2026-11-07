@@ -47,11 +47,34 @@ func TestExtractMusicSearchKeyword(t *testing.T) {
 		// 中文短名
 		{"甄妮-心聲", false, "甄妮 心聲"},
 		// 书名号《》内文优先
+		// §59.478 修订: Nicki 锚回归 ：整体形态——粘连拆分收紧为仅纯
+		// ASCII 字母数字 token（含全角字符不拆·日文标题案）
 		{"Nicki Minaj -《Pink Friday：Roman Reloaded》[Explicit Version]", false, "Pink Friday：Roman Reloaded"},
 	}
 	for _, c := range cases {
 		got := ExtractMusicSearchKeyword(c.name, c.stripYear)
 		if got != c.want {
+			t.Errorf("ExtractMusicSearchKeyword(%q, %v) = %q, want %q", c.name, c.stripYear, got, c.want)
+		}
+	}
+}
+
+// §59.478: 粘连拆分+SACD/ISO 增补锚（RCA 案）。
+func TestExtractMusicSearchKeywordGlued(t *testing.T) {
+	cases := []struct {
+		name      string
+		stripYear bool
+		want      string
+	}{
+		// RCA 案（12 环境·皇后 tid=99869 目标在）："60SACD"→[60,SACD]·
+		// SACD spec 剥·CJK 词由搜索层 CJK 降级轮剥（stripCJKWords→
+		// "RCA Living stereo 60" ⊆ 皇后标题）
+		{"古典名厂RCA Living stereo 60SACD 系列收藏 [SACD-ISO- 152G]", false, "古典名厂RCA Living stereo 60 系列收藏"},
+		// 纯字母/纯数字不拆
+		{"Carol Albert Stronger Now 2020", false, "Carol Albert Stronger Now 2020"},
+	}
+	for _, c := range cases {
+		if got := ExtractMusicSearchKeyword(c.name, c.stripYear); got != c.want {
 			t.Errorf("ExtractMusicSearchKeyword(%q, %v) = %q, want %q", c.name, c.stripYear, got, c.want)
 		}
 	}

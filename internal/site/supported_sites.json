@@ -382,6 +382,7 @@
   "auth_type": "cookie",
   "cookiecloud_domain": "open.cd",
   "download_url_template": "download.php?id={id}&passkey={passkey}",
+  "details_url_template": "/plugin_details.php?id={id}",
   "verification_status": "verified"
  },
  "ourbits.club": {
