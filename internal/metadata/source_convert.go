@@ -89,6 +89,17 @@ func SourceToArtifact(src LocalSourceJSON) (mediainfo, bdinfo string, screenshot
 }
 
 // UnmarshalDetailSource 反序列化 detail_source_json。空字符串返回 nil。
+// HasMusic §59.489: 音乐种判定（原 api.detailSourceHasMusic 提升——发布
+// Eligibility/compliance 分流的公共输入）。detail_source_json 的 Music
+// 非 nil 即音乐种（单源自足：三站 adapter 落 Music 结构）。
+func HasMusic(detailSourceJSON string) bool {
+	if detailSourceJSON == "" {
+		return false
+	}
+	src, err := UnmarshalDetailSource(detailSourceJSON)
+	return err == nil && src != nil && src.Music != nil
+}
+
 func UnmarshalDetailSource(jsonStr string) (*DetailSourceJSON, error) {
 	if jsonStr == "" {
 		return nil, nil

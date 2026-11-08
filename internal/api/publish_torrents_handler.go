@@ -3711,6 +3711,19 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// 4. 组装结果（§59.29 性能：轻量状态标注全量执行——flags/映射/reviewed 纯内存或
 	// 带缓存查询；compliance（含 per-row DB 查询）延迟到分页后的当前页执行，
 	// 未筛选 system_forbidden 时默认降级为轻量判定，筛该态时对全量补跑）
+	// §59.489: 簇级音乐判定（compliance 分流输入——音乐不存在成人内容·
+	// 用户定案）。musicMeta 批量预查（§59.469 附七）+metaByCluster 簇关联：
+	// 簇内任一行有 music 即音乐种（代表行可能无 music 而簇内副本有——
+	// §59.484 同型跨行残留防御）。
+	clusterIsMusic := func(item map[string]interface{}) bool {
+		key := fmt.Sprintf("%d|%s|%s", item["client_id"], item["save_path"], item["name"])
+		for _, m := range metaByCluster[key] {
+			if _, ok := musicMeta[m.InfoHash]; ok {
+				return true
+			}
+		}
+		return false
+	}
 	needFullCompliance := statusFilter == "system_forbidden"
 	items := make([]map[string]interface{}, 0, len(snapshots))
 	for _, snap := range snapshots {
@@ -3912,7 +3925,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		for _, item := range items {
 			name, _ := item["name"].(string)
 			siteName, _ := item["site_name"].(string)
-			if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName); r2 != nil && !r2.Passed {
+			if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName, clusterIsMusic(item)); r2 != nil && !r2.Passed {
 				item["status"] = "system_forbidden"
 				filtered = append(filtered, item)
 			}
@@ -3943,7 +3956,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			status, _ := item["status"].(string)
 			// 轻量态非禁转/无映射的行才需要 compliance 精化
 			if status != "forbidden" && status != "no_mapping" {
-				if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName); r2 != nil && !r2.Passed {
+				if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName, clusterIsMusic(item)); r2 != nil && !r2.Passed {
 					item["status"] = "system_forbidden"
 				}
 			}
@@ -4256,11 +4269,7 @@ func (h *PublishTorrentsHandler) musicFetchArgs(musicRouting bool, args ...strin
 // UnmarshalDetailSource 判 Music 非 nil）。列表批量场景走 listSeeds 的
 // LIKE 预查（等价性见该处注释）。
 func detailSourceHasMusic(detailSourceJSON string) bool {
-	if detailSourceJSON == "" {
-		return false
-	}
-	src, err := metadata.UnmarshalDetailSource(detailSourceJSON)
-	return err == nil && src != nil && src.Music != nil
+	return metadata.HasMusic(detailSourceJSON) // §59.489 提升公共
 }
 
 // checkRequiredFields §59.20: 9 必需字段校验，返回缺失字段名列表。

@@ -143,9 +143,22 @@ func (c *Checker) CheckWithScope(ctx context.Context, title, subtitle string, sc
 	return c.checkFull(ctx, title, subtitle, scope)
 }
 
-func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope CheckScope) *Result {
+// checkFull §59.489: isMusicOpt 变参——音乐种分流（音乐不存在成人内容·
+// 用户定案 2026-11-08）：跳过 adult 段（DB adult 规则+DetectAdult 四正则）。
+// School Rumble 案：文件夹名 [2005.04.27] 日期前缀命中 bracket_date 规则
+// 误判系统禁转——音乐语境 [YYYY.MM.DD] 是发行日期标准命名法（影视/综合
+// 站才是成人特征）。保留：禁转词/禁转组/用户词/站点黑名单（音乐≠免疫
+// 禁转——皇后 ShareRule R7 依赖）。
+func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope CheckScope, isMusicOpt ...bool) *Result {
 	if title == "" && subtitle == "" {
 		return Pass
+	}
+	isMusic := false
+	for _, v := range isMusicOpt {
+		if v {
+			isMusic = true
+			break
+		}
 	}
 
 	// §56.39: 从 DB 加载规则并按 scope 过滤（缓存 5 分钟）
@@ -159,23 +172,26 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 	// 共用前置（原豁免散在两处（isBenignXXX 在 A2 内、§59.292 补进 A1）——
 	// 改一漏一结构性风险（xXx 电影案实证）；上提单点后任何成人判据命中前
 	// 先过豁免）
-	if adultExempted(titleLower, subtitleLower) {
-		goto forbiddenCheck
-	}
-
-	for _, kw := range adult {
-		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
-			// §56.2x: 中文误报排除（成人教育/高考/大学/学院）
-			if isChineseFalsePositive(title, kw) || isChineseFalsePositive(subtitle, kw) {
-				continue
-			}
-			return &Result{Passed: false, Reason: kw, Category: "adult"}
+	// §59.489: isMusic 整段旁路（音乐不存在成人内容·用户定案）
+	if !isMusic {
+		if adultExempted(titleLower, subtitleLower) {
+			goto forbiddenCheck
 		}
-	}
 
-	// qui 精确正则检测（JAV 番号 / 日期格式 / XXX 关键词），补充关键词无法覆盖的结构化模式
-	if matched, reason := DetectAdult(title, subtitle); matched {
-		return &Result{Passed: false, Reason: reason, Category: "adult"}
+		for _, kw := range adult {
+			if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
+				// §56.2x: 中文误报排除（成人教育/高考/大学/学院）
+				if isChineseFalsePositive(title, kw) || isChineseFalsePositive(subtitle, kw) {
+					continue
+				}
+				return &Result{Passed: false, Reason: kw, Category: "adult"}
+			}
+		}
+
+		// qui 精确正则检测（JAV 番号 / 日期格式 / XXX 关键词），补充关键词无法覆盖的结构化模式
+		if matched, reason := DetectAdult(title, subtitle); matched {
+			return &Result{Passed: false, Reason: reason, Category: "adult"}
+		}
 	}
 
 forbiddenCheck:
@@ -205,8 +221,10 @@ forbiddenCheck:
 	return Pass
 }
 
-func (c *Checker) CheckWithSite(ctx context.Context, title, siteName string) *Result {
-	r := c.checkFull(ctx, title, "", ScopePublish)
+// CheckWithSite §59.489: isMusicOpt 变参——音乐种分流（见 checkFull 文档）。
+// 现有调用（影视链）零改动。
+func (c *Checker) CheckWithSite(ctx context.Context, title, siteName string, isMusicOpt ...bool) *Result {
+	r := c.checkFull(ctx, title, "", ScopePublish, isMusicOpt...)
 	if !r.Passed {
 		return r
 	}
@@ -350,6 +368,12 @@ func (c *Checker) getSiteBlacklist(ctx context.Context) map[string][]string {
 	result := make(map[string][]string)
 	for k, v := range SiteCategoryBlacklist {
 		result[k] = v
+	}
+
+	// nil 安全（§59.489 测试锚暴露：getUserKeywords/lookupSourceCategory 均有
+	// 此守卫·本函数漏——nil db 单测构造 CheckWithSite 即 panic）
+	if c.db == nil {
+		return result
 	}
 
 	var raw string

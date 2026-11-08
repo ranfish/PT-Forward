@@ -159,7 +159,9 @@ func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.T
 	// （列表层先例——装配点 main 无条件注入，nil 仅测试构造）。判定输入=
 	// meta.Title 站方标题（发布消费权威——与列表用下载器名相比更严一格）。
 	if e.pipe.complianceChecker != nil {
-		if r := e.pipe.complianceChecker.CheckWithSite(ctx, meta.Title, sourceSite); r != nil && !r.Passed {
+		// §59.489: 音乐种分流（音乐不存在成人内容·用户定案——School Rumble
+		// 案 [YYYY.MM.DD] 日期前缀误判 bracket_date）。禁转词/组保留。
+		if r := e.pipe.complianceChecker.CheckWithSite(ctx, meta.Title, sourceSite, metadata.HasMusic(meta.DetailSourceJSON)); r != nil && !r.Passed {
 			return true, fmt.Sprintf("系统禁转（compliance %s）：%s", r.Category, r.Reason)
 		}
 	}
