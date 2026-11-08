@@ -96,7 +96,7 @@
           <span v-else style="color: #ccc">-</span>
         </template>
         <template v-else-if="column.key === 'publish_url'">
-          <a v-if="record.publish_url" :href="record.publish_url" target="_blank" style="font-size: 12px">查看</a>
+          <a v-if="record.publish_url" :href="detailHref(record.publish_url)" target="_blank" style="font-size: 12px">查看</a>
           <span v-else style="color: #ccc">-</span>
         </template>
         <template v-else-if="column.key === 'created_at'">
@@ -276,7 +276,9 @@ async function batchRepush() {
 function canRepush(r: { torrent_id?: string; status?: string; seeded?: boolean; downloader_id?: string; save_path?: string }): boolean {
   if (!r.torrent_id || !r.downloader_id || !r.save_path) return false
   if (r.seeded && r.status === 'pushed') return false
-  return ['uploaded', 'pushed_existing', 'failed'].includes(r.status ?? '')
+  // §59.491: duplicate 入集——站上已有（含别人发的老种）+tid 在手+未做种
+  // → 补推=拉站方种推下载器做种（辅站方种·增益 seeder）
+  return ['uploaded', 'pushed_existing', 'failed', 'duplicate'].includes(r.status ?? '')
 }
 
 async function repush(r: { id: number; torrent_id?: string; target_site?: string; source_info_hash?: string; downloader_id?: string; save_path?: string }) {
@@ -384,18 +386,28 @@ function statusColor(status: string): string {
     failed: 'red',
     skipped: 'orange',
     exists: 'gold',
+    duplicate: 'gold', // §59.491: 站上已有（在线/本地 dedup 命中——防重正确终态）
     publishing: 'blue',
   }
   return map[status] || 'default'
+}
+
+// §59.491: 链接协议防御——存量记录 publish_url 无协议头（detailURLOf 旧版
+// 裸 Domain 拼接）·裸 href 会被浏览器当相对路径拼系统地址。根修在后端·
+// 此处兜底存量行。
+function detailHref(url: string): string {
+  if (/^https?:\/\//.test(url)) return url
+  return 'https://' + url
 }
 
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
     completed: '成功',
     edited: '已编辑',
-    failed: '失败',
+    failed: '发布失败', // §59.491: 与"加种失败"区分（加种=推下载器·发布=上传站方）
     skipped: '跳过',
     exists: '已存在',
+    duplicate: '站上已有', // §59.491: 在线/本地 dedup 命中（tid 在记录·可补推做种）
     publishing: '发布中',
   }
   return map[status] || status
