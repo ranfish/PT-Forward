@@ -56,35 +56,37 @@
         <div v-else class="mdp-content">
           <!-- ═══ ① 头部通用槽：标题·来源站·大小·InfoHash·封面 ═══ -->
           <a-card size="small" style="margin-bottom: 12px">
-            <div class="mdp-head-slot">
-              <div class="mdp-head-main">
-                <a-descriptions :column="1" size="small">
-                  <a-descriptions-item label="标题">
-                    <span style="font-size: 15px; font-weight: 600">{{ detail?.title || preset?.name || '—' }}</span>
-                  </a-descriptions-item>
-                  <a-descriptions-item v-if="detail?.subtitle" label="副标题">
-                    <span style="color: #666">{{ detail.subtitle }}</span>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="来源站">{{ detail?.site_name || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="大小">{{ formatBytes(preset?.size ?? 0) }}</a-descriptions-item>
-                  <a-descriptions-item label="InfoHash">
-                    <span style="font-family: monospace; font-size: 12px">{{ preset?.info_hash || detail?.info_hash || '—' }}</span>
-                  </a-descriptions-item>
-                  <a-descriptions-item v-if="detail?.fetched_at" label="获取时间">
-                    {{ detail.fetched_at.replace('T', ' ').slice(0, 19) }}
-                  </a-descriptions-item>
-                </a-descriptions>
+            <a-descriptions :column="2" size="small">
+              <a-descriptions-item label="标题" :span="2">
+                <span style="font-size: 15px; font-weight: 600">{{ detail?.title || preset?.name || '—' }}</span>
+              </a-descriptions-item>
+              <a-descriptions-item v-if="detail?.subtitle" label="副标题" :span="2">
+                <span style="color: #666">{{ detail.subtitle }}</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="来源站">{{ detail?.site_name || '—' }}</a-descriptions-item>
+              <a-descriptions-item label="大小">{{ formatBytes(preset?.size ?? 0) }}</a-descriptions-item>
+              <a-descriptions-item label="InfoHash" :span="2">
+                <span style="font-family: monospace; font-size: 12px">{{ preset?.info_hash || detail?.info_hash || '—' }}</span>
+              </a-descriptions-item>
+              <a-descriptions-item v-if="detail?.fetched_at" label="获取时间">
+                {{ detail.fetched_at.replace('T', ' ').slice(0, 19) }}
+              </a-descriptions-item>
+            </a-descriptions>
+          </a-card>
+
+          <!-- ═══ ① 封面（§59.488 用户定案：从头部移到独立①·按钮在图下方） ═══ -->
+          <a-card size="small" style="margin-bottom: 12px">
+            <template #title><div class="mdp-card-title" style="background: #eb2f96">① 封面</div></template>
+            <div style="display: flex; align-items: flex-start; gap: 16px">
+              <div v-if="posterDisplay">
+                <a-image :src="posterDisplay" :width="180" :fallback="fallbackPoster" style="border-radius: 4px" />
               </div>
-              <!-- §59.488: poster 编辑入口（手动补封面——发布链审核工具） -->
-              <div class="mdp-head-poster">
-                <div v-if="posterDisplay" style="position: relative">
-                  <a-image :src="posterDisplay" :width="180" :fallback="fallbackPoster" style="border-radius: 4px" />
-                  <a-button size="small" style="position: absolute; top: 4px; right: 4px" @click="openPosterEdit">编辑</a-button>
-                </div>
-                <div v-else style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px; flex-direction: column; gap: 8px">
-                  <span style="color: #999; font-size: 12px">无封面</span>
-                  <a-button size="small" @click="openPosterEdit">补封面</a-button>
-                </div>
+              <div v-else style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px">
+                <span style="color: #999; font-size: 12px">无封面</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px">
+                <a-button size="small" @click="openPosterEdit">{{ posterDisplay ? '更换封面' : '补封面' }}</a-button>
+                <span v-if="posterDisplay" style="color: #999; font-size: 12px">点击图片可查看大图</span>
               </div>
             </div>
           </a-card>
@@ -157,9 +159,9 @@
             </a-descriptions>
           </a-card>
 
-          <!-- ═══ ⑤ 长内容（折叠） ═══ -->
+          <!-- ═══ ⑤ 简介（折叠·§59.488 用户定案文案） ═══ -->
           <a-card size="small" style="margin-bottom: 12px">
-            <template #title><div class="mdp-card-title" style="background: #595959">⑤ 长内容</div></template>
+            <template #title><div class="mdp-card-title" style="background: #595959">⑤ 简介</div></template>
             <a-collapse :default-active-key="longActiveKeys" ghost>
               <a-collapse-panel v-if="music.track_list" key="track" header="曲目列表">
                 <pre class="mdp-pre">{{ music.track_list }}</pre>
@@ -171,7 +173,7 @@
                 <pre class="mdp-pre mdp-desc">{{ detail.description }}</pre>
               </a-collapse-panel>
             </a-collapse>
-            <div v-if="!music.track_list && !music.log_text && !detail?.description" style="color: #999; padding: 8px 0">无长内容</div>
+            <div v-if="!music.track_list && !music.log_text && !detail?.description" style="color: #999; padding: 8px 0">无简介内容</div>
           </a-card>
 
           <!-- ═══ ⑥ 标签 ═══ -->
@@ -353,18 +355,6 @@ async function forceReview() {
 }
 .mdp-content {
   max-width: 1200px;
-}
-.mdp-head-slot {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
-.mdp-head-main {
-  flex: 1;
-  min-width: 0;
-}
-.mdp-head-poster {
-  flex-shrink: 0;
 }
 .mdp-card-title {
   font-size: 13px;
