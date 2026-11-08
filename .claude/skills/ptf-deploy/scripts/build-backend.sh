@@ -39,6 +39,9 @@ CGO_ENABLED=1 "$GO" build \
   -o pt-forward ./cmd/pt-forward/
 
 echo "==> [6/6] 重启服务"
+# §59.487: DBUS 兜底——非交互 shell（Agent ssh/CI）无 DBUS_SESSION_BUS_ADDRESS
+# 时 systemctl --user 报 Failed to connect to bus（v0.0.1376/1377 两版人工补位）
+[ -z "$DBUS_SESSION_BUS_ADDRESS" ] && export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 systemctl --user restart pt-forward
 sleep 2
 systemctl --user is-active pt-forward
