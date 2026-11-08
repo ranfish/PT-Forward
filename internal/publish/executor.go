@@ -1889,7 +1889,14 @@ func detailURLOf(cfg *model.SiteConfig, tid string) string {
 	if tid == "" {
 		return ""
 	}
-	return strings.TrimRight(cfg.Domain, "/") + "/details.php?id=" + tid
+	// §59.491: 协议根修——裸 Domain 拼接产出无协议 URL（publish_url 落库
+	// "www.musopia.vip/..."）·前端 href 相对路径拼系统地址。PT 站全 https·
+	// 已带协议的 Domain 原样（防御双形态）。
+	d := strings.TrimRight(cfg.Domain, "/")
+	if !strings.HasPrefix(d, "http://") && !strings.HasPrefix(d, "https://") {
+		d = "https://" + d
+	}
+	return d + "/details.php?id=" + tid
 }
 
 // preAuditTitle §59.166 B2 补：预检 name 与上传标题同源（tp 重组 MI 纠错终态
