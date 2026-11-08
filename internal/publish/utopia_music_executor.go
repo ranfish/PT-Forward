@@ -69,6 +69,19 @@ func (e *PublishExecutor) executeMusicPublish(ctx context.Context, in ExecuteInp
 			"音频编码映射缺失：format=%q 不在乌托邦值集——检查获取数据 format 字段", mm.Format))
 	}
 
+	// ③b log 硬拦门（§59.492 刀2：乌托邦站规——种内无 .log 硬拦·
+	// 朱孝天案实测拦截文案。fail-close：解析失败同拦（torrentData
+	// 是下载器导出真种·解析失败≈数据异常·防误发）。DryRun 同拦
+	// （预检可见——无 log 素材 DryRun 即红·不烧上传）。
+	if logs, lErr := utopiaMusicLogCount(torrentData); lErr != nil {
+		return failRec("ineligible", fmt.Sprintf(
+			"种子文件解析失败（log 预检 fail-close）: %v", lErr))
+	} else if logs == 0 {
+		return failRec("ineligible",
+			"乌托邦站规：种子包内未找到抓轨 LOG 文件（.log 数=0）——"+
+				"源种无 log 无法发布该站（朱孝天案实证站方硬拦）")
+	}
+
 	// ④ DryRun 检查点（组装后·上传前——完整表单形态验证）
 	if in.DryRun {
 		dryForm := map[string]string{}

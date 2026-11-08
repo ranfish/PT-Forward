@@ -211,9 +211,11 @@ multipart 字段名: torrent（tfile/file 均拒——"未上传种子文件"）
 
 实测（tid=25174 自己的种）：log_count=1·files=5×flac+cue+log+Cover.jpg。
 
-限制：手工构造的 bencode 被拒（"Invalid integer format"——严格解析
-器·非标准形态敏感）；真实 .torrent 正常解析。**只解析不产生种子
-=安全可调**（DryRun L4 站方校验通道）。
+**只解析不产生种子=安全可调**（DryRun L4 站方校验通道）。
+
+（探测期"手工 bencode 被拒"系构造方长度前缀笔误——非站方解析器
+问题·真实 .torrent 一直正常解析。教训：手工 bencode 测试前先用
+本地解码器自检。）
 
 ## 六、预检规则集（渐进式积累——音乐站规则资产）
 
@@ -221,7 +223,7 @@ multipart 字段名: torrent（tfile/file 均拒——"未上传种子文件"）
 
 | # | 规则 | 来源 | 实施状态 |
 |---|------|------|---------|
-| 1 | log 硬拦：种内 .log 数=0 拒发 | 朱孝天案拦截文案 | 待实施（bencode 本地数+parse_torrent 双验） |
+| 1 | log 硬拦：种内 .log 数=0 拒发（fail-close） | 朱孝天案拦截文案 | ✓ 已实施（§59.492 刀2·utopiaMusicLogCount 本地判定+DryRun 同拦） |
 | 2 | dedup：pieces-hash 反查站方已有 | 机制已有（§59.470/§59.485） | ✓ 已在线 |
 
 回灌机制：每次 failed 上传的站方拦截文案 → 本表新增（人工确认入册）。
