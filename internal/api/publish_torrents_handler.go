@@ -2969,7 +2969,10 @@ fetched:
 	// §59.49+§59.57: 截图探活与策略——strategy 可用时探活内联进其前序（串行消除竞态：
 	// 原双 goroutine 并发，strategy 读到 purge 前死链 → rehost 失败保源 → same 早退 → 永不捕获）；
 	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
-	if meta != nil {
+	// §59.490: 音乐种跳过截图链——mpv 渲染音频文件（无视频轨）白截：
+	// 每颗几十秒策略预算+并发闸门额度+"total failure" warn 噪声（64 颗
+	// 获取全白跑实证）。音乐种发布不消费截图（乌托邦 descr=致谢+封面）。
+	if meta != nil && !metadata.HasMusic(meta.DetailSourceJSON) {
 		if h.shotStrategy != nil && savePath != "" {
 			// §59.299: force（单种重获）跳过簇缓存读——每次全新截传+写穿（Q4 语义
 			// 对齐手动捕获链）；批量 force=false 维持 Q3 缓存优先
@@ -4362,6 +4365,17 @@ func extractSeedHash(r *http.Request) string {
 // force=true 绕缓存（单条重获 §59.173）/false 普通缓存（批量——§59.236 决策点①）。
 func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *model.TorrentMetadata, force bool) bool {
 	if meta == nil || h.ptgen == nil {
+		return false
+	}
+	// §59.490: 音乐种跳过——PTGen 是影视元数据语义（title 兜底搜索碰巧
+	// 命中影视/动漫/豆瓣音乐条目时 poster/description 被"成功即权威"
+	// 无条件覆盖——School Rumble 案 86 行污染实证：封面=doubaninfo 海报·
+	// desc=豆瓣剧情简介）。音乐链数据单源自足（§59.466）·音乐 poster/
+	// desc 由 adapter 权威提供。影视链零触碰（music 不在场照走）。
+	if metadata.HasMusic(meta.DetailSourceJSON) {
+		h.logger.Info("mainline ptgen: music seed, skip",
+			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+			zap.String("site", meta.SiteName))
 		return false
 	}
 	// §59.286 终版: 三级顺序链——douban →（失败）→ imdb →（失败）→ title；
@@ -5951,6 +5965,13 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 // h.ptgen == nil（组件未装配）时恒 true（不过滤）。
 func (h *PublishTorrentsHandler) ptgenViable(ctx context.Context, meta *model.TorrentMetadata) bool {
 	if h.ptgen == nil || meta == nil {
+		return true
+	}
+	// §59.490: 音乐种恒可行——PTGen 是影视质量门语义：音乐种 douban/imdb
+	// 恒空+title 纯音乐大多搜不中 → 误判"获取站数据质量差"换下一站白烧
+	// （School Rumble 案双面坑：搜不中→换站白烧配额；搜得中→不换站但被
+	// runMainlinePTGen 污染）。音乐数据质量由 music 字段在场性判定。
+	if metadata.HasMusic(meta.DetailSourceJSON) {
 		return true
 	}
 	keys := mainlineQueryKeys(meta.DoubanURL, meta.IMDbURL, meta.Title)
