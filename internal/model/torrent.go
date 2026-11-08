@@ -142,6 +142,9 @@ type SearchOptions struct {
 	SortBy     string `json:"sort_by"`
 	MaxResults int    `json:"max_results"`
 	SearchArea string `json:"search_area,omitempty"` // §59.30: NexusPHP search_area（0=标题 1=简介），空=默认 0
+	// §59.486: 翻页（NP page 参数 0 起——大合集场景同体积真身在默认序
+	// 100+ 位·第一页 50 截断之外·音乐第三轮翻页聚合覆盖）
+	Page int `json:"page,omitempty"`
 }
 
 // §33.1.74 — PTGenResult: PTGen 查询结果

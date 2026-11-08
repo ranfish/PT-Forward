@@ -335,6 +335,23 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 			}
 		}
 	}
+	// §59.486: 音乐第三轮——size 降序重搜（大合集场景：单词/短关键词命中
+	// 100+ 候选·同体积真身被默认时间序排到第一页 50 截断之外（Monstercat
+	// 77.8GB 案：真身 tid=72218 排 ~100 位）——size 序把同体积候选冲到最前
+	// （站方 order_by=size 实证 72218 升至第 4 位）。仅音乐链（影视搜索
+	// 排序语义零触碰）。
+	if match == nil && isMusicSeed {
+		// §59.486: 大上限重搜（150）——皇后单页全量 61 条无分页（page=1
+		// 实证空返回·order_by 排序实证无效）·但解析器默认 50 上限把
+		// "同体积真身排 60+ 位"（Monstercat 77.8GB 案 tid=72218 位次 61）
+		// 截断丢弃——MaxResults 提高解析上限一次拿全。仅音乐链（影视
+		// 搜索零触碰）。
+		if r3, err3 := adapter.SearchTorrents(ctx, config, keyword, &model.SearchOptions{MaxResults: 150}); err3 == nil && len(r3) > 0 {
+			if m3, _ := reseed.VerifyMatchWithTruncationCheckAndSource(r3, "", size, torrentName); m3 != nil {
+				match = m3
+			}
+		}
+	}
 
 	// §59.36 修订: 主轮 + loose 轮的音频冲突候选收集（组名/相关性/其余字段全过，
 	// 仅音频 token 冲突）→ MI 仲裁（源 local MI 可得时）或降级放行。
