@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 )
@@ -329,6 +330,25 @@ func utopiaMusicRipScore(mm *model.MusicMeta) string {
 		return m[1]
 	}
 	return ""
+}
+
+// utopiaMusicLogCount §59.492 刀2: 种内 .log 文件数（乌托邦 log 硬拦
+// 预检——朱孝天案实证站方拦截"音乐种子包内未找到EAC抓轨LOG文件"）。
+// 判定=torrent 文件实体（fingerprint.FileTree·本地权威零网络·与
+// 站方 parse_torrent.php log_count 同源）。err=解析失败（fail-close
+// 消费——防误发）。
+func utopiaMusicLogCount(torrentData []byte) (int, error) {
+	m, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil {
+		return 0, err
+	}
+	logs := 0
+	for p := range m.FileTree {
+		if strings.HasSuffix(strings.ToLower(p), ".log") {
+			logs++
+		}
+	}
+	return logs, nil
 }
 
 // utopiaMusicDescr §59.485 决策点④+③: descr 组装。

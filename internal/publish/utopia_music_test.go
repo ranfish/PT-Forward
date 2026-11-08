@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -211,5 +212,47 @@ func TestUtopiaMusicFormValues(t *testing.T) {
 	}
 	if form["rip_score"] != "100" {
 		t.Errorf("rip_score: %q", form["rip_score"])
+	}
+}
+
+// benc 造最小合法 torrent（多文件·files 按字典序不敏感——fingerprint 解析器容错）。
+func bencTorrent(paths []string) []byte {
+	// info: files[{length,path[]}] 单/多文件统一 files 形态
+	var fb string
+	for _, p := range paths {
+		fb += "d6:lengthi1024e4:pathl"
+		for _, seg := range strings.Split(p, "/") {
+			fb += fmt.Sprintf("%d:%s", len(seg), seg)
+		}
+		fb += "ee"
+	}
+	info := "d5:filesl" + fb + "e4:name4:teste" // files=list(l..e)·字典序 files<name
+	t := "d8:announce18:https://test.com/a4:info" + info + "e"
+	return []byte(t)
+}
+
+// §59.492 刀2: log 硬拦预检纯函数锚——四态（有 log/无 log/多 log/解析失败 fail-close）。
+func TestUtopiaMusicLogCount(t *testing.T) {
+	// 有 log（25174 真实形态：flac+cue+log）
+	n, err := utopiaMusicLogCount(bencTorrent([]string{"a.flac", "a.cue", "a.log"}))
+	if err != nil || n != 1 {
+		t.Fatalf("has-log: n=%d err=%v want 1/nil", n, err)
+	}
+	// 无 log（朱孝天案形态）
+	n, err = utopiaMusicLogCount(bencTorrent([]string{"a.flac", "a.cue"}))
+	if err != nil || n != 0 {
+		t.Fatalf("no-log: n=%d err=%v want 0/nil", n, err)
+	}
+	// 多 CD 多 log
+	n, err = utopiaMusicLogCount(bencTorrent([]string{"CD1/a.log", "CD2/b.LOG", "CD2/b.flac"}))
+	if err != nil || n != 2 {
+		t.Fatalf("multi-log: n=%d err=%v want 2/nil（大小写不敏感）", n, err)
+	}
+	// 解析失败 fail-close 输入
+	if _, err := utopiaMusicLogCount([]byte("not-bencode")); err == nil {
+		t.Fatal("garbage: expect error (fail-close)")
+	}
+	if _, err := utopiaMusicLogCount(nil); err == nil {
+		t.Fatal("empty: expect error")
 	}
 }
