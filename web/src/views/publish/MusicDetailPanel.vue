@@ -271,7 +271,7 @@ const localReviewed = ref(false)
 // §59.484 回归审核修：切换种子时重置 localReviewed——同一抽屉实例不重建·
 // 审核上一颗的 true 残留导致下一颗误显示"已审核"（用户实测：审核 A →
 // 点开 B 显示绿"已审核"·刷新才恢复红"强制审核通过"）
-watch(() => props.preset?.info_hash, () => { localReviewed.value = false })
+watch(() => props.preset?.info_hash, () => { localReviewed.value = false; posterLocal.value = '' })
 const isReviewed = computed(() => props.detail?.reviewed || localReviewed.value)
 
 async function confirmReview() {
