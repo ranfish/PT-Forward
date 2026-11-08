@@ -67,9 +67,9 @@ func TestExtractMusicSearchKeywordGlued(t *testing.T) {
 		want      string
 	}{
 		// RCA 案（12 环境·皇后 tid=99869 目标在）："60SACD"→[60,SACD]·
-		// SACD spec 剥·CJK 词由搜索层 CJK 降级轮剥（stripCJKWords→
-		// "RCA Living stereo 60" ⊆ 皇后标题）
-		{"古典名厂RCA Living stereo 60SACD 系列收藏 [SACD-ISO- 152G]", false, "古典名厂RCA Living stereo 60 系列收藏"},
+		// §59.487 用户实测定案：SACD=判别词（站内标题不恒带）保留——
+		// 皇后站方标题 "60 SACD" 空格形态 AND Contains 命中·更精准
+		{"古典名厂RCA Living stereo 60SACD 系列收藏 [SACD-ISO- 152G]", false, "古典名厂RCA Living stereo 60 SACD"},
 		// 纯字母/纯数字不拆
 		{"Carol Albert Stronger Now 2020", false, "Carol Albert Stronger Now 2020"},
 	}
@@ -95,6 +95,24 @@ func TestExtractMusicSearchKeywordAbbrev(t *testing.T) {
 	for _, c := range cases {
 		if got := ExtractMusicSearchKeyword(c.name, c.stripYear); got != c.want {
 			t.Errorf("ExtractMusicSearchKeyword(%q, %v) = %q, want %q", c.name, c.stripYear, got, c.want)
+		}
+	}
+}
+
+// §59.487: SACD 判别词定案锚——首 token spec 摧毁关键词案根治
+// （"SACD&LP 24bit..."合集名以规格开头·旧 spec break 输出空→
+// exhausted；用户实测皇后搜 "SACD LP" 直接命中站方标题形态）。
+func TestExtractMusicSearchKeywordSacdKept(t *testing.T) {
+	cases := []struct {
+		name string
+		want string
+	}{
+		{"SACD&LP 24bit Classical music-古典音乐", "SACD LP"},
+		{"VA - SACD&LP 24bit Classical music 2000 - FLAC 分軌", "SACD LP"},
+	}
+	for _, c := range cases {
+		if got := ExtractMusicSearchKeyword(c.name, false); got != c.want {
+			t.Errorf("ExtractMusicSearchKeyword(%q) = %q, want %q", c.name, got, c.want)
 		}
 	}
 }
