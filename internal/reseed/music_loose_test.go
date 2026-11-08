@@ -78,3 +78,30 @@ func TestMusicTitleStrongMatch(t *testing.T) {
 		t.Error("CJK 段命中应过")
 	}
 }
+
+// §59.486: 单词关键词门挂钩——厂牌/艺术家名单词（Monstercat 83.5GB 案：
+// max(2,..) 恒 2 → 单词 1 命中永拒 → 全候选灭 → iyuu fallback exhausted）。
+func TestMusicTitleStrongMatch_SingleWord(t *testing.T) {
+	// 单词整词命中（多词候选）→ 过（修复点）
+	if !musicTitleStrongMatch([]string{"monstercat"}, nil, "Monstercat - Best of 2023 2023 - FLAC 分軌") {
+		t.Errorf("单词关键词整词命中应过（Monstercat 案）")
+	}
+	if !musicTitleStrongMatch([]string{"monstercat"}, nil, "Various Artists - Monstercat - Best of 2025 2025 - FLAC 分軌 - Qobuz") {
+		t.Errorf("单词关键词长候选命中应过")
+	}
+	// 单词不命中 → 拒
+	if musicTitleStrongMatch([]string{"monstercat"}, nil, "Naxos 25 Years Collection FLAC") {
+		t.Errorf("单词不命中应拒")
+	}
+	// 单词子串不命中（词边界防线保留——§59.477 time⊆Times 防线）
+	if musicTitleStrongMatch([]string{"monster"}, nil, "Monstercat Best of 2023") {
+		t.Errorf("子串形态应拒（词边界防线）")
+	}
+	// 多词行为不变：4 词 2 命中过 / 1 命中拒
+	if !musicTitleStrongMatch([]string{"koda", "kumi", "feel", "mind"}, nil, "KODA KUMI - feel my mind 2004 - FLAC") {
+		t.Errorf("多词过半命中应过（不变）")
+	}
+	if musicTitleStrongMatch([]string{"koda", "kumi", "feel", "mind"}, nil, "koda something else FLAC") {
+		t.Errorf("多词 1 命中<2 应拒（不变）")
+	}
+}

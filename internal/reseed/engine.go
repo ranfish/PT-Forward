@@ -3663,7 +3663,15 @@ func musicLoosePick(results []*model.SeedingSearchResult, sourceTitle string, so
 func musicTitleStrongMatch(words []string, cjk []string, candidateTitle string) bool {
 	candLower := strings.ToLower(candidateTitle)
 	if len(words) > 0 {
+		// §59.486: 门下限与关键词词数挂钩——单词关键词（厂牌/艺术家名
+		// 下载器名就是一词·Monstercat 83.5GB 案）max(2,..) 恒 2 → 单词
+		// 1 命中永拒全候选灭（iyuu fallback exhausted 终态）。单词整词
+		// 边界命中=强标识（词边界已防子串伪命中·size 带兜底）；多词
+		// 维持 max(2, 过半) 不变（§59.477 毒案防线零放松）。
 		need := max(2, (len(words)+1)/2)
+		if len(words) < need {
+			need = len(words)
+		}
 		hits := 0
 		for _, w := range words {
 			if wordBoundaryIn(w, candLower) {
