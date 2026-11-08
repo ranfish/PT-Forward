@@ -4376,6 +4376,23 @@ func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *mod
 		h.logger.Info("mainline ptgen: music seed, skip",
 			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
 			zap.String("site", meta.SiteName))
+		// §59.490 附: 幂等清理 PTGen 影视语义残留列——upsert 零值语义
+		// （store 的 Assign 只写非零值字段）致重获不清理旧行：12 九簇
+		// 重获后消费行 ptgen/description 仍豆瓣残留实证。音乐语义两列
+		// 恒空——Updates map 显式写空串（map 可写零值）·每次获取都清
+		// （不只 force·防御性幂等）。影视链零触碰（music 不在场不进）。
+		if h.db != nil {
+			if uErr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+				Updates(map[string]interface{}{
+					"ptgen_source_json": "",
+					"description":       "",
+				}).Error; uErr != nil {
+				h.logger.Warn("mainline ptgen: music residue cleanup failed",
+					zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+					zap.Error(uErr))
+			}
+		}
 		return false
 	}
 	// §59.286 终版: 三级顺序链——douban →（失败）→ imdb →（失败）→ title；

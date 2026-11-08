@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/ranfish/pt-forward/internal/model"
 )
@@ -74,5 +76,48 @@ func TestRunMainlinePTGenMusicBypass(t *testing.T) {
 	}
 	if bomb.calls != 0 {
 		t.Fatalf("music seed: ptgen should not be called, got %d calls", bomb.calls)
+	}
+}
+
+// §59.490 附: 音乐跳过分支幂等清理锚——upsert 零值语义（Assign 只写
+// 非零值）致重获不清旧行；跳过时 Updates map 显式清空两列。
+func TestRunMainlinePTGenMusicResidueCleanup(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	musicJSON := `{"title":"t","music":{"artist":"a","album":"b"}}`
+	// 旧行带 PTGen 残留（12 九簇实测形态）
+	old := &model.TorrentMetadata{
+		InfoHash: "3a8b93e4e67c", SiteName: "皇后",
+		Title: "[2005.04.27] School Rumble",
+		Description:       "◎片名 校园迷糊大王",
+		PTGenSourceJSON:   `{"chinese_title":"校园迷糊大王"}`,
+		DetailSourceJSON:  musicJSON,
+	}
+	if err := db.Create(old).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	bomb := &bombPTGen{t: t}
+	h := &PublishTorrentsHandler{ptgen: bomb, logger: zap.NewNop(), db: db}
+	if h.runMainlinePTGen(context.Background(), old, false) {
+		t.Fatal("music seed: should return false")
+	}
+	var row model.TorrentMetadata
+	if err := db.Where("info_hash = ? AND site_name = ?", old.InfoHash, old.SiteName).First(&row).Error; err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if row.PTGenSourceJSON != "" || row.Description != "" {
+		t.Fatalf("residue not cleaned: ptgen=%q desc=%q", row.PTGenSourceJSON[:min(30, len(row.PTGenSourceJSON))], row.Description[:min(30, len(row.Description))])
+	}
+	if row.DetailSourceJSON != musicJSON {
+		t.Fatal("music block should be untouched")
+	}
+	if bomb.calls != 0 {
+		t.Fatalf("ptgen should not be called, got %d", bomb.calls)
 	}
 }
