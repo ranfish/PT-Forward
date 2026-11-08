@@ -34,6 +34,11 @@ var (
 	reOpenCDCoverImg = regexp.MustCompile(`<div class="cover"[^>]*>\s*<img[^>]*src=['"]([^'"]+)['"]`)
 	reOpenCDOldCoverURL = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*onclick=['"]Previewurl\('([^']+)'\)['"]`)
 	reOpenCDOldCoverSrc = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*src=['"]([^'"]+)['"]`)
+	// §59.488: 全文内容首图（第三层回退）——老种 div.cover 空+kdescr 无·
+	// 但发布者在简介正文开头贴了封面（三颗大合集案：tid=10004 attachments/
+	// tid=13377 http://open.cd/attachments/·tid=1836 http://j.imagehost.org/
+	// t/0138/cover.jpg——URL 本身含 "cover"）。排除 UI 图后首张内容图即封面。
+	reOpenCDContentImg = regexp.MustCompile(`src=['"]([^'"]+\.(?:jpg|jpeg|png|webp)(?:\?[^'"]*)?)['"]`)
 	// 字段行：<td class="rowtitle">字段名：</td><td ...>值</td>
 	reOpenCDField = regexp.MustCompile(`(?s)<td class="rowtitle"[^>]*>([^<：]+)：?</td>\s*<td[^>]*>(.*?)</td>`)
 	// §59.466: <a> 内文本反锚提取（tooltip data-options 属性含 jQuery('<div></div>')
@@ -183,6 +188,20 @@ func extractOpenCDCover(rawHTML string) string {
 		if c != "" && !strings.Contains(c, "trans.gif") {
 			return c
 		}
+	}
+	// §59.488: 第三层回退——全文内容首图（排除 UI 图）。
+	// 老种发布者在简介开头贴封面（三颗大合集案实证）。
+	for _, m := range reOpenCDContentImg.FindAllStringSubmatch(rawHTML, -1) {
+		u := m[1]
+		if u == "" || strings.Contains(u, "trans.gif") {
+			continue
+		}
+		// 排除 UI/站点模板图（相对路径 pic/·styles/·logo·favicon）
+		if strings.HasPrefix(u, "pic/") || strings.HasPrefix(u, "styles/") ||
+			strings.Contains(u, "logo") || strings.Contains(u, "favicon") {
+			continue
+		}
+		return u
 	}
 	return ""
 }

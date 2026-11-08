@@ -58,3 +58,41 @@ func TestOpenCDCover_NoCover(t *testing.T) {
 		t.Errorf("无封面: got=%q want empty", got)
 	}
 }
+
+// §59.488: 全文内容首图回退——老种 div.cover 空+kdescr 无·发布者在
+// 简介开头贴了封面（三颗大合集案实证）。
+func TestOpenCDCover_ContentImgFallback(t *testing.T) {
+	// tid=10004 形态：div.cover 空·简介首图 attachments/ 相对路径
+	html := `<div class="cover"></div>` +
+		`<div>正文区<br/><img src="attachments/201203/20120313093314abc.jpg" /></div>`
+	got := extractOpenCDCover(html)
+	if got != "attachments/201203/20120313093314abc.jpg" {
+		t.Errorf("内容首图回退(attachments): got=%q", got)
+	}
+	// tid=1836 形态：div.cover 空·简介首图外域图床
+	html2 := `<div class="cover"></div>` +
+		`<div>正文<br/><img src="http://j.imagehost.org/t/0138/cover.jpg" /></div>`
+	got2 := extractOpenCDCover(html2)
+	if got2 != "http://j.imagehost.org/t/0138/cover.jpg" {
+		t.Errorf("内容首图回退(外域): got=%q", got2)
+	}
+	// UI 图排除：pic/ 开头的模板图不取·取后面的内容图
+	html3 := `<img src="pic/logo.png" /><div class="cover"></div>` +
+		`<img src="pic/some_icon.jpg" /><img src="https://img.pixhost.to/real_cover.jpg" />`
+	got3 := extractOpenCDCover(html3)
+	if got3 != "https://img.pixhost.to/real_cover.jpg" {
+		t.Errorf("UI图排除: got=%q", got3)
+	}
+	// trans.gif 排除（内容区首张是占位·取后面的真图）
+	html4 := `<div class="cover"></div><img src="pic/trans.gif" />` +
+		`<img src="attachments/202401/real.jpg" />`
+	got4 := extractOpenCDCover(html4)
+	if got4 != "attachments/202401/real.jpg" {
+		t.Errorf("trans.gif排除: got=%q", got4)
+	}
+	// 全无内容图 → 空
+	html5 := `<div class="cover"></div><img src="pic/logo.png" />`
+	if got := extractOpenCDCover(html5); got != "" {
+		t.Errorf("无内容图: got=%q", got)
+	}
+}
