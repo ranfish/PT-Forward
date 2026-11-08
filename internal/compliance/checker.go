@@ -231,15 +231,6 @@ func (c *Checker) CheckWithSite(ctx context.Context, title, siteName string, isM
 	return c.checkSite(ctx, title, siteName)
 }
 
-// CheckWithSiteAndSubtitle §56.39: 带 subtitle + site 的合规检查。
-func (c *Checker) CheckWithSiteAndSubtitle(ctx context.Context, title, subtitle, siteName string) *Result {
-	r := c.checkFull(ctx, title, subtitle, ScopePublish)
-	if !r.Passed {
-		return r
-	}
-	return c.checkSite(ctx, title, siteName)
-}
-
 func (c *Checker) checkSite(ctx context.Context, title, siteName string) *Result {
 
 	if siteName == "" {
