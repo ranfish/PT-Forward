@@ -1327,10 +1327,17 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	if opts != nil && opts.SearchArea != "" {
 		areaParam = opts.SearchArea
 	}
+	// §59.486: 翻页参数（NP page 0 起——皇后无排序功能（列头零排序链接
+	// 实证）·order_by 方案废弃；大合集场景同体积真身在默认序 60+ 位·
+	// 第一页 50 截断外·音乐第三轮翻页聚合覆盖）
+	pageParam := ""
+	if opts != nil && opts.Page > 0 {
+		pageParam = "&page=" + fmt.Sprintf("%d", opts.Page)
+	}
 
 	var lastErr error
 	for _, bp := range browsePaths {
-		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=" + areaParam + "&search_mode=0&incldead=1" + catParam
+		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=" + areaParam + "&search_mode=0&incldead=1" + catParam + pageParam
 
 		// §59.213: 全站搜索调试（debug 级）——audiences-only 时代产物 universal 化：
 		// PT30 容器 vs 同容器探针结果分叉案（密阳 7 行 vs 0 行，同栈同 cookie
@@ -1370,7 +1377,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		parsed := parseNexusPHPBrowse(string(body), config)
+		parsed := parseNexusPHPBrowseLimit(string(body), config, searchLimitOf(opts))
 		if a.logger != nil {
 			a.logger.Debug("nexusphp search resp",
 				zap.String("domain", config.Domain),
@@ -1653,6 +1660,17 @@ func setCommonHeaders(req *http.Request, cookie string) {
 }
 
 func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
+	return parseNexusPHPBrowseLimit(html, config, 0)
+}
+
+// parseNexusPHPBrowseLimit §59.486: limit>0 覆盖默认 50 上限——皇后等
+// 单页全量站（61 条无分页）在"同体积真身排 60+ 位"场景（Monstercat
+// 77.8GB 案 tid=72218 位次 61）被默认 50 截断丢弃——音乐第三轮大上限
+// （150）覆盖。
+func parseNexusPHPBrowseLimit(html string, config *model.SiteConfig, limit int) []*model.SeedingSearchResult {
+	if limit <= 0 {
+		limit = 50
+	}
 
 	detailLinkRe := reNexusBrowseLink
 	altDetailLinkRe := reNexusBrowseAltLink
@@ -1834,7 +1852,7 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			textResults = append(textResults, result)
 		}
 
-		if len(textResults)+len(imgResults) >= 50 {
+		if len(textResults)+len(imgResults) >= limit {
 			break
 		}
 	}
@@ -1844,6 +1862,14 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		return textResults
 	}
 	return imgResults
+}
+
+// searchLimitOf §59.486: opts.MaxResults>0 → 解析上限（默认 50）。
+func searchLimitOf(opts *model.SearchOptions) int {
+	if opts != nil && opts.MaxResults > 0 {
+		return opts.MaxResults
+	}
+	return 0
 }
 
 var reHDCiTYEntry = regexp.MustCompile(`href="t-(\d+)"[^>]*>([^<]+)`)
