@@ -75,8 +75,16 @@
                   </a-descriptions-item>
                 </a-descriptions>
               </div>
-              <div v-if="detail?.poster" class="mdp-head-poster">
-                <a-image :src="detail.poster" :width="180" :fallback="fallbackPoster" style="border-radius: 4px" />
+              <!-- §59.488: poster 编辑入口（手动补封面——发布链审核工具） -->
+              <div class="mdp-head-poster">
+                <div v-if="posterDisplay" style="position: relative">
+                  <a-image :src="posterDisplay" :width="180" :fallback="fallbackPoster" style="border-radius: 4px" />
+                  <a-button size="small" style="position: absolute; top: 4px; right: 4px" @click="openPosterEdit">编辑</a-button>
+                </div>
+                <div v-else style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px; flex-direction: column; gap: 8px">
+                  <span style="color: #999; font-size: 12px">无封面</span>
+                  <a-button size="small" @click="openPosterEdit">补封面</a-button>
+                </div>
               </div>
             </div>
           </a-card>
@@ -178,6 +186,19 @@
       </div>
     </div>
   </a-drawer>
+  <!-- §59.488: poster 编辑弹窗 -->
+  <a-modal
+    v-model:open="posterEditOpen"
+    title="封面 URL"
+    :ok-text="posterSaving ? '保存中…' : '保存'"
+    :confirm-loading="posterSaving"
+    @ok="savePoster"
+  >
+    <a-input v-model:value="posterEditValue" placeholder="输入封面图 URL（pixhost/discogs/musicbrainz 等）" allow-clear />
+    <p v-if="posterEditValue" style="margin-top: 8px">
+      <a-image :src="posterEditValue" :height="120" :fallback="fallbackPoster" style="border-radius: 4px" />
+    </p>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -196,7 +217,35 @@ const props = defineProps<{
   preset: { info_hash: string; name: string; size: number; client_id: number } | null
 }>()
 
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'reviewed'): void }>()
+const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'reviewed'): void; (e: 'updated'): void }>()
+
+// §59.488: poster 编辑（手动补封面——发布链审核工具）
+const posterEditOpen = ref(false)
+// §59.488: poster 本地覆盖（不直接 mutate prop——vue/no-mutating-props）
+const posterLocal = ref('')
+const posterDisplay = computed(() => posterLocal.value || props.detail?.poster || '')
+const posterEditValue = ref('')
+const posterSaving = ref(false)
+function openPosterEdit() {
+  posterEditValue.value = props.detail?.poster || ''
+  posterEditOpen.value = true
+}
+async function savePoster() {
+  const hash = props.preset?.info_hash
+  if (!hash) return
+  posterSaving.value = true
+  try {
+    await seedConfigApi.putSeed(hash, { poster: posterEditValue.value.trim() })
+    posterLocal.value = posterEditValue.value.trim()
+    posterEditOpen.value = false
+    message.success('封面已更新')
+    emit('updated')
+  } catch (e: unknown) {
+    message.error('封面更新失败: ' + (e as Error).message)
+  } finally {
+    posterSaving.value = false
+  }
+}
 
 const music = computed(() => props.detail?.music ?? null)
 
