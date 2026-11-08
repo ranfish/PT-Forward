@@ -6396,11 +6396,15 @@ var musicGluedSplitRe = regexp.MustCompile(`[A-Za-z]+|\d+`)
 // （KSR043/LAB070/PHCP2035 形态族）。标题主体不含此形态。
 var musicCatalogNoRe = regexp.MustCompile(`^[A-Z]{2,6}\d{2,6}$`)
 
-// musicSpecTokenRe §59.477/§59.478: 规格/载体词——\d+BIT（16BIT/24BIT）·
+// musicSpecTokenRe §59.477/§59.478/§59.487: 规格/载体词——\d+BIT（16BIT/24BIT）·
 // CDEP/EP/WEB/Single·音频格式（FLAC/WAV/APE/ALAC/MP3/M4A——皇后标题
-// 恒带 FLAC 非判别词·剥除=关键词更宽=召回更稳·验证层过滤）·
-// SACD/ISO（§59.478 RCA 案：SACD-ISO 载体对形态）。
-var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a|sacd|iso)$`)
+// 恒带 FLAC 非判别词·剥除=关键词更宽=召回更稳·验证层过滤）。
+// §59.487 用户实测定案：SACD/ISO 移出——站内标题不恒带（少数合集带）
+// = 判别词·保留有筛价值（"SACD&LP 合集"案：皇后搜 "SACD LP" 直接命中
+// 站方标题形态；首 token spec 触发 break 摧毁关键词的案外根治）。
+// RCA 案回归推演："60SACD"→[60,SACD] 拆分后两词保留——皇后站方标题
+// "60 SACD"（空格形态）AND Contains 命中·不回归（更精准）。
+var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a)$`)
 
 func min(a, b int) int {
 	if a < b {
