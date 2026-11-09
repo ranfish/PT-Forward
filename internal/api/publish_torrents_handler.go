@@ -296,6 +296,10 @@ func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task
 	}
 	updated := 0
 	for i := range rows {
+		// §59.500 刀1: 行级完整性闸门——不完整不推理（与发布门同语义）
+		if missing := h.checkRequiredFields(&rows[i], detailSourceHasMusic(rows[i].DetailSourceJSON)); len(missing) > 0 {
+			continue
+		}
 		var existing []string
 		if rows[i].Tags != "" {
 			if err := json.Unmarshal([]byte(rows[i].Tags), &existing); err != nil {
@@ -3127,44 +3131,13 @@ fetched:
 				}
 			}
 
-			// §59.26: 标签推断（对齐 auto_feed：副标题+标题+简介+MI 多源关键词匹配）
-			// §59.319 附二十六补: Region+Statement 传入——产地语言联合推断依赖
-			inferer := publish.NewMediaTagInferer()
-			inferredTags := inferer.InferFull(publish.TagInput{
-				MediaInfo:   finalMeta.MediaInfo,
-				Title:       finalMeta.Title,
-				Subtitle:    finalMeta.Subtitle,
-				Description: finalMeta.Description,
-				NFO:         finalMeta.BDInfo,
-				Size:        size, // §59.72 B2: big_pack >1TB
-				Region:      finalMeta.RegionCode,
-				Statement:   finalMeta.Statement,
-			})
-			// 源站显式标签优先，推断只补空（§59.28 G：坏 JSON 不静默——记录并按空处理）
-			var existingTags []string
-			if finalMeta.Tags != "" {
-				if err := json.Unmarshal([]byte(finalMeta.Tags), &existingTags); err != nil {
-					h.logger.Warn("seed fetch: tags column invalid json, resetting",
-						zap.String("hash", hash), zap.Error(err))
-					existingTags = nil
-				}
-			}
-			if len(inferredTags) > 0 {
-				// §59.326: 音频语言族=推断独占域——existing（DB tags 列，可能含
-				// 上轮推断写入）中的音频语言标签先剔除再合并（智齿案：旧推断的
-				// 国/粤被当"源站显式"保留自我强化，MI 完备门重算永不纠错）；
-				// 其他类（HDR/规格）保持源站/人工优先语义。
-				cleaned := publish.CleanExistingForMerge(existingTags, finalMeta.MediaInfo)
-				// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁于合并结果
-				all := publish.MergeTags(cleaned, inferredTags)
-				if data, err := json.Marshal(all); err == nil {
-					updates["tags"] = string(data)
-				}
-			}
-
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
+			// §59.500 刀1: tags 推理换 inferFinalTags 单点——完整性闸门
+			// （截图/BDInfo 未到不推·后续数据源落地触发）；原 t0 内联推理
+			// 段（§59.26/§59.326/§59.496 附二逻辑全收编入单点）
+			h.inferFinalTags(ctx, clientUID, meta.InfoHash, meta.SiteName)
 		}
 	}
 
@@ -5207,6 +5180,68 @@ func (h *PublishTorrentsHandler) persistPTGenSource(ctx context.Context, infoHas
 	}
 }
 
+// inferFinalTags §59.500 刀1: 终局推理单点——完整性闸门达标后单轮推理。
+// 闸门=checkRequiredFields（形态条件化·与发布门同一语义：推理资格=发布
+// 资格=完整性·三端统一·用户定案"数据不完整即不推理"）。截图/BDInfo 未
+// 到或失败=missing=不可发布=不定型；幂等（推理纯函数+无变化不写）；
+// 定型后簇回传（clusterInferredFields·§59.326 附四同款语义）。
+func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID uint, infoHash, siteName string) {
+	var m model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&m).Error; err != nil {
+		return
+	}
+	// 完整性闸门：missing 非空=数据不完整=不推理（等待后续数据源触发）
+	if missing := h.checkRequiredFields(&m, detailSourceHasMusic(m.DetailSourceJSON)); len(missing) > 0 {
+		h.logger.Debug("infer final gated: incomplete",
+			zap.String("hash", infoHash[:min(10, len(infoHash))]),
+			zap.Strings("missing", missing))
+		return
+	}
+	var snapSize int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", infoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
+	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
+		MediaInfo:   m.MediaInfo,
+		Title:       m.Title,
+		Subtitle:    m.Subtitle,
+		Description: m.Description,
+		NFO:         m.BDInfo,
+		Size:        snapSize,
+		Region:      m.RegionCode,
+		Statement:   m.Statement,
+	})
+	var existing []string
+	if m.Tags != "" {
+		if err := json.Unmarshal([]byte(m.Tags), &existing); err != nil {
+			existing = nil
+		}
+	}
+	// §59.496 附二 existing 铁证门 + §59.74 MergeTags 单点
+	all := publish.MergeTags(publish.CleanExistingForMerge(existing, m.MediaInfo), inferred)
+	data, _ := json.Marshal(all)
+	if string(data) == m.Tags {
+		return
+	}
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update("tags", string(data)).Error; err != nil {
+		h.logger.Warn("infer final tags persist failed", zap.Error(err))
+		return
+	}
+	h.logger.Info("infer final tags applied",
+		zap.String("hash", infoHash[:min(10, len(infoHash))]),
+		zap.Int("tags_total", len(all)))
+	// 簇回传（幂等）：定型产物同步副本行
+	if clientUID != 0 {
+		var snap model.TorrentSnapshot
+		if err := h.db.WithContext(ctx).Where("hash = ?", infoHash).First(&snap).Error; err == nil {
+			h.propagateClusterMetadata(ctx, clientUID, snap.SavePath, snap.Name, infoHash, siteName)
+		}
+	}
+}
+
 // refreshInferredTags §59.70: t2 重推标签——PTGen 简介落库后评分行才存在
 // （t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
 // （既有标签全保留——直采/用户标签优先，推断只补差）。
@@ -5370,6 +5405,8 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 				h.logger.Info("screenshot cache hit",
 					zap.String("hash", infoHash[:min(10, len(infoHash))]),
 					zap.Int("shots", len(cached)))
+				// §59.500 刀1: 截图落地=完整性最后到达者之一→终局推理触发
+				h.inferFinalTags(ctx, clientUID, infoHash, siteName)
 			}
 			return
 		}
@@ -5440,6 +5477,8 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	}
 	// §59.61 第 4 步: 截图二次传播（策略异步完成后补簇内空行——元数据传播时未就绪）
 	h.propagateClusterScreenshots(ctx, clientUID, savePath, name, infoHash, string(data))
+	// §59.500 刀1: 截图落地=完整性最后到达者之一→终局推理触发
+	h.inferFinalTags(ctx, clientUID, infoHash, siteName)
 	h.logger.Info("screenshot strategy applied",
 		zap.String("hash", infoHash[:10]),
 		zap.Bool("local", isLocal),
