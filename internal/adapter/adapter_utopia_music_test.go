@@ -207,3 +207,25 @@ func TestUtopiaCoverBackfill(t *testing.T) {
 		t.Errorf("非乌托邦域应零动作, got poster=%q music=%v", d3.PosterURL, d3.Music)
 	}
 }
+
+// §59.493: Title 列剥保种区标记锚（22 环境实据形态——🌱 保种区 ×N（已保护 X 小时…）
+// 含换行截断形态（尾部无闭合括号=h1 换行）·剥后 Title 干净且 MusicMeta 解析正常。
+func TestUtopiaTitleStripSeedZoneMark(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"单行标记", "Godsmack - Faceless 2003 - FLAC 分轨 - Orpheus🌱 保种区 ×2（已保护 205 小时）",
+			"Godsmack - Faceless 2003 - FLAC 分轨 - Orpheus"},
+		{"换行截断", "Ali McGuirk - Watertop 2025 - FLAC 分轨🌱 保种区 ×2（已保护 82 小时",
+			"Ali McGuirk - Watertop 2025 - FLAC 分轨"},
+		{"免费标记", "Artist - Album 2020 - FLAC 整轨 [免费]",
+			"Artist - Album 2020 - FLAC 整轨"},
+		{"无标记", "Artist - Album 2020 - FLAC 分轨 - OpenCD",
+			"Artist - Album 2020 - FLAC 分轨 - OpenCD"},
+	}
+	for _, c := range cases {
+		got := strings.TrimSpace(reUtopiaTailFree.ReplaceAllString(
+			reUtopiaTailSeed.ReplaceAllString(c.in, ""), ""))
+		if got != c.want {
+			t.Errorf("%s:\n  in=%q\n got=%q\nwant=%q", c.name, c.in, got, c.want)
+		}
+	}
+}
