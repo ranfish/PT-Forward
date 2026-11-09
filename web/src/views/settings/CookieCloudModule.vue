@@ -178,7 +178,7 @@ async function handleSync() {
   syncing.value = true
   try {
     const resp = await cookiecloudApi.sync()
-    message.success(t('cookiecloud.syncCompleted', { n: resp.data?.data?.synced || 0 }))
+    message.success(t('cookiecloud.syncCompleted', { n: resp.data?.data?.synced_sites || 0 }))
     loadHistory()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }

@@ -9,7 +9,8 @@ export const cookiecloudApi = {
     return client.put<ApiResponse<CookieCloudConfig>>('/cookiecloud/config', data)
   },
   sync() {
-    return client.post<ApiResponse<{ synced: number }>>('/cookiecloud/sync')
+    // §59.498 附：返回 model.CookieCloudSyncHistory 形态（snake_case JSON tag）
+    return client.post<ApiResponse<{ synced_sites: number; skipped_sites: number }>>('/cookiecloud/sync')
   },
   listHistory(params?: { page?: number; size?: number }) {
     return client.get<ApiResponsePaginated<unknown>>('/cookiecloud/history', { params })
