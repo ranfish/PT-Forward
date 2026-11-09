@@ -147,7 +147,7 @@
           <a-alert v-if="updateInfo.release_notes" type="info" show-icon style="margin-bottom: 12px;">
             <template #message>更新内容</template>
             <template #description>
-              <pre style="white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto; margin: 0;">{{ updateInfo.release_notes }}</pre>
+              <pre style="white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto; margin: 0;">{{ stripSectionPrefix(updateInfo.release_notes) }}</pre>
             </template>
           </a-alert>
           <a-popconfirm title="确认更新？系统将自动重启。" ok-text="确认" cancel-text="取消" @confirm="performUpdate">
@@ -265,6 +265,21 @@ const backendVersion = ref('-')
 const updateChecking = ref(false)
 const updateModalVisible = ref(false)
 const updateInfo = ref<UpdateInfo | null>(null)
+
+// §59.503: 更新信息剥内部章节前缀——GitHub 自动 Release notes 每行=commit
+// 标题原文，行首 "§59.XXX[ 附N]：" 是 docs/31 章节锚定（commit 侧必须保留
+// ——项目管理需要），对更新弹窗读者是无意义前缀。展示层逐行剥掉：
+// ①冒号形态 "§59.502 附：内容" → 剥到冒号（含）
+// ②无冒号形态 "§59.500 刀3 MI 素材融合" → 剥编号+附标记+后随空白
+// 内容中间的 § 引用（如 "——§59.159 形态①"）非行首不动；无分隔符紧跟
+// 内容（§59.500刀3）不剥（保守防误伤）。
+const reSectionPrefix = /^(\s*(?:[-*]\s*)?)§\d+(?:\.\d+)?(?:\s*附[一二三四五六七八九十百\d]*)?(?:[：:]\s*|\s+)/
+function stripSectionPrefix(notes: string): string {
+  return notes
+    .split('\n')
+    .map((line) => line.replace(reSectionPrefix, '$1'))
+    .join('\n')
+}
 const updating = ref(false)
 
 function switchLocale(lang: string) {
