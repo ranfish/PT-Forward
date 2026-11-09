@@ -96,6 +96,7 @@ type updateSiteRequest struct {
 	AuthHash    *string `json:"authHash,omitempty"`
 	UserID      *int    `json:"userId,omitempty"`
 	RSSKey      *string `json:"rssKey,omitempty"`
+	UploadAuth  *string `json:"uploadAuth,omitempty"` // §59.501
 
 	HashStrategy     *string `json:"hashStrategy,omitempty"`
 	SizeStrategy     *string `json:"sizeStrategy,omitempty"`
@@ -157,6 +158,7 @@ type updateCredentialsRequest struct {
 	AuthHash    *string `json:"authHash,omitempty"`
 	UserID      *int    `json:"userId,omitempty"`
 	RSSKey      *string `json:"rssKey,omitempty"`
+	UploadAuth  *string `json:"uploadAuth,omitempty"` // §59.501 临时上传 Basic Auth
 }
 
 type siteResponse struct {
@@ -224,6 +226,7 @@ type siteResponse struct {
 	HasCookie      bool   `json:"hasCookie"`
 	CookieMasked   string `json:"cookieMasked,omitempty"`
 	HasAPIKey      bool   `json:"hasApiKey"`
+	HasUploadAuth  bool   `json:"hasUploadAuth"` // §59.501
 	APIKeyMasked   string `json:"apiKeyMasked,omitempty"`
 	HasBearerToken bool   `json:"hasBearerToken"`
 	HasAuthKey     bool   `json:"hasAuthKey"`
@@ -346,6 +349,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		HasCookie:      s.Cookie != "",
 		CookieMasked:   maskCookie(s.Cookie),
 		HasAPIKey:      s.APIKey != "",
+		HasUploadAuth:  s.UploadAuth != "",
 		APIKeyMasked:   maskPasskey(s.APIKey),
 		HasBearerToken: s.BearerToken != "",
 		HasAuthKey:     s.AuthKey != "",
@@ -564,6 +568,7 @@ type siteExportImport struct {
 
 var siteImportFields = []string{
 	"passkey", "api_key", "bearer_token", "auth_key", "auth_hash", "user_id", "rss_key",
+	"upload_auth",
 	"base_url", "auth_type", "enabled",
 	"cookie_cloud_sync", "cookie_cloud_domain",
 	"is_source", "is_target", "is_reseed_target", "participate_auto_publish",
@@ -1132,6 +1137,9 @@ func (h *SiteHandler) handleUpdateCredentials(w http.ResponseWriter, r *http.Req
 	}
 	if req.AuthHash != nil {
 		creds["auth_hash"] = *req.AuthHash
+	}
+	if req.UploadAuth != nil {
+		creds["upload_auth"] = *req.UploadAuth
 	}
 	if req.UserID != nil {
 		creds["user_id"] = *req.UserID

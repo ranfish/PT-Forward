@@ -19,6 +19,9 @@ type Site struct {
 
 	Passkey     string `json:"passkey,omitempty" gorm:"size:200" encrypted:"true"`
 	Cookie      string `json:"cookie,omitempty" gorm:"type:text" encrypted:"true"`
+	// §59.501: 临时上传 Basic Auth 凭证（好多油临时措施·"user:pass" 整体
+	// 加密存储·消费端确定性发送不探测·站点放开后用户清空即终）
+	UploadAuth  string `json:"upload_auth,omitempty" gorm:"size:200" encrypted:"true"`
 	APIKey      string `json:"api_key,omitempty" gorm:"size:200" encrypted:"true"`
 	BearerToken string `json:"bearer_token,omitempty" gorm:"size:200" encrypted:"true"`
 	AuthKey     string `json:"auth_key,omitempty" gorm:"size:200" encrypted:"true"`
@@ -173,6 +176,7 @@ type SiteInfo struct {
 
 	Passkey     string `json:"passkey,omitempty"`
 	Cookie      string `json:"cookie,omitempty"`
+	UploadAuth  string `json:"upload_auth,omitempty"` // §59.501
 	APIKey      string `json:"api_key,omitempty"`
 	BearerToken string `json:"bearer_token,omitempty"`
 	AuthKey     string `json:"auth_key,omitempty"`
@@ -351,6 +355,7 @@ type SiteConfig struct {
 	UserID      int    `json:"user_id,omitempty"`
 	RSSKey      string `json:"rss_key,omitempty"`
 	BearerToken string `json:"bearer_token,omitempty"`
+	UploadAuth  string `json:"upload_auth,omitempty"` // §59.501: 临时上传 Basic Auth
 
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`

@@ -241,6 +241,10 @@
               <a-form-item :label="apiKeyLabel">
                 <a-input v-model:value="credForm.apiKey" :placeholder="apiKeyHint" />
               </a-form-item>
+              <!-- §59.501: 临时上传 Basic Auth（好多油临时措施·站点放开后请清空） -->
+              <a-form-item label="上传凭证（临时）">
+                <a-input-password v-model:value="credForm.uploadAuth" placeholder="仅站点临时要求上传凭证时填写（user:pass）·放开后清空" />
+              </a-form-item>
             </a-col>
             <a-col v-if="showPasskeyField" :span="12">
               <a-form-item :label="site.passkeyAlias || t('sites.passkey')">
@@ -334,7 +338,7 @@ const siteId = Number(route.params.id)
 
 const loading = ref(false)
 const site = ref<Partial<Site>>({})
-const credForm = reactive({ cookie: '', passkey: '', apiKey: '', bearerToken: '', authKey: '', authHash: '', userId: undefined as number | undefined, rssKey: '' })
+const credForm = reactive({ cookie: '', passkey: '', apiKey: '', bearerToken: '', authKey: '', authHash: '', userId: undefined as number | undefined, rssKey: '', uploadAuth: '' })
 
 // §59.318: 角色显示（语义拆分后两参——辅种探测开关独立列展示）
 function formatRoles(isSource?: boolean, isTarget?: boolean): string {
@@ -521,6 +525,7 @@ async function updateCredentials() {
     const payload: SiteCredentials = {}
     if (credForm.passkey) payload.passkey = credForm.passkey
     if (credForm.apiKey) payload.apiKey = credForm.apiKey
+    if (credForm.uploadAuth !== undefined && credForm.uploadAuth !== '') payload.uploadAuth = credForm.uploadAuth
     if (credForm.bearerToken) payload.bearerToken = credForm.bearerToken
     if (credForm.authKey) payload.authKey = credForm.authKey
     if (credForm.authHash) payload.authHash = credForm.authHash
