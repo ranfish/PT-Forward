@@ -72,9 +72,10 @@
           <a-tag :color="triggerColor(record.trigger)" style="font-size: 11px">{{ triggerLabel(record.trigger) }}</a-tag>
         </template>
         <template v-if="column.key === 'title'">
-          <div>
-            <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
-            <div>{{ record.title || record.target_site }}</div>
+          <!-- §59.502: 双行单行省略（长标题挤压时间列——width+overflow 约束） -->
+          <div style="max-width: 100%">
+            <div v-if="record.subtitle" :title="record.subtitle" style="color: #666; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ record.subtitle }}</div>
+            <div :title="record.title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ record.title || record.target_site }}</div>
           </div>
         </template>
         <template v-else-if="column.key === 'source_site'">
@@ -228,7 +229,7 @@ const columns = [
   { title: '源站', key: 'source_site', width: 100 },
   { title: '目标站', key: 'target_site', width: 100 },
   { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 90 },
-  { title: '标题', key: 'title', ellipsis: true },
+  { title: '标题', key: 'title', ellipsis: true, width: 300 },
   { title: '状态', key: 'status', width: 80 },
   { title: '加种', key: 'seeded', width: 80 },
   { title: '耗时', key: 'cost_ms', width: 80 },
@@ -272,13 +273,16 @@ async function batchRepush() {
   }
 }
 
-// 补推条件：有站上种子 ID + 未真正推送（uploaded/pushed_existing/failed）+ 源 hash 可定位资源
-function canRepush(r: { torrent_id?: string; status?: string; seeded?: boolean; downloader_id?: string; save_path?: string }): boolean {
+// §59.502: 补推判据纯粹化（用户定案两轮收敛）——核心场景=发布链
+// 欠的收尾：上传成功→站方返回 tid→下载 .torrent/推下载器失败（站点或
+// 网络抖动）→ uploaded（一公里断裂·补推=完成自己的收尾·幂等轻量）。
+// 附带=duplicate（辅种增益·tid 在手做种别人老种）。其余排除：
+// pushed/pushed_existing 已推种（seeded 是 status 投影恒 1——"推过
+// 但校验不过"数据形态不存在·用户论证：不是同一种子补推也无用）；
+// failed/existing 无 tid（existing=辅种业务范畴·无权威 ID）。
+function canRepush(r: { torrent_id?: string; status?: string; downloader_id?: string; save_path?: string }): boolean {
   if (!r.torrent_id || !r.downloader_id || !r.save_path) return false
-  if (r.seeded && r.status === 'pushed') return false
-  // §59.491: duplicate 入集——站上已有（含别人发的老种）+tid 在手+未做种
-  // → 补推=拉站方种推下载器做种（辅站方种·增益 seeder）
-  return ['uploaded', 'pushed_existing', 'failed', 'duplicate'].includes(r.status ?? '')
+  return ['uploaded', 'duplicate'].includes(r.status ?? '')
 }
 
 async function repush(r: { id: number; torrent_id?: string; target_site?: string; source_info_hash?: string; downloader_id?: string; save_path?: string }) {
@@ -388,6 +392,12 @@ function statusColor(status: string): string {
     exists: 'gold',
     duplicate: 'gold', // §59.491: 站上已有（在线/本地 dedup 命中——防重正确终态）
     publishing: 'blue',
+    // §59.502: §59.159 四终态映射补全（此前缺——中英混杂根源）
+    pushed: 'green',
+    pushed_existing: 'green', // 已推种（302 权威 ID·含下载器已有形态）
+    uploaded: 'gold', // 上传成功未做种（一公里断裂——补推核心场景）
+    uploaded_existing: 'gold', // 上传成功（站上已有形态）未做种
+    existing: 'gold', // 站上已有（文案判定·无权威 ID——辅种业务范畴）
   }
   return map[status] || 'default'
 }
@@ -409,6 +419,12 @@ function statusLabel(status: string): string {
     exists: '已存在',
     duplicate: '站上已有', // §59.491: 在线/本地 dedup 命中（tid 在记录·可补推做种）
     publishing: '发布中',
+    // §59.502: §59.159 四终态映射补全（此前缺——显示英文原值）
+    pushed: '发布成功',
+    pushed_existing: '已发布·站上已有', // 302 权威 ID 已推种（含下载器已有）
+    uploaded: '已上传未做种', // 一公里断裂——补推核心场景
+    uploaded_existing: '已上传·站上已有', // 上传成功（已有形态）未做种
+    existing: '站上已有', // 文案判定·无权威 ID·辅种业务范畴（同 duplicate 文案·按钮区分）
   }
   return map[status] || status
 }
