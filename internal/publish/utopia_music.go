@@ -332,6 +332,48 @@ func utopiaMusicRipScore(mm *model.MusicMeta) string {
 	return ""
 }
 
+// ── 乌托邦值集白名单（§59.492 刀3 L2——四节实时复核 2026-11-09 快照·零漂移）──
+
+var utopiaAudioCodecValues = map[string]bool{
+	"1": true, "8": true, "9": true, "10": true, "11": true, "12": true,
+	"13": true, "14": true, "15": true, "4": true, "16": true, "17": true,
+	"18": true, "6": true, "7": true, "5": true, "3": true, "2": true,
+}
+var utopiaMediumValues = map[string]bool{"8": true, "9": true, "10": true, "11": true, "12": true}
+var utopiaTeamValues = map[string]bool{"1": true, "2": true, "3": true, "4": true, "5": true, "6": true}
+var utopiaTagValues = map[string]bool{
+	"1": true, "2": true, "6": true, "4": true, "5": true, "7": true,
+	"8": true, "10": true, "31": true, "30": true, "47": true, "44": true,
+	"43": true, "42": true, "41": true, "40": true, "39": true, "38": true,
+	"37": true, "36": true, "35": true, "34": true, "33": true, "32": true,
+	"29": true, "28": true, "27": true, "26": true, "25": true, "24": true,
+	"23": true, "22": true, "21": true, "20": true, "19": true, "18": true,
+	"17": true, "16": true, "15": true, "14": true, "13": true, "12": true,
+	"11": true, "9": true,
+}
+
+// utopiaMusicValueSetAudit §59.492 刀3 L2：DryRun 组装值 vs 值集白名单
+// 校验——miss 收集为 warnings（不拦：组装值来自翻译层映射·miss=映射
+// bug 或数据异常·DryRun 人工核对；正式发布不变）。
+func utopiaMusicValueSetAudit(form map[string]string, tagArray []model.TagKV) []string {
+	var w []string
+	for _, slot := range []struct{ key, name string; set map[string]bool }{
+		{"audiocodec_sel[4]", "音频编码", utopiaAudioCodecValues},
+		{"medium_sel[4]", "媒介", utopiaMediumValues},
+		{"team_sel[4]", "制作组", utopiaTeamValues},
+	} {
+		if v, ok := form[slot.key]; ok && v != "" && !slot.set[v] {
+			w = append(w, fmt.Sprintf("值集miss %s=%q（不在站方 %d 值白名单）", slot.name, v, len(slot.set)))
+		}
+	}
+	for _, kv := range tagArray {
+		if kv.Key == "tags[4][]" && !utopiaTagValues[kv.Value] {
+			w = append(w, fmt.Sprintf("值集miss 标签=%q（不在站方 44 值集）", kv.Value))
+		}
+	}
+	return w
+}
+
 // utopiaMusicLogCount §59.492 刀2: 种内 .log 文件数（乌托邦 log 硬拦
 // 预检——朱孝天案实证站方拦截"音乐种子包内未找到EAC抓轨LOG文件"）。
 // 判定=torrent 文件实体（fingerprint.FileTree·本地权威零网络·与

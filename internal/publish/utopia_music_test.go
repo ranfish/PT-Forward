@@ -256,3 +256,31 @@ func TestUtopiaMusicLogCount(t *testing.T) {
 		t.Fatal("empty: expect error")
 	}
 }
+
+// §59.492 刀3 L2: 值集校验锚——三态（全过/单 miss/多 miss 含标签）。
+func TestUtopiaMusicValueSetAudit(t *testing.T) {
+	// 全过：25174 真实形态槽位
+	form := map[string]string{
+		"audiocodec_sel[4]": "1", // FLAC
+		"medium_sel[4]":     "8", // CD
+		"team_sel[4]":       "5", // Other
+	}
+	tags := []model.TagKV{{Key: "tags[4][]", Value: "5"}, {Key: "tags[4][]", Value: "16"}}
+	if w := utopiaMusicValueSetAudit(form, tags); len(w) != 0 {
+		t.Fatalf("all-pass: want 0 warnings, got %v", w)
+	}
+	// 单 miss：audiocodec 不在 19 值
+	form["audiocodec_sel[4]"] = "99"
+	w := utopiaMusicValueSetAudit(form, tags)
+	if len(w) != 1 || !strings.Contains(w[0], "音频编码") {
+		t.Fatalf("single-miss: got %v", w)
+	}
+	// 多 miss：标签越界（"999" 不在 44 值集）+ 媒介越界
+	form["audiocodec_sel[4]"] = "1"
+	form["medium_sel[4]"] = "100"
+	tags = append(tags, model.TagKV{Key: "tags[4][]", Value: "999"})
+	w = utopiaMusicValueSetAudit(form, tags)
+	if len(w) != 2 {
+		t.Fatalf("multi-miss: want 2, got %v", w)
+	}
+}

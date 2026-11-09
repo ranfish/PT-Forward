@@ -248,10 +248,18 @@ multipart 字段名: torrent（tfile/file 均拒——"未上传种子文件"）
 
 ```
 L1 表单全览   dry_run_ok Form+Tags（§59.485 已有）
-L2 值集校验   组装值 vs 四节实时值集表——miss 即红
-L3 站规预检   bencode 数 .log（六节规则集）+ reviewed 门 + R7
-L4 站方解析   parse_torrent.php（五节契约）——log_count/has_cover 双验
+L2 值集校验   ✓ 刀3 实施——utopiaMusicValueSetAudit（编码/媒介/组
+             ∈白名单+标签∈44 值集·miss→Message 可见不拦·DryRun
+             人工核对）
+L3 站规预检   ✓ 刀2——log 门（DryRun 同拦）+ reviewed 门 + R7
+L4 站方解析   挂账（2026-11-09 定案）——真实上传站方内嵌
+             parse_torrent 自动跑（25174 实证）·DryRun 预演增量
+             仅剩 has_cover 回显·按需生长（本地/站方判定分歧
+             案例出现再做）
 ```
+
+DryRun Message 汇总形态（刀3）：`表单 N 域 · 种内 .log=X ·
+值集校验 ✓（或 ⚠ N 项miss: …）`
 
 ## 八、验证矩阵与素材矩阵（刀4）
 
