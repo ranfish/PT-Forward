@@ -246,6 +246,68 @@ func (s *SyncService) GetConfig(ctx context.Context) (*model.CookieCloudConfig, 
 	return s.getConfig(ctx)
 }
 
+// syncLoopIdleWait 未启用/builtin/耗时≥interval 时的短轮询间隔：
+// 配置变更（开启自动同步/改间隔）最快 30s 内被循环感知。
+const syncLoopIdleWait = 30 * time.Second
+
+// cookiecloudLoopWait §59.498: 同步循环等待计算（纯函数·测试锚）。
+// 语义 = 用户心智模型的"每 interval 分钟执行一次"（cron 式周期）：
+// 开始到开始 = interval（SyncAll 耗时从间隔中扣除）。
+func cookiecloudLoopWait(enabled bool, mode string, intervalMin int, elapsed time.Duration) time.Duration {
+	if !enabled || mode == "builtin" {
+		return syncLoopIdleWait
+	}
+	interval := time.Duration(intervalMin) * time.Minute
+	if interval < 5*time.Minute {
+		interval = 5 * time.Minute // 与旧调度任务同款下限（handler 另钳 >0→60）
+	}
+	if d := interval - elapsed; d > syncLoopIdleWait {
+		return d
+	}
+	return syncLoopIdleWait // 耗时≥interval-30s：兜底防热循环
+}
+
+// StartSyncLoop §59.498: CookieCloud 周期同步循环（对齐 IYUU StartSyncLoop
+// 模式——系统内两处"用户可配间隔"调度需求同款解法）。
+//
+// 替代旧 cookiecloud_sync 调度任务（固定 */5 tick + 距【完成】时刻比较的
+// 杂交模式）——其 off-by-epsilon 缺陷：LastSyncAt 记完成时刻+SyncAll 耗时
+// ~3s → "正好 interval"的 tick 永远差 3 秒被严格小于判断 skip → 10 分钟
+// 配置实际跑 15 分钟周期（29 实证 15:25→16:40 严格 15 分钟六条）。
+//
+// 语义：每 interval 分钟执行一次（开始到开始）；未启用/builtin 模式
+// （浏览器插件推送·无需拉取）30s 短轮询感知配置变化；手动"立即同步"
+// 不干扰循环节奏（LastSyncAt 仅作展示）。
+func (s *SyncService) StartSyncLoop(ctx context.Context) {
+	for {
+		var cfg model.CookieCloudConfig
+		start := time.Now()
+		ran := false
+		if err := s.db.WithContext(ctx).First(&cfg).Error; err == nil &&
+			cfg.SyncEnabled && cfg.Mode != "builtin" {
+			ran = true
+			if history, err := s.SyncAll(ctx); err != nil {
+				s.logger.Warn("cookiecloud scheduled sync failed", zap.Error(err))
+			} else {
+				s.logger.Info("cookiecloud scheduled sync completed",
+					zap.Int("synced", history.SyncedSites),
+					zap.Int("skipped", history.SkippedSites))
+			}
+		}
+		var elapsed time.Duration
+		if ran {
+			elapsed = time.Since(start)
+		}
+		// cfg 零值（无配置行/读失败）→ SyncEnabled=false → 短轮询 ✓
+		wait := cookiecloudLoopWait(cfg.SyncEnabled, cfg.Mode, cfg.SyncInterval, elapsed)
+		select {
+		case <-time.After(wait):
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (s *SyncService) GetDB() *gorm.DB {
 	return s.db
 }
