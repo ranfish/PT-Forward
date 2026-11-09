@@ -303,3 +303,27 @@ func TestUtopiaMusicFormValues_SACDMirror(t *testing.T) {
 		t.Fatalf("CD mirror: should stay unmapped (fail-fast), got %q", form["audiocodec_sel[4]"])
 	}
 }
+
+// §59.492 刀5: 值集白名单数量锚——与 utopia.md 四节实时复核快照对齐
+// （audiocodec 19 值含 0 占位→18 实值；medium 6→5；team 7→6；tags 44）。
+// 站方值集漂移时此锚红——提醒同步文档+白名单+锚三处。
+func TestUtopiaValueSetSizes(t *testing.T) {
+	if n := len(utopiaAudioCodecValues); n != 18 {
+		t.Fatalf("audiocodec 白名单 %d 项·want 18（utopia.md 四节 19 值含 0 占位）", n)
+	}
+	if n := len(utopiaMediumValues); n != 5 {
+		t.Fatalf("medium 白名单 %d 项·want 5（6 值含 0）", n)
+	}
+	if n := len(utopiaTeamValues); n != 6 {
+		t.Fatalf("team 白名单 %d 项·want 6（7 值含 0）", n)
+	}
+	if n := len(utopiaTagValues); n != 44 {
+		t.Fatalf("tags 白名单 %d 项·want 44", n)
+	}
+	// 关键铁律值在场（1 禁转/2 首发/47·44 加速——恒不勾但须在白名单可识别）
+	for _, k := range []string{"1", "2", "47", "44"} {
+		if !utopiaTagValues[k] {
+			t.Fatalf("tags 白名单缺关键值 %s", k)
+		}
+	}
+}
