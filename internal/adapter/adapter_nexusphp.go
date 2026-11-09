@@ -13,7 +13,8 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
+	"encoding/base64"
+"strings"
 	"sync"
 	"time"
 
@@ -1234,6 +1235,13 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
+	// §59.501: 好多油临时上传 Basic Auth（用户定案：确定性发送不探测——
+	// 站方网关级 401 realm="PT Upload" 挑战；带凭证仍 401=cookie/权限问题
+	// 诊断无歧义；空凭证零行为；站点放开限制后用户清空字段即终）
+	if config.UploadAuth != "" && strings.Contains(config.Domain, "hdupt.com") {
+		httpReq.Header.Set("Authorization",
+			"Basic "+base64.StdEncoding.EncodeToString([]byte(config.UploadAuth)))
+	}
 
 	// §59.159: 重定向 existed=1 捕获（NP 重复上传 302 details.php?id=N&existed=1 形态；
 	// 幸运实测为 200 失败页形态——双形态兼容，transport 继承站点代理）

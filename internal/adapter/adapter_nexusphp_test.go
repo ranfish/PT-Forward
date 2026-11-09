@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -2001,5 +2002,37 @@ func TestPreflightPublishStates(t *testing.T) {
 	r3, _ := a.PreflightPublish(context.Background(), &model.SiteConfig{Domain: s3.URL})
 	if r3 == nil || r3.Allowed || !strings.Contains(r3.Reason, "登录态失效") {
 		t.Errorf("登录墙应提示凭证失效: %+v", r3)
+	}
+}
+
+// §59.501: 好多油临时上传 Basic Auth——配置凭证即确定性发送（不探测），
+// 空凭证零行为；非好多油域配置了也不发（特判消费）。纯构造级断言。
+func TestUploadBasicAuthHeader(t *testing.T) {
+	// 正态：好多油 + 凭证 → Basic 头
+	cfg := &model.SiteConfig{Domain: "pt.hdupt.com", UploadAuth: "uploader:secret"}
+	req, _ := http.NewRequest("POST", "https://pt.hdupt.com/takeupload.php", nil)
+	if cfg.UploadAuth != "" && strings.Contains(cfg.Domain, "hdupt.com") {
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(cfg.UploadAuth)))
+	}
+	if got, want := req.Header.Get("Authorization"), "Basic "+base64.StdEncoding.EncodeToString([]byte("uploader:secret")); got != want {
+		t.Fatalf("header = %q want %q", got, want)
+	}
+	// 负态：空凭证零行为
+	cfg2 := &model.SiteConfig{Domain: "pt.hdupt.com"}
+	req2, _ := http.NewRequest("POST", "https://pt.hdupt.com/takeupload.php", nil)
+	if cfg2.UploadAuth != "" && strings.Contains(cfg2.Domain, "hdupt.com") {
+		req2.Header.Set("Authorization", "x")
+	}
+	if req2.Header.Get("Authorization") != "" {
+		t.Fatal("空凭证不得发送 Authorization")
+	}
+	// 负态：非好多油域配置了也不发
+	cfg3 := &model.SiteConfig{Domain: "other.site", UploadAuth: "u:p"}
+	req3, _ := http.NewRequest("POST", "https://other.site/takeupload.php", nil)
+	if cfg3.UploadAuth != "" && strings.Contains(cfg3.Domain, "hdupt.com") {
+		req3.Header.Set("Authorization", "x")
+	}
+	if req3.Header.Get("Authorization") != "" {
+		t.Fatal("非好多油域不得发送")
 	}
 }

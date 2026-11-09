@@ -408,6 +408,7 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		ContentType:         lookupContentType(s.Domain),
 		Passkey:             s.Passkey,
 		Cookie:              s.Cookie,
+		UploadAuth:          s.UploadAuth,
 		APIKey:              s.APIKey,
 		BearerToken:         s.BearerToken,
 		AuthKey:             s.AuthKey,

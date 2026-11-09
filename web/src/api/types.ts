@@ -248,6 +248,7 @@ export interface Site {
   hasCookie: boolean
   cookieMasked?: string
   hasApiKey: boolean
+  hasUploadAuth?: boolean // §59.501 临时上传 Basic Auth
   apiKeyMasked?: string
   hasBearerToken: boolean
   hasAuthKey: boolean
@@ -326,6 +327,7 @@ export interface SiteCredentials {
   authHash?: string
   userId?: number
   rssKey?: string
+  uploadAuth?: string // §59.501 临时上传 Basic Auth（user:pass）
 }
 
 export interface FilterRule {
