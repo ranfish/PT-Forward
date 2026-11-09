@@ -277,8 +277,13 @@ func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("hash = ?", rep.InfoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
 	// §59.319 附二十九: NFO 用扫描产出报告（rep 是更新前快照，BDInfo 恒空）
+	// §59.500 刀3 MI 素材融合 a：同 inferFinalTags 单点（local→source）
+	miForReinfer := rep.MediaInfo
+	if miForReinfer == "" {
+		miForReinfer = rep.SourceMediaInfo
+	}
 	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
-		MediaInfo:   rep.MediaInfo,
+		MediaInfo:   miForReinfer,
 		Title:       rep.Title,
 		Subtitle:    rep.Subtitle,
 		Description: rep.Description,
@@ -5203,8 +5208,16 @@ func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID u
 	var snapSize int64
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("hash = ?", infoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
+	// §59.500 刀3 MI 素材融合 a（用户定案）：local 优先→source 兜底——
+	// source MI 亦采集素材（"标签=采集素材+推理融合产物"），任一含编码
+	// 痕迹即铁证；远程下载器/本地分析未产出场景受同等版本族保护
+	// （BDInfo 走 NFO 独立通道不进此链）
+	miForInfer := m.MediaInfo
+	if miForInfer == "" {
+		miForInfer = m.SourceMediaInfo
+	}
 	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
-		MediaInfo:   m.MediaInfo,
+		MediaInfo:   miForInfer,
 		Title:       m.Title,
 		Subtitle:    m.Subtitle,
 		Description: m.Description,
@@ -5219,8 +5232,8 @@ func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID u
 			existing = nil
 		}
 	}
-	// §59.496 附二 existing 铁证门 + §59.74 MergeTags 单点
-	all := publish.MergeTags(publish.CleanExistingForMerge(existing, m.MediaInfo), inferred)
+	// §59.496 附二 existing 铁证门（融合素材同源）+ §59.74 MergeTags 单点
+	all := publish.MergeTags(publish.CleanExistingForMerge(existing, miForInfer), inferred)
 	data, _ := json.Marshal(all)
 	if string(data) == m.Tags {
 		return

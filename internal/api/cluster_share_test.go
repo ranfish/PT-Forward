@@ -254,6 +254,31 @@ func TestInferFinalTags_GateAndInfer(t *testing.T) {
 	if !has("chinese_subtitle") {
 		t.Errorf("既有标签不可丢: %v", tags)
 	}
+	// 态③ §59.500 刀3 MI 素材融合 a：仅 SourceMediaInfo 有编码铁证
+	// （MediaInfo 空——远程下载器/本地未产出形态）→ 铁证门生效剔除
+	// existing 中的 original_disc（remux 同门）
+	hash3 := "hsrc00000000000000000000000000000000000"
+	db.Create(&model.TorrentMetadata{InfoHash: hash3, SiteName: "朋友", Title: "电影.2024.1080p",
+		Description:     "◎豆瓣评分　8.4/10\n◎简　介　剧情",
+		Tags:            `["chinese_subtitle","original_disc","remux"]`,
+		Subtitle:        "*WCL原盘压制",
+		FetchSource:     "rss_detail",
+		Poster:          "https://example.com/p.jpg",
+		Screenshots:     `["https://example.com/1.jpg","https://example.com/2.jpg","https://example.com/3.jpg"]`,
+		SourceMediaInfo: "General\nVideo\nFormat : HEVC\nWriting library : x265 3.5",
+		Resolution:      "1080p", VideoCodec: "h265", AudioCodec: "aac",
+		RegionCode: "中国大陆"})
+	h.inferFinalTags(context.Background(), 0, hash3, "朋友")
+	var srcMI model.TorrentMetadata
+	db.Where("info_hash = ?", hash3).First(&srcMI)
+	var tags3 []string
+	_ = json.Unmarshal([]byte(srcMI.Tags), &tags3)
+	for _, x := range tags3 {
+		if x == "original_disc" || x == "remux" {
+			t.Errorf("source MI 铁证应剔除版本族: %v", tags3)
+			break
+		}
+	}
 }
 
 // §59.75: t2 PTGen 源持久化——ptgen_source_json 落库（Region/Genre 结构化资产，
