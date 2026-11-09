@@ -4035,20 +4035,6 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 			"edition_info":    profile.EditionInfo,
 			"region_code":     profile.RegionCode,
 		}
-		// tags 重推（MI 层判据版——§59.151 HDR/语言族结构化）
-		inferer := publish.NewMediaTagInferer()
-		inferred := inferer.Infer(mi, m.Title, m.Subtitle)
-		if sub := m.Subtitle; sub != "" {
-			// 副标题语义补充（infer 全输入）
-			inferred = inferer.InferFull(publish.TagInput{
-				MediaInfo: mi, Title: m.Title, Subtitle: sub,
-				Description: m.Description, Statement: m.Statement,
-				Region: regionLabelsOfMeta(m),
-			})
-		}
-		if data, err := json.Marshal(inferred); err == nil {
-			updates["tags"] = string(data)
-		}
 		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 			Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
 			Updates(updates).Error; err != nil {
@@ -4057,6 +4043,10 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 			skipped++
 			continue
 		}
+		// §59.500 刀4: tags 重推收编 inferFinalTags 单点——闸门（完整才
+		// 推理）+MI 素材融合 a+铁证门与 fetch 链同源（原段三参 Infer/
+		// 无闸门/单列 MI 三处偏差归一；存量自愈与增量定型同语义）
+		h.inferFinalTags(ctx, 0, m.InfoHash, m.SiteName)
 		recomputed++
 	}
 	Success(w, map[string]interface{}{
