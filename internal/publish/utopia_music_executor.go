@@ -83,6 +83,9 @@ func (e *PublishExecutor) executeMusicPublish(ctx context.Context, in ExecuteInp
 	}
 
 	// ④ DryRun 检查点（组装后·上传前——完整表单形态验证）
+	// §59.492 刀3：L1 表单全览+L2 值集校验（miss→Message 可见）+
+	// L3 站规预检（log 门在前·DryRun 同拦）。L4 站方解析挂账
+	// （真实上传站方内嵌 parse_torrent 自动跑——增量仅剩回显·按需生长）。
 	if in.DryRun {
 		dryForm := map[string]string{}
 		for k, v := range form {
@@ -91,10 +94,20 @@ func (e *PublishExecutor) executeMusicPublish(ctx context.Context, in ExecuteInp
 		for _, kv := range tagArray {
 			dryForm["["+kv.Key+"]"+fmt.Sprint(len(dryForm))] = kv.Value
 		}
+		msg := "表单 " + fmt.Sprint(len(form)) + " 域"
+		if logs, lErr := utopiaMusicLogCount(torrentData); lErr == nil {
+			msg += fmt.Sprintf(" · 种内 .log=%d", logs)
+		}
+		if w := utopiaMusicValueSetAudit(form, tagArray); len(w) > 0 {
+			msg += " · ⚠ 值集校验 " + fmt.Sprint(len(w)) + " 项miss: " + strings.Join(w, "；")
+		} else {
+			msg += " · 值集校验 ✓（编码/媒介/组/标签全在白名单）"
+		}
 		return &ExecuteResult{
-			Status: "dry_run_ok",
-			Form:   dryForm,
-			Tags:   utopiaMusicTags(meta, mm, groupName),
+			Status:  "dry_run_ok",
+			Message: msg,
+			Form:    dryForm,
+			Tags:    utopiaMusicTags(meta, mm, groupName),
 		}
 	}
 
