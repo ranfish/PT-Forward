@@ -302,7 +302,8 @@ func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task
 				existing = nil
 			}
 		}
-		all := publish.MergeTags(existing, inferred)
+		// §59.496 附二: existing 过铁证门（同 t0/t2 单点）
+		all := publish.MergeTags(publish.CleanExistingForMerge(existing, rows[i].MediaInfo), inferred)
 		data, _ := json.Marshal(all)
 		if string(data) == rows[i].Tags {
 			continue
@@ -2973,17 +2974,6 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	}
 fetched:
 
-	// §59.236 ①: 主链必经 PTGen——豆瓣链接 → PTGen 端点查询 →
-	// ptgen_source_json（唯一账本，落代表行）+ desc=RawBBCode。
-	// 失败全空（incomplete 状态机承接——用户自查端点；站方原文
-	// 不保存 §59.236 定案）。取代 §59.235 P2 的 extractPTGenAssets
-	// 双时序补丁（架构性取代——kdouban/NexusPHP 分叉根除）。
-	// §59.286 终版: 主链 PTGen 单点单责——三级顺序链成功时同步吸收②副产物
-	// 中的标签重推（②海报链全线下线；海报簇传播由尾部 finalizeClusterPropagation
-	// 统一执行——幂等可重复；ptgen_source_json canonical 包装已并入主链 persist）
-	if h.runMainlinePTGen(ctx, meta, force) {
-		h.refreshInferredTags(ctx, meta.InfoHash, meta.SiteName)
-	}
 	// §59.49+§59.57: 截图探活与策略——strategy 可用时探活内联进其前序（串行消除竞态：
 	// 原双 goroutine 并发，strategy 读到 purge 前死链 → rehost 失败保源 → same 早退 → 永不捕获）；
 	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
@@ -3018,6 +3008,20 @@ fetched:
 			// （haveSet 跳过已有行），重获场景副本恒空（PT31 63 副本实锤）
 			propagateClusterMediainfoDB(h.db, h.logger, ctx, clientUID, savePath, name, meta.InfoHash, localMI)
 		}
+	}
+
+	// §59.236 ①: 主链必经 PTGen——豆瓣链接 → PTGen 端点查询 →
+	// ptgen_source_json（唯一账本，落代表行）+ desc=RawBBCode。
+	// 失败全空（incomplete 状态机承接——用户自查端点；站方原文
+	// 不保存 §59.236 定案）。取代 §59.235 P2 的 extractPTGenAssets
+	// 双时序补丁（架构性取代——kdouban/NexusPHP 分叉根除）。
+	// §59.286 终版: 主链 PTGen 单点单责——三级顺序链成功时同步吸收②副产物
+	// 中的标签重推（②海报链全线下线；海报簇传播由尾部 finalizeClusterPropagation
+	// 统一执行——幂等可重复；ptgen_source_json canonical 包装已并入主链 persist）
+	// §59.496 附二 B1: 挪至 localMI 落库后——t2 重推原在 MI 落库前执行，
+	// 铁证素材未到先推理（文案兜底写 OD）·Black Snow 案时序缺陷根治
+	if h.runMainlinePTGen(ctx, meta, force) {
+		h.refreshInferredTags(ctx, meta.InfoHash, meta.SiteName)
 	}
 
 	// §59.26: TechProfile 三源合并 + 分类推断 + 声明过滤（与 runAnalyze ⑫ 统一管线）
@@ -3150,12 +3154,7 @@ fetched:
 				// 上轮推断写入）中的音频语言标签先剔除再合并（智齿案：旧推断的
 				// 国/粤被当"源站显式"保留自我强化，MI 完备门重算永不纠错）；
 				// 其他类（HDR/规格）保持源站/人工优先语义。
-				cleaned := make([]string, 0, len(existingTags))
-				for _, t := range existingTags {
-					if !publish.IsAudioLanguageTag(t) {
-						cleaned = append(cleaned, t)
-					}
-				}
+				cleaned := publish.CleanExistingForMerge(existingTags, finalMeta.MediaInfo)
 				// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁于合并结果
 				all := publish.MergeTags(cleaned, inferredTags)
 				if data, err := json.Marshal(all); err == nil {
@@ -5237,7 +5236,8 @@ func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHa
 		}
 	}
 	// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁；无变化不写
-	all := publish.MergeTags(existing, inferred)
+	// §59.496 附二: existing 过铁证门（音频族+MIEncoded 版本族剔除）
+	all := publish.MergeTags(publish.CleanExistingForMerge(existing, m.MediaInfo), inferred)
 	data, _ := json.Marshal(all)
 	if string(data) == m.Tags {
 		return
