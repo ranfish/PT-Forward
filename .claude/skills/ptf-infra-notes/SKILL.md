@@ -61,3 +61,17 @@ rm -f /tmp/opencode/*_cookie.txt /tmp/opencode/*-cookie.txt \
 - `page.evaluate()` 中的变量必须用闭包或参数传递，不能直接引用外层 `const` 变量
 - `innerText` 抓取可能遗漏 JS 动态渲染的 `<select>` 选项，需要用 DOM query 做 deep inspect
 - NODE_PATH：`NODE_PATH=/home/incast/.npm-global/lib/node_modules`
+
+## Playwright 容器化运行（§59.499 工具化·用户指令）
+
+**统一入口**：`bash .claude/skills/ptf-infra-notes/scripts/pw-run.sh <脚本.js>`——封装镜像/浏览器路径/挂载/网络，免每次重查经验。
+
+固化经验（脚本内已实现）：
+- 镜像 `mcr.microsoft.com/playwright:v1.53.0-noble`（自带 node+chromium·与 playwright-core 版本配套）
+- **29 宿主直跑 chromium 缺 libnspr4 等系统库——必须走容器**（§59.499 实证）
+- 浏览器路径容器内探测 `/ms-playwright/chromium-*/chrome-linux/chrome`（镜像升级自动适配）
+- playwright-core npm 包在 `/tmp/opencode/node_modules`（缺失时脚本提示安装命令）
+- 脚本所在目录挂载 `/pwtest`（截图产物直接落宿主机）；`--network host` 访问内网目标
+- 脚本约定：`chromium.launch({ executablePath: process.env.CHROME_PATH })`；PT-Forward 登录注入 `localStorage.setItem('pt-forward-access-token', token)`
+
+**UI 验证场景**（无缓存环境渲染验证·§59.499 破案法）：Playwright 全新上下文加载页面→操作到目标组件→DOM dump（`document.querySelector` 取 innerHTML/子元素计数）——比截图更硬（模型不读图时 DOM 层可判）。

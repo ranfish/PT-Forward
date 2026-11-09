@@ -31,8 +31,13 @@
       show-icon
       style="margin-bottom: 12px"
     >
-      <a-progress :percent="progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0" size="small" />
-      <a-button v-if="!progress.stopRequested" size="small" danger style="margin-top: 4px" @click="stopBatchFetch">停止</a-button>
+      <!-- §59.499: antd-vue Alert 不渲染默认插槽（v0.0.1392 停止按钮写在
+           默认 slot 从未显示·99 无缓存环境 Playwright DOM dump 实证
+           空注释占位）——移入 #description 插槽 -->
+      <template #description>
+        <a-progress :percent="progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0" size="small" />
+        <a-button v-if="!progress.stopRequested" size="small" danger style="margin-top: 4px" @click="stopBatchFetch">停止</a-button>
+      </template>
     </a-alert>
 
     <!-- 完成汇总 -->
@@ -45,16 +50,18 @@
       style="margin-bottom: 12px"
       @close="fetchDone = false"
     >
-      <div v-if="progress.items.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
-        <div v-for="item in progress.items" :key="item.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
-          <span v-if="item.status === 'done'" style="color: #52c41a">✓</span>
-          <span v-else-if="item.status === 'deferred'" style="color: #faad14">⏳</span>
-          <span v-else-if="item.status === 'failed'" style="color: #ff4d4f">✗</span>
-          <span v-else style="color: #999">…</span>
-          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.name }}</span>
-          <span v-if="item.error" style="color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.error }}</span>
+      <template #description>
+        <div v-if="progress.items.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
+          <div v-for="item in progress.items" :key="item.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
+            <span v-if="item.status === 'done'" style="color: #52c41a">✓</span>
+            <span v-else-if="item.status === 'deferred'" style="color: #faad14">⏳</span>
+            <span v-else-if="item.status === 'failed'" style="color: #ff4d4f">✗</span>
+            <span v-else style="color: #999">…</span>
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.name }}</span>
+            <span v-if="item.error" style="color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.error }}</span>
+          </div>
         </div>
-      </div>
+      </template>
     </a-alert>
 
     <!-- 种子列表 -->

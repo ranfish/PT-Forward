@@ -21,10 +21,14 @@
       </template>
     </a-page-header>
 
-    <a-alert v-if="scannedAt" type="info" style="margin: 0 24px 16px" show-icon>
-      {{ t('orphan.lastScan') }}: {{ formatTime(scannedAt.toISOString()) }} ·
-      {{ orphans.length }} {{ t('orphan.itemsFound') }}
-    </a-alert>
+    <!-- §59.499: antd-vue Alert 默认插槽不渲染（全库同型第四处）——摘要移入 #message -->
+    <a-alert
+      v-if="scannedAt"
+      type="info"
+      style="margin: 0 24px 16px"
+      show-icon
+      :message="`${t('orphan.lastScan')}: ${formatTime(scannedAt.toISOString())} · ${orphans.length} ${t('orphan.itemsFound')}`"
+    />
 
     <div style="padding: 0 24px; margin-bottom: 16px">
       <a-card v-if="showIgnored" size="small" title="忽略列表（这些路径不会被扫描）" style="margin-bottom: 16px">
@@ -51,7 +55,7 @@
     <div style="padding: 0 24px; margin-bottom: 16px">
       <a-card size="small" :title="t('orphan.scanConfigTitle')">
         <div v-if="scanConfigs.length > 0" style="margin-bottom: 12px">
-          <a-tag v-for="cfg in scanConfigs" :key="cfg.id" closable @close="deleteScanConfig(cfg.id)" style="margin-bottom: 4px">
+          <a-tag v-for="cfg in scanConfigs" :key="cfg.id" closable style="margin-bottom: 4px" @close="deleteScanConfig(cfg.id)">
             {{ cfg.client_uid }}: {{ cfg.scan_path }}
           </a-tag>
         </div>
