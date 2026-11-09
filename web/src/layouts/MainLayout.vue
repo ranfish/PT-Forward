@@ -274,11 +274,21 @@ const updateInfo = ref<UpdateInfo | null>(null)
 // 内容中间的 § 引用（如 "——§59.159 形态①"）非行首不动；无分隔符紧跟
 // 内容（§59.500刀3）不剥（保守防误伤）。
 const reSectionPrefix = /^(\s*(?:[-*]\s*)?)§\d+(?:\.\d+)?(?:\s*附[一二三四五六七八九十百\d]*)?(?:[：:]\s*|\s+)/
+// §59.503 附:只保留更新内容本体——剥 GitHub 自动 notes 的非内容元素：
+// ①列表标记 "* " ②行尾 " by @user in https://…" ③结构行（## What's Changed /
+// **Full Changelog**·含 ## New Contributors 等 ## 通配）④首尾空行 trim
+const reListMark = /^\s*[-*]\s+/
+const reTailAuthor = /\s+by\s+@\S+\s+in\s+\S+\s*$/
+const reStructLine = /^\s*(?:##\s|\*\*Full Changelog\*\*)/
 function stripSectionPrefix(notes: string): string {
   return notes
     .split('\n')
-    .map((line) => line.replace(reSectionPrefix, '$1'))
+    .filter((line) => !reStructLine.test(line))
+    .map((line) =>
+      line.replace(reSectionPrefix, '$1').replace(reListMark, '').replace(reTailAuthor, ''),
+    )
     .join('\n')
+    .trim()
 }
 const updating = ref(false)
 
