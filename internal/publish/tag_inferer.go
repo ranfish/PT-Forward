@@ -905,6 +905,28 @@ var audioLanguageTags = map[string]bool{
 }
 
 // IsAudioLanguageTag 判定是否音频语言族标签（§59.326 推断独占域）。
+// CleanExistingForMerge §59.496 附二: tags 合并前 existing 清理（t0/t2/
+// BDInfo 重推三处单点）。两类剔除：
+//   ① 音频语言族（§59.326 推断独占域——旧推断自我强化防治）
+//   ② MIEncoded 时的 original_disc/remux（243 Black Snow 案：t2 重推先于
+//     localMI 落库执行——MI 空文案兜底写入 OD→t0 铁证在场却把 t2 产物
+//     当"源站显式"豁免保留——推断产物自我强化·与音频族同构；MI 铁证下
+//     与推断产出同门剔除零豁免。MI 空/无铁证时保留=文案兜底语义不收紧）
+func CleanExistingForMerge(existing []string, mi string) []string {
+	miEncoded := titleparser.ExtractMediaInfo(mi).Encoded
+	out := make([]string, 0, len(existing))
+	for _, t := range existing {
+		if IsAudioLanguageTag(t) {
+			continue
+		}
+		if miEncoded && (t == "original_disc" || t == "remux") {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 func IsAudioLanguageTag(tag string) bool {
 	return audioLanguageTags[tag]
 }

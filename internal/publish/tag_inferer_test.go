@@ -712,3 +712,42 @@ func TestInferFullVersionTypeMIVeto(t *testing.T) {
 		t.Fatalf("clean MI: original_disc text inference should stand, got %v", got)
 	}
 }
+
+// §59.496 附二: existing 过铁证门锚——Black Snow 案（t2 文案兜底写 OD→
+// t0 铁证在场被"直采优先"豁免保留的自我强化）根治回归。
+func TestCleanExistingForMerge(t *testing.T) {
+	miEncoded := "General\nVideo\nFormat : HEVC\nWriting library : x265 3.5"
+	cases := []struct {
+		name     string
+		existing []string
+		mi       string
+		want     []string
+	}{
+		// MIEncoded：t2 兜底写入的 OD/remux 剔除（本案形态；
+		// chinese_audio 同时被音频族剔除——§59.326 既有语义·inferred 补回）
+		{"mi-veto", []string{"10_bit", "original_disc", "chinese_audio", "remux"}, miEncoded,
+			[]string{"10_bit"}},
+		// MI 空：文案兜底语义保留（无铁证不收紧）
+		{"no-mi keep", []string{"original_disc", "remux"}, "", []string{"original_disc", "remux"}},
+		// 无铁证 MI（原生）：保留
+		{"clean mi keep", []string{"original_disc"}, "General\nFormat : BDAV", []string{"original_disc"}},
+		// 音频族剔除（§59.326 语义回归）
+		{"audio family", []string{"chinese_audio", "cantonese_audio", "10_bit"}, miEncoded,
+			[]string{"10_bit"}},
+		// 空输入
+		{"empty", nil, miEncoded, []string{}},
+	}
+	for _, c := range cases {
+		got := CleanExistingForMerge(c.existing, c.mi)
+		if len(got) != len(c.want) {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%s: got %v want %v", c.name, got, c.want)
+				break
+			}
+		}
+	}
+}
