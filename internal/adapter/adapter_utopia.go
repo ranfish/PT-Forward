@@ -37,9 +37,10 @@ var (
 	reUtopiaOriginURL = regexp.MustCompile(`转载自：?\s*</span>\s*<a href=['"]([^'"]+)['"]`)
 	// 抓轨 Log 区（codemain pre——多碟 FindAll join）
 	reUtopiaRipLog = regexp.MustCompile(`(?s)抓轨 Log[^<]*</td>\s*<td[^>]*>.*?<pre><code>(.*?)</code></pre>`)
-	// h1 尾部状态标记（[免费]/🌱保种区）
+	// h1 尾部状态标记（[免费]/🌱保种区×N（已保护 X 小时）——§59.493 升级 (?s)：
+	// h1 含换行时 🌱.*$ 剥不净（22 环境实据尾部"（已保护 82 小时"无闭合=换行截断形态））
 	reUtopiaTailFree = regexp.MustCompile(`\s*\[免费\]\s*$`)
-	reUtopiaTailSeed = regexp.MustCompile(`🌱.*$`)
+	reUtopiaTailSeed = regexp.MustCompile(`(?s)🌱.*`)
 	// 标题年份（中段末位剥取）
 	reUtopiaYear = regexp.MustCompile(`\b(19|20)\d{2}\b`)
 	// 格式词表（标题中段剥取——从右往左）
@@ -65,6 +66,12 @@ func (a *NexusPHPAdapter) enrichUtopiaMusic(config *model.SiteConfig, rawHTML st
 			detail.PosterURL = m[1]
 		}
 	}
+	// §59.493: Title 列剥站方尾部状态标记（保种区×N（已保护 X 小时）/
+	// [免费]——站方页面装饰非种名内容。此前剥仅作用于 MusicMeta 解析
+	// 输入·Title 列原样落库（22 环境保种区批实据：title 尾
+	// "🌱 保种区 ×2（已保护 82 小时…"）。
+	detail.Title = strings.TrimSpace(reUtopiaTailFree.ReplaceAllString(
+		reUtopiaTailSeed.ReplaceAllString(detail.Title, ""), ""))
 	mm := buildUtopiaMusicMeta(rawHTML, detail.Title)
 	if mm != nil {
 		detail.Music = mm
