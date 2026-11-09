@@ -481,6 +481,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		IsTarget:    s.IsTarget,
 		Passkey:     s.Passkey,
 		Cookie:      s.Cookie,
+		UploadAuth:  s.UploadAuth, // §59.501 发布链消费（siteToConfig）
 		APIKey:      s.APIKey,
 		AuthKey:     s.AuthKey,
 		AuthHash:    s.AuthHash,
