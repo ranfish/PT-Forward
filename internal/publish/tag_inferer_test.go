@@ -658,3 +658,57 @@ func TestSingleAudioCollapseAnyChannel(t *testing.T) {
 		t.Fatalf("单轨不应双中文标签（统一收敛层）: %v", tags)
 	}
 }
+
+// §59.496: 版本类型族 MI 铁证判定——MIEncoded 即重编码（用户定案：
+// 推理产物模式）。Black Snow 案：副标题"*WCL原盘压制"文案命中
+// original_disc 词条压过 MI Writing library x265——推理产出即脏。
+// 锚四态：编码痕迹否决原盘/否决 remux/无 MI 文案兜底/真原盘 MI 不误杀。
+func TestInferFullVersionTypeMIVeto(t *testing.T) {
+	miEncoded := "General\nComplete name : x.mkv\nVideo\nFormat : HEVC\nWriting library : x265 - 3.4"
+	// 副标题"原盘压制"（本案形态）+ 编码痕迹 → original_disc 不产出
+	got := NewMediaTagInferer().InferFull(TagInput{
+		Title: "Black Snow 1990 1080p BluRay x265 FLAC 1.0 2Audios-FRDS",
+		Subtitle: "【本命年】10bit HEVC版本 国语 带评论 简繁英字幕 *WCL原盘压制",
+		MediaInfo: miEncoded,
+	})
+	for _, tg := range got {
+		if tg == "original_disc" {
+			t.Fatalf("encode veto: original_disc should not be inferred, got %v", got)
+		}
+	}
+	// 标题 Remux + 编码痕迹 → remux 不产出（物理互斥同款）
+	got = NewMediaTagInferer().InferFull(TagInput{
+		Title: "Movie 2020 1080p BluRay REMUX x265", MediaInfo: miEncoded,
+	})
+	for _, tg := range got {
+		if tg == "remux" {
+			t.Fatalf("encode veto: remux should not be inferred, got %v", got)
+		}
+	}
+	// 无 MI（铁证缺失）→ 文案兜底照旧（"原盘压制"仍产出——弱证据场景不收紧）
+	got = NewMediaTagInferer().InferFull(TagInput{
+		Subtitle: "*WCL原盘压制",
+	})
+	found := false
+	for _, tg := range got {
+		if tg == "original_disc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no-MI fallback: original_disc should still infer from text, got %v", got)
+	}
+	// 无编码痕迹 MI（原生/BDAV）→ 文案判据不受影响（不误杀真原盘场景）
+	got = NewMediaTagInferer().InferFull(TagInput{
+		Subtitle: "官方原盘", MediaInfo: "General\nComplete name : x.bdobj\nVideo\nFormat : HEVC",
+	})
+	found = false
+	for _, tg := range got {
+		if tg == "original_disc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("clean MI: original_disc text inference should stand, got %v", got)
+	}
+}

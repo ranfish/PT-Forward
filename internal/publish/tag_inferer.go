@@ -57,6 +57,25 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// Language/Title 字段直证（跨行 regex 补丁废除）; 数值判据层内化
 	// （General["overall bit rate"] / Videos[0]["width"/"frame rate"]）。
 	miSec := titleparser.ParseMISections(in.MediaInfo)
+	// §59.496: 版本类型族 MI 铁证判定（用户定案：MIEncoded 即判定重编码——
+	// 推理产物模式·非发布侧否决）。Black Snow 案：副标题"*WCL原盘压制"
+	// 文案命中 dict 词条 original_disc（infer_pattern="原盘" scope=title_raw
+	// 子串命中）压过 MI Writing library x265 编码铁证——tags 列落库即脏
+	// → 优堡勾"原生原盘"被拒"非原盘"。编码痕迹与原盘/Remux 物理互斥
+	// （Remux 定义=无重编码）——ExtractMediaInfo 的 Encoded 判据
+	// （§59.151 唯一真相+§59.319 附三十二 General 段词表叠加）为终审：
+	// MIEncoded=true 时 original_disc/remux 一律不产出（文案只是素材，
+	// 推理融合判定后落库的才是产物——副标题"原盘压制"类来源描述天然免疫）。
+	if tech := titleparser.ExtractMediaInfo(in.MediaInfo); tech.Encoded {
+		filtered := tags[:0]
+		for _, t := range tags {
+			if t == "original_disc" || t == "remux" {
+				continue
+			}
+			filtered = append(filtered, t)
+		}
+		tags = filtered
+	}
 	// §59.326: MI 音轨完备门——Audios 非空且至少一轨有语言证据=MI 是
 	// 完备音轨清单，desc_raw 通道（TagInferMatches 扫豆瓣简介"◎语 言"=
 	// 作品元数据非本种音轨）产出的音频语言标签全部剔除（智齿案：LiTV
