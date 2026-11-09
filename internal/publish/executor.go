@@ -3382,7 +3382,24 @@ func (e *PublishExecutor) regionMappingOf(cfg *model.PublishFormConfig, siteName
 			}
 		}
 	}
-	return fallbackByValue(mappings, "28")
+	// §59.494: 兜底站自适应——"28"为 HDVideo 值集（其它站无 28 值会
+	// fallback nil→region 缺→站方"质量区域未选择"·优堡案）。miss 时按
+	// label 词形找"其它/其他"条目（各站其它桶通用形态）。
+	if m := fallbackByValue(mappings, "28"); m != nil {
+		return m
+	}
+	return fallbackByOtherLabel(mappings)
+}
+
+// fallbackByOtherLabel §59.494: 地区兜底"其它"桶 label 词形匹配
+// （优堡"其它(Other)"/HDVideo"其他地区"双形态）。
+func fallbackByOtherLabel(mappings []model.FormValueMapping) *model.FormValueMapping {
+	for i := range mappings {
+		if strings.Contains(mappings[i].Label, "其它") || strings.Contains(mappings[i].Label, "其他") {
+			return &mappings[i]
+		}
+	}
+	return nil
 }
 
 // styleMappingOf §59.471: 风格槽映射——PTGen 类型词 canonical 化匹配；
