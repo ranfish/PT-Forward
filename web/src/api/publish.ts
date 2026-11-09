@@ -277,7 +277,11 @@ export const seedConfigApi = {
     return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId, force })
   },
   batchFetchProgress() {
-    return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
+    return client.get<ApiResponse<{ active: boolean; stopRequested?: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
+  },
+  // §59.495: 批量获取 graceful 停止——当前颗完成后续止·剩余保持未获取
+  batchFetchCancel() {
+    return client.post<ApiResponse<{ message: string; stopped: boolean }>>('/publish/seeds/batch-fetch-cancel')
   },
   snapshotUnconfigured(clientId: number, savePath: string) {
     return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: number; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
