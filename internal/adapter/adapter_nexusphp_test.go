@@ -341,6 +341,11 @@ func TestNexusPHP_DetectHR(t *testing.T) {
 
 func TestNexusPHP_UploadTorrent_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// §59.494: 首请求=GET upload 页（CSRF _token 提取·本 mock 无 token 页）
+		if r.Method == "GET" {
+			_, _ = w.Write([]byte(`<html><form action="takeupload.php"></form></html>`))
+			return
+		}
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}

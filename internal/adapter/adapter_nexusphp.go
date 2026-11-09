@@ -1126,6 +1126,12 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 
 	uploadURL := baseURL + uploadPath
 
+	// §59.494: NP 新版 CSRF _token（优堡案实证——表单 hidden _token·
+	// 缺失被拒"请填写必填项目"）。通用提取：GET upload 页拿 token
+	// （会话绑定）·有则带·无则不带（老 NP 站零影响——幸运/南洋/葡萄
+	// 实证无 _token 也过）。上传低频·多一个 GET 成本可忽略。
+	csrf := a.fetchUploadCSRFToken(ctx, config, baseURL+config.Paths.Upload)
+
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 	fw := newFieldWriter(writer)
@@ -1151,6 +1157,9 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		fw.writeField("url", req.IMDbLink)
 	}
 	if req.Anonymous {
+		if csrf != "" {
+			fw.writeField("_token", csrf) // §59.494: NP 新版 CSRF（优堡案）
+		}
 		fw.writeField("uplver", "yes") // §59.159: 幸运 checkbox value=yes（NP 存在即勾，值对齐站方）
 	}
 
@@ -3263,4 +3272,24 @@ func stripTagsForPreflight(body string) string {
 		text = "（发布页无表单且未提取到文案——请登录站点查看）"
 	}
 	return text
+}
+
+
+// §59.494: NP 新版 CSRF _token 提取（优堡案——upload 表单 hidden
+// _token·Laravel 式）。GET upload 页正则提取；页面缺失/请求失败返回空
+// （调用方不带——老 NP 站兼容）。token 会话绑定·与 cookie 同栈请求。
+var reNPUploadCSRF = regexp.MustCompile(`name="_token"[^>]*value="([a-f0-9]{20,})"`)
+
+func (a *NexusPHPAdapter) fetchUploadCSRFToken(ctx context.Context, config *model.SiteConfig, uploadPageURL string) string {
+	if uploadPageURL == "" {
+		return ""
+	}
+	html, err := a.fetchDetailsHTMLViaHTTP(ctx, config, uploadPageURL)
+	if err != nil {
+		return ""
+	}
+	if m := reNPUploadCSRF.FindStringSubmatch(html); len(m) > 1 {
+		return m[1]
+	}
+	return ""
 }
