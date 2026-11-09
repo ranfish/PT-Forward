@@ -5448,14 +5448,6 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientUID, savePath, name, final)
 }
 
-// regionLabelsOfMeta §59.151: metadata 行 → PTGen 产地 labels 串（复合判据输入）。
-func regionLabelsOfMeta(m model.TorrentMetadata) string {
-	src, err := metadata.UnmarshalPTGenSource(m.PTGenSourceJSON)
-	if err != nil || src == nil {
-		return ""
-	}
-	return strings.Join(src.Region, " ")
-}
 
 // handleExecutePublish §59.156 切片 2: 新发布执行器入口（DB 供给——切读 publish_form_config）。
 // body: {info_hash, target_site, anonymous, tag_overrides: [], dry_run}
