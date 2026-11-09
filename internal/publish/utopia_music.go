@@ -495,7 +495,7 @@ func utopiaMusicLanguageID(meta *model.TorrentMetadata, mm *model.MusicMeta) str
 // utopiaMusicFormValues 音乐表单标量域组装（type/medium/audiocodec/team）。
 // medium miss 留空（站方可选实证——官种都没填媒介）；audiocodec miss
 // 留空由 fail-fast 拦（必选域）；team miss=Other（决策点①）。
-func utopiaMusicFormValues(meta *model.TorrentMetadata, mm *model.MusicMeta) map[string]string {
+func utopiaMusicFormValues(meta *model.TorrentMetadata, mm *model.MusicMeta, torrentData []byte) map[string]string {
 	form := map[string]string{
 		"type": utopiaMusicType,
 	}
@@ -504,12 +504,35 @@ func utopiaMusicFormValues(meta *model.TorrentMetadata, mm *model.MusicMeta) map
 	}
 	if v, ok := utopiaMusicAudioCodec[strings.ToUpper(strings.TrimSpace(mm.Format))]; ok {
 		form["audiocodec_sel[4]"] = v
-	} else if strings.Contains(strings.ToLower(mm.Format), "镜像") && strings.EqualFold(strings.TrimSpace(mm.Media), "SACD") {
-		// §59.492 刀4 素材矩阵缺口修（RCA 60SACD 案）：镜像(Mirror)=
-		// SACD ISO 原盘形态——音频流即 DSD（乌托邦值集 11=DSD/DSF·
-		// 站内 SACD 52 行实证镜像可发）。仅 SACD 媒介判——CD 镜像
-		// 等其它形态零实证不杜撰（miss 走 ③ fail-fast 拦截）。
-		form["audiocodec_sel[4]"] = "11"
+	} else if strings.Contains(strings.ToLower(mm.Format), "镜像") {
+		// §59.492 附六（修正刀4 的 ISO 理解）：镜像(Mirror)=完整复制版
+		// （相对转码版·站内 tid=3588 镜像+WAV 文件实证）——不是 ISO
+		// 原盘专属。编码看实际音频文件（FileTree 权威·log 门同源）：
+		// .dsf/.dff/.iso→DSD（RCA 案）/.flac→FLAC（12 素材 Bach 案）/
+		// .wav→PCM/WAV（站内 3588 形态）——计数最大者；零音频文件或
+		// 解析失败不映射（③ fail-fast 保持·不杜撰）。
+		if m, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
+			flac, wav, dsd := 0, 0, 0
+			for p := range m.FileTree {
+				lp := strings.ToLower(p)
+				switch {
+				case strings.HasSuffix(lp, ".flac"):
+					flac++
+				case strings.HasSuffix(lp, ".wav"):
+					wav++
+				case strings.HasSuffix(lp, ".dsf"), strings.HasSuffix(lp, ".dff"), strings.HasSuffix(lp, ".iso"):
+					dsd++
+				}
+			}
+			switch {
+			case dsd > flac && dsd > wav:
+				form["audiocodec_sel[4]"] = "11"
+			case flac > wav:
+				form["audiocodec_sel[4]"] = "1"
+			case wav > 0:
+				form["audiocodec_sel[4]"] = "8"
+			}
+		}
 	}
 	// team：组名识别 → 值集匹配 → Other（决策点①）。
 	// 组名信号现状：meta 无站方组名列（皇后"制作组"字段行未落 meta 列）——
