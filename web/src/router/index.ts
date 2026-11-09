@@ -43,7 +43,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'events', name: 'TorrentEvents', component: () => import('@/views/events/TorrentEventList.vue') },
       { path: 'iyuu', name: 'IYUU', component: () => import('@/views/iyuu/IYUUConfig.vue') },
       { path: 'cloud-fp', name: 'CloudFP', component: () => import('@/views/cloudfp/CloudFPConfig.vue') },
-      { path: 'cookiecloud', name: 'CookieCloud', component: () => import('@/views/cookiecloud/CookieCloudConfig.vue') },
       { path: 'lifecycle', name: 'Lifecycle', component: () => import('@/views/lifecycle/LifecycleConfig.vue') },
       { path: 'scheduler', name: 'Scheduler', component: () => import('@/views/scheduler/SchedulerTaskList.vue') },
       { path: 'system', name: 'SystemHealth', component: () => import('@/views/system/SystemHealth.vue') },

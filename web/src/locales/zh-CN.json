@@ -132,7 +132,6 @@
     "filterRules": "全局排除规则",
     "iyuu": "IYUU配置",
     "cloudFp": "云指纹配置",
-    "cookiecloud": "CookieCloud 配置",
     "seedingDashboard": "总览",
     "tracker": "Tracker 管理",
     "lifecycle": "生命周期",
@@ -1206,9 +1205,6 @@
     "httpProxy": "HTTP 代理地址",
     "socksProxy": "SOCKS5 代理地址",
     "cookiecloudConfig": "CookieCloud 配置",
-    "cookiecloudUrl": "CookieCloud 地址",
-    "cookiecloudUuid": "CookieCloud UUID",
-    "cookiecloudPassword": "CookieCloud 密码",
     "otherSettings": "其他设置",
     "websocketEnabled": "WebSocket 推送",
     "settingsSaved": "设置已保存",
@@ -1220,9 +1216,6 @@
     "otaUseProxy": "OTA 更新启用代理",
     "otaUseProxyHint": "开启后 OTA 检查更新与下载强制走上方 HTTP 代理（默认关闭=直连）",
     "socksProxyPlaceholder": "例如: socks5://127.0.0.1:7891",
-    "cookiecloudUrlPlaceholder": "CookieCloud 服务器地址",
-    "cookiecloudUuidPlaceholder": "用户 UUID",
-    "cookiecloudPasswordPlaceholder": "加密密码",
     "notifications": {
       "addChannel": "添加通知渠道",
       "editChannel": "编辑通知渠道",
@@ -1345,7 +1338,8 @@
     "githubTokenClearFailed": "清除失败",
     "rssFailAlertThreshold": "订阅停摆告警阈值（轮）",
     "rssFailAlertThresholdHint": "连续失败 ≥N 轮时订阅列表状态列变红（1~N-1 橙色）",
-    "screenshotFormat": "截图格式"
+    "screenshotFormat": "截图格式",
+    "cookiecloudSaveFailed": "CookieCloud 配置保存失败（其它设置已保存）——请检查模块内配置"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",

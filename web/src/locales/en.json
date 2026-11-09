@@ -129,7 +129,6 @@
     "filterRules": "Global Exclusion Rules",
     "iyuu": "IYUU Reseed",
     "cloudFp": "Cloud Fingerprint",
-    "cookiecloud": "CookieCloud",
     "ptgen": "PTGen Movie Info",
     "seedingDashboard": "Overview",
     "tracker": "Tracker",
@@ -1229,9 +1228,6 @@
     "httpProxy": "HTTP Proxy",
     "socksProxy": "SOCKS5 Proxy",
     "cookiecloudConfig": "CookieCloud Config",
-    "cookiecloudUrl": "CookieCloud URL",
-    "cookiecloudUuid": "CookieCloud UUID",
-    "cookiecloudPassword": "CookieCloud Password",
     "otherSettings": "Other Settings",
     "websocketEnabled": "WebSocket Push",
     "settingsSaved": "Settings saved",
@@ -1243,9 +1239,6 @@
     "otaUseProxy": "OTA Update via Proxy",
     "otaUseProxyHint": "When enabled, OTA check & download force through the HTTP proxy above (default off = direct)",
     "socksProxyPlaceholder": "e.g. socks5://127.0.0.1:7891",
-    "cookiecloudUrlPlaceholder": "CookieCloud server URL",
-    "cookiecloudUuidPlaceholder": "User UUID",
-    "cookiecloudPasswordPlaceholder": "Encryption password",
     "notifications": {
       "addChannel": "Add Channel",
       "editChannel": "Edit Channel",
@@ -1368,7 +1361,8 @@
     "githubTokenClearFailed": "Clear failed",
     "rssFailAlertThreshold": "Subscription stall alert threshold (rounds)",
     "rssFailAlertThresholdHint": "Status column turns red after N consecutive failed rounds (orange for 1~N-1)",
-    "screenshotFormat": "Screenshot Format"
+    "screenshotFormat": "Screenshot Format",
+    "cookiecloudSaveFailed": "CookieCloud config save failed (other settings saved) — please check the module"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",
