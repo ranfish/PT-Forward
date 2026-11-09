@@ -73,12 +73,13 @@ type backgroundQueryState struct {
 }
 
 type batchFetchState struct {
-	mu     sync.Mutex
-	active bool
-	total  int
-	done   int
-	failed int
-	items  []batchFetchItem
+	mu            sync.Mutex
+	active        bool
+	stopRequested bool // §59.495: graceful 停止——不再开始新颗·当前颗完整执行完
+	total         int
+	done          int
+	failed        int
+	items         []batchFetchItem
 }
 
 type batchFetchItem struct {
@@ -480,6 +481,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleBatchFetch(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch-progress") && r.Method == http.MethodGet:
 		h.handleBatchFetchProgress(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/batch-fetch-cancel") && r.Method == http.MethodPost:
+		h.handleBatchFetchCancel(w, r)
 	case strings.HasSuffix(path, "/publish/seeds") && r.Method == http.MethodGet:
 		h.handleListSeeds(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/unique-paths") && r.Method == http.MethodGet:
@@ -2370,6 +2373,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 		return
 	}
 	h.batchFetch.active = true
+	h.batchFetch.stopRequested = false // §59.495: 新批次重置停止请求
 	h.batchFetch.total = len(req.Items)
 	h.batchFetch.done = 0
 	h.batchFetch.failed = 0
@@ -2486,7 +2490,16 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	items = interleaveBySourceSite(h.sourceDetector, ctx, items)
 
 	for i, item := range items {
+		// §59.495: graceful 停止检查点——不再开始新颗（正在执行的颗已完整
+		// 跑完；剩余项保持 pending 原状=未获取语义·下次批量照跑——用户定案：
+		// 未获取列表是唯一真相源·pending/被跳过本质都是未获取）
 		h.batchFetch.mu.Lock()
+		if h.batchFetch.stopRequested {
+			h.batchFetch.mu.Unlock()
+			h.logger.Info("batch-fetch graceful stop: remaining items skipped",
+				zap.Int("remaining", len(items)-i))
+			return // defer 释放 active
+		}
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
 
@@ -2602,6 +2615,11 @@ func (h *PublishTorrentsHandler) retryDeferredBatch(ctx context.Context, clientU
 	retried := 0
 	for _, i := range deferred {
 		h.batchFetch.mu.Lock()
+		if h.batchFetch.stopRequested { // §59.495: retry 轮同拦
+			h.batchFetch.mu.Unlock()
+			h.logger.Info("batch-fetch graceful stop: retry round skipped")
+			return
+		}
 		if h.batchFetch.items[i].Status != "deferred" {
 			h.batchFetch.mu.Unlock()
 			continue
@@ -3249,11 +3267,36 @@ func (h *PublishTorrentsHandler) handleBatchFetchProgress(w http.ResponseWriter,
 	h.batchFetch.mu.Lock()
 	defer h.batchFetch.mu.Unlock()
 	Success(w, map[string]interface{}{
-		"active": h.batchFetch.active,
-		"total":  h.batchFetch.total,
-		"done":   h.batchFetch.done,
-		"failed": h.batchFetch.failed,
-		"items":  h.batchFetch.items,
+		"active":        h.batchFetch.active,
+		"stopRequested": h.batchFetch.stopRequested, // §59.495
+		"total":         h.batchFetch.total,
+		"done":          h.batchFetch.done,
+		"failed":        h.batchFetch.failed,
+		"items":         h.batchFetch.items,
+	})
+}
+
+// handleBatchFetchCancel §59.495: 批量获取 graceful 停止——不再开始
+// 新颗·正在采集/落盘的当前颗完整执行完（自然终态 done/failed）；剩余
+// 项保持 pending 原状（未获取语义·下次批量照跑——用户定案：未获取
+// 列表是唯一真相源）。幂等：重复请求返回"已在停止中"。
+func (h *PublishTorrentsHandler) handleBatchFetchCancel(w http.ResponseWriter, r *http.Request) {
+	h.batchFetch.mu.Lock()
+	defer h.batchFetch.mu.Unlock()
+	if !h.batchFetch.active {
+		Success(w, map[string]interface{}{"message": "无运行中的批量任务", "stopped": false})
+		return
+	}
+	if h.batchFetch.stopRequested {
+		Success(w, map[string]interface{}{"message": "已在停止中（当前种子完成后终止）", "stopped": true})
+		return
+	}
+	h.batchFetch.stopRequested = true
+	h.logger.Info("batch-fetch graceful stop requested",
+		zap.Int("done", h.batchFetch.done), zap.Int("failed", h.batchFetch.failed))
+	Success(w, map[string]interface{}{
+		"message": "停止请求已接受——当前种子完成后终止，剩余种子保持未获取",
+		"stopped": true,
 	})
 }
 

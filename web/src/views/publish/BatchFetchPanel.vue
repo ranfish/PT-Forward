@@ -26,12 +26,13 @@
     <!-- 进度条 -->
     <a-alert
       v-if="fetching"
-      :message="`正在获取数据... ${progress.done}/${progress.total}`"
-      type="info"
+      :message="progress.stopRequested ? `停止中…当前种子完成后终止 ${progress.done}/${progress.total}` : `正在获取数据... ${progress.done}/${progress.total}`"
+      :type="progress.stopRequested ? 'warning' : 'info'"
       show-icon
       style="margin-bottom: 12px"
     >
       <a-progress :percent="progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0" size="small" />
+      <a-button v-if="!progress.stopRequested" size="small" danger style="margin-top: 4px" @click="stopBatchFetch">停止</a-button>
     </a-alert>
 
     <!-- 完成汇总 -->
@@ -171,6 +172,7 @@ const fetching = ref(false)
 const fetchDone = ref(false)
 const progress = ref({
   active: false,
+  stopRequested: false,
   total: 0,
   done: 0,
   failed: 0,
@@ -203,6 +205,7 @@ watch(() => props.open, async (val) => {
       if (p?.active) {
         progress.value = {
           active: true,
+          stopRequested: p.stopRequested || false,
           total: p.total || 0,
           done: p.done || 0,
           failed: p.failed || 0,
@@ -233,7 +236,7 @@ function reset() {
   searchText.value = ''
   fetching.value = false
   fetchDone.value = false
-  progress.value = { active: false, total: 0, done: 0, failed: 0, items: [] }
+  progress.value = { active: false, stopRequested: false, total: 0, done: 0, failed: 0, items: [] }
 }
 
 async function loadUnconfigured() {
@@ -264,7 +267,7 @@ async function startBatchFetch() {
     await seedConfigApi.batchFetch(items, props.clientId || 0, refetchMode.value)
     fetching.value = true
     fetchDone.value = false
-    progress.value = { active: true, total: items.length, done: 0, failed: 0, items: [] }
+    progress.value = { active: true, stopRequested: false, total: items.length, done: 0, failed: 0, items: [] }
     pollProgress()
   } catch (e) {
     message.error('启动批量获取失败：' + (e as Error).message)
@@ -277,6 +280,16 @@ function startPolling() {
   pollProgress()
 }
 
+// §59.495: graceful 停止——当前颗完成后终止·剩余保持未获取
+async function stopBatchFetch() {
+  try {
+    await seedConfigApi.batchFetchCancel()
+    message.info('停止请求已接受——当前种子完成后终止')
+  } catch (e) {
+    message.error('停止请求失败：' + (e as Error).message)
+  }
+}
+
 function pollProgress() {
   pollTimer = setTimeout(async () => {
     try {
@@ -285,6 +298,7 @@ function pollProgress() {
       if (data) {
         progress.value = {
           active: data.active,
+          stopRequested: data.stopRequested || false,
           total: data.total,
           done: data.done,
           failed: data.failed,
@@ -297,7 +311,11 @@ function pollProgress() {
         fetching.value = false
         fetchDone.value = true
         const success = (data?.done || 0) - (data?.failed || 0)
-        message.success(`获取完成: ${success} 成功${(data?.failed || 0) > 0 ? ', ' + data.failed + ' 失败' : ''}`)
+        const stopped = progress.value.stopRequested
+        message[stopped ? 'warning' : 'success'](
+          stopped
+            ? `批量获取已停止: ${success} 成功${(data?.failed || 0) > 0 ? ', ' + data.failed + ' 失败' : ''}·剩余保持未获取`
+            : `获取完成: ${success} 成功${(data?.failed || 0) > 0 ? ', ' + data.failed + ' 失败' : ''}`)
         emit('completed')
         if (!refetchMode.value) await loadUnconfigured()
       }
