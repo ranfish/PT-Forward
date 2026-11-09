@@ -12,19 +12,16 @@
         />
         <a-select
           v-model:value="statusFilter"
-          style="width: 130px"
+          style="width: 140px"
           placeholder="状态"
           allow-clear
           @change="onFilterChange"
         >
-          <a-select-option value="completed">成功</a-select-option>
-          <a-select-option value="failed">失败</a-select-option>
-          <a-select-option value="skipped">跳过</a-select-option>
-          <a-select-option value="publishing">发布中</a-select-option>
-          <a-select-option value="exists">已存在</a-select-option>
-          <a-select-option value="edited">已编辑</a-select-option>
-          <!-- §59.374 B2: 加种失败筛选（跨状态子集——seed_error 非空未加种） -->
-          <a-select-option value="seed_failed">加种失败</a-select-option>
+          <!-- §59.502 附:筛选项与状态列 statusLabel 单点对齐（文案零分叉——
+               旧下拉只有 completed/exists 等旧值与状态列不一致） -->
+          <a-select-option v-for="v in statusFilterValues" :key="v" :value="v">
+            {{ statusLabel(v) }}
+          </a-select-option>
         </a-select>
         <a-select
           v-model:value="triggerFilter"
@@ -63,7 +60,7 @@
       :pagination="pagination"
       :row-selection="{ selectedRowKeys, onChange: onSelectionChange, getCheckboxProps: checkboxProps }"
       row-key="id"
-      :scroll="{ x: 1770 }"
+      :scroll="{ x: 1170 }"
       size="small"
       @change="onTableChange"
     >
@@ -224,15 +221,28 @@ const pagination = ref({
   showTotal: (total: number) => `共 ${total} 条`,
 })
 
+// §59.502 附:状态筛选值集——与状态列 statusLabel 单点对齐（文案调
+// statusLabel(v) 零分叉）。顺序=现役主流（§59.159 四终态+dedup）在前、
+// 存量兼容值（completed/exists/edited——旧记录）在后。seed_failed 为
+// 跨状态子集筛选（seed_error 非空未加种·§59.374 B2 后端分支）非真实
+// status 值。
+const statusFilterValues = [
+  'pushed', 'pushed_existing', 'uploaded', 'uploaded_existing',
+  'existing', 'duplicate', 'failed', 'publishing', 'seed_failed',
+  'completed', 'exists', 'edited', 'skipped',
+]
+
+// §59.502 附:窄数据列收紧（数据不宽表头宽——旧 x:1770 超列宽总和 530px
+// 把时间列推出视口要拉滚动条）。列宽总和 1134+勾选列 32≈1170。
 const columns = [
-  { title: '触发', key: 'trigger', width: 80 },
-  { title: '源站', key: 'source_site', width: 100 },
-  { title: '目标站', key: 'target_site', width: 100 },
-  { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 90 },
+  { title: '触发', key: 'trigger', width: 60 },
+  { title: '源站', key: 'source_site', width: 80 },
+  { title: '目标站', key: 'target_site', width: 80 },
+  { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 70 },
   { title: '标题', key: 'title', ellipsis: true, width: 300 },
-  { title: '状态', key: 'status', width: 80 },
-  { title: '加种', key: 'seeded', width: 80 },
-  { title: '耗时', key: 'cost_ms', width: 80 },
+  { title: '状态', key: 'status', width: 84 },
+  { title: '加种', key: 'seeded', width: 60 },
+  { title: '耗时', key: 'cost_ms', width: 70 },
   { title: '链接', key: 'publish_url', width: 60 },
   { title: '时间', key: 'created_at', width: 150 },
   { title: '操作', key: 'action', width: 120, fixed: 'right' as const },
@@ -398,6 +408,7 @@ function statusColor(status: string): string {
     uploaded: 'gold', // 上传成功未做种（一公里断裂——补推核心场景）
     uploaded_existing: 'gold', // 上传成功（站上已有形态）未做种
     existing: 'gold', // 站上已有（文案判定·无权威 ID——辅种业务范畴）
+    seed_failed: 'orange', // §59.374 B2 子集筛选用（非真实 status·状态列不显示）
   }
   return map[status] || 'default'
 }
@@ -425,6 +436,7 @@ function statusLabel(status: string): string {
     uploaded: '已上传未做种', // 一公里断裂——补推核心场景
     uploaded_existing: '已上传·站上已有', // 上传成功（已有形态）未做种
     existing: '站上已有', // 文案判定·无权威 ID·辅种业务范畴（同 duplicate 文案·按钮区分）
+    seed_failed: '加种失败', // §59.374 B2 子集筛选用（非真实 status·状态列不显示）
   }
   return map[status] || status
 }
