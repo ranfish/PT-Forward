@@ -284,3 +284,22 @@ func TestUtopiaMusicValueSetAudit(t *testing.T) {
 		t.Fatalf("multi-miss: want 2, got %v", w)
 	}
 }
+
+// §59.492 刀4: SACD 镜像(Mirror)→DSD 映射锚（RCA 60SACD 案素材矩阵缺口）。
+func TestUtopiaMusicFormValues_SACDMirror(t *testing.T) {
+	m := &model.TorrentMetadata{Title: "RCA Living stereo 60 SACD 2010"}
+	// SACD 镜像 → DSD/DSF(11)
+	form := utopiaMusicFormValues(m, &model.MusicMeta{
+		Format: "镜像(Mirror)", Media: "SACD",
+	})
+	if form["audiocodec_sel[4]"] != "11" {
+		t.Fatalf("SACD mirror: audiocodec=%q want 11 (DSD/DSF)", form["audiocodec_sel[4]"])
+	}
+	// CD 镜像：零实证不杜撰 → 无映射（③ fail-fast 保持）
+	form = utopiaMusicFormValues(m, &model.MusicMeta{
+		Format: "镜像(Mirror)", Media: "CD",
+	})
+	if _, ok := form["audiocodec_sel[4]"]; ok {
+		t.Fatalf("CD mirror: should stay unmapped (fail-fast), got %q", form["audiocodec_sel[4]"])
+	}
+}

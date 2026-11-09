@@ -504,6 +504,12 @@ func utopiaMusicFormValues(meta *model.TorrentMetadata, mm *model.MusicMeta) map
 	}
 	if v, ok := utopiaMusicAudioCodec[strings.ToUpper(strings.TrimSpace(mm.Format))]; ok {
 		form["audiocodec_sel[4]"] = v
+	} else if strings.Contains(strings.ToLower(mm.Format), "镜像") && strings.EqualFold(strings.TrimSpace(mm.Media), "SACD") {
+		// §59.492 刀4 素材矩阵缺口修（RCA 60SACD 案）：镜像(Mirror)=
+		// SACD ISO 原盘形态——音频流即 DSD（乌托邦值集 11=DSD/DSF·
+		// 站内 SACD 52 行实证镜像可发）。仅 SACD 媒介判——CD 镜像
+		// 等其它形态零实证不杜撰（miss 走 ③ fail-fast 拦截）。
+		form["audiocodec_sel[4]"] = "11"
 	}
 	// team：组名识别 → 值集匹配 → Other（决策点①）。
 	// 组名信号现状：meta 无站方组名列（皇后"制作组"字段行未落 meta 列）——
