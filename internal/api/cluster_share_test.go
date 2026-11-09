@@ -205,20 +205,41 @@ func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
 	}
 }
 
-// §59.70: PTGen 简介落库后 t2 重推标签——豆瓣评分行在 t0 不存在，t2 补推 high_rating。
-func TestRefreshInferredTags_AfterPTGen(t *testing.T) {
+// §59.500 刀2: t2 轮删除后的闸门两态锚——数据不完整不推理（拦）/
+// 完整才推理（推·豆瓣评分行补 high_rating+既有标签保留——§59.70 语义
+// 由 inferFinalTags 单点承接）。
+func TestInferFinalTags_GateAndInfer(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	hash := "hself00000000000000000000000000000000000"
+
+	// 态① 数据不完整（缺截图/MI/规格等）→ 闸门拦·tags 保持原样
+	hash := "hgate0000000000000000000000000000000000"
 	db.Create(&model.TorrentMetadata{InfoHash: hash, SiteName: "朋友", Title: "电影.2024.1080p",
 		Description: "◎豆瓣评分　8.4/10 (12345 人评价)\n◎简　介　剧情", Tags: `["chinese_subtitle"]`, FetchSource: "rss_detail"})
+	h.inferFinalTags(context.Background(), 0, hash, "朋友")
+	var gated model.TorrentMetadata
+	db.Where("info_hash = ?", hash).First(&gated)
+	if gated.Tags != `["chinese_subtitle"]` {
+		t.Errorf("不完整行不得推理: %s", gated.Tags)
+	}
 
-	h.refreshInferredTags(context.Background(), hash, "朋友")
-
-	var m model.TorrentMetadata
-	db.Where("info_hash = ?", hash).First(&m)
+	// 态② 数据完整（9 字段齐）→ 推理·high_rating 补+既有保留
+	hash2 := "hfull0000000000000000000000000000000000"
+	db.Create(&model.TorrentMetadata{InfoHash: hash2, SiteName: "朋友", Title: "电影.2024.1080p",
+		Description:     "◎豆瓣评分　8.4/10 (12345 人评价)\n◎简　介　剧情",
+		Tags:            `["chinese_subtitle"]`,
+		FetchSource:     "rss_detail",
+		Poster:          "https://example.com/p.jpg",
+		Screenshots:     `["https://example.com/1.jpg","https://example.com/2.jpg","https://example.com/3.jpg"]`,
+		MediaInfo:       "General\nVideo\nFormat : AVC",
+		SourceMediaInfo: "General\nVideo\nFormat : AVC",
+		Resolution:      "1080p", VideoCodec: "h264", AudioCodec: "aac",
+		RegionCode: "中国大陆"})
+	h.inferFinalTags(context.Background(), 0, hash2, "朋友")
+	var full model.TorrentMetadata
+	db.Where("info_hash = ?", hash2).First(&full)
 	var tags []string
-	_ = json.Unmarshal([]byte(m.Tags), &tags)
+	_ = json.Unmarshal([]byte(full.Tags), &tags)
 	has := func(k string) bool {
 		for _, x := range tags {
 			if x == k {
@@ -228,7 +249,7 @@ func TestRefreshInferredTags_AfterPTGen(t *testing.T) {
 		return false
 	}
 	if !has("high_rating") {
-		t.Errorf("t2 重推应补 high_rating: %v", tags)
+		t.Errorf("完整行推理应补 high_rating: %v", tags)
 	}
 	if !has("chinese_subtitle") {
 		t.Errorf("既有标签不可丢: %v", tags)

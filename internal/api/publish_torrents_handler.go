@@ -3020,13 +3020,14 @@ fetched:
 	// 不保存 §59.236 定案）。取代 §59.235 P2 的 extractPTGenAssets
 	// 双时序补丁（架构性取代——kdouban/NexusPHP 分叉根除）。
 	// §59.286 终版: 主链 PTGen 单点单责——三级顺序链成功时同步吸收②副产物
-	// 中的标签重推（②海报链全线下线；海报簇传播由尾部 finalizeClusterPropagation
+	// （②海报链全线下线；海报簇传播由尾部 finalizeClusterPropagation
 	// 统一执行——幂等可重复；ptgen_source_json canonical 包装已并入主链 persist）
-	// §59.496 附二 B1: 挪至 localMI 落库后——t2 重推原在 MI 落库前执行，
-	// 铁证素材未到先推理（文案兜底写 OD）·Black Snow 案时序缺陷根治
-	if h.runMainlinePTGen(ctx, meta, force) {
-		h.refreshInferredTags(ctx, meta.InfoHash, meta.SiteName)
-	}
+	// §59.496 附二 B1: 挪至 localMI 落库后
+	// §59.500 刀2: t2 refreshInferredTags 轮删除——B1 挪序后 PTGen 先于
+	// t0 完成·t2 与 t0 输入完全同（纯冗余轮）；且 t2 无闸门会在截图未到
+	// 时写 tags 绕过"完整才推理"语义。tags 统一由 inferFinalTags 单点产出
+	// （Description/评分素材此刻已在场·t0 闸门版输入等价 t2）
+	_ = h.runMainlinePTGen(ctx, meta, force)
 
 	// §59.26: TechProfile 三源合并 + 分类推断 + 声明过滤（与 runAnalyze ⑫ 统一管线）
 	if meta != nil {
@@ -5242,51 +5243,6 @@ func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID u
 	}
 }
 
-// refreshInferredTags §59.70: t2 重推标签——PTGen 简介落库后评分行才存在
-// （t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
-// （既有标签全保留——直采/用户标签优先，推断只补差）。
-func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHash, siteName string) {
-	var m model.TorrentMetadata
-	if err := h.db.WithContext(ctx).
-		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-		First(&m).Error; err != nil {
-		return
-	}
-	// §59.72 B2: big_pack 需 size——从快照查（簇内同 size）
-	var snapSize int64
-	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-		Where("hash = ?", infoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
-	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
-		MediaInfo:   m.MediaInfo,
-		Title:       m.Title,
-		Subtitle:    m.Subtitle,
-		Description: m.Description,
-		NFO:         m.BDInfo,
-		Size:        snapSize,
-	})
-	var existing []string
-	if m.Tags != "" {
-		if err := json.Unmarshal([]byte(m.Tags), &existing); err != nil {
-			existing = nil
-		}
-	}
-	// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁；无变化不写
-	// §59.496 附二: existing 过铁证门（音频族+MIEncoded 版本族剔除）
-	all := publish.MergeTags(publish.CleanExistingForMerge(existing, m.MediaInfo), inferred)
-	data, _ := json.Marshal(all)
-	if string(data) == m.Tags {
-		return
-	}
-	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-		Update("tags", string(data)).Error; err != nil {
-		h.logger.Warn("refresh inferred tags failed", zap.Error(err))
-		return
-	}
-	h.logger.Info("inferred tags refreshed",
-		zap.String("hash", infoHash[:min(10, len(infoHash))]),
-		zap.Int("tags_total", len(existing)))
-}
 
 // purgeDeadScreenshots §59.49: 截图获取时探活——HEAD（含 1 次重试）逐张检查，
 // 清死留活；全死全清（screenshots=[]）。只反映获取时点存活状态。
