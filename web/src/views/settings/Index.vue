@@ -24,16 +24,11 @@
           <a-input v-model:value="form.socksProxy" :placeholder="t('settings.socksProxyPlaceholder')" />
         </a-form-item>
 
+        <!-- §59.497: CookieCloud 完整模块（自 /cookiecloud 独立页迁入——
+             独立表 cookie_cloud_configs 真实接线；旧 system_settings 三键
+             cookieCloudUrl/Uuid/Password 为死键零消费·UI 移除） -->
         <a-divider>{{ t('settings.cookiecloudConfig') }}</a-divider>
-        <a-form-item :label="t('settings.cookiecloudUrl')">
-          <a-input v-model:value="form.cookieCloudUrl" :placeholder="t('settings.cookiecloudUrlPlaceholder')" />
-        </a-form-item>
-        <a-form-item :label="t('settings.cookiecloudUuid')">
-          <a-input v-model:value="form.cookieCloudUuid" :placeholder="t('settings.cookiecloudUuidPlaceholder')" />
-        </a-form-item>
-        <a-form-item :label="t('settings.cookiecloudPassword')">
-          <a-input-password v-model:value="form.cookieCloudPassword" :placeholder="t('settings.cookiecloudPasswordPlaceholder')" />
-        </a-form-item>
+        <CookieCloudModule ref="cookieCloudRef" />
 
         <a-divider>{{ t('settings.otherSettings') }}</a-divider>
         <a-form-item :label="t('settings.websocketEnabled')">
@@ -208,6 +203,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api/settings'
+import CookieCloudModule from './CookieCloudModule.vue'
 import { switchAutoSave } from '@/utils/switch-auto-save'
 import ImageHostSettings from './ImageHostSettings.vue'
 
@@ -223,14 +219,14 @@ const githubTokenMasked = ref('')
 const backingUp = ref(false)
 const restoring = ref(false)
 
+// §59.497: CookieCloud 模块引用（load 自管·save 并入整页）
+const cookieCloudRef = ref<InstanceType<typeof CookieCloudModule> | null>(null)
+
 const form = reactive({
   httpProxy: '',
   otaUseProxy: false,
   githubToken: '',
   socksProxy: '',
-  cookieCloudUrl: '',
-  cookieCloudUuid: '',
-  cookieCloudPassword: '',
   websocketEnabled: true,
   loginLockoutEnabled: false,
   loginMaxRetries: 5,
@@ -281,9 +277,6 @@ async function fetchSettings() {
       httpProxy: data.httpProxy || '',
       otaUseProxy: data.otaUseProxy === 'true',
       socksProxy: data.socksProxy || '',
-      cookieCloudUrl: data.cookieCloudUrl || '',
-      cookieCloudUuid: data.cookieCloudUuid || '',
-      cookieCloudPassword: data.cookieCloudPassword || '',
       websocketEnabled: data.websocketEnabled !== 'false',
       loginLockoutEnabled: data.login_lockout_enabled === 'true',
       loginMaxRetries: parseInt(data.login_max_retries) || 5,
@@ -347,9 +340,6 @@ async function saveSettings() {
       // §59.367 附六: github_token 三态语义单独处理（见 saveSettings 内
       // githubToken 分支——哨兵保持/空清除/新值覆盖），不进批量 entries。
       ['socksProxy', form.socksProxy],
-      ['cookieCloudUrl', form.cookieCloudUrl],
-      ['cookieCloudUuid', form.cookieCloudUuid],
-      ['cookieCloudPassword', form.cookieCloudPassword],
       ['websocketEnabled', String(form.websocketEnabled)],
       ['login_lockout_enabled', String(form.loginLockoutEnabled)],
       ['login_max_retries', String(form.loginMaxRetries)],
@@ -399,6 +389,13 @@ async function saveSettings() {
     } else if (tok) {
       // 未配置态：输入新值直接写入（首配路径——28 环境案修复）
       await settingsApi.update('github_token', { value: tok })
+    }
+    // §59.497: CookieCloud 独立表保存（模块内 save——失败不阻断整页
+    // 其它设置已存成功·提示区分）
+    try {
+      await cookieCloudRef.value?.save()
+    } catch {
+      message.warning(t('settings.cookiecloudSaveFailed'))
     }
     message.success(t('settings.settingsSaved'))
     // §59.403: 三态变化（覆盖/清除/首配）统一刷新——哨兵保持（tok==masked）不刷

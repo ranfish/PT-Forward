@@ -71,10 +71,6 @@
             <template #icon><CloudOutlined /></template>
             <span>{{ t('nav.cloudFp') }}</span>
           </a-menu-item>
-          <a-menu-item key="/cookiecloud" @click="$router.push('/cookiecloud')">
-            <template #icon><CloudSyncOutlined /></template>
-            <span>{{ t('nav.cookiecloud') }}</span>
-          </a-menu-item>
           <a-menu-item key="/lifecycle" @click="$router.push('/lifecycle')">
             <template #icon><HeartOutlined /></template>
             <span>{{ t('nav.lifecycle') }}</span>
@@ -242,7 +238,6 @@ import {
   BulbOutlined,
   LogoutOutlined,
   ApiOutlined,
-  CloudSyncOutlined,
   CloudOutlined,
   VideoCameraOutlined,
   ClusterOutlined,
