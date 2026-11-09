@@ -1246,6 +1246,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	// §59.159: 重定向 existed=1 捕获（NP 重复上传 302 details.php?id=N&existed=1 形态；
 	// 幸运实测为 200 失败页形态——双形态兼容，transport 继承站点代理）
 	existingID, finalID := "", ""
+	uploadRedirectSuccess := false
 	// §59.470: 上传专用超时 120s——慢站 takeupload 站方处理可 >30s（南洋案
 	// 实证：09:42:57 发起→站方 09:43:44 完成入库，但 doer 默认 30s 超时先到
 	// →假失败+人工重试险重复发布）。浅拷贝共享 Transport（连接池/smart dial
@@ -1259,9 +1260,22 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 			id := req.URL.Query().Get("id")
 			if req.URL.Query().Get("existed") == "1" && id != "" {
 				existingID = id
+				// §59.501 附三：成功/已存在形态 302 不再跟随——Go http
+				// 跟随 redirect 不保留 Authorization 头 → 网关拦 details
+				// GET 403 覆盖判定（243 tid=89170 实证上传已成功却报
+				// "authentication failed (HTTP 403)"假失败）。existed=1
+				// 即重复上传明确签名，无需页面佐证。
+				return http.ErrUseLastResponse
 			}
 			if id != "" && strings.Contains(req.URL.Path, "details.php") {
 				finalID = id
+				// §59.501 附三：uploaded=1 是成功页权威签名（§59.159 形态①
+				// ——成功页标志参数，推荐位链接不带），Location 即铁证，
+				// 不跟随（同上 403 假失败）。
+				if req.URL.Query().Get("uploaded") == "1" {
+					uploadRedirectSuccess = true
+					return http.ErrUseLastResponse
+				}
 			}
 			return nil
 		},
@@ -1280,6 +1294,22 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	html := string(body)
 
 	if resp.StatusCode != http.StatusOK {
+		// §59.501 附三：成功形态 302（未跟随）——先于错误分类判定
+		if existingID != "" {
+			return &model.PublishResponse{
+				Success: true, IsExisting: true, ExistingID: existingID,
+				DetailURL:  baseURL + "/details.php?id=" + existingID,
+				TargetSite: config.Domain,
+			}, nil
+		}
+		if finalID != "" && uploadRedirectSuccess {
+			return &model.PublishResponse{
+				Success: true, TorrentID: finalID,
+				DetailURL:  baseURL + "/details.php?id=" + finalID,
+				TargetSite: config.Domain,
+				IDSource:   "redirect",
+			}, nil
+		}
 		return nil, classifySiteError(resp, "upload")
 	}
 
