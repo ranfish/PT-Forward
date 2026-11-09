@@ -194,7 +194,7 @@ func TestUtopiaMusicR7_Matrix(t *testing.T) {
 }
 
 func TestUtopiaMusicFormValues(t *testing.T) {
-	form := utopiaMusicFormValues(metaFixture(), mmFixture())
+	form := utopiaMusicFormValues(metaFixture(), mmFixture(), nil) // FLAC 直映射·镜像分支不进
 	if form["type"] != "408" {
 		t.Errorf("type 恒 408: %q", form["type"])
 	}
@@ -285,22 +285,35 @@ func TestUtopiaMusicValueSetAudit(t *testing.T) {
 	}
 }
 
-// §59.492 刀4: SACD 镜像(Mirror)→DSD 映射锚（RCA 60SACD 案素材矩阵缺口）。
-func TestUtopiaMusicFormValues_SACDMirror(t *testing.T) {
-	m := &model.TorrentMetadata{Title: "RCA Living stereo 60 SACD 2010"}
-	// SACD 镜像 → DSD/DSF(11)
-	form := utopiaMusicFormValues(m, &model.MusicMeta{
-		Format: "镜像(Mirror)", Media: "SACD",
-	})
-	if form["audiocodec_sel[4]"] != "11" {
-		t.Fatalf("SACD mirror: audiocodec=%q want 11 (DSD/DSF)", form["audiocodec_sel[4]"])
+// §59.492 附六: 镜像(Mirror)=完整复制版（非 ISO 专属·站内 3588 镜像+WAV
+// 实证）——编码看实际音频文件后缀（FileTree 权威·计数最大者）。
+func TestUtopiaMusicFormValues_Mirror(t *testing.T) {
+	m := &model.TorrentMetadata{Title: "Mirror Case"}
+	mm := &model.MusicMeta{Format: "镜像(Mirror)", Media: "CD"}
+	flacTor := bencTorrent([]string{"CD1/a.flac", "CD1/a.cue", "CD1/a.log", "CD2/b.flac", "CD2/b.log"})
+	wavTor := bencTorrent([]string{"a.wav", "b.wav", "a.log"})  // 站内 3588 形态
+	dsdTor := bencTorrent([]string{"a.iso", "b.dsf", "a.log"})  // RCA/SACD ISO 形态
+	noAudio := bencTorrent([]string{"scan.jpg", "a.log"})       // 零音频文件
+
+	flac := utopiaMusicFormValues(m, mm, flacTor) // 12 素材 Bach 案：镜像+CD+FLAC → 1
+	if flac["audiocodec_sel[4]"] != "1" {
+		t.Fatalf("flac mirror: %q want 1", flac["audiocodec_sel[4]"])
 	}
-	// CD 镜像：零实证不杜撰 → 无映射（③ fail-fast 保持）
-	form = utopiaMusicFormValues(m, &model.MusicMeta{
-		Format: "镜像(Mirror)", Media: "CD",
-	})
-	if _, ok := form["audiocodec_sel[4]"]; ok {
-		t.Fatalf("CD mirror: should stay unmapped (fail-fast), got %q", form["audiocodec_sel[4]"])
+	wav := utopiaMusicFormValues(m, mm, wavTor) // 站内 3588 → 8
+	if wav["audiocodec_sel[4]"] != "8" {
+		t.Fatalf("wav mirror: %q want 8", wav["audiocodec_sel[4]"])
+	}
+	dsd := utopiaMusicFormValues(m, mm, dsdTor) // RCA 60SACD：iso/dsf → 11
+	if dsd["audiocodec_sel[4]"] != "11" {
+		t.Fatalf("dsd mirror: %q want 11", dsd["audiocodec_sel[4]"])
+	}
+	na := utopiaMusicFormValues(m, mm, noAudio) // 零音频文件 → 无映射（③ fail-fast 保持）
+	if _, ok := na["audiocodec_sel[4]"]; ok {
+		t.Fatalf("no-audio mirror: should stay unmapped, got %q", na["audiocodec_sel[4]"])
+	}
+	gb := utopiaMusicFormValues(m, mm, []byte("garbage")) // 解析失败 → 无映射
+	if _, ok := gb["audiocodec_sel[4]"]; ok {
+		t.Fatalf("garbage mirror: should stay unmapped, got %q", gb["audiocodec_sel[4]"])
 	}
 }
 

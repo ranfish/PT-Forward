@@ -47,7 +47,7 @@ func (e *PublishExecutor) executeMusicPublish(ctx context.Context, in ExecuteInp
 	subtitle := utopiaMusicSubtitle(mm)
 	descr := utopiaMusicDescr(meta, mm)
 
-	form := utopiaMusicFormValues(meta, mm)
+	form := utopiaMusicFormValues(meta, mm, torrentData)
 	form["name"] = name
 	if subtitle != "" {
 		form["small_descr"] = subtitle
