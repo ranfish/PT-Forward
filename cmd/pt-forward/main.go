@@ -383,6 +383,10 @@ func main() {
 	iyuuService := iyuu.NewService(db, log)
 	go iyuuService.StartSyncLoop(ctx, 24*time.Hour)
 
+	// §59.498: CookieCloud 周期同步循环（IYUU 同款——替代旧 cookiecloud_sync
+	// 调度任务·"每 interval 分钟一次"语义·根治 off-by-epsilon）
+	go cookiecloud.NewSyncService(db, log).StartSyncLoop(ctx)
+
 	cloudFPService := cloudfp.NewService(db, log)
 
 	fpRepo := fingerprint.NewRepository(db, log)
@@ -1221,37 +1225,6 @@ func registerSchedulerTasks(
 
 	register("rss_disk_budget_expire", "rss", "*/5 * * * *", func(_ context.Context) error {
 		rssEngine.ExpireDiskBudget()
-		return nil
-	})
-
-	register("cookiecloud_sync", "maintenance", "*/5 * * * *", func(ctx context.Context) error {
-		var cfg model.CookieCloudConfig
-		if err := db.WithContext(ctx).First(&cfg).Error; err != nil {
-			return nil
-		}
-		if !cfg.SyncEnabled {
-			return nil
-		}
-		if cfg.Mode == "builtin" {
-			return nil
-		}
-		interval := cfg.SyncInterval
-		if interval < 5 {
-			interval = 5
-		}
-		if cfg.LastSyncAt != nil && time.Since(*cfg.LastSyncAt) < time.Duration(interval)*time.Minute {
-			return nil
-		}
-		syncSvc := cookiecloud.NewSyncService(db, log)
-		history, err := syncSvc.SyncAll(ctx)
-		if err != nil {
-			log.Warn("cookiecloud scheduled sync failed", zap.Error(err))
-			return nil
-		}
-		log.Info("cookiecloud scheduled sync completed",
-			zap.Int("synced", history.SyncedSites),
-			zap.Int("skipped", history.SkippedSites),
-		)
 		return nil
 	})
 
