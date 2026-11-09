@@ -241,10 +241,6 @@
               <a-form-item :label="apiKeyLabel">
                 <a-input v-model:value="credForm.apiKey" :placeholder="apiKeyHint" />
               </a-form-item>
-              <!-- §59.501: 临时上传 Basic Auth（好多油临时措施·站点放开后请清空） -->
-              <a-form-item label="上传凭证（临时）">
-                <a-input-password v-model:value="credForm.uploadAuth" placeholder="仅站点临时要求上传凭证时填写（user:pass）·放开后清空" />
-              </a-form-item>
             </a-col>
             <a-col v-if="showPasskeyField" :span="12">
               <a-form-item :label="site.passkeyAlias || t('sites.passkey')">
@@ -255,6 +251,14 @@
                   v-model:value="credForm.passkey"
                   :placeholder="site.passkeyMasked || (site.passkeyAlias ? `${t('site.inputPasskey')}${site.passkeyAlias}` : t('site.inputPasskey'))"
                 />
+              </a-form-item>
+            </a-col>
+            <!-- §59.501: 临时上传 Basic Auth（好多油临时措施·站点放开后请清空）。
+                 首版误置于 needsApiKey 列内被 cookie 站隐藏（好多油 auth_type=cookie）。
+                 显示条件=好多油域 或 已配置（放开后可编辑/清空） -->
+            <a-col v-if="site.domain?.includes('hdupt.com') || site.hasUploadAuth" :span="12">
+              <a-form-item label="上传凭证（临时）">
+                <a-input-password v-model:value="credForm.uploadAuth" :placeholder="site.hasUploadAuth ? '已配置（user:pass·可修改或清空）' : '站点临时要求上传凭证时填写（user:pass）'" />
               </a-form-item>
             </a-col>
           </a-row>
