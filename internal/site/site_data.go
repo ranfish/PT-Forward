@@ -95,6 +95,16 @@ func GetSiteSeedData(domain string) (*SiteSeedData, bool) {
 }
 
 func SeedSites(db *gorm.DB) error {
+	// §59.512 层5: 启动断言——seed 数据必须 ⊆ 支持集（supported_sites.json
+	// 唯一权威）。违反=开发期改一漏一失误（站点增删双 JSON 漏改一侧），
+	// fail-fast 显性失败（CI/29 开发期即炸·到不了生产）。
+	for _, s := range seedSites() {
+		if _, ok := GetSupportedSite(s.Domain); !ok {
+			return siteError(ErrSiteSeed, fmt.Sprintf(
+				"seed data/sites.json 条目 %s 不在 supported_sites.json 支持集——站点增删需双 JSON 同步（漏改检测）", s.Domain), nil)
+		}
+	}
+
 	for _, s := range seedSites() {
 		// v0.0.266: tracker_domains 序列化为 JSON 字符串（与 reseed.TrackerSiteResolver 格式一致）
 		var trackerDomainsJSON string
@@ -212,6 +222,35 @@ func SeedSites(db *gorm.DB) error {
 					IsBuiltin:  true,
 				})
 		}
+	}
+
+	// §59.512 层3: 启动对账——DB 行 ∉ 支持集（supported_sites.json 唯一
+	// 权威）→ DELETE。结构性根治幽灵站点：migration DELETE 的一次性语义
+	// 防不住数据恢复路径（镜像重构/旧卷/备份——migration 记录随数据恢复
+	// 不再重跑·243 pt.cdy.skin 案实证）；对账每次启动强制 DB 收敛于支持
+	// 集，任何路径进来的幽灵活不过一次启动。判定源禁用 seed 数据
+	// （修道院仅在 supported·105 vs 104——误判=误删用户配置）。只删
+	// sites 行（关联悬空由消费方容忍·migration36 单表先例）。回滚代价
+	// 已定案接受（旧版对账删新版站行→用户配置丢·罕见场景）。
+	var all []model.Site
+	if err := db.Find(&all).Error; err != nil {
+		return siteError(ErrSiteSeed, "对账查询站点失败", err)
+	}
+	for i := range all {
+		if _, ok := GetSupportedSite(all[i].Domain); ok {
+			continue
+		}
+		if err := db.Where("domain = ?", all[i].Domain).Delete(&model.Site{}).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("对账删除幽灵站点 %s 失败", all[i].Domain), err)
+		}
+		// 审计留痕（DB 侧——SeedSites 早于全局 logger 就绪·zap.L() 可能
+		// Nop 静默丢；operation_audit_logs 与导入/删除等站点操作同表可查）
+		_ = db.Create(&model.OperationAuditLog{
+			Actor: "system", Module: "site", Action: "reconcile_delete_ghost",
+			TargetType: "sites", TargetID: all[i].Domain,
+			Detail: fmt.Sprintf("启动对账：删除幽灵站点 %s（%s·不在当前版本支持集）", all[i].Domain, all[i].Name),
+			Result: "success",
+		}).Error
 	}
 
 	return nil
