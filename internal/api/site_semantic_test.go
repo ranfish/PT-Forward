@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/url"
 	"net/http/httptest"
 	"encoding/json"
 	"bytes"
@@ -288,4 +289,54 @@ func TestBatchRepushCriteriaAligned(t *testing.T) {
 	if !got[rows[0].ID] || !got[rows[6].ID] {
 		t.Errorf("应含 duplicate 行 %d 与 failed-but-tid 行 %d，got %v", rows[0].ID, rows[6].ID, got)
 	}
+}
+
+// §59.513: 批量发布 graceful 停止——cancel 端点幂等三态（§59.495 批量
+// 获取同款语义：取消不再开始下一颗·当前颗完整执行完）。
+func TestSiteBatchCancelIdempotent(t *testing.T) {
+	env := setupTestEnv(t)
+	h := &PublishTorrentsHandler{db: env.db, logger: zap.NewNop()}
+	h.siteBatch.tasks = map[string]*siteBatchTask{}
+	h.siteBatch.active = map[string]string{}
+	doCancel := func(site string) (int, string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/publish/seeds/site-batch-cancel?site="+url.QueryEscape(site), nil)
+		w := httptest.NewRecorder()
+		h.handleSiteBatchCancel(w, req)
+		return w.Code, w.Body.String()
+	}
+	// ① 无任务：no-op 200
+	code, body := doCancel("瓷器")
+	if code != http.StatusOK || !strings.Contains(body, "无运行中任务") {
+		t.Errorf("无任务应 no-op 200, got %d %s", code, body[:min(80, len(body))])
+	}
+	// ② 运行中：请求接受+stopRequested 置位
+	task := &siteBatchTask{ID: "t1", TargetSite: "瓷器", Total: 10}
+	h.siteBatch.tasks["t1"] = task
+	h.siteBatch.active["瓷器"] = "t1"
+	code, body = doCancel("瓷器")
+	if code != http.StatusOK || !strings.Contains(body, "停止请求已接受") {
+		t.Errorf("运行中应接受, got %d %s", code, body[:min(80, len(body))])
+	}
+	if !task.StopRequested {
+		t.Error("stopRequested 未置位")
+	}
+	// ③ 幂等：再取消同一任务仍 200（已请求）
+	code, _ = doCancel("瓷器")
+	if code != http.StatusOK {
+		t.Errorf("重复取消应幂等 200, got %d", code)
+	}
+	// ④ 已完成：告知终态（不复活）
+	task.Finished = true
+	delete(h.siteBatch.active, "瓷器")
+	code, body = doCancel("瓷器")
+	if code != http.StatusOK || !strings.Contains(body, "无运行中任务") {
+		t.Errorf("已完成应 no-op, got %d", code)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

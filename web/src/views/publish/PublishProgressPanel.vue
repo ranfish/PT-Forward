@@ -8,6 +8,13 @@
         <span v-if="progress.currentTitle">：{{ progress.currentTitle }}</span>
         <a-spin size="small" style="margin-left: 8px" />
       </p>
+      <!-- §59.513: graceful 停止（§59.495 批量获取同款——站点故障/网络
+           问题时干等全部失败的逃生口；当前颗完整执行完后终止） -->
+      <div v-if="stopRequested !== undefined" style="margin-top: 12px">
+        <a-popconfirm title="停止后不再开始下一颗，当前种子将完整执行完。确定停止？" @confirm="emit('stop')">
+          <a-button danger :loading="stopRequested">停止批量发布</a-button>
+        </a-popconfirm>
+      </div>
     </template>
 
     <!-- 完成态（一种多站/一站多种共用） -->
@@ -62,9 +69,12 @@ const props = defineProps<{
   progress?: { done: number; total: number; currentTitle?: string } | null
   results: PPResultRow[]
   rowMode: 'site' | 'seed'
+  /** §59.513: 传入即启用停止按钮（undefined 不显示——一种多站并行态
+   * 不适用 graceful 单串行语义）；loading 态由父层轮询 stop_requested 驱动 */
+  stopRequested?: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'done'): void }>()
+const emit = defineEmits<{ (e: 'done'): void; (e: 'stop'): void }>()
 
 const percent = computed(() => {
   if (!props.progress) return 0
