@@ -596,6 +596,11 @@ func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
 	out := make([]siteExportImport, 0, len(sites))
 	for i := range sites {
 		s := &sites[i]
+		// §59.512: 已下线站点不导出（与导入过滤双侧防线——历史潜伏幽灵
+		// 行即使 enabled=1 也不随文件扩散）
+		if _, ok := site.GetSupportedSite(s.Domain); !ok {
+			continue
+		}
 		out = append(out, siteExportImport{
 			Domain: s.Domain, Name: s.Name,
 			Passkey:                s.Passkey,
@@ -658,6 +663,15 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 		result.Total++
 		if in.Domain == "" {
 			result.Errors = append(result.Errors, "缺少 domain")
+			continue
+		}
+		// §59.512: 已下线站点过滤（用户报 Case：历史导出文件导入后下线站
+		// 复活——243 pt.cdy.skin 实证：幽灵行潜伏 enabled=0+导入整行替换
+		// 刷回 1）。supported_sites.json 不认识的 domain 一律拒入——连
+		// "更新 DB 已潜伏的幽灵行"也不允许（防续命；幽灵清理另行走删除）。
+		if _, ok := site.GetSupportedSite(in.Domain); !ok {
+			result.Skipped = append(result.Skipped, in.Domain)
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: 已下线站点（不在支持集）——已过滤，导入跳过", in.Domain))
 			continue
 		}
 		var existing model.Site

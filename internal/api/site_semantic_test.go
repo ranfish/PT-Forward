@@ -143,3 +143,76 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 		t.Errorf("passkey 密文应解密回明文, err=%v match=%v", err, got == plainPasskey)
 	}
 }
+
+// §59.512: 幽灵站点导入复活防线——DB 潜伏幽灵行（supported miss）+
+// 旧版本配置文件（制作时幽灵还在支持集·条目 enabled=true）→ 导入过滤
+// 拒入（当前版本支持集为唯一权威·文件声称无效）+DB 行不被续命。
+func TestSiteImportGhostFilter(t *testing.T) {
+	env := setupTestEnv(t)
+	enc, err := crypto.NewCredentialEncryptor("test-encryption-key-0123456789")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := crypto.RegisterCallbacks(env.db, enc, zap.NewNop()); err != nil {
+		t.Fatal(err)
+	}
+	// DB 潜伏幽灵行（历史窗口期 seed 重建形态·enabled=0 不可见潜伏）
+	ghost := &model.Site{Name: "传道院", Domain: "pt.cdy.skin", BaseURL: "https://pt.cdy.skin",
+		Framework: "nexusphp", AuthType: "cookie"}
+	if err := env.db.Create(ghost).Error; err != nil {
+		t.Fatal(err)
+	}
+	// GORM bool 零值坑：Create 跳过 false → 列默认 true（SeedSites 同坑
+	// 有对策·测试直 Create 需显式置 false——243 幽灵行 enabled=1 的可能来源）
+	if err := env.db.Model(ghost).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	// 在支持集的对照行（正常站不受过滤影响）
+	okRow := &model.Site{Name: "时光", Domain: "hdtime.org", BaseURL: "https://hdtime.org",
+		Framework: "nexusphp", AuthType: "cookie", Enabled: false}
+	if err := env.db.Create(okRow).Error; err != nil {
+		t.Fatal(err)
+	}
+	// 旧版本文件：含幽灵条目（enabled=true 复活尝试）+正常条目
+	w := env.doRequest("POST", "/api/v1/sites/import", map[string]interface{}{
+		"sites": []map[string]interface{}{
+			{"domain": "pt.cdy.skin", "enabled": true, "passkey": "0123456789abcdef0123456789abcdef"},
+			{"domain": "hdtime.org", "enabled": true},
+		},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("导入应 200, got %d: %s", w.Code, w.Body.String())
+	}
+	rd, _ := parseResponse(t, w).Data.(map[string]interface{})
+	// 幽灵被过滤（skip+警告）·正常站 updated
+	if rd["updated"] != float64(1) {
+		t.Errorf("仅正常站应 updated=1, got %v", rd["updated"])
+	}
+	skipped, _ := rd["skipped"].([]interface{})
+	if len(skipped) != 1 || skipped[0] != "pt.cdy.skin" {
+		t.Errorf("幽灵应 skip, got %v", skipped)
+	}
+	warns, _ := rd["warnings"].([]interface{})
+	if len(warns) != 1 || !strings.Contains(fmt.Sprint(warns[0]), "已下线") {
+		t.Errorf("应 1 条下线警告, got %v", warns)
+	}
+	// DB 幽灵行不被续命：enabled 保持 0 + passkey 未被写入
+	var ghost2 model.Site
+	if err := env.db.Where("domain = ?", "pt.cdy.skin").First(&ghost2).Error; err != nil {
+		t.Fatal("幽灵行应仍在（清理另行走删除·导入不删行）", err)
+	}
+	if ghost2.Enabled {
+		t.Error("幽灵行 enabled 不应被导入刷为 true（复活拦截）")
+	}
+	if ghost2.Passkey != "" {
+		t.Error("幽灵行 passkey 不应被写入（拒入含拒绝更新）")
+	}
+	// 正常站被更新
+	var ok2 model.Site
+	if err := env.db.Where("domain = ?", "hdtime.org").First(&ok2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !ok2.Enabled {
+		t.Error("正常站应被更新 enabled=true")
+	}
+}
