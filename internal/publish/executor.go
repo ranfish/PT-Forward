@@ -165,6 +165,12 @@ func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.T
 			return true, fmt.Sprintf("系统禁转（compliance %s）：%s", r.Category, r.Reason)
 		}
 	}
+	// ⑥ §59.511 官组种禁回流源站（全站通用——组→mappings(is_official=1)
+	// 归属站==目标站→拦截·251 组自动生效。与②定向禁转正交：②=官种→
+	// 特定站名单驱动·⑥=组→归属站数据驱动）
+	if blocked, reason := e.checkOfficialGroupBackflow(ctx, meta, targetSite); blocked {
+		return true, reason
+	}
 	return false, ""
 }
 
@@ -411,6 +417,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	// §59.472: 海胆季/集/合集注入（未配置 season 键的站零动作）
 	haidanSeasonEpisodeInject(form, cfg, meta, &tp)
+	// §59.511: 瓷器固定字段注入（share_rule=3 欢迎/board=1 普通区/
+	// is3d=Stereo3D 勾——未配置键零动作）
+	hdwingPublishInject(form, cfg, meta, tp)
 	// §59.289 fail-fast: 站方表单要求 type（FormFields 有域）但映射不出
 	// （元数据 category 无对应选项）——注定失败的上传不发出去，本地精准
 	// 拒发（修道院纪录片单复数错位案：type 不发→站方 Invalid integer
@@ -2228,6 +2237,11 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 		return v
 	}
 	if v := e.mteamCategoryValue(cfg, siteName, meta, tp); v != nil {
+		return v
+	}
+	// §59.511: 瓷器 type 混维路由（第十一站——4K 大桶/电影媒介分桶/
+	// 剧集产区轴·直映射类回退通用链）
+	if v := e.hdwingCategoryValue(cfg, siteName, meta, tp); v != nil {
 		return v
 	}
 	return e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)

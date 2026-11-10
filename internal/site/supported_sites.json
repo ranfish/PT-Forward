@@ -282,7 +282,8 @@
   "framework": "nexusphp",
   "auth_type": "cookie",
   "cookiecloud_domain": "hdwing.org",
-  "verification_status": "verified"
+  "verification_status": "verified",
+  "publish_supported": true
  },
  "hdtime.org": {
   "domain": "hdtime.org",

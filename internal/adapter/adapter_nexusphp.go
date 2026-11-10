@@ -389,13 +389,14 @@ func (a *NexusPHPAdapter) enrichHdwingTransferFlags(ctx context.Context, config 
 		// 837787/822791——share_rule_2 首版漏判·禁转词族显式列举防未知编号误伤）
 		noTransfer = true
 	case strings.Contains(ruleText, "其他情况"):
-		// share_rule_255 软规则：副标题+简介标注语（站内正例四形态实测——
-		// "自购禁转"/"未允禁转"/"发布者授权转载，禁转"/"【禁转】"——
-		// "禁转"子串全覆盖。判定源=detail.Subtitle/Description（主链
-		// GetTorrentDetail 产出·与 mainHTML 同源——回归审核删除首版残留
-		// 的 html 空判死代码：字段在场即权威，无需 HTML 变参中转）
-		scan := detail.Subtitle + " " + detail.Description
-		if reHdwingNoTransferWords.MatchString(scan) {
+		// share_rule_255 软规则：站方语义"参考副标题及种子简介的标注语"。
+		// §59.511 回归修正：扫描域收窄 Subtitle-only——正例四形态实测全部
+		// 在副标题（自购禁转/未允禁转/授权转载禁转/【禁转】），简介正文
+		// 正例零实证；简介=声明/致谢混杂区，系统禁转判定设计不读简介
+		// 声明（extractFlags 两道防线：§59.39 quote 剥离+「禁转PTT」定向
+		// 豁免——首版裸扫 Subtitle+Description 偏离该设计）。站内出现
+		// 简介级标注实证再扩（扩展时复用系统防线不裸扫）。
+		if reHdwingNoTransferWords.MatchString(detail.Subtitle) {
 			noTransfer = true
 		}
 	default:
