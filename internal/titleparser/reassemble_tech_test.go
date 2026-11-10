@@ -227,6 +227,12 @@ func TestNormalizeResolution(t *testing.T) {
 	assertEquals(t, "lower", "1080p", normalizeResolution("1080p", ""))
 	assertEquals(t, "lower2", "1080p", normalizeResolution("1080p", "lower"))
 	assertEquals(t, "upper", "1080P", normalizeResolution("1080p", "upper"))
+	// §59.504: 无像素形态兜底归一——"4K"/"8K" 标题（站方风格无像素词）
+	// 原值直通=词形违规（v1.05 不写 4K）；PT 惯例 4K≈2160p/8K≈4320p
+	assertEquals(t, "4k-lower", "2160p", normalizeResolution("4K", ""))
+	assertEquals(t, "4k-upper", "2160P", normalizeResolution("4K", "upper"))
+	assertEquals(t, "8k-lower", "4320p", normalizeResolution("8K", ""))
+	assertEquals(t, "4k-already-lower", "2160p", normalizeResolution("4k", ""))
 }
 
 func TestNormalizeAudio(t *testing.T) {

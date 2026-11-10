@@ -2,7 +2,7 @@ package publish
 
 import (
 	"encoding/json"
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -11,14 +11,28 @@ import (
 
 // ═══ §59.166 LocalAudit 内部重组审核规范（advisory——仅提示不阻塞）═══
 //
-// 用户定案：站点适配阶段规则未经验证，发布后才知道规则是否正确——全 WARN 不拦。
-// 规则源：幸运探针实证 + v1.05 规范 + 9 站种审脚本共性抽取（docs/38——
-// Source 标注来源，同规则多站命中=共性，单站=站特例按 SiteOnly 过滤）。
+// §59.504 规则可达性审查（12→6 条·实战数据驱动删减）：
+// 删 6 条——REASSEMBLED（1652 次高频·重组=设计行为非错误·无行动价值·
+//   透明性已由 DryRun form 预览+站方页面承担）；
+// NON_ASCII（死规则——重组出口 StripChinese 恒剥中文/全角·两面皆不可达）；
+// SUBTITLE_EMPTY（3 次全 pushed 零站方拒·零行动价值）；
+// MEDIAINFO_EMPTY（口径错位——单列检查 vs 审核门三列·原盘 BDInfo 行
+//   误报；连 DryRun 面一起删——与审核门同判据的提示是重复信息源）；
+// IMDB_EMPTY（205 次零 failed·98.5% 成功率高于基线 57%·imdb 表单域
+//   1/72 站——"7 站必填"在 62 站适配面未兑现；失败兜底=站方拒信回流）；
+// TITLE_WORD_FORM（71 次全 "HDR10→HDR" 伪规则误报——HDR10 是 tp.HDR
+//   合法值+站点自治开关 HDR10ToHDR 已存在；大写P/AC3/SDR 三死检查——
+//   槽级归一早已结构性保证；4K 真缺口移 normalizeResolution 兜底修）。
+// 修 1 条——IMAGES 阈值 2→3（对齐审核门 MinScreenshots）+解析函数
+//   单源化（model.ParseScreenshotColumn·防双源漂移）。
+// 留 5 条——映射类三条（9 次 medium miss 全 pushed 实证 advisory 定位
+//   正确·不升级 fail-fast）；粤语无据（行为防御·真行动）；禁发组
+//   （低频高止损·FGT 种发禁发站=删种+警告）。
 //
-// 校验分工（回归审核定案）：判据引擎产 tags（自动有据）、executor 硬拦行为
-// 铁律（首发禁勾等）——LocalAudit 只做校验类（映射缺口/纠错透明/override 有据）。
+// 用户方法论：结构性防止错误可达——提示是兜底，上游能修的修上游
+// （4K 词形→重组器兜底归一；噪声→删规则）。
 
-// LocalAuditFinding 单条提示（全 WARN——message 含修法建议）。
+// LocalAuditFinding 单条提示（全 WARN）。
 type LocalAuditFinding struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -26,15 +40,14 @@ type LocalAuditFinding struct {
 }
 
 // localAuditInput 引擎输入（executor ⑤ tags 段后的终态产物）。
+// §59.504: 删 PublishTitle/AppliedTags（消费者 #4/#6/#12 随规则删减归零）。
 type localAuditInput struct {
 	TargetSite   string
 	TP           titleparser.TechProfile
 	Form         map[string]string
 	Cfg          *model.PublishFormConfig
-	AppliedTags  []string
 	TagOverrides []string
 	Meta         *model.TorrentMetadata
-	PublishTitle string // §59.166 B2 重组终态标题
 }
 
 // RunLocalAudit 执行全部适用规则（共性全站 + 站特例按 TargetSite 过滤）。
@@ -68,7 +81,7 @@ var bannedGroupsCommon = []string{
 	"verypsp", "dwr", "xlmv", "xjctv", "ctrlhd",
 }
 
-// localAuditRules 规则集（初始=幸运实证五规则 + 9 站共性七规则——docs/38 矩阵）。
+// localAuditRules 规则集（§59.504 终局 6 条·文案=用户定版纯事实+带值）。
 var localAuditRules = []localAuditRule{
 	{
 		Code:   "LOCAL_MEDIUM_UNMAPPED",
@@ -79,7 +92,7 @@ var localAuditRules = []localAuditRule{
 				return "" // 站点无该域非违例
 			}
 			if _, ok := in.Form[f]; !ok {
-				return "媒介域未选择（站点词表可能缺词条）——建议核对站点发布配置的媒介映射"
+				return "媒介域未选择"
 			}
 			return ""
 		},
@@ -93,7 +106,10 @@ var localAuditRules = []localAuditRule{
 				return ""
 			}
 			if _, ok := in.Form[f]; !ok {
-				return "分辨率域未选择（站点词表可能缺词条）——建议核对分辨率映射（标题 " + in.TP.Resolution + "）"
+				if in.TP.Resolution != "" {
+					return "分辨率域未选择（" + in.TP.Resolution + "）"
+				}
+				return "分辨率域未选择"
 			}
 			return ""
 		},
@@ -118,17 +134,10 @@ var localAuditRules = []localAuditRule{
 				if !hasAudioTrace {
 					return "" // 标题/MI 均无音频痕迹不提示
 				}
-				return fmt.Sprintf("音频域未选择——标题/MI 有音频信息（%s）但未映射到站点词表，建议核对音频词条", in.TP.AudioCodec)
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_TITLE_REASSEMBLED",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			if in.PublishTitle != "" && in.Meta.Title != "" && in.PublishTitle != in.Meta.Title {
-				return "发布标题已按 MI 纠错重组（库存标题与 MI 不一致时以 MI 权威）——如不符预期请核对种子配置 MediaInfo"
+				if in.TP.AudioCodec != "" {
+					return "音频域未选择（" + in.TP.AudioCodec + "）"
+				}
+				return "音频域未选择"
 			}
 			return ""
 		},
@@ -142,40 +151,9 @@ var localAuditRules = []localAuditRule{
 					hasEvidence := strings.Contains(in.Meta.Subtitle, "粤") ||
 						strings.Contains(in.Meta.MediaInfo, "Cantonese")
 					if !hasEvidence {
-						return "人工勾选粤语但 MI/副标题无粤语依据——建议核对音轨语言（谨防站方审核判 WRONGLY）"
+						return "人工勾选粤语但 MI/副标题无粤语依据"
 					}
 				}
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_TITLE_NON_ASCII",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			// 9/9 站共性（docs/38 C1）：主标题禁中文/全角——tp 重组应保证纯 ASCII
-			if hasFullWidthOrChinese(in.PublishTitle) {
-				return "发布标题含中文/全角字符（9 站共性禁令）——请核对标题重组（中文名应走 cnname/副标题）"
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_SUBTITLE_EMPTY",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			if strings.TrimSpace(in.Meta.Subtitle) == "" {
-				return "副标题为空（9 站共性必填）——建议补齐副标题再发布"
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_MEDIAINFO_EMPTY",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			if strings.TrimSpace(in.Meta.MediaInfo) == "" {
-				return "MediaInfo 为空（9 站共性必填，形态各异）——建议先在种子配置页完成 MI 获取"
 			}
 			return ""
 		},
@@ -184,20 +162,13 @@ var localAuditRules = []localAuditRule{
 		Code:   "LOCAL_IMAGES_INSUFFICIENT",
 		Source: "common",
 		Check: func(in localAuditInput) string {
-			// 宽松阈值 2（AGSV≥2/春日≥3/青蛙藏宝阁≥1——docs/38 C5）
-			shots := parseScreenshotsCol(in.Meta.Screenshots)
-			if len(shots) < 2 {
-				return fmt.Sprintf("截图不足（%d 张 < 2，6 站共性 ≥1-3）——建议补齐截图", len(shots))
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_IMDB_EMPTY",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			if strings.TrimSpace(in.Meta.IMDbURL) == "" {
-				return "IMDb 链接为空（7 站共性必填）——建议补齐 IMDb 链接"
+			// §59.504: 阈值对齐审核门 MinScreenshots=3（原 2 过时）；解析
+			// 单源化 model.ParseScreenshotColumn（原 executor 私有
+			// parseScreenshotsCol 双源漂移——空串过滤口径与审核门一致）。
+			// 实战命中面=force 审核旁路（§59.484）+DryRun 未审核种子引导。
+			shots := model.ParseScreenshotColumn(in.Meta.Screenshots)
+			if len(shots) < 3 {
+				return "截图不足（" + itoa(len(shots)) + " 张）"
 			}
 			return ""
 		},
@@ -206,41 +177,10 @@ var localAuditRules = []localAuditRule{
 		Code:   "LOCAL_BANNED_GROUP",
 		Source: "common",
 		Check: func(in localAuditInput) string {
-			if g := containsBannedGroup(in.PublishTitle); g != "" {
-				return "标题含多站禁发组 " + g + "（AGSV/CS/春日/劳改所/青蛙名单交集）——目标站可能禁发该组，发布前请确认"
-			}
-			return ""
-		},
-	},
-	{
-		Code:   "LOCAL_TITLE_WORD_FORM",
-		Source: "common",
-		Check: func(in localAuditInput) string {
-			// 词形规范防御（青蛙/织梦词形+多站归一——docs/38 §三）
-			t := " " + in.PublishTitle + " "
-			var bad []string
-			if strings.Contains(t, " 4K ") {
-				bad = append(bad, "4K→2160p")
-			}
-			for _, p := range []string{" 1080P ", " 720P ", " 2160P ", " 480P ", " 4320P "} {
-				if strings.Contains(t, p) {
-					bad = append(bad, strings.TrimSpace(p)+"→小写p")
-					break
-				}
-			}
-			if strings.Contains(t, " AC3 ") {
-				bad = append(bad, "AC3→DD")
-			}
-			if strings.Contains(t, " HDR10 ") {
-				bad = append(bad, "HDR10→HDR")
-			}
-			for _, w := range []string{" HQ ", " EDR ", " SDR "} {
-				if strings.Contains(t, w) {
-					bad = append(bad, strings.TrimSpace(w)+"应删除")
-				}
-			}
-			if len(bad) > 0 {
-				return "标题词形违规（" + strings.Join(bad, "；") + "）——请核对标题重组"
+			// §59.504: 消费源改标题原文（PublishTitle 字段已删——Meta.Title
+			// 含组名段同等可达：源组名来自标题解析）。
+			if g := containsBannedGroup(in.Meta.Title); g != "" {
+				return "标题含多站禁发组（" + g + "）"
 			}
 			return ""
 		},
@@ -279,24 +219,20 @@ func isAlnum(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
-// hasFullWidthOrChinese 全角字符或中文检测（9 站共性 C1——同款 [\u4e00-\u9fa5\uFF01-\uFF60]）。
-func hasFullWidthOrChinese(s string) bool {
-	for _, r := range s {
-		if (r >= 0x4e00 && r <= 0x9fa5) || (r >= 0xFF01 && r <= 0xFF60) {
-			return true
-		}
-	}
-	return false
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }
 
 // FormatLocalAudit 提示格式化（成功态 message 后缀）。
+// §59.504: 去内部 CODE 前缀——英文代号对用户无意义（溯源走 logs 列
+// JSON 的 code 字段，单点保留）。
 func FormatLocalAudit(findings []LocalAuditFinding) string {
 	if len(findings) == 0 {
 		return ""
 	}
 	parts := make([]string, 0, len(findings))
 	for _, f := range findings {
-		parts = append(parts, f.Code+": "+f.Message)
+		parts = append(parts, f.Message)
 	}
 	return "内部规范提示[" + strings.Join(parts, "；") + "]"
 }

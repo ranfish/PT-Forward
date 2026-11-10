@@ -651,15 +651,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// §59.166 LocalAudit 内部重组审核规范（advisory 全 WARN 不阻塞——规则未实战
 	// 验证前不拦发布，用户定案；提示走 DryRun/成功 message/logs 三出口）
+	// §59.504: 删 PublishTitle/AppliedTags 传参（消费者随规则删减归零）
 	localFindings := RunLocalAudit(localAuditInput{
 		TargetSite:   in.TargetSite,
 		TP:           tp,
 		Form:         form,
 		Cfg:          cfg,
-		AppliedTags:  applied,
 		TagOverrides: in.TagOverrides,
 		Meta:         meta,
-		PublishTitle: publishTitle,
 	})
 
 	// DryRun 检查点：组装+渲染+预检之后、上传之前（§59.156——完整表单形态验证，
