@@ -1,6 +1,8 @@
 <template>
   <div style="padding: 24px">
-    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
+    <!-- §59.507: 头部整体左对齐（原 space-between 标题左工具右——
+         用户定案工具紧跟标题流式排列） -->
+    <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
       <h3 style="margin: 0">发布日志</h3>
       <a-space>
         <!-- §59.506: 目标站模糊搜索+自动完成（用户定案：输入任意子串模糊
@@ -18,7 +20,7 @@
         />
         <a-select
           v-model:value="statusFilter"
-          style="width: 140px"
+          style="width: 170px"
           placeholder="状态"
           allow-clear
           @change="onFilterChange"
@@ -253,10 +255,13 @@ const pagination = ref({
 // 存量兼容值（completed/exists/edited——旧记录）在后。seed_failed 为
 // 跨状态子集筛选（seed_error 非空未加种·§59.374 B2 后端分支）非真实
 // status 值。
+// §59.507: 筛选项终集 13→8——243 生产 3288 行回归（五值+uploaded 可达）：
+// 删 publishing（同步落终态·DB 恒无死值）+旧值四项（completed/exists/
+// edited/skipped·243 零行）；statusLabel/statusColor 保留旧值翻译（历史行
+// 显示兼容·仅筛选项删）；unreviewed/ineligible 零行按需生长不预加。
 const statusFilterValues = [
   'pushed', 'pushed_existing', 'uploaded', 'uploaded_existing',
-  'existing', 'duplicate', 'failed', 'publishing', 'seed_failed',
-  'completed', 'exists', 'edited', 'skipped',
+  'existing', 'duplicate', 'failed', 'seed_failed',
 ]
 
 // §59.502 附:窄数据列收紧（数据不宽表头宽——旧 x:1770 超列宽总和 530px
