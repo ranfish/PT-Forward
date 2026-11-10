@@ -1232,6 +1232,15 @@ func (e *PublishExecutor) lookupOtherOption(cfg *model.PublishFormConfig, domain
 			return &cfg.ValueMappings[domain][i]
 		}
 	}
+	// §59.511 附: 复合词形 Contains 兜底——hdwing "其他(Other)" 双语
+	// 复合形态两形态均 miss（精确枚举+other 前缀）→ team 槽缺失（DryRun
+	// 2046 案实证）；对齐同包 fallbackByOtherLabel 的 Contains 语义。
+	for i, m := range cfg.ValueMappings[domain] {
+		lower := strings.ToLower(m.Label)
+		if strings.Contains(lower, "其它") || strings.Contains(lower, "其他") || strings.Contains(lower, "other") {
+			return &cfg.ValueMappings[domain][i]
+		}
+	}
 	return nil
 }
 
