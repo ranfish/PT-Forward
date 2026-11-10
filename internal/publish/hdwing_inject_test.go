@@ -58,6 +58,8 @@ func TestHdwingCategoryValue(t *testing.T) {
 		// ② 电影层：媒介分桶（medium 由 tp.SourceType 判——此处直验 tp.Resolution 路径）
 		{"1080i电影", &model.TorrentMetadata{Category: "category.movie"}, titleparser.TechProfile{Resolution: "1080i"}, "16"},
 		{"720p电影", &model.TorrentMetadata{Category: "category.movie"}, titleparser.TechProfile{Resolution: "720p"}, "9"},
+		// ②b 电影原盘分桶（medium 判定链→bluray 族→20）
+		{"1080p原盘电影", &model.TorrentMetadata{Category: "category.movie", Title: "Oldboy 2003 1080p JPN Blu-ray AVC DTS-HD MA-FRDS"}, titleparser.TechProfile{Resolution: "1080p", SourceType: "Blu-ray"}, "20"},
 		// ③ 剧集产区轴（PTGen Region）
 		{"美剧", &model.TorrentMetadata{Category: "category.tv_series", Title: "Lost S02 1080p", PTGenSourceJSON: `{"region":["美国"]}`}, titleparser.TechProfile{Resolution: "1080p"}, "13"},
 		{"日剧", &model.TorrentMetadata{Category: "category.tv_series", Title: "X S01", PTGenSourceJSON: `{"region":["日本"]}`}, titleparser.TechProfile{}, "24"},
