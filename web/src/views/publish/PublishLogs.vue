@@ -51,7 +51,9 @@
             <a-button :disabled="selectedRowKeys.length === 0" :loading="batchRepushing">批量补推</a-button>
           </a-badge>
         </a-popconfirm>
-        <a-button :disabled="tableData.length === 0" @click="exportCSV"><DownloadOutlined /> CSV</a-button>
+        <!-- §59.509 附: margin-left 给左侧批量补推 badge 数字让位
+             （红色 count 溢出按钮右上角被 CSV 按钮遮挡·用户实测） -->
+        <a-button :disabled="tableData.length === 0" style="margin-left: 14px" @click="exportCSV"><DownloadOutlined /> CSV</a-button>
         <a-switch
           v-model:checked="autoRefresh"
           checked-children="自动"
