@@ -223,7 +223,13 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (editingRecord.value) {
-      await downloadersApi.update(editingRecord.value.id, form)
+      // §59.508 附: transferTargetUid 清空时显式提交 0（区分"未传=不
+      // 覆盖"与"清空"——后端指针化配套；undefined 序列化省略字段会
+      // 被后端 nil 守卫跳过导致无法主动清空）
+      await downloadersApi.update(editingRecord.value.id, {
+        ...form,
+        transferTargetUid: form.transferTargetUid ?? 0,
+      })
     } else {
       await downloadersApi.create(form)
     }
