@@ -153,3 +153,28 @@ func TestOfficialGroupBackflow(t *testing.T) {
 		t.Fatal("无组种不拦")
 	}
 }
+
+// §59.511 附: lookupOtherOption 复合词形——hdwing "其他(Other)" 双语
+// 复合形态（DryRun 2046 案 team 槽缺失根因）。
+func TestLookupOtherOptionCompoundLabel(t *testing.T) {
+	e := &PublishExecutor{}
+	cfg := &model.PublishFormConfig{}
+	cfg.ValueMappings = map[string][]model.FormValueMapping{
+		model.FieldDomainTeam: {
+			{Label: "CMCT", Value: "2"},
+			{Label: "其他(Other)", Value: "5"}, // hdwing 站方原文复合形态
+		},
+	}
+	got := e.lookupOtherOption(cfg, model.FieldDomainTeam)
+	if got == nil || got.Value != "5" {
+		t.Errorf("复合词形 Other 应兜底命中: %+v", got)
+	}
+	// 既有形态回归（精确/前缀）
+	cfg2 := &model.PublishFormConfig{}
+	cfg2.ValueMappings = map[string][]model.FormValueMapping{
+		model.FieldDomainTeam: {{Label: "Other", Value: "11"}},
+	}
+	if got := e.lookupOtherOption(cfg2, model.FieldDomainTeam); got == nil || got.Value != "11" {
+		t.Error("前缀形态回归失败")
+	}
+}
