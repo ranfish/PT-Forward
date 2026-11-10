@@ -1,7 +1,7 @@
 # HDWinG 瓷器适配器设计
 
 > 站点：瓷器 HDWinG · hdwing.org · tracker.hdwing.org
-> 状态：源站接入完成（§59.510·2026-11-10·v0.0.1424·五链端到端验证毕）
+> 状态：**全功能收官**（§59.510-511·2026-11-10——源站+目标站+首颗实战 pushed tid=838594 seeded=1 五链全绿）
 > 摸底账号：ranfish_hdc（UID 268618 · UltimateUser 等级 · CC cookie 有效）
 
 ## 1. 站点实态档案
