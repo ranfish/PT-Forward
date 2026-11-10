@@ -574,7 +574,10 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 		}
 	}
 	if targetSite != "" {
-		q = q.Where("target_site = ?", targetSite)
+		// §59.506: 目标站模糊搜索（用户定案）——精确匹配改包含匹配
+		// （LIKE %X%：优/堡/优堡均命中"优堡"·好/好多/油均命中"好多油"）；
+		// 本函数唯一消费方=发布日志页端点（publish_handler:305），语义安全。
+		q = q.Where("target_site LIKE ?", "%"+targetSite+"%")
 	}
 	if trigger != "" {
 		q = q.Where("trigger = ?", trigger)
@@ -597,6 +600,19 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 }
 
 
+
+// DistinctTargetSites §59.506: 发布记录出现过的目标站去重列表（日志页
+// 搜索自动完成候选源——候选一定有记录可搜·按记录数降序）。
+func (p *Pipeline) DistinctTargetSites(ctx context.Context) []string {
+	var sites []string
+	p.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Select("target_site").
+		Where("target_site != ''").
+		Group("target_site").
+		Order("COUNT(*) DESC").
+		Pluck("target_site", &sites)
+	return sites
+}
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
 	// ⚠️ §59.409 附二警示：本方法自 §59.147 拆自动发布流后**零生产调用**

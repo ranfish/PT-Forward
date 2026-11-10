@@ -54,6 +54,17 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
+
+	// §59.506: 目标站搜索自动完成候选源（发布记录出现过的站·去重按量降序）
+	case trimmed == "/api/v1/publish/results/target-sites":
+		if r.Method == http.MethodGet {
+			Success(w, map[string]interface{}{
+				"sites": h.pipeline.DistinctTargetSites(r.Context()),
+			})
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
 	}
 
 	if strings.Contains(trimmed, "/publish/results/") {
