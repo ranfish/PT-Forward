@@ -3,12 +3,18 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
       <h3 style="margin: 0">发布日志</h3>
       <a-space>
-        <a-input-search
+        <!-- §59.506: 目标站模糊搜索+自动完成（用户定案：输入任意子串模糊
+             命中·输入时下拉实时过滤候选站名——候选源=发布记录出现过的站
+             （点选必命中）·对齐站点管理搜索的 includes 语义） -->
+        <a-auto-complete
           v-model:value="searchTarget"
-          placeholder="目标站搜索"
+          :options="targetSiteOptions"
           style="width: 200px"
+          placeholder="目标站搜索"
           allow-clear
-          @search="onFilterChange"
+          @search="onTargetSiteInput"
+          @select="onFilterChange"
+          @keydown.enter="onFilterChange"
         />
         <a-select
           v-model:value="statusFilter"
@@ -153,7 +159,8 @@
 
 <script setup lang="ts">
 import { executeApi } from '@/api/formConfig'
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import client from '@/api/client'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -204,6 +211,26 @@ const persisted = loadPersistedFilters()
 const loading = ref(false)
 const tableData = ref<PublishResultRecord[]>([])
 const searchTarget = ref(persisted.search || '')
+
+// §59.506: 目标站自动完成——候选源=发布记录出现过的站（DistinctTargetSites
+// 端点·按量降序·点选必命中）；输入实时 includes 过滤（对齐站点管理搜索语义）
+const allTargetSites = ref<string[]>([])
+const targetSiteOptions = computed(() => {
+  const q = searchTarget.value.trim().toLowerCase()
+  if (!q) return allTargetSites.value.map(s => ({ value: s }))
+  return allTargetSites.value
+    .filter(s => s.toLowerCase().includes(q))
+    .map(s => ({ value: s }))
+})
+function onTargetSiteInput() {
+  if (allTargetSites.value.length === 0) {
+    client.get('/publish/results/target-sites')
+      .then((resp) => {
+        allTargetSites.value = (resp.data?.data?.sites as string[]) || []
+      })
+      .catch(() => { /* silent——候选源缺省不影响搜索本身 */ })
+  }
+}
 const statusFilter = ref<string | undefined>(persisted.status)
 const triggerFilter = ref<string | undefined>(persisted.trigger)
 const dateRange = ref<[Dayjs, Dayjs] | undefined>(
