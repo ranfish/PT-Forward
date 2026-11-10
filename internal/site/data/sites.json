@@ -6033,6 +6033,32 @@
       "is_reseed_target": true
     },
     {
+      "domain": "hdwing.org",
+      "name": "瓷器",
+      "base_url": "https://hdwing.org",
+      "framework": "nexusphp",
+      "auth_type": "",
+      "download_mode": "signed_hash",
+      "is_source": true,
+      "is_target": false,
+      "cookiecloud_domain": "hdwing.org",
+      "alternative_domains": "",
+      "groups": [
+        "HDWinG",
+        "HDWTV",
+        "HDChina",
+        "HDCTV",
+        "LU9998",
+        "iHD",
+        "KiSHD"
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdwing.org"
+      ],
+      "is_reseed_target": false
+    },
+    {
       "domain": "hdtime.org",
       "name": "时光",
       "base_url": "https://hdtime.org",

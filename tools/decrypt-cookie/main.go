@@ -3,6 +3,7 @@
 // 用法：
 //   ./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com
 //   ./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com | xargs -I{} curl -b '{}' ...
+//   ./decrypt-cookie -cc > /tmp/cc.env && source /tmp/cc.env   （输出 CC 三个环境变量）
 //
 // 环境变量：
 //   DB_PATH       — 默认 DB 路径（替代 -db 参数）
@@ -84,6 +85,7 @@ func main() {
 	dbPath := flag.String("db", "", "SQLite DB 路径（默认从 DB_PATH 环境变量读取，再默认 data/pt-forward.db）")
 	domain := flag.String("domain", "", "站点域名（模糊匹配）")
 	client := flag.String("client", "", "下载器名称或 ID（解密 clients.password）")
+	cc := flag.Bool("cc", false, "输出 CookieCloud 配置为 export 环境变量（server_url/uuid/password）")
 	flag.Parse()
 
 	if *dbPath == "" {
@@ -92,8 +94,8 @@ func main() {
 	if *dbPath == "" {
 		*dbPath = "data/pt-forward.db"
 	}
-	if *domain == "" && *client == "" {
-		fmt.Fprintln(os.Stderr, "用法: decrypt-cookie -domain <domain> | -client <name|id> [-db <path>]")
+	if *domain == "" && *client == "" && !*cc {
+		fmt.Fprintln(os.Stderr, "用法: decrypt-cookie -domain <domain> | -client <name|id> | -cc [-db <path>]")
 		os.Exit(1)
 	}
 
@@ -109,6 +111,23 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read encryption_key: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *cc {
+		// cookie_cloud_configs 单配置行：解密 password，输出三环境变量
+		var serverURL, uuid, pwdCipher string
+		err = db.QueryRow("SELECT server_url, uuid, password FROM cookie_cloud_configs LIMIT 1").Scan(&serverURL, &uuid, &pwdCipher)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read cookie_cloud_configs: %v\n", err)
+			os.Exit(1)
+		}
+		pwd, derr := decrypt(encKey, pwdCipher)
+		if derr != nil {
+			fmt.Fprintf(os.Stderr, "decrypt cc password: %v\n", derr)
+			os.Exit(1)
+		}
+		fmt.Printf("export COOKIECLOUD_URL=%s\nexport COOKIECLOUD_UUID=%s\nexport COOKIECLOUD_PASSWORD=%s\n", serverURL, uuid, pwd)
+		return
 	}
 
 	var ciphertext string

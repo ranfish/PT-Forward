@@ -1,0 +1,79 @@
+{
+  "domain": "hdwing.org",
+  "site_code": "hdwing",
+  "site_name": "瓷器 HDWinG",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "格式",
+    "team": "制作组"
+  },
+  "standard_keys": {
+    "type": {
+      "电影Movie(720p)": "category.movie",
+      "电影Movie(1080p)": "category.movie",
+      "电影Movie(1080i)": "category.movie",
+      "纪录片(Documentary)": "category.documentary",
+      "欧美剧(EU/US TV series)": "category.tv_series",
+      "欧美剧集包(EU/US TV series pack)": "category.tv_series",
+      "中港台剧集(Chinese TV series)": "category.tv_series",
+      "中港台剧集包(Chinese TV series pack)": "category.tv_series",
+      "日韩剧集包(JPN/KOR drama pack)": "category.tv_series",
+      "动画片(Animation)": "category.animation",
+      "体育节目(Sports)": "category.sports",
+      "综艺(TV Shows)": "category.tv_shows",
+      "演唱会(Vocal Concert)": "category.concert"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "HD DVD": "medium.hddvd",
+      "Remux": "medium.remux",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "HDTV": "medium.hdtv",
+      "WEB-DL": "medium.webdl",
+      "DVD": "medium.dvd",
+      "DVDR": "medium.dvdr",
+      "CD": "medium.cd",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264/AVC": "video.h264",
+      "x264": "video.h264",
+      "x265/HEVC": "video.h265",
+      "H.265/HEVC": "video.h265",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "Xvid": "video.xvid",
+      "Other": "video.other"
+    },
+    "audio_codec": {
+      "DTS X": "audio.dtsx",
+      "Atmos": "audio.atmos",
+      "DTS-HDMA": "audio.dts_hd_ma",
+      "True-HD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "DTS": "audio.dts",
+      "AC3": "audio.ac3",
+      "WAVE": "audio.wav",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "AAC": "audio.aac",
+      "OGG": "audio.ogg",
+      "MP2/3": "audio.mp3",
+      "Other": "audio.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K": "resolution.r2160p",
+      "2K": "resolution.r1440p",
+      "1080P": "resolution.r1080p",
+      "1080I": "resolution.r1080i",
+      "720P": "resolution.r720p",
+      "SD": "resolution.sd",
+      "其它(Other)": "resolution.other"
+    }
+  }
+}

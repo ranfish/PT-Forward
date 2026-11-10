@@ -2036,3 +2036,84 @@ func TestUploadBasicAuthHeader(t *testing.T) {
 		t.Fatal("非好多油域不得发送")
 	}
 }
+
+// §59.510 hdwing（瓷器）接入四锚——全部真实站内 HTML 片段（2026-11-10 摸底）。
+func TestHdwingShareRuleStates(t *testing.T) {
+	// 列表行 share_rule 四态（真实 title 文本·search=禁转 109 命中实测）
+	cases := []struct {
+		row  string
+		id   string // share_rule 编号
+		text string // title 原文
+	}{
+		{`<td class="share_rule" valign="middle"><img src='/pic/share_rule_1.gif' title='禁止转载'/></td>`, "1", "禁止转载"},
+		{`<td class="share_rule" valign="middle"><img src='/pic/share_rule_2.gif' title='未经允许不得转载'/></td>`, "2", "未经允许不得转载"},
+		{`<td class="share_rule" valign="middle"><img src='/pic/share_rule_3.gif' title='欢迎转载'/></td>`, "3", "欢迎转载"},
+		{`<td class="share_rule" valign="middle"><img src='/pic/share_rule_255.gif' title='其他情况(参考副标题及种子简介的标注语)'/></td>`, "255", "其他情况(参考副标题及种子简介的标注语)"},
+	}
+	for _, c := range cases {
+		m := reHdwingShareRule.FindStringSubmatch(c.row)
+		if m == nil || m[1] != c.id || m[2] != c.text {
+			t.Errorf("share_rule_%s 提取失败: %+v", c.id, m)
+		}
+	}
+	// 禁转判定词族（title 语义）：1/2 号硬禁转；255 软规则不在此判
+	for _, hard := range []string{"禁止转载", "未经允许不得转载"} {
+		if !(strings.Contains(hard, "禁止转载") || strings.Contains(hard, "不得转载") || strings.Contains(hard, "未经允许")) {
+			t.Errorf("硬禁转词族漏判: %s", hard)
+		}
+	}
+}
+
+// §59.510 255 态标注语词族——四形态正例（"禁转"子串全覆盖）+反例（纯内容副标）。
+func TestHdwingNoTransferWords(t *testing.T) {
+	positives := []string{
+		"初代奥特曼 赛文奥特曼 自购禁转",          // 837787 副标
+		"环太平洋 4K 60FPS SVFI补帧 **未允禁转**", // 822791 副标
+		"康熙王朝 全46集 发布者授权转载，禁转",     // 601877 副标
+		"【禁转】有声小说 明朝那些事儿",           // 438018 副标
+	}
+	for _, p := range positives {
+		if !reHdwingNoTransferWords.MatchString(p) {
+			t.Errorf("标注语正例应命中: %s", p)
+		}
+	}
+	// 反例：255 行无标注语=默认可转（838381 大醉侠·纯内容描述）
+	negative := "大醉侠 / Come Drink with Me / 醉侠 | 类别：动作 武侠 古装 【澳版原盘】"
+	if reHdwingNoTransferWords.MatchString(negative) {
+		t.Error("纯内容副标不应命中（255 无标注语=可转·反例 838381）")
+	}
+}
+
+// §59.510 hash 签名下载链接——真实形态（base64 段.签名段）+miss 形态。
+func TestHdwingHashDownloadRe(t *testing.T) {
+	html := `<a href="download.php?hash=MQo4MzgzMDMKMjY4NjE4.aRSFTOhrcUFQkQtO3b1fO8kJ2MCN54AEu9PAVLQPwZE"><img class="download" src="pic/trans.gif" alt="download" title="下载本种" /></a>`
+	m := reHdwingHashDownload.FindString(html)
+	if m != "download.php?hash=MQo4MzgzMDMKMjY4NjE4.aRSFTOhrcUFQkQtO3b1fO8kJ2MCN54AEu9PAVLQPwZE" {
+		t.Errorf("hash 链接提取失败: %q", m)
+	}
+	// 标准形态链接不应误命中（站方禁用形态）
+	if reHdwingHashDownload.MatchString(`download.php?id=838303&passkey=abc123`) {
+		t.Error("标准 id 形态不应命中 hash 正则")
+	}
+	// csrf meta（ajax_promotion POST 凭证）
+	csrf := reHdwingCsrfMeta.FindStringSubmatch(`<meta name="x-csrf" content="5e31736d82f64f19d3a96fd87aa62c0fba45" />`)
+	if csrf == nil || csrf[1] != "5e31736d82f64f19d3a96fd87aa62c0fba45" {
+		t.Error("csrf meta 提取失败")
+	}
+}
+
+// §59.510 列表 size 单元格 t_size 分支（用户样本 /tmp/hdw.html 100/100 全中形态）。
+func TestNexusBrowseSizeHdwingTSize(t *testing.T) {
+	html := `<td class="t_size">799.12&nbsp;GB</td>`
+	m := reNexusBrowseSize.FindStringSubmatch(html)
+	if m == nil {
+		t.Fatal("t_size 形态 miss（首版漏分支·size 恒 0 根因）")
+	}
+	if m[1] != "799.12" || m[2] != "GB" {
+		t.Errorf("size 值错: %+v", m)
+	}
+	// 旧形态回归（rowfollow 不破坏）
+	if reNexusBrowseSize.FindStringSubmatch(`<td class="rowfollow">1.46<br />GB</td>`) == nil {
+		t.Error("rowfollow 旧形态回归失败")
+	}
+}

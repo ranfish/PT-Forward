@@ -85,6 +85,34 @@ func findSizeInRows(doc *goquery.Document) string {
 			}
 		}
 	})
+	if found != "" {
+		return found
+	}
+	// §59.510: hdwing（瓷器）基本信息区结构——
+	// <li class="right bspace"><i><b>类型：</b>体育节目(Sports)</i>…<i><b>大小：</b>799.12 GB</i>…</li>
+	// dt/dd、th/td、details-meta 三结构全 miss 时 fallback 正则会错抓页面
+	// 首个"数字+单位"（用户信息区上传量 57.553 TB 实证——size 错 70 倍）。
+	// b 内键名+父元素全文（剥键取值；全角/半角冒号分剥）。
+	doc.Find("b").Each(func(_ int, b *goquery.Selection) {
+		if found != "" {
+			return
+		}
+		text := b.Text()
+		for _, kw := range keywords {
+			if strings.Contains(text, kw) || containsInsensitive(text, kw) {
+				if parent := b.Parent(); parent.Length() > 0 {
+					full := strings.TrimSpace(parent.Text())
+					for _, sep := range []string{"：", ":"} {
+						if i := strings.Index(full, sep); i >= 0 {
+							found = strings.TrimSpace(full[i+len(sep):])
+							break
+						}
+					}
+				}
+				return
+			}
+		}
+	})
 	return found
 }
 
