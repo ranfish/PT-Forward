@@ -72,7 +72,7 @@ func init() {
 					{"label": "其他", "value": "409", "standard_keys": ["category.other"]}
 				],
 				"medium": [
-					{"label": "Blu-ray", "value": "11", "standard_keys": ["medium.bluray"]},
+					{"label": "Blu-ray", "value": "11", "standard_keys": ["medium.bluray", "medium.uhd_bluray"]},
 					{"label": "HD DVD", "value": "12", "standard_keys": ["medium.hddvd"]},
 					{"label": "Remux", "value": "6", "standard_keys": ["medium.remux", "medium.uhd_remux"]},
 					{"label": "MiniBD", "value": "2", "standard_keys": ["medium.minibd"]},
