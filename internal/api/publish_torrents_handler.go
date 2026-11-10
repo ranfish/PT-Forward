@@ -110,6 +110,10 @@ type siteBatchTask struct {
 	Error        string            `json:"error,omitempty"`
 	StartedAt    time.Time         `json:"started_at"`
 	FinishedAt   time.Time         `json:"finished_at,omitempty"`
+	// §59.513: graceful 停止（§59.495 批量获取同款）——stopRequested 由
+	// cancel 端点置位；循环检查点（每颗开始前+熔断冷却 select）读取后
+	// 当前颗完整执行完再终态（不打断不产半截数据）。
+	StopRequested bool `json:"stop_requested,omitempty"`
 }
 
 type siteBatchResult struct {
@@ -486,6 +490,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleExecuteSiteBatch(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/site-batch-progress") && r.Method == http.MethodGet:
 		h.handleSiteBatchProgress(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/site-batch-cancel") && r.Method == http.MethodPost:
+		h.handleSiteBatchCancel(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
@@ -5845,6 +5851,15 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 		defer cancel()
 		batchGroupID := taskID
 		for i, hash := range req.InfoHashes {
+			// §59.513: graceful 停止检查点①——每颗开始前（取消后当前颗已
+			// 完整执行，未开始颗不再开始；§59.495 批量获取同款语义）。
+			h.siteBatch.mu.Lock()
+			stopped := task.StopRequested
+			h.siteBatch.mu.Unlock()
+			if stopped {
+				h.finishSiteBatch(task, "用户取消（已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
+				return
+			}
 			if i > 0 {
 				select {
 				case <-ctx.Done():
@@ -5897,6 +5912,16 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 					h.finishSiteBatch(task, "任务超时中断（已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
 					return
 				case <-time.After(circuitCooldown):
+				}
+				// §59.513: graceful 停止检查点②——熔断冷却醒来后（等待期
+				// 最多 35s·站点故障场景用户取消应尽快生效：当前颗熔断态
+				// 本就未发出请求，停止无半截风险）。
+				h.siteBatch.mu.Lock()
+				stopped2 := task.StopRequested
+				h.siteBatch.mu.Unlock()
+				if stopped2 {
+					h.finishSiteBatch(task, "用户取消（熔断冷却中·已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
+					return
 				}
 				h.logger.Info("site-batch 熔断重试",
 					zap.String("site", req.TargetSite), zap.Int("attempt", attempt),
@@ -5954,6 +5979,35 @@ func (h *PublishTorrentsHandler) finishSiteBatch(task *siteBatchTask, errMsg str
 	if h.siteBatch.active[task.TargetSite] == task.ID {
 		delete(h.siteBatch.active, task.TargetSite)
 	}
+}
+
+// handleSiteBatchCancel §59.513: 批量发布 graceful 停止（§59.495 批量
+// 获取同款——用户报 Case：网络故障/站点故障时批量发布无法取消只能干等
+// 全部失败）。幂等三态：无任务 no-op / 运行中置 stopRequested（当前颗
+// 完整执行完后终态·循环检查点读标志）/ 已完成 no-op。同站互斥由
+// finishSiteBatch 正常释放（不立即删 active 防新批插入语义与
+// §59.495 一致——当前颗完成前该站仍锁）。
+func (h *PublishTorrentsHandler) handleSiteBatchCancel(w http.ResponseWriter, r *http.Request) {
+	site := r.URL.Query().Get("site")
+	if site == "" {
+		Error(w, http.StatusBadRequest, 40001, "site 必填")
+		return
+	}
+	h.siteBatch.mu.Lock()
+	runID, running := h.siteBatch.active[site]
+	if running {
+		if t := h.siteBatch.tasks[runID]; t != nil {
+			t.StopRequested = true
+			h.siteBatch.mu.Unlock()
+			Success(w, map[string]interface{}{
+				"message": "停止请求已接受——当前种子完成后终止（已完成 " + fmt.Sprint(t.Done) + "/" + fmt.Sprint(t.Total) + "）",
+				"task_id": runID,
+			})
+			return
+		}
+	}
+	h.siteBatch.mu.Unlock()
+	Success(w, map[string]interface{}{"message": "无运行中任务（已停止或已完成）"})
 }
 
 // handleSiteBatchProgress §59.166 批量任务进度轮询：

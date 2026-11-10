@@ -166,7 +166,9 @@
             v-else-if="!batchTask.finished"
             :progress="{ done: batchTask.done, total: batchTask.total, currentTitle: batchTask.current_title }"
             :results="batchTask.results"
+            :stop-requested="batchTask.stop_requested"
             row-mode="seed"
+            @stop="stopBatchPublish"
           />
           <!-- 态 3：完成汇总 -->
           <PublishProgressPanel
@@ -312,6 +314,18 @@ function onSelectionChange(keys: (string | number)[]) {
 
 // ═══ §59.166 一站多种：批量任务（提交+轮询+断线恢复）═══
 const batchTask = ref<SiteBatchTask | null>(null)
+// §59.513: 批量发布 graceful 停止——置位后轮询自然带回终态（停止请求
+// 已接受→当前颗完成后 finished）；幂等（重复点/loading 态由面板驱动）
+async function stopBatchPublish() {
+  const t = batchTask.value
+  if (!t || t.finished) return
+  try {
+    await executeApi.siteBatchCancel(t.target_site)
+    message.info('停止请求已接受——当前种子完成后终止')
+  } catch (e) {
+    message.error(String(e))
+  }
+}
 const batchSubmitting = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 

@@ -96,6 +96,7 @@ export interface SiteBatchTask {
   done: number
   current_title?: string
   results: Array<{ info_hash: string; title: string; status: string; message?: string; torrent_id?: string; url?: string }>
+  stop_requested?: boolean
   finished: boolean
   error?: string
   started_at: string
@@ -122,6 +123,10 @@ export const executeApi = {
   // §59.166: 不带 site → 全部活跃任务（选站不持久化下刷新恢复的无锚查询）
   siteBatchActiveAll() {
     return client.get<ApiResponse<SiteBatchTask[] | null>>('/publish/seeds/site-batch-progress?active=1')
+  },
+  // §59.513: 批量发布 graceful 停止（幂等三态——当前颗完整执行完后终止）
+  siteBatchCancel(site: string) {
+    return client.post<ApiResponse<{ message: string; task_id?: string }>>(`/publish/seeds/site-batch-cancel?site=${encodeURIComponent(site)}`)
   },
   execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string | number; pushSavePath?: string }) {
     // 空可选字段不发送：push_client_id 后端为 uint，空串会致 JSON 解码失败
