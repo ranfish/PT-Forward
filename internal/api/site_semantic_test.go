@@ -1,6 +1,9 @@
 package api
 
 import (
+	"net/http/httptest"
+	"encoding/json"
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/crypto"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"go.uber.org/zap"
 )
 
@@ -214,5 +218,74 @@ func TestSiteImportGhostFilter(t *testing.T) {
 	}
 	if !ok2.Enabled {
 		t.Error("正常站应被更新 enabled=true")
+	}
+}
+
+// §59.509 附六: 批量补推后端判据锚——WHERE 与前端 canRepush 事实判据
+// 单点一致（tid 在手且未做种）。历史案：前端已改事实判据、后端漏跟
+// 仍 seed_error 旧判据 → duplicate 714 行全滤误拒（用户实测报 bug）。
+func TestBatchRepushCriteriaAligned(t *testing.T) {
+	env := setupTestEnv(t)
+	if err := env.db.AutoMigrate(&model.PublishResultRecord{}); err != nil {
+		t.Fatal(err)
+	}
+	mk := func(status, tid string, seeded bool, dlID uint, savePath string) *model.PublishResultRecord {
+		return &model.PublishResultRecord{
+			Status: model.PublishResultStatus(status), TorrentID: tid, Seeded: seeded,
+			DownloaderID: dlID, SavePath: savePath,
+			TargetSite: "瓷器", Title: "T-" + status + "-" + tid,
+		}
+	}
+	rows := []*model.PublishResultRecord{
+		mk("duplicate", "49104", false, 2, "/PT"),   // ✓ 应入（用户案主形态）
+		mk("duplicate", "", false, 2, "/PT"),        // ✗ 无 tid
+		mk("duplicate", "0", false, 2, "/PT"),       // ✗ tid='0'
+		mk("duplicate", "49105", true, 2, "/PT"),    // ✗ 已做种
+		mk("duplicate", "49106", false, 0, "/PT"),   // ✗ 无下载器
+		mk("duplicate", "49107", false, 2, ""),      // ✗ 无保存路径
+		mk("failed", "99001", false, 2, "/PT"),      // ✓ 应入（failed-but-tid 边缘行）
+		mk("existing", "", false, 2, "/PT"),         // ✗ 无 tid（辅种范畴）
+	}
+	for _, r := range rows {
+		if err := env.db.Create(r).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	// executor 需在场（nil 在 WHERE 前被拦）——最小构造（Execute 会因
+	// 素材缺失失败，但本锚验证 WHERE 过滤集，outcome failed 不影响）
+	h := &PublishTorrentsHandler{
+		db: env.db, logger: zap.NewNop(),
+		executor: publish.NewPublishExecutor(publish.NewPipeline(env.db, zap.NewNop())),
+	}
+	ids := make([]uint, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	body, _ := json.Marshal(map[string]interface{}{"ids": ids})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/publish/seeds/batch-repush", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.handleBatchRepush(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("应 200（duplicate tid 在手行可入）, got %d: %s", w.Code, w.Body.String()[:200])
+	}
+	var resp struct {
+		Data struct {
+			Outcomes []struct {
+				ID uint `json:"id"`
+			} `json:"outcomes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Data.Outcomes) != 2 {
+		t.Errorf("WHERE 应恰放行 2 行（duplicate 49104 + failed 99001），got %d", len(resp.Data.Outcomes))
+	}
+	got := map[uint]bool{}
+	for _, o := range resp.Data.Outcomes {
+		got[o.ID] = true
+	}
+	if !got[rows[0].ID] || !got[rows[6].ID] {
+		t.Errorf("应含 duplicate 行 %d 与 failed-but-tid 行 %d，got %v", rows[0].ID, rows[6].ID, got)
 	}
 }
