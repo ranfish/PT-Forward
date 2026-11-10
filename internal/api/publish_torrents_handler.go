@@ -6058,10 +6058,14 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 	}
 
 	var records []model.PublishResultRecord
+	// §59.509 附六: 判据对齐前端 canRepush 事实判据（tid 在手且本地未做种
+	// ——§59.509 前端勾选已改·后端此处漏跟：duplicate 行（seed_error 空）
+	// 被旧判据"加种失败态"全滤→「无可补推记录」误拒 714 行可补推实况）。
+	// downloader_id/save_path 同查=PushOnly 重放的必要执行条件。
 	if err := h.db.WithContext(r.Context()).
-		Where("id IN ? AND seed_error != '' AND seeded = 0", req.IDs).
+		Where("id IN ? AND torrent_id != '' AND torrent_id != '0' AND seeded = 0 AND downloader_id != 0 AND save_path != ''", req.IDs).
 		Find(&records).Error; err != nil || len(records) == 0 {
-		Error(w, http.StatusNotFound, 40400, "无可补推记录（需为加种失败态）")
+		Error(w, http.StatusNotFound, 40400, "无可补推记录（需 tid 在手且本地未做种——站上已有·可补推/已上传未做种均可）")
 		return
 	}
 
