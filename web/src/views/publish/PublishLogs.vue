@@ -542,7 +542,7 @@ function exportCSV() {
     r.source_site || '',
     r.target_site || '',
     (r.title || r.subtitle || '').replace(/"/g, '""'),
-    r.status || '',
+    statusLabel(r.status || ''), // §59.509 附七: 状态列中文化（与界面单点一致——原导英文枚举）
     r.cost_ms ? formatCost(r.cost_ms) : '',
     r.publish_url || '',
     (r.error_message || '').replace(/"/g, '""').replace(/\n/g, ' '),

@@ -310,8 +310,13 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 
 	// 新模式：分页 + 筛选
 	if page > 0 {
-		if pageSize < 1 || pageSize > 200 {
+		// §59.509 附七: 上限 clamp 语义（原 >200 重置 20——用户显式要
+		// 大页被静默缩到比默认还小·语义反向；clamp 到上限）
+		if pageSize < 1 {
 			pageSize = 20
+		}
+		if pageSize > 200 {
+			pageSize = 200
 		}
 		results, total, err := h.pipeline.ListResultsFiltered(r.Context(), page, pageSize, status, targetSite, trigger, startDate, endDate)
 		if err != nil {
