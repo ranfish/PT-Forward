@@ -276,6 +276,14 @@
   "verification_status": "verified",
   "publish_supported": true
  },
+ "hdwing.org": {
+  "domain": "hdwing.org",
+  "name_cn": "瓷器",
+  "framework": "nexusphp",
+  "auth_type": "cookie",
+  "cookiecloud_domain": "hdwing.org",
+  "verification_status": "verified"
+ },
  "hdtime.org": {
   "domain": "hdtime.org",
   "name_cn": "时光",

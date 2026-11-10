@@ -62,7 +62,10 @@ var (
 	// altLink（altLink 捕组 id 会错投 tid·海胆搜索行实证）。仅含
 	// torrent_id 参数的行命中·其它站零影响。
 	reNexusGroupTorrentLink = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?details?\.php\?group_id=\d+&(?:amp;)?torrent_id=(\d+)["'][^>]*>(.*?)</a>`)
-	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?(?:rowfollow|[^"']*torrent-info-text-size)["']?[^>]*>\s*([\d.]+)\s*(?:&nbsp;)?\s*(?:<br\s*/?>)?\s*(?:&nbsp;)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
+	// §59.510: t_size 分支——hdwing（瓷器）列表 size 单元格 class="t_size"
+	// （`799.12&nbsp;GB`·&nbsp; 分隔），原 rowfollow/torrent-info-text-size
+	// 两分支 miss → size 恒 0；加分支后用户样本 100/100 全中。
+	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?(?:rowfollow|t_size|[^"']*torrent-info-text-size)["']?[^>]*>\s*([\d.]+)\s*(?:&nbsp;)?\s*(?:<br\s*/?>)?\s*(?:&nbsp;)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
@@ -83,6 +86,7 @@ type NexusPHPAdapter struct {
 	engine    *extract.Engine    // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
 	browser   *browser.Fetcher   // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
 	listCache keepfrdsListCache  // §59.340 B: 列表页批次缓存（page=0 同 URL 批量去重）
+	hdwCache  keepfrdsListCache  // §59.510: hdwing 列表缓存（NP adapter 单例——与 keepfrds HTML 不同防互踩）
 }
 
 func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
@@ -113,22 +117,31 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	}
 
 	var u string
-	if config.DownloadMode == "signed" {
+	var method = "GET"
+	switch config.DownloadMode {
+	case "signed":
+		// 先例形态：download.php?id={tid}&t=N&sign=hex（POST）
 		signedURL, err := a.resolveSignedDownloadURL(ctx, config, torrentID)
 		if err != nil {
 			return nil, err
 		}
 		u = signedURL
-	} else if config.DownloadURLTemplate != "" {
-		u = buildTemplateURL(config, config.DownloadURLTemplate, torrentID)
-	} else {
-		// §59.159: NP 族公共单点（download_url.go——双副本收敛）
-		u = BuildNexusDownloadURL(baseURLOf(config), torrentID, config.Passkey)
-	}
-
-	method := "GET"
-	if config.DownloadMode == "signed" {
 		method = "POST"
+	case "signed_hash":
+		// §59.510 hdwing（瓷器）形态：download.php?hash=base64(1\ntid\nuid).签名
+		// （GET·标准 id= 形态站方 404 禁用——hash 签名链接列表/详情页均可提取）
+		hashURL, err := a.resolveHashDownloadURL(ctx, config, torrentID)
+		if err != nil {
+			return nil, err
+		}
+		u = hashURL
+	default:
+		if config.DownloadURLTemplate != "" {
+			u = buildTemplateURL(config, config.DownloadURLTemplate, torrentID)
+		} else {
+			// §59.159: NP 族公共单点（download_url.go——双副本收敛）
+			u = BuildNexusDownloadURL(baseURLOf(config), torrentID, config.Passkey)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, u, nil)
@@ -204,6 +217,49 @@ func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *
 	return match, nil
 }
 
+// reHdwingHashDownload hdwing hash 签名下载链接：
+// download.php?hash=MQo4MzgzMDMKMjY4NjE4.aRSFTOhrcUFQkQtO3b1fO8kJ2MCN54AEu9PAVLQPwZE
+// 前段=URL-safe base64("1\n{tid}\n{uid}")，后段=站方签名（字母数字-_ 字符集）。
+var reHdwingHashDownload = regexp.MustCompile(`download\.php\?hash=[A-Za-z0-9_=]+\.[A-Za-z0-9_-]+`)
+
+// resolveHashDownloadURL §59.510 hdwing（瓷器）：详情页提取 hash 签名下载链接。
+// 站方禁用标准 download.php?id= 形态（404）——hash 链接列表/详情页均可提取，
+// 走详情页（与 signed 模式同构·getTorrentDetailInner 主链同源 HTML 场景另议）。
+func (a *NexusPHPAdapter) resolveHashDownloadURL(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+	detailURL := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
+	if err != nil {
+		return "", networkError("构造详情页请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return "", downloadError("获取详情页失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
+	if err != nil {
+		return "", downloadError("读取详情页失败", err)
+	}
+
+	match := reHdwingHashDownload.FindString(string(body))
+	if match == "" {
+		return "", configError("未在详情页找到 hash 签名下载链接")
+	}
+
+	if !strings.HasPrefix(match, "http") {
+		base := config.Domain
+		if !strings.HasPrefix(base, "http") {
+			base = "https://" + base
+		}
+		match = base + "/" + strings.TrimLeft(match, "/")
+	}
+	return match, nil
+}
+
 // GetTorrentDetail §59.162 外层：keepfrds 禁转增强 merge（内层原逻辑零改动）。
 // §59.340 A: enrich 复用主链 HTML——原二次 fetchDetailsHTML(同 tid 同 URL) 是
 // 纯重复请求（keepfrds 流控流量的 1/3 浪费——§59.340 探究实验背景）。
@@ -222,6 +278,10 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	// §59.167 憨憨：标签明示禁转（无限时态——用户权威；详情页 Tailwind 徽章）
 	if strings.Contains(config.Domain, "hhanclub") {
 		a.enrichHhanTransferFlags(ctx, config, torrentID, detail, html)
+	}
+	// §59.510 瓷器：share_rule 结构化转载规则列（列表页独有·详情页无此标记）
+	if strings.Contains(config.Domain, "hdwing") {
+		a.enrichHdwingTransferFlags(ctx, config, torrentID, detail, html)
 	}
 	return detail, nil
 }
@@ -294,6 +354,111 @@ func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, confi
 }
 
 var reKeepfrdsAddedAt = regexp.MustCompile(`由[^<]{0,30}发布于([^<]{2,25})`)
+
+// reHdwingShareRule hdwing 列表行转载规则列：
+// `<img src='/pic/share_rule_255.gif' title='其他情况(参考副标题及种子简介的标注语)'/>`
+var reHdwingShareRule = regexp.MustCompile(`share_rule_(\d+)\.gif' title='([^']+)'`)
+
+// reHdwingNoTransferWords 软规则（share_rule_255=其他情况）标注语词族——
+// 扫描域限定副标题+简介两字段（§59.1406 教训：全页/声明文本扫描跨词伪命中；
+// 站方语义"参考副标题及种子简介的标注语"=扫描域权威定义）。繁简变体齐备。
+var reHdwingNoTransferWords = regexp.MustCompile(`禁转|禁止转载|谢绝转载|严禁转载|謝絕轉載|請勿轉載|禁止轉載`)
+
+// enrichHdwingTransferFlags §59.510 hdwing（瓷器）share_rule 三态禁转采集。
+// 站方独有结构化转载规则列（列表行 img title·100 行采样三态分布 2%/32%/66%）：
+//   share_rule_1 = 禁止转载 → 硬禁转（Flags += "禁转"）
+//   share_rule_3 = 欢迎转载 → 可转（无操作）
+//   share_rule_255 = 其他情况(参考副标题及种子简介的标注语) → 软规则——
+//     副标题+简介扫词族（命中=禁转·未命中=可转）
+// 判定收口：Flags += "禁转"（publish_torrents_handler 词集合消费契约同 hhan）。
+// 列表页锚定行（keepfrds 同构·批次缓存 10min·tid 不在第一页=无标记不误伤）。
+func (a *NexusPHPAdapter) enrichHdwingTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
+	row := a.fetchHdwingListRow(ctx, config, torrentID)
+	if row == "" {
+		return
+	}
+	m := reHdwingShareRule.FindStringSubmatch(row)
+	if m == nil {
+		return
+	}
+	ruleText := m[2]
+	noTransfer := false
+	switch {
+	case strings.Contains(ruleText, "禁止转载"), strings.Contains(ruleText, "不得转载"), strings.Contains(ruleText, "未经允许"):
+		// share_rule_1=禁止转载 / share_rule_2=未经允许不得转载（站内实测
+		// 837787/822791——share_rule_2 首版漏判·禁转词族显式列举防未知编号误伤）
+		noTransfer = true
+	case strings.Contains(ruleText, "其他情况"):
+		// share_rule_255 软规则：副标题+简介标注语（站内正例四形态实测——
+		// "自购禁转"/"未允禁转"/"发布者授权转载，禁转"/"【禁转】"——
+		// "禁转"子串全覆盖；mainHTML 变参=详情页 HTML 复用主链；
+		// 独立调用方空则不深抓——列表行已是权威信号源，标注语是补充判定）
+		var html string
+		if len(mainHTML) > 0 {
+			html = mainHTML[0]
+		}
+		if html == "" {
+			return
+		}
+		scan := detail.Subtitle + " " + detail.Description
+		if reHdwingNoTransferWords.MatchString(scan) {
+			noTransfer = true
+		}
+	default:
+		// share_rule_3=欢迎转载及其它未知编号——不误伤
+	}
+	if !noTransfer {
+		return
+	}
+	for _, f := range detail.Flags {
+		if f == "禁转" {
+			return
+		}
+	}
+	detail.Flags = append(detail.Flags, "禁转")
+}
+
+// fetchHdwingListRow 抓 hdwing 列表首页（裸 torrents.php=第一页 100 行）按
+// tid 锚定行块——与 keepfrds 同构但 URL 不同（page=0 参数该站未实证·裸路径
+// 摸底实测 200），缓存独立字段防单例互踩。
+func (a *NexusPHPAdapter) fetchHdwingListRow(ctx context.Context, config *model.SiteConfig, torrentID string) string {
+	base := config.Domain
+	if !strings.HasPrefix(base, "http") {
+		base = "https://" + base
+	}
+	u := strings.TrimRight(base, "/") + "/torrents.php"
+
+	a.hdwCache.mu.Lock()
+	cachedHTML, cachedAt := a.hdwCache.html, a.hdwCache.expires
+	a.hdwCache.mu.Unlock()
+	if cachedHTML != "" && time.Now().Before(cachedAt) {
+		return anchorListRow(cachedHTML, torrentID)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return ""
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	body, err := readBody(resp)
+	if err != nil {
+		return ""
+	}
+	html := string(body)
+	a.hdwCache.mu.Lock()
+	a.hdwCache.html = html
+	a.hdwCache.expires = time.Now().Add(keepfrdsListCacheTTL)
+	a.hdwCache.mu.Unlock()
+	return anchorListRow(html, torrentID)
+}
 
 // fetchKeepfrdsListRow 抓列表页首页按 tid 定位的行原始文本（新种限时窗内必在
 // 首页——NP 默认时间倒序；老种[标记已消失]拿不到行=无标记语义，不误伤）。
@@ -887,10 +1052,104 @@ func parseNexusSLFromHTML(html string) *model.SLData {
 }
 
 func (a *NexusPHPAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+	// §59.510 hdwing（瓷器）：优惠状态 JS 动态填充（列表页静态零信息）——
+	// POST ajax_promotion.php（ids[]+csrf·csrf 取详情页 meta x-csrf）
+	if strings.Contains(config.Domain, "hdwing") {
+		return a.detectDiscountHdwing(ctx, config, torrentID)
+	}
 	if config.Discount.HasAPI && config.Discount.APIURL != "" {
 		return a.detectDiscountAPI(ctx, config, torrentID)
 	}
 	return a.detectDiscountPage(ctx, config, torrentID)
+}
+
+// reHdwingCsrfMeta 详情页 CSRF token（NP 全页 meta——ajax_promotion POST 凭证）
+var reHdwingCsrfMeta = regexp.MustCompile(`name="x-csrf" content="([a-f0-9]+)"`)
+
+// detectDiscountHdwing §59.510 hdwing 优惠检测：
+// ① GET 详情页提 meta x-csrf
+// ② POST ajax_promotion.php（ids[]={tid}&csrf={token}·X-Requested-With）
+// ③ 响应 {"status":200,"message":{"{tid}":{"sp_state":"<img class=\"pro_free\" …
+//    title=\"免费\"/>","timeout":"…"}}}——class 词映射优惠档（pro_free=Free/
+//    pro_2free=2xFree/pro_50percent=50%/pro_30percent=30%/pro_2x=2xUp；
+//    timeout=限时截止·空=不限时——当前消费方 Level 即可·限时语义后续按需）。
+// 实测（2026-11-10）：三 tid 全 pro_free 命中。
+func (a *NexusPHPAdapter) detectDiscountHdwing(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+	base := config.Domain
+	if !strings.HasPrefix(base, "http") {
+		base = "https://" + base
+	}
+	base = strings.TrimRight(base, "/")
+
+	// ① 详情页提 csrf
+	detailURL := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
+	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, networkError("获取详情页失败", err)
+	}
+	body, _ := readBody(resp)
+	drainBody(resp)
+	csrfM := reHdwingCsrfMeta.FindStringSubmatch(string(body))
+	if csrfM == nil {
+		return nil, configError("未在详情页找到 csrf token")
+	}
+
+	// ② POST ajax_promotion
+	form := url.Values{}
+	form.Set("ids[]", torrentID)
+	form.Set("csrf", csrfM[1])
+	promoReq, err := http.NewRequestWithContext(ctx, "POST", base+"/ajax_promotion.php", strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(promoReq, config.Cookie)
+	promoReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	promoReq.Header.Set("X-Requested-With", "XMLHttpRequest")
+	promoReq.Header.Set("Referer", base+"/torrents.php")
+	promoResp, err := a.doer.Client.Do(promoReq)
+	if err != nil {
+		return nil, networkError("请求优惠状态失败", err)
+	}
+	defer func() { drainBody(promoResp) }()
+	promoBody, err := readBody(promoResp)
+	if err != nil {
+		return nil, err
+	}
+
+	// ③ 解析 {message:{tid:{sp_state:…}}}
+	var payload struct {
+		Status  int `json:"status"`
+		Message map[string]struct {
+			SpState string `json:"sp_state"`
+			Timeout string `json:"timeout"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal(promoBody, &payload); err != nil {
+		return nil, parseError("解析优惠响应失败", err)
+	}
+	entry, ok := payload.Message[torrentID]
+	if !ok {
+		return &model.DiscountResult{Level: model.DiscountNone}, nil
+	}
+	lower := strings.ToLower(entry.SpState)
+	switch {
+	case strings.Contains(lower, "pro_2free"):
+		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
+	case strings.Contains(lower, "pro_free"):
+		return &model.DiscountResult{Level: model.DiscountFree}, nil
+	case strings.Contains(lower, "pro_50percent"), strings.Contains(lower, "pro_50down"):
+		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
+	case strings.Contains(lower, "pro_30percent"), strings.Contains(lower, "pro_30down"):
+		return &model.DiscountResult{Level: model.DiscountPercent30}, nil
+	case strings.Contains(lower, "pro_2x"):
+		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
+	}
+	return &model.DiscountResult{Level: model.DiscountNone}, nil
 }
 
 func (a *NexusPHPAdapter) detectDiscountAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {

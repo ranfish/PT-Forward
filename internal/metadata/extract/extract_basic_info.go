@@ -141,6 +141,55 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 		}
 	})
 
+	// §59.510 模式 1.5: li 结构（hdwing 瓷器）——
+	// <ul><li class="left">基本信息</li><li class="right bspace">
+	// <i><b>类型：</b>体育节目(Sports)</i>…<i><b>大小：</b>799.12 GB</i>…</li></ul>
+	// td/dt/th 三结构 miss 的 li 聚合形态：锚"基本信息"li → 相邻 li 内
+	// <b>键：</b>值 兄弟文本（同模式 c 取值语义）。
+	doc.Find("li").Each(func(_ int, li *goquery.Selection) {
+		if len(values) > 0 {
+			return
+		}
+		headText := strings.TrimSpace(li.Text())
+		if headText != "基本信息" && headText != "基本資料" && headText != "基本资料" && headText != "基本資訊" {
+			return
+		}
+		follow := li.NextFiltered("li")
+		if follow.Length() == 0 {
+			return
+		}
+		follow.Find("b").Each(func(_ int, b *goquery.Selection) {
+			bText := strings.TrimSpace(b.Text())
+			if bText == "" {
+				return
+			}
+			trimmed := strings.TrimRight(bText, ":：")
+			if trimmed == bText {
+				return
+			}
+			field := matchFieldWithLabels(trimmed, fieldLabels)
+			if field == "" {
+				return
+			}
+			if node := b.Nodes[0]; node != nil && node.NextSibling != nil {
+				next := node.NextSibling
+				var value string
+				switch next.Type {
+				case html.TextNode:
+					value = strings.TrimSpace(strings.TrimLeft(next.Data, " \t\n\r\u00a0"))
+				case html.ElementNode:
+					value = strings.TrimSpace(b.Next().Text())
+				}
+				if value == "" || len([]rune(value)) > maxFieldRunes(field, 80) {
+					return
+				}
+				if _, exists := values[field]; !exists {
+					values[field] = value
+				}
+			}
+		})
+	})
+
 	// 模式 2: dt/dd
 	doc.Find("dt").Each(func(_ int, dt *goquery.Selection) {
 		dtText := strings.TrimSpace(dt.Text())
@@ -303,11 +352,24 @@ func buildFieldLabels(domain, siteCode string) map[string][]string {
 }
 
 // matchFieldWithLabels 用指定 labels 判断标签文本是否匹配某字段。
+// §59.510: 两轮匹配——第一轮各 field 的**首位 label**（site-specific
+// source_key·buildFieldLabels 显式配置在数组首位）精确匹配优先；全 miss
+// 再走全量变体。动因：hdwing"格式："=分辨率（site key 显式配置）vs
+// SSD/碟粉"格式："=媒介（default 变体·§56.10 49 站 inspect 分析）——
+// 同标签跨站异义，显式配置压过 default，两站语义都保。
 func matchFieldWithLabels(label string, fieldLabels map[string][]string) string {
 	label = strings.TrimSpace(label)
 	if label == "" {
 		return ""
 	}
+	trimmed := strings.TrimRight(label, ":：")
+	// 第一轮：site-specific source_key（首位 label）精确匹配
+	for field, candidates := range fieldLabels {
+		if len(candidates) > 0 && (label == candidates[0] || trimmed == candidates[0]) {
+			return field
+		}
+	}
+	// 第二轮：全量变体（原逻辑）
 	for field, candidates := range fieldLabels {
 		for _, c := range candidates {
 			if label == c {
@@ -316,7 +378,6 @@ func matchFieldWithLabels(label string, fieldLabels map[string][]string) string 
 		}
 	}
 	// partial：去掉结尾冒号后再匹配
-	trimmed := strings.TrimRight(label, ":：")
 	for field, candidates := range fieldLabels {
 		for _, c := range candidates {
 			if trimmed == c {
