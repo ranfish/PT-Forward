@@ -391,15 +391,9 @@ func (a *NexusPHPAdapter) enrichHdwingTransferFlags(ctx context.Context, config 
 	case strings.Contains(ruleText, "其他情况"):
 		// share_rule_255 软规则：副标题+简介标注语（站内正例四形态实测——
 		// "自购禁转"/"未允禁转"/"发布者授权转载，禁转"/"【禁转】"——
-		// "禁转"子串全覆盖；mainHTML 变参=详情页 HTML 复用主链；
-		// 独立调用方空则不深抓——列表行已是权威信号源，标注语是补充判定）
-		var html string
-		if len(mainHTML) > 0 {
-			html = mainHTML[0]
-		}
-		if html == "" {
-			return
-		}
+		// "禁转"子串全覆盖。判定源=detail.Subtitle/Description（主链
+		// GetTorrentDetail 产出·与 mainHTML 同源——回归审核删除首版残留
+		// 的 html 空判死代码：字段在场即权威，无需 HTML 变参中转）
 		scan := detail.Subtitle + " " + detail.Description
 		if reHdwingNoTransferWords.MatchString(scan) {
 			noTransfer = true
