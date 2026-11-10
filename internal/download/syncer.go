@@ -295,26 +295,31 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientUID uint, torrents []*
 		Update("is_hidden", true)
 }
 
+// torrentStatusOf §59.508 刀1: 种子状态判定单点（updateTaskProgress 与
+// importTask 双消费——此前两处各自 IsPaused 优先分支同型缺陷）。
+// 完成优先于暂停：qb「完成」态（stoppedUP=进度100%+暂停）判 completed
+// ——完成是事实·暂停是临时状态，完成的暂停种应进转移链。
+func torrentStatusOf(ti *model.TorrentInfo) (string, float64) {
+	progress := ti.Progress * 100
+	switch {
+	case ti.IsFinished:
+		return model.DownloadStatusCompleted, 100
+	case ti.IsPaused:
+		return model.DownloadStatusPaused, progress
+	case ti.Error != "":
+		return model.DownloadStatusError, progress
+	default:
+		return model.DownloadStatusDownloading, progress
+	}
+}
+
 func (s *Syncer) updateTaskProgress(ctx context.Context, clientUID uint, ti *model.TorrentInfo) {
 	task, err := s.repo.FindByClientAndHash(ctx, clientUID, ti.Hash)
 	if err != nil || task == nil {
 		return
 	}
 
-	var status string
-	progress := ti.Progress * 100
-
-	switch {
-	case ti.IsPaused:
-		status = model.DownloadStatusPaused
-	case ti.IsFinished:
-		status = model.DownloadStatusCompleted
-		progress = 100
-	case ti.Error != "":
-		status = model.DownloadStatusError
-	default:
-		status = model.DownloadStatusDownloading
-	}
+	status, progress := torrentStatusOf(ti)
 
 	if task.Status == model.DownloadStatusDeleted {
 		return
@@ -376,8 +381,7 @@ func (s *Syncer) importTask(ctx context.Context, clientUID uint, ti *model.Torre
 	if ti.IsFinished {
 		task.Status = model.DownloadStatusCompleted
 		task.Progress = 100
-	}
-	if ti.IsPaused {
+	} else if ti.IsPaused { // §59.508 刀1: 完成优先于暂停（同 torrentStatusOf 单点语义）
 		task.Status = model.DownloadStatusPaused
 	}
 	if ti.Error != "" {
@@ -400,6 +404,12 @@ func (s *Syncer) importTask(ctx context.Context, clientUID uint, ti *model.Torre
 }
 
 func (s *Syncer) processClientTransfers(ctx context.Context, clientUID uint) {
+	// §59.508 刀1: 未配转移目标的客户端整体跳过（对齐 record 链纯跳过
+	// 语义——旧版查询捞到 completed 任务后经 processTransfer :523 标
+	// transferred 假账，配置恢复后存量永不转移；且防空捞每轮白查）。
+	if c, gerr := s.clientMgr.Get(clientUID); gerr == nil && c != nil && c.GetTransferTargetUID() == 0 {
+		return
+	}
 	var tasks []model.DownloadTask
 	query := s.db.WithContext(ctx).
 		Where("status = ? AND transfer_status != ? AND client_uid = ?",
