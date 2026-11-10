@@ -255,12 +255,14 @@ const pagination = ref({
 // 存量兼容值（completed/exists/edited——旧记录）在后。seed_failed 为
 // 跨状态子集筛选（seed_error 非空未加种·§59.374 B2 后端分支）非真实
 // status 值。
-// §59.507: 筛选项终集 13→8——243 生产 3288 行回归（五值+uploaded 可达）：
-// 删 publishing（同步落终态·DB 恒无死值）+旧值四项（completed/exists/
-// edited/skipped·243 零行）；statusLabel/statusColor 保留旧值翻译（历史行
-// 显示兼容·仅筛选项删）；unreviewed/ineligible 零行按需生长不预加。
+// §59.509: 筛选项终集 13→8→7——243 生产 3548 行+依赖链回归：
+// 删 uploaded_existing（0 历史·与 pushed_existing 感知重叠·显示翻译保留）；
+// 保留 uploaded（补推核心暂态·canRepush 成员·一公里断裂必筛）/
+// seed_failed（uploaded 子集·批量补推勾选入口依赖——checkboxProps 行选
+// 需先筛出可见）；duplicate 文案改「站上已有·可补推」（实证 714/714
+// 有 tid 可行动 vs existing 0/153 无 tid 辅种范畴——同文案撞车区分）。
 const statusFilterValues = [
-  'pushed', 'pushed_existing', 'uploaded', 'uploaded_existing',
+  'pushed', 'pushed_existing', 'uploaded',
   'existing', 'duplicate', 'failed', 'seed_failed',
 ]
 
@@ -284,11 +286,15 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollRefreshing = false
 
 const repushing = ref<number | null>(null)  // 单颗补推 loading 键
-// §59.374 B2: 多选批量补推——仅加种失败行可选（seed_error 非空未 seeded）
+// §59.374 B2 → §59.509: 多选批量补推勾选对齐 canRepush 事实判据
+// （tid 在手且本地未做种——原仅加种失败行可勾：243 当下零加种失败行
+// → 全灰=用户感知"功能消失"；duplicate 714 行 tid 在手逐行点不现实）。
+// 与行内补推按钮同判据单点一致。
 const selectedRowKeys = ref<number[]>([])
 const batchRepushing = ref<boolean | undefined>(undefined)
 function checkboxProps(record: Record<string, unknown>): { disabled: boolean } {
-  return { disabled: !(record.seed_error && !record.seeded) }
+  const tid = String(record.torrent_id ?? '')
+  return { disabled: !(tid && tid !== '0' && !record.seeded && record.downloader_id && record.save_path) }
 }
 function onSelectionChange(keys: (number | string)[]) {
   selectedRowKeys.value = keys.map(Number)
@@ -315,16 +321,14 @@ async function batchRepush() {
   }
 }
 
-// §59.502: 补推判据纯粹化（用户定案两轮收敛）——核心场景=发布链
-// 欠的收尾：上传成功→站方返回 tid→下载 .torrent/推下载器失败（站点或
-// 网络抖动）→ uploaded（一公里断裂·补推=完成自己的收尾·幂等轻量）。
-// 附带=duplicate（辅种增益·tid 在手做种别人老种）。其余排除：
-// pushed/pushed_existing 已推种（seeded 是 status 投影恒 1——"推过
-// 但校验不过"数据形态不存在·用户论证：不是同一种子补推也无用）；
-// failed/existing 无 tid（existing=辅种业务范畴·无权威 ID）。
-function canRepush(r: { torrent_id?: string; status?: string; downloader_id?: string; save_path?: string }): boolean {
-  if (!r.torrent_id || !r.downloader_id || !r.save_path) return false
-  return ['uploaded', 'duplicate'].includes(r.status ?? '')
+// §59.509: 补推判据事实化（用户定案：可补推=tid 在手且本地未做种）
+// ——替代 §59.502 的状态枚举（更收敛：uploaded/duplicate 恒命中·
+// pushed/pushed_existing 已做种 seeded=1 天然排除·failed-but-tid
+// 边缘行也能补；执行条件 downloader/save_path 同查防勾了推不了）。
+// 与 checkboxProps 批量勾选同判据单点一致。
+function canRepush(r: { torrent_id?: string; status?: string; seeded?: boolean; downloader_id?: string; save_path?: string }): boolean {
+  if (!r.torrent_id || r.torrent_id === '0' || !r.downloader_id || !r.save_path) return false
+  return !r.seeded
 }
 
 async function repush(r: { id: number; torrent_id?: string; target_site?: string; source_info_hash?: string; downloader_id?: string; save_path?: string }) {
@@ -460,7 +464,7 @@ function statusLabel(status: string): string {
     failed: '发布失败', // §59.491: 与"加种失败"区分（加种=推下载器·发布=上传站方）
     skipped: '跳过',
     exists: '已存在',
-    duplicate: '站上已有', // §59.491: 在线/本地 dedup 命中（tid 在记录·可补推做种）
+    duplicate: '站上已有·可补推', // §59.509: 与 existing 同文案撞车区分——实证 714/714 有 tid 可补推（canRepush 成员）
     publishing: '发布中',
     // §59.502: §59.159 四终态映射补全（此前缺——显示英文原值）
     pushed: '发布成功',
