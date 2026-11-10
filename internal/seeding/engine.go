@@ -3444,7 +3444,12 @@ func (e *Engine) patrolBatchSize() int {
 // 每客户端每 tick 一次点查，结果语义稳定。
 func (e *Engine) clientFramework(clientUID uint) string {
 	var t string
-	if err := e.db.Raw("SELECT type FROM clients WHERE name = ? AND deleted_at IS NULL LIMIT 1", clientUID).Row().Scan(&t); err != nil {
+	// §59.508 附二: WHERE name → id——§59.251 UID 化重构（2026-09-19）
+	// 签名 name→uid 但 SQL 列未跟改，uint 查 name 列恒 miss → framework
+	// 恒空 → patrol 幽灵巡检 switch 两档全不匹配 → qb/tr 全部下载器
+	// 的 tracker 失联检测自 09-19 起静默失效两个月（零报错零日志=
+	// 铁律"静默错"标准形态·UID 化漏网第六处）。
+	if err := e.db.Raw("SELECT type FROM clients WHERE id = ? AND deleted_at IS NULL LIMIT 1", clientUID).Row().Scan(&t); err != nil {
 		return ""
 	}
 	return t
