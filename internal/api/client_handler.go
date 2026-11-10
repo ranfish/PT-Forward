@@ -46,9 +46,13 @@ type createDownloaderRequest struct {
 	Password          string               `json:"password"`
 	Role              string               `json:"role"`
 	IsLocal           *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
-	TransferTargetUID uint                 `json:"transferTargetUid"`
-	Enabled           bool                 `json:"enabled"`
-	IsDefault         bool                 `json:"isDefault"`
+	// §59.508 附: 三字段指针化——零值不可区分类型的无条件覆盖是静默
+	// 清空陷阱（65 实测实锤：不带 transferTargetUid 的 PUT 清空转移
+	// 目标；Enabled 省略=静默禁用更严重）。nil=不覆盖；显式零值=主动
+	// 清空/关闭（前端配合：清空下拉时显式提交 0）。
+	TransferTargetUID *uint                `json:"transferTargetUid"`
+	Enabled           *bool                `json:"enabled"`
+	IsDefault         *bool                `json:"isDefault"`
 	TorrentDir        string               `json:"torrentDir"`
 	PathMappings      []pathMappingRequest `json:"pathMappings"`
 }
@@ -251,7 +255,11 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
 		return
 	}
-	if req.TransferTargetUID != 0 && req.Type != "qbittorrent" {
+	reqTTUID := uint(0)
+	if req.TransferTargetUID != nil { // §59.508 附: 指针化解引用（创建语义=显式给定）
+		reqTTUID = *req.TransferTargetUID
+	}
+	if reqTTUID != 0 && req.Type != "qbittorrent" {
 		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
 		return
 	}
@@ -279,11 +287,11 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		URL:               req.URL,
 		Username:          req.Username,
 		Password:          req.Password,
-		Enabled:           req.Enabled,
-		IsDefault:         req.IsDefault,
+		Enabled:           req.Enabled != nil && *req.Enabled,
+		IsDefault:         req.IsDefault != nil && *req.IsDefault,
 		Role:              req.Role,
 		IsLocal:           req.IsLocal != nil && *req.IsLocal,
-		TransferTargetUID: req.TransferTargetUID,
+		TransferTargetUID: reqTTUID,
 	}
 	if req.TorrentDir != "" {
 		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
@@ -388,9 +396,17 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		client.Role = req.Role
 	}
-	client.TransferTargetUID = req.TransferTargetUID
-	client.Enabled = req.Enabled
-	client.IsDefault = req.IsDefault
+	// §59.508 附: 指针守卫——省略字段不覆盖（旧版无条件覆盖：省略
+	// transferTargetUid=静默清空转移目标·省略 enabled=静默禁用）
+	if req.TransferTargetUID != nil {
+		client.TransferTargetUID = *req.TransferTargetUID
+	}
+	if req.Enabled != nil {
+		client.Enabled = *req.Enabled
+	}
+	if req.IsDefault != nil {
+		client.IsDefault = *req.IsDefault
+	}
 	if req.IsLocal != nil {
 		client.IsLocal = *req.IsLocal
 	}
