@@ -53,10 +53,27 @@ jobs:
       - name: Generate SHA256
         run: sha256sum pt-forward-linux-amd64 > pt-forward-linux-amd64.sha256
 
+      # §59.503 附二: Release body 从 git log 生成（实际更新内容）——
+      # GitHub 自动 notes 的 What's Changed 区块只列 PR，本仓库直推 main
+      # 无 PR → body 恒仅 Full Changelog 一行（87 字符·五 release 实证），
+      # 更新弹窗从未有过实际内容。git log 生成 commit 标题列表（含 § 前缀）
+      # ——前端 stripSectionPrefix 剥前缀后显示纯更新内容（§59.503 配套）。
+      - name: Generate release body from git log
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          if [ -n "$PREV_TAG" ]; then
+            echo "生成 ${PREV_TAG}..${GITHUB_REF_NAME} 的 commit 列表"
+            git log "${PREV_TAG}..HEAD" --no-merges --pretty=format:'- %s' > release_body.md
+          else
+            git log -1 --no-merges --pretty=format:'- %s' > release_body.md
+          fi
+          echo "── body 预览 ──"
+          cat release_body.md
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             pt-forward-linux-amd64
             pt-forward-linux-amd64.sha256
-          generate_release_notes: true
+          body_path: release_body.md
