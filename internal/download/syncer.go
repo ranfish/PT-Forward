@@ -530,9 +530,11 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 
 	targetUID := sourceClient.GetTransferTargetUID()
 	if targetUID == 0 {
-		if err := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, 0, ""); err != nil {
-			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(err))
-		}
+		// §59.508 刀2: 对齐 record 链纯跳过语义——未配目标不标记。
+		// 旧版此处标 transferred 假账（transfer_client_uid=0 无注入）：
+		// 配置恢复后查询条件 transfer_status != 'transferred' 排除
+		// → 存量永不转移（65 环境 71 颗卡死案）。正常路径已被
+		// processClientTransfers 前置过滤拦截，此处为防御层。
 		return
 	}
 
