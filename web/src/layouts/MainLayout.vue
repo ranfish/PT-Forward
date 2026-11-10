@@ -144,10 +144,13 @@
         <div v-if="updateInfo.error" style="color: #ff4d4f; margin-top: 12px;">{{ updateInfo.error }}</div>
         <div v-if="updateInfo.has_update" style="margin-top: 16px;">
           <!-- §59.499: antd-vue Alert 默认插槽不渲染（全库同型第三处）——正文移入 #description -->
-          <a-alert v-if="updateInfo.release_notes" type="info" show-icon style="margin-bottom: 12px;">
+          <!-- §59.503 附二: v-if 判净化后结果（releaseNotesClean）——判原始值时
+               "仅 Full Changelog 一行"的 body 净化后空串 → Alert 标题在内容空
+               （存量 release 形态实证）；v-if 与显示同源杜绝 -->
+          <a-alert v-if="releaseNotesClean" type="info" show-icon style="margin-bottom: 12px;">
             <template #message>更新内容</template>
             <template #description>
-              <pre style="white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto; margin: 0;">{{ stripSectionPrefix(updateInfo.release_notes) }}</pre>
+              <pre style="white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto; margin: 0;">{{ releaseNotesClean }}</pre>
             </template>
           </a-alert>
           <a-popconfirm title="确认更新？系统将自动重启。" ok-text="确认" cancel-text="取消" @confirm="performUpdate">
@@ -290,6 +293,12 @@ function stripSectionPrefix(notes: string): string {
     .join('\n')
     .trim()
 }
+
+// §59.503 附二: 净化结果单点 computed——v-if 与显示同源（空 body/仅
+// 结构行的存量 release 净化后空 → Alert 整体隐藏，诚实无内容）
+const releaseNotesClean = computed(() =>
+  updateInfo.value?.release_notes ? stripSectionPrefix(updateInfo.value.release_notes) : '',
+)
 const updating = ref(false)
 
 function switchLocale(lang: string) {
