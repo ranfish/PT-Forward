@@ -117,18 +117,13 @@ const result = ref<ExecuteResult | null>(null)
 
 // §59.312: 内部规范 code → 中文短名（人工预检可读；原 code 悬浮 title 保留）
 const AUDIT_CODE_NAMES: Record<string, string> = {
+  // §59.504: 规则 12→6（删 6 条见 docs/31）——翻译表同步
   LOCAL_MEDIUM_UNMAPPED: '媒介未映射',
   LOCAL_STANDARD_UNMAPPED: '规格未映射',
   LOCAL_AUDIO_UNMAPPED: '音频未映射',
-  LOCAL_TITLE_REASSEMBLED: '标题重组',
   LOCAL_TAG_OVERRIDE_NO_EVIDENCE: '标签改判无据',
-  LOCAL_TITLE_NON_ASCII: '标题含中文',
-  LOCAL_SUBTITLE_EMPTY: '副标题为空',
-  LOCAL_MEDIAINFO_EMPTY: 'MI 为空',
   LOCAL_IMAGES_INSUFFICIENT: '图量不足',
-  LOCAL_IMDB_EMPTY: 'IMDb 为空',
   LOCAL_BANNED_GROUP: '禁发布组',
-  LOCAL_TITLE_WORD_FORM: '标题词形',
 }
 const auditCodeName = (code: string): string => AUDIT_CODE_NAMES[code] || code
 

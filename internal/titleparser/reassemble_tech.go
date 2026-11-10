@@ -399,8 +399,19 @@ func classifyMediumForCodec(medium string) string {
 
 // normalizeResolution 分辨率大小写（§56.35：DuckBooBee 要求大写 P）。
 // 默认转为小写（v1.05 规范：p 不写 P）。upper 模式只转 p→P，不影响 i。
+// §59.504: 无像素形态时兜底归一 4k→2160p / 8k→4320p——parser 在标题
+// 只有 "4K"/"8K" 无像素词时原值返回（reResolutionTok 像素优先·全无则
+// 原值），"4k" 直通标题=词形违规（v1.05 规范不写 4K）。PT 惯例
+// 4K≈2160p/8K≈4320p。仅输出层归一——tp.Resolution 本身不变（验证层
+// §59.190 4K 语境交 size 仲裁逻辑零影响）。
 func normalizeResolution(res, caseMode string) string {
 	res = strings.ToLower(res)
+	switch res {
+	case "4k":
+		res = "2160p"
+	case "8k":
+		res = "4320p"
+	}
 	if caseMode == "upper" && strings.HasSuffix(res, "p") {
 		return res[:len(res)-1] + "P"
 	}

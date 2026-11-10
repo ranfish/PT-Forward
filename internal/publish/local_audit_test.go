@@ -1,12 +1,20 @@
 package publish
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
-// §59.166 LocalAudit 初始规则（advisory）
+// model2TP 构造最小 TechProfile（音频/分辨率带值断言用）
+func model2TP(audio, resolution string) titleparser.TechProfile {
+	return titleparser.TechProfile{AudioCodec: audio, Resolution: resolution}
+}
+
+// §59.504 LocalAudit 终局 6 条规则（12→6·可达性审查后——文案=用户定版
+// 纯事实+带值；阈值 IMAGES 对齐审核门 3；解析单源 model.ParseScreenshotColumn）
 func TestRunLocalAuditRules(t *testing.T) {
 	cfg := &model.PublishFormConfig{FormFields: map[string]string{
 		model.FieldDomainMedium:     "medium_sel[4]",
@@ -15,85 +23,98 @@ func TestRunLocalAuditRules(t *testing.T) {
 	}}
 	meta := &model.TorrentMetadata{Title: "Arco 2025 UHD BluRay DTS-HD MA 7.1 mUHD-FRDS",
 		Subtitle: "副标题", MediaInfo: "General", IMDbURL: "https://imdb.com/tt1",
-		Screenshots: `["a.jpg","b.jpg"]`}
+		Screenshots: `["a.jpg","b.jpg","c.jpg"]`}
 
-	// ① 全域齐备 → 零提示
+	// ① 全域齐备（截图 3 张）→ 零提示
 	formFull := map[string]string{"medium_sel[4]": "7", "standard_sel[4]": "6", "audiocodec_sel[4]": "12"}
-	f := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta, PublishTitle: meta.Title})
+	f := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta})
 	if len(f) != 0 {
 		t.Errorf("全域齐备应零提示, got %v", f)
 	}
 
-	// ② 音频未映射+标题有音频痕迹 → LOCAL_AUDIO_UNMAPPED
+	// ② 音频未映射+标题有音频痕迹 → 带值文案
 	formNoAudio := map[string]string{"medium_sel[4]": "7", "standard_sel[4]": "6"}
 	f2 := RunLocalAudit(localAuditInput{Form: formNoAudio, Cfg: cfg, Meta: meta,
-		PublishTitle: "Arco 2025 UHD BluRay DDP 7.1 mUHD-FRDS"})
-	hasAudioHint, hasTitleHint := false, false
+		TP: model2TP("DTS-HD MA", "")})
+	if !hasCode(f2, "LOCAL_AUDIO_UNMAPPED") {
+		t.Errorf("应提示音频未映射, got %v", codes(f2))
+	}
 	for _, x := range f2 {
-		if x.Code == "LOCAL_AUDIO_UNMAPPED" { hasAudioHint = true }
-		if x.Code == "LOCAL_TITLE_REASSEMBLED" { hasTitleHint = true }
+		if x.Code == "LOCAL_AUDIO_UNMAPPED" && x.Message != "音频域未选择（DTS-HD MA）" {
+			t.Errorf("音频文案应带值, got %q", x.Message)
+		}
 	}
-	if !hasAudioHint { t.Errorf("应提示音频未映射, got %v", f2) }
-	if !hasTitleHint { t.Errorf("应提示标题重组, got %v", f2) }
 
-	// ③ 人工粤语无据 → LOCAL_TAG_OVERRIDE_NO_EVIDENCE
-	f3 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta,
-		PublishTitle: meta.Title, TagOverrides: []string{"cantonese_audio", "lucky:cantonese_audio"}})
-	hasTagHint := false
+	// ③ 分辨率未映射 → 带值
+	formNoStd := map[string]string{"medium_sel[4]": "7", "audiocodec_sel[4]": "12"}
+	f3 := RunLocalAudit(localAuditInput{Form: formNoStd, Cfg: cfg, Meta: meta,
+		TP: model2TP("", "2160p")})
 	for _, x := range f3 {
-		if x.Code == "LOCAL_TAG_OVERRIDE_NO_EVIDENCE" { hasTagHint = true }
+		if x.Code == "LOCAL_STANDARD_UNMAPPED" && x.Message != "分辨率域未选择（2160p）" {
+			t.Errorf("分辨率文案应带值, got %q", x.Message)
+		}
 	}
-	if !hasTagHint { t.Errorf("人工粤语无据应提示, got %v", f3) }
+
+	// ④ 人工粤语无据
+	f4 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta,
+		TagOverrides: []string{"cantonese_audio", "lucky:cantonese_audio"}})
+	if !hasCode(f4, "LOCAL_TAG_OVERRIDE_NO_EVIDENCE") {
+		t.Errorf("人工粤语无据应提示, got %v", codes(f4))
+	}
+
+	// ⑤ 截图 2 张 < 3 → 截图不足（N 张）带张数
+	metaShort := *meta
+	metaShort.Screenshots = `["a.jpg","b.jpg"]`
+	f5 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: &metaShort})
+	found := false
+	for _, x := range f5 {
+		if x.Code == "LOCAL_IMAGES_INSUFFICIENT" {
+			found = true
+			if x.Message != "截图不足（2 张）" {
+				t.Errorf("截图文案应带张数, got %q", x.Message)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("截图 2 张应提示不足, got %v", codes(f5))
+	}
+
+	// ⑥ 禁发组带组名
+	meta6 := *meta
+	meta6.Title = "Movie 2026 1080p BluRay x265-FGT"
+	f6 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: &meta6})
+	for _, x := range f6 {
+		if x.Code == "LOCAL_BANNED_GROUP" && x.Message != "标题含多站禁发组（FGT）" {
+			t.Errorf("禁发组文案应带组名, got %q", x.Message)
+		}
+	}
+
+	// ⑦ §59.504 已删规则零残留（6 条删减回归锚）
+	for _, f := range [][]LocalAuditFinding{f, f2, f3, f4, f5, f6} {
+		for _, x := range f {
+			for _, dead := range []string{"LOCAL_TITLE_REASSEMBLED", "LOCAL_TITLE_NON_ASCII",
+				"LOCAL_SUBTITLE_EMPTY", "LOCAL_MEDIAINFO_EMPTY", "LOCAL_IMDB_EMPTY", "LOCAL_TITLE_WORD_FORM"} {
+				if x.Code == dead {
+					t.Errorf("已删规则 %s 不应触发", dead)
+				}
+			}
+		}
+	}
 }
 
-// §59.166 9 站共性规则（docs/38 矩阵 R6-R12）
-func TestLocalAuditCommonRules(t *testing.T) {
-	cfg := &model.PublishFormConfig{FormFields: map[string]string{
-		model.FieldDomainMedium:     "medium_sel[4]",
-		model.FieldDomainStandard:   "standard_sel[4]",
-		model.FieldDomainAudiocodec: "audiocodec_sel[4]",
-	}}
-	formFull := map[string]string{"medium_sel[4]": "7", "standard_sel[4]": "6", "audiocodec_sel[4]": "12"}
-
-	// 中文标题（9/9 共性禁令）
-	meta := &model.TorrentMetadata{Title: "天空之城 Laputa 1986", Subtitle: "副标题",
-		MediaInfo: "General", IMDbURL: "https://imdb.com/tt1", Screenshots: `["a.jpg","b.jpg"]`}
-	f := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta, PublishTitle: meta.Title})
-	if !hasCode(f, "LOCAL_TITLE_NON_ASCII") {
-		t.Errorf("中文标题应提示, got %v", codes(f))
+// §59.504 FormatLocalAudit 去内部 CODE 前缀（英文代号对用户无意义·
+// 溯源走 logs 列 JSON）
+func TestFormatLocalAuditNoCode(t *testing.T) {
+	out := FormatLocalAudit([]LocalAuditFinding{
+		{Code: "LOCAL_MEDIUM_UNMAPPED", Message: "媒介域未选择"},
+		{Code: "LOCAL_AUDIO_UNMAPPED", Message: "音频域未选择（DTS）"},
+	})
+	if strings.Contains(out, "LOCAL_") {
+		t.Errorf("输出不应含内部 CODE, got %q", out)
 	}
-
-	// 完备英文标题 → 零提示
-	meta2 := &model.TorrentMetadata{Title: "Movie 2026 1080p BluRay x265 DDP5.1-GROUP", Subtitle: "副标题",
-		MediaInfo: "General", IMDbURL: "https://imdb.com/tt1", Screenshots: `["a.jpg","b.jpg"]`}
-	f2 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta2, PublishTitle: meta2.Title})
-	if len(f2) != 0 {
-		t.Errorf("完备应零提示, got %v", codes(f2))
-	}
-
-	// 禁发组（词边界）
-	meta3 := &model.TorrentMetadata{Title: "Movie 2026 1080p BluRay x265-FGT", Subtitle: "副标题",
-		MediaInfo: "General", IMDbURL: "https://imdb.com/tt1", Screenshots: `["a.jpg","b.jpg"]`}
-	f3 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta3, PublishTitle: meta3.Title})
-	if !hasCode(f3, "LOCAL_BANNED_GROUP") {
-		t.Errorf("禁发组 FGT 应提示, got %v", codes(f3))
-	}
-
-	// 词形违规（4K/1080P/AC3/HDR10）
-	meta4 := &model.TorrentMetadata{Title: "Movie 2026 4K BluRay AC3 HDR10-GROUP", Subtitle: "副标题",
-		MediaInfo: "General", IMDbURL: "https://imdb.com/tt1", Screenshots: `["a.jpg","b.jpg"]`}
-	f4 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta4, PublishTitle: meta4.Title})
-	if !hasCode(f4, "LOCAL_TITLE_WORD_FORM") {
-		t.Errorf("词形违规应提示, got %v", codes(f4))
-	}
-
-	// 缺项（副标题/MI/IMDb/截图）
-	meta5 := &model.TorrentMetadata{Title: "Movie 2026 1080p BluRay x265 DDP5.1-GROUP"}
-	f5 := RunLocalAudit(localAuditInput{Form: formFull, Cfg: cfg, Meta: meta5, PublishTitle: meta5.Title})
-	for _, want := range []string{"LOCAL_SUBTITLE_EMPTY", "LOCAL_MEDIAINFO_EMPTY", "LOCAL_IMDB_EMPTY", "LOCAL_IMAGES_INSUFFICIENT"} {
-		if !hasCode(f5, want) {
-			t.Errorf("缺项 %s 应提示, got %v", want, codes(f5))
-		}
+	want := "内部规范提示[媒介域未选择；音频域未选择（DTS）]"
+	if out != want {
+		t.Errorf("got %q, want %q", out, want)
 	}
 }
 
