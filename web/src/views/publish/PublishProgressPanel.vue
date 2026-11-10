@@ -19,10 +19,13 @@
           </span>
         </template>
         <template #description>
-          逐{{ rowMode === 'site' ? '站' : '种' }}明细（{{ results.length }}）——失败原因见各行/发布日志
+          <!-- §59.505: 弹窗只列失败行（成功项汇总计数+发布日志页查看——
+               全列成功行是噪声·用户定案）；全成功时零明细最干净 -->
+          <template v-if="attentionRows.length">失败明细（{{ attentionRows.length }}）——成功项详情见发布日志</template>
+          <template v-else>全部成功——详情见发布日志</template>
         </template>
       </a-alert>
-      <div v-for="(r, i) in results" :key="i" class="pp-row">
+      <div v-for="(r, i) in attentionRows" :key="i" class="pp-row">
         <template v-if="rowMode === 'site'">
           <a-tag :color="rowColor(r.status)">{{ r.site || r.title }}</a-tag>
           <span>{{ rowLabel(r.status) }}</span>
@@ -73,7 +76,12 @@ const existStatuses = ['duplicate', 'existing']
 const okCount = computed(() => props.results.filter(r => okStatuses.includes(r.status)).length)
 const existCount = computed(() => props.results.filter(r => existStatuses.includes(r.status)).length)
 const failCount = computed(() => props.results.filter(r => r.status === 'failed').length)
-const alertType = computed(() => (failCount.value > 0 ? 'warning' : 'success'))
+// §59.505: 明细只列需关注行=failed+未知状态（ok/exist 之外的防御集合）——
+// 成功/已存在是正常终态（§59.502 定案），汇总计数已表达，详情走发布日志页
+const attentionRows = computed(() =>
+  props.results.filter(r => !okStatuses.includes(r.status) && !existStatuses.includes(r.status)),
+)
+const alertType = computed(() => (attentionRows.value.length > 0 ? 'warning' : 'success'))
 
 const STATUS_LABEL: Record<string, string> = {
   pushed: '发布成功', pushed_existing: '已推种', duplicate: '站上已有', existing: '站上已有', failed: '失败',
