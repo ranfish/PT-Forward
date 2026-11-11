@@ -176,7 +176,7 @@
 
 **三优势**：①完整栈真实（smart dial/limiter/breaker 全生效）②29 合规（零生产触碰）③数据级基线（可复现——§59.338 基线复测 20/20 即此法产出，发版最强证据）。
 
-**实施**：临时程序放 `cmd/tmp-<name>/`（编译验证后即删，不提交）；需长期保留的探测工具放 `cmd/`（如 searchprobe 先例）；生产 DB 数据（cookie 等）只读取出后本地使用。
+**实施**：临时程序放 `cmd/tmp-<name>/`（编译验证后即删，不提交）；需长期保留的探测工具放 `cmd/`（如 searchprobe 先例）或 `tools/`（摸站探针 `tools/siteprobe` 先例·2026-11-11 用户指令工具化——**主模块成员身份**（无独立 go.mod）以导入 internal/ 生产链：三模式 `-cred`（凭证解密→bash 管道）/`-fetch`（页面抓取·curl stdin 注 cookie 不落盘）/`-verify`（货架 HTML→生产 adapter+Engine 离线验证））；生产 DB 数据（cookie 等）只读取出后本地使用。
 
 
 ## 回归审核第一项（每次审核先查）
