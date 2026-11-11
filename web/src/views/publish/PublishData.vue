@@ -166,7 +166,7 @@
             v-else-if="!batchTask.finished"
             :progress="{ done: batchTask.done, total: batchTask.total, currentTitle: batchTask.current_title }"
             :results="batchTask.results"
-            :stop-requested="batchTask.stop_requested"
+            :stop-requested="batchTask.stop_requested ?? false"
             row-mode="seed"
             @stop="stopBatchPublish"
           />
