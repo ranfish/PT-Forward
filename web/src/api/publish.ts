@@ -196,6 +196,9 @@ export interface SeedDetail {
   fetch_source: string
   tags?: string[]
   tag_labels?: string[] // §59.106: 后端权威显示名（与 tags 索引对齐）
+  // §59.514 附八: 重组标题资产列（Tab1 ①区展示核对+tooltip=仲裁明细）
+  reassembled_title?: string
+  reassembled_notes?: string
   medium?: string // §59.108: 编辑表单媒介输入框数据源
   audio_tracks?: number
   // §59.469 附六: MDP 消费——音乐结构化元数据（音乐种非 undefined；
