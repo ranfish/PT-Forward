@@ -24,17 +24,30 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 	if mi.VideoCodec != "" {
 		p.VideoCodec = mi.VideoCodec
 	}
-	if mi.AudioCodec != "" {
+	// §59.514 附六（用户定案）：音频族 MI 唯一权威——MI Audio 段在场时
+	// 四字段以 MI 为准（直接赋值：提取 miss 清零标题值——宁缺毋错，
+	// Lost Prince 案词表缺口曾让回流坏标题的音频 token 存留；站方改写
+	// 标题的音频 token 从此不被消费——回流污染链切断）。影视无音轨=
+	// 废种被举报删·段理论必在（用户定案）。MI 缺失（HasAudio=false）
+	// 走下方原回退语义：标题值保留。
+	if mi.HasAudio {
 		p.AudioCodec = mi.AudioCodec
-	}
-	if mi.AudioChannels != "" {
 		p.AudioChannels = mi.AudioChannels
-	}
-	if mi.AudioTechnology != "" {
 		p.AudioTechnology = mi.AudioTechnology
-	}
-	if mi.AudioTracks > 0 {
 		p.AudioTracks = mi.AudioTracks
+	} else {
+		if mi.AudioCodec != "" {
+			p.AudioCodec = mi.AudioCodec
+		}
+		if mi.AudioChannels != "" {
+			p.AudioChannels = mi.AudioChannels
+		}
+		if mi.AudioTechnology != "" {
+			p.AudioTechnology = mi.AudioTechnology
+		}
+		if mi.AudioTracks > 0 {
+			p.AudioTracks = mi.AudioTracks
+		}
 	}
 	if mi.HDR != "" {
 		p.HDR = mi.HDR

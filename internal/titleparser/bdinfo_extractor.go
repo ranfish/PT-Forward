@@ -99,6 +99,11 @@ func ExtractBDInfo(text string) MediaInfoTech {
 			result.AudioTechnology = "Atmos"
 		}
 	}
+	// §59.514 附六: BDInfo 报告音频行在场（本地扫描报告——产物近似：
+	// BDInfo 音频行解析必有产出，miss 场景由报告本身保证不出现）
+	if result.AudioCodec != "" || result.AudioTracks > 0 {
+		result.HasAudio = true
+	}
 	return result
 }
 
