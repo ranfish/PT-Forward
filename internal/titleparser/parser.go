@@ -14,6 +14,14 @@ var (
 	// §59.98: 范围/复合形态——S01-S03(跨季)/S01E03-E05/S01+S02 组合
 	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,4}(?:[-~]E?\d{1,4})?)?(?:[-+]S\d{1,2}(?:E\d{1,4})?)*\b`)
 	reYearToken     = regexp.MustCompile(`[\s.(]((?:19|20)\d{2})([\s.)]|$)`)
+	// §59.514 刀1: 年份区间锚（多季合集 2015-2022 形态——v1.05 多季合集填
+	// 最早-最晚年份）。单年正则后边界不认 '-'，区间被整体忽略（Time
+	// 2021-2023 案：标题年空 → PTGen 单年填充 → 区间丢失）。
+	reYearRangeAnchor = regexp.MustCompile(`[\s.(]((?:19|20)\d{2})[-~]((?:19|20)\d{2})([\s.)]|$)`)
+	// §59.514 刀1: 裸 Exx 锚（无 S 前缀集号——站方改坏/组惯例标记形态：
+	// Quacks E01 案合集被标分集）。中文集数锚同族第三通道；捕获组=纯
+	// token；词边界+E 后紧邻 1-2 位数字防误伤（Eden/Elysium 词不匹配）。
+	reBareEpisode = regexp.MustCompile(`(?i)(?:^|[\s.\-_])(E\d{1,2}(?:[-~]E?\d{1,3})?)(?:[\s.\-_]|$)`)
 	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1440p|1080p|1080i|720p|480p)\b`)
 	reBDRipToken    = regexp.MustCompile(`(?i)\bBD[-\s]?RIP\b`)
 	reTVRipToken    = regexp.MustCompile(`(?i)\bTV[-\s]?RIP\b`)
@@ -251,13 +259,25 @@ func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string
 			seLoc = cnLoc2
 		}
 	}
-	// 年份锚（技术跟随）
+	// §59.514 刀1: 裸 Exx 锚（中文集数锚同族第三通道）——techFollow
+	// 跟随判定（集号后随年份/技术词=集号语境；防 E3 展会类词误锚）。
+	if seLoc == nil {
+		if m := reBareEpisode.FindStringSubmatchIndex(title); m != nil && techFollowRe.MatchString(title[m[3]:]) {
+			seLoc = []int{m[2], m[3]}
+		}
+	}
+	// 年份锚（技术跟随）——§59.514 刀1: 区间锚优先（2015-2022 多季合集
+	// 形态），无区间再走单年循环
 	var yearStart, yearEnd int
-	matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
 	anchorVal := ""
-	for _, m := range matches {
-		if techFollowRe.MatchString(title[m[3]:]) {
-			yearStart, yearEnd, anchorVal = m[2], m[3], title[m[2]:m[3]]
+	if m := reYearRangeAnchor.FindStringSubmatchIndex(title); m != nil && techFollowRe.MatchString(title[m[5]:]) {
+		yearStart, yearEnd, anchorVal = m[2], m[5], title[m[2]:m[3]]+"-"+title[m[4]:m[5]]
+	} else {
+		matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
+		for _, m := range matches {
+			if techFollowRe.MatchString(title[m[3]:]) {
+				yearStart, yearEnd, anchorVal = m[2], m[3], title[m[2]:m[3]]
+			}
 		}
 	}
 	takeMain := func(cut int) string {
