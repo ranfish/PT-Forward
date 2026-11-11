@@ -92,6 +92,11 @@
         >
           <ReloadOutlined /> 批量重获（{{ tableData.length }}）
         </a-button>
+        <!-- §59.514 附八 P2: 重建重组标题（任务化+进度+graceful 停止——
+             逻辑升级后存量刷列的标准运维通道） -->
+        <a-button :loading="recomputeActive" @click="startRecompute">
+          <SyncOutlined /> 重建重组标题{{ recomputeProgressText }}
+        </a-button>
       </div>
     </div>
 
@@ -268,7 +273,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
+import { SyncOutlined, PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import MusicDetailPanel from './MusicDetailPanel.vue'
@@ -701,6 +706,45 @@ async function clearSingle(item: SeedListItem) {
   } finally {
     clearingSet.value.delete(item.hash)
   }
+}
+
+// ==================== §59.514 附八 P2: 重建重组标题 ====================
+const recomputeActive = ref(false)
+const recomputeProgressText = ref('')
+let recomputeTimer: ReturnType<typeof setTimeout> | undefined
+
+async function startRecompute() {
+  try {
+    const resp = await seedConfigApi.recomputeStart()
+    const total = resp.data?.data?.total ?? 0
+    message.success(`重建任务已开始（${total} 行）`)
+    recomputeActive.value = true
+    pollRecompute()
+  } catch (e) {
+    message.error(String(e))
+  }
+}
+
+function pollRecompute() {
+  if (recomputeTimer) clearTimeout(recomputeTimer)
+  recomputeTimer = setTimeout(async () => {
+    try {
+      const resp = await seedConfigApi.recomputeProgress()
+      const d = resp.data?.data
+      if (!d || !d.active) {
+        recomputeActive.value = false
+        recomputeProgressText.value = ''
+        message.success(`重建完成（${d?.done ?? 0}/${d?.total ?? 0}${d?.failed ? ` 失败 ${d.failed}` : ''}）`)
+        await fetchList()
+        return
+      }
+      recomputeProgressText.value = `（${d.done}/${d.total}）`
+      pollRecompute()
+    } catch {
+      recomputeActive.value = false
+      recomputeProgressText.value = ''
+    }
+  }, 3000)
 }
 
 // ==================== 批量获取 ====================
