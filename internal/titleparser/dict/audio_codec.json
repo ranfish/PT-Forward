@@ -35,7 +35,7 @@
     {
       "canonical": "DTS-HD HR",
       "title_form": "DTS-HD.HR",
-      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*HR(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?LBR\\b",
+      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*HR(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?LBR\\b|\\bDTS[._\\- ]?XBR\\b",
       "standard_key": "audio.dts_hd_hr",
       "variants": [
         "DTS-HD HR",

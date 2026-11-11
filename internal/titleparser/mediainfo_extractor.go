@@ -19,6 +19,10 @@ type MediaInfoTech struct {
 	AudioChannels   string // 2.0/5.1/7.1
 	AudioTechnology string // Atmos
 	AudioTracks     int    // 有效音轨数（排除兼容音轨）
+	// §59.514 附六: Audio 段在场标志（段级探测非产物推断——「段在而提取
+	// miss」正是 MergeMediaInfoInto 清零标题值的场景）。影视无音轨=废种
+	// 理论必在（用户定案）——false=MI 文本缺失/异常形态，标题回退。
+	HasAudio bool
 	HDR             string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
 	BitDepth        string // 8bit/10bit
 	Encoded         bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
@@ -104,6 +108,8 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 			audioStreams = append(audioStreams, s)
 		}
 	}
+	// §59.514 附六: 段级在场标志（在 selectBest 之前——探测与提取独立）
+	result.HasAudio = len(audioStreams) > 0
 	if len(audioStreams) > 0 {
 		best := selectBestAudioStream(audioStreams)
 		result.AudioCodec, result.AudioTechnology = audioFromMI(
