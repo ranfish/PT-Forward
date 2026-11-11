@@ -115,70 +115,76 @@ func (h *PublishTorrentsHandler) runRecomputeTask(rows []model.TorrentMetadata) 
 			h.recompute.mu.Unlock()
 			continue
 		}
-		func(m model.TorrentMetadata) {
-			defer func() {
-				if p := recover(); p != nil {
-					h.logger.Error("recompute panic", zap.String("hash", m.InfoHash), zap.Any("panic", p))
-					h.recompute.mu.Lock()
-					h.recompute.failed++
-					h.recompute.done++
-					h.recompute.mu.Unlock()
-				}
-			}()
-			domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
-			profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
-			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
-			var torrentData []byte
-			if h.clientMgr != nil && m.InfoHash != "" {
-				var snap model.TorrentSnapshot
-				if err := h.db.WithContext(ctx).Where("hash = ?", m.InfoHash).First(&snap).Error; err == nil {
-					if cl, clErr := h.clientMgr.Get(snap.ClientUID); clErr == nil && cl != nil {
-						fCtx, fCancel := context.WithTimeout(ctx, 15*time.Second)
-						if b, bErr := cl.ExportTorrent(fCtx, m.InfoHash); bErr == nil {
-							torrentData = b
-						}
-						fCancel()
-					}
-				}
-			}
-			reassembledTitle, reassembledNotes := h.executor.FinalizeTitle(ctx, &m, &profile, torrentData)
-			components := titleparser.TechProfileToComponents(profile)
-			category := titleparser.InferCategory(components, m.SourceCategory, "", "")
-			updates := map[string]interface{}{
-				"reassembled_title": reassembledTitle,
-				"reassembled_notes": strings.Join(reassembledNotes, "；"),
-				"category":          category,
-				"resolution":        profile.Resolution,
-				"video_codec":       profile.VideoCodec,
-				"audio_codec":       profile.AudioCodec,
-				"audio_channels":    profile.AudioChannels,
-				"audio_tech":        profile.AudioTechnology,
-				"audio_tracks":      profile.AudioTracks,
-				"hdr":               profile.HDR,
-				"bit_depth":         profile.BitDepth,
-				"source_type":       profile.SourceType,
-				"specification":     profile.Specification,
-				"source_platform":   profile.SourcePlatform,
-				"edition_info":      profile.EditionInfo,
-				"region_code":       profile.RegionCode,
-			}
-			if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-				Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
-				Updates(updates).Error; err != nil {
-				h.logger.Warn("recompute task row failed", zap.String("hash", m.InfoHash[:min(10, len(m.InfoHash))]), zap.Error(err))
-				h.recompute.mu.Lock()
-				h.recompute.failed++
-				h.recompute.done++
-				h.recompute.mu.Unlock()
-				return
-			}
-			h.recompute.mu.Lock()
-			h.recompute.done++
-			h.recompute.mu.Unlock()
-		}(m)
+		h.recomputeRow(ctx, m, mi)
 	}
 	h.recompute.mu.Lock()
 	h.finishRecompute()
+	h.recompute.mu.Unlock()
+}
+
+// recomputeRow 单行重建（§59.514 附八 P6 从闭包提取为方法——sqlcheck 闭包
+// 合并误报：立即调用闭包是一条 ExprStmt·快照查询 Where("hash") 与 Updates
+// 链被 analyzeStmt 合并到 torrent_metadata 报 no such column: hash；
+// 提取后各查询是独立语句零合并·行为零变化）。
+func (h *PublishTorrentsHandler) recomputeRow(ctx context.Context, m model.TorrentMetadata, mi string) {
+	defer func() {
+		if p := recover(); p != nil {
+			h.logger.Error("recompute panic", zap.String("hash", m.InfoHash), zap.Any("panic", p))
+			h.recompute.mu.Lock()
+			h.recompute.failed++
+			h.recompute.done++
+			h.recompute.mu.Unlock()
+		}
+	}()
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
+	profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
+	profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
+	var torrentData []byte
+	if h.clientMgr != nil && m.InfoHash != "" {
+		var snap model.TorrentSnapshot
+		if err := h.db.WithContext(ctx).Where("hash = ?", m.InfoHash).First(&snap).Error; err == nil {
+			if cl, clErr := h.clientMgr.Get(snap.ClientUID); clErr == nil && cl != nil {
+				fCtx, fCancel := context.WithTimeout(ctx, 15*time.Second)
+				if b, bErr := cl.ExportTorrent(fCtx, m.InfoHash); bErr == nil {
+					torrentData = b
+				}
+				fCancel()
+			}
+		}
+	}
+	reassembledTitle, reassembledNotes := h.executor.FinalizeTitle(ctx, &m, &profile, torrentData)
+	components := titleparser.TechProfileToComponents(profile)
+	category := titleparser.InferCategory(components, m.SourceCategory, "", "")
+	updates := map[string]interface{}{
+		"reassembled_title": reassembledTitle,
+		"reassembled_notes": strings.Join(reassembledNotes, "；"),
+		"category":          category,
+		"resolution":        profile.Resolution,
+		"video_codec":       profile.VideoCodec,
+		"audio_codec":       profile.AudioCodec,
+		"audio_channels":    profile.AudioChannels,
+		"audio_tech":        profile.AudioTechnology,
+		"audio_tracks":      profile.AudioTracks,
+		"hdr":               profile.HDR,
+		"bit_depth":         profile.BitDepth,
+		"source_type":       profile.SourceType,
+		"specification":     profile.Specification,
+		"source_platform":   profile.SourcePlatform,
+		"edition_info":      profile.EditionInfo,
+		"region_code":       profile.RegionCode,
+	}
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
+		Updates(updates).Error; err != nil {
+		h.logger.Warn("recompute task row failed", zap.String("hash", m.InfoHash[:min(10, len(m.InfoHash))]), zap.Error(err))
+		h.recompute.mu.Lock()
+		h.recompute.failed++
+		h.recompute.done++
+		h.recompute.mu.Unlock()
+		return
+	}
+	h.recompute.mu.Lock()
+	h.recompute.done++
 	h.recompute.mu.Unlock()
 }
 
