@@ -12,6 +12,7 @@
 | 规则页面 | rules.php |
 | 公告页面 | forums.php?topicid=6122（新手发种教程）、topicid=6126（盒子规则）、topicid=6123（完结剧规则） |
 | 发布页面 | upload.php → takeupload.php |
+| API 网关 | 2026.11.11 上线统一 API（全量契约见 [hdarea-api.md](hdarea-api.md)——全量 API adapter 底本） |
 
 **站点角色**: 目标站（发布站）。HDApt Auto Transfer 项目已实现 M-Team/TTG → HDArea 的完整自动转发。
 
