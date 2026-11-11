@@ -95,8 +95,9 @@ func (e *PublishExecutor) arbitrateNameTokens(meta *model.TorrentMetadata, tp *t
 		nameHasRange := strings.Contains(np.Year, "-")
 		titleHasRange := strings.Contains(tp.Year, "-")
 		if nameHasRange && !titleHasRange {
+			oldY := tp.Year
 			tp.Year = np.Year
-			notes = append(notes, "年份仲裁(name): "+tp.Year+" → "+np.Year)
+			notes = append(notes, "年份仲裁(name): "+oldY+" → "+np.Year)
 		}
 	}
 
@@ -105,14 +106,23 @@ func (e *PublishExecutor) arbitrateNameTokens(meta *model.TorrentMetadata, tp *t
 	// 语义——站方审核不认等价）
 	if np.Specification != "" && tp.Specification != "" &&
 		!strings.EqualFold(np.Specification, tp.Specification) {
+		old := tp.Specification
 		tp.Specification = np.Specification
-		notes = append(notes, "规格仲裁(name): "+tp.Specification+" → "+np.Specification)
+		notes = append(notes, "规格仲裁(name): "+old+" → "+np.Specification)
 	}
 	if np.SourceType != "" && tp.SourceType != "" &&
 		!strings.EqualFold(np.SourceType, tp.SourceType) && np.Specification == "" {
 		// ST 单独冲突仅当 Spec 无值时（Spec 承载 ST 语义的多数场景已上行处理）
+		oldST, oldSpec := tp.SourceType, tp.Specification
 		tp.SourceType = np.SourceType
-		notes = append(notes, "片源仲裁(name): "+tp.SourceType+" → "+np.SourceType)
+		// §59.514 复验缺陷修：媒介级冲突（BluRay vs WEB-DL）ST 修正后
+		// 旧媒介族 Spec 残留——重组双媒介 token（Mauvais sang 案）。
+		// ST 已改判媒介→旧族 Spec 同源失真，一并清除交 ST 单独表达。
+		if oldSpec != "" && !strings.EqualFold(oldSpec, np.SourceType) {
+			tp.Specification = ""
+		}
+		notes = append(notes, "片源仲裁(name): "+oldST+" → "+np.SourceType+
+			"（清残留规格 "+oldSpec+"）")
 	}
 	if np.SourcePlatform != "" && tp.SourcePlatform == "" {
 		tp.SourcePlatform = np.SourcePlatform
