@@ -140,7 +140,8 @@ func TestExtractMediaInfo_DTSVariants(t *testing.T) {
 	}{
 		{"DTS XLL", "DTS-HD MA"},
 		{"DTS LBR", "DTS-HD HR"},
-		{"DTS ES XLL", "DTS-ES"},
+		{"DTS ES XLL", "DTS-HD MA"}, // §59.514 附十 A: XLL=无损后缀→HD MA（docs/31 :71356 设计权威表·对齐设计修实现）
+		{"DTS ES", "DTS-ES"},        // 有损矩阵变体保持 canonical 身份（:64626 映射表）
 		{"DTS-UHD", "DTS"},
 		{"DTS XLL X", "DTS"},
 		{"DTS", "DTS"},

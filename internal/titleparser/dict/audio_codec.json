@@ -25,7 +25,7 @@
     {
       "canonical": "DTS-HD MA",
       "title_form": "DTS-HD.MA",
-      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*MA(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?XLL\\b",
+      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*MA(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?XLL\\b|\\bDTS[._\\- ]?ES[._\\- ]?XLL\\b",
       "standard_key": "audio.dts_hd_ma",
       "variants": [
         "DTS-HD MA",
@@ -44,7 +44,7 @@
     },
     {
       "canonical": "DTS-ES",
-      "pattern": "\\bDTS[._\\- ]?ES(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?ES[._\\- ]?XLL\\b",
+      "pattern": "\\bDTS[._\\- ]?ES(?:[._\\d]+)?\\b",
       "variants": []
     },
     {

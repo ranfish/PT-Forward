@@ -100,15 +100,17 @@ func TestArbitrateFrom(t *testing.T) {
 		t.Errorf("From Spec=%q want WEBRip（name 的 WEB-DL 不得覆盖·notes=%v）", tp.Specification, notes)
 	}
 	// MI 铁证单方向：标题误标 WEB-DL + MIEncoded → 纠正 WEBRip
+	// §59.514 附十 B: 纠正移至 arbitrateMIEvidence（MI 证据层恒跑——
+	// torrentData 门外·recompute 降级路径不再漏）·测试对齐新接缝
 	tp2 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
 	tp2.MIEncoded = true
-	notes2 := e.arbitrateNameTokens(arbTestMeta("Some Show S01 1080p WEB-DL x264-GRP", ""), &tp2, "Some.Show.S01.1080p.WEB-DL.x264-GRP")
+	notes2 := e.arbitrateMIEvidence(&tp2)
 	if !strings.EqualFold(tp2.Specification, "WEBRip") {
 		t.Errorf("MI 铁证纠正: Spec=%q want WEBRip（notes=%v）", tp2.Specification, notes2)
 	}
 	// 反方向不纠正（MIEncoded=false 无铁证不干预——§59.226 附五单方向性）
 	tp3 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
-	e.arbitrateNameTokens(arbTestMeta("Some Show S01 1080p WEB-DL x264-GRP", ""), &tp3, "Some.Show.S01.1080p.WEB-DL.x264-GRP")
+	e.arbitrateMIEvidence(&tp3)
 	if !strings.EqualFold(tp3.Specification, "WEB-DL") {
 		t.Errorf("无铁证不干预: Spec=%q want WEB-DL", tp3.Specification)
 	}
