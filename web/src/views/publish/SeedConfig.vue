@@ -92,11 +92,14 @@
         >
           <ReloadOutlined /> 批量重获（{{ tableData.length }}）
         </a-button>
-        <!-- §59.514 附八 P2: 重建重组标题（任务化+进度+graceful 停止——
-             逻辑升级后存量刷列的标准运维通道） -->
-        <a-button :loading="recomputeActive" @click="startRecompute">
-          <SyncOutlined /> 重建重组标题{{ recomputeProgressText }}
-        </a-button>
+        <!-- §59.514 附八 P2: 全库重建重组标题（任务化+进度+graceful 停止——
+             逻辑升级后存量刷列的标准运维通道·全库语义=宁可多花时间修正
+             错误标题也不能让错误发布到站点·用户定案文案明示范围） -->
+        <a-tooltip title="对全库（所有下载器/路径）已获取种子按当前版本规则重建重组标题——涉及重组逻辑的版本升级后建议点一次">
+          <a-button :loading="recomputeActive" @click="startRecompute">
+            <SyncOutlined /> 全库重建重组标题{{ recomputeProgressText }}
+          </a-button>
+        </a-tooltip>
       </div>
     </div>
 
