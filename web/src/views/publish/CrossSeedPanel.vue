@@ -49,8 +49,14 @@
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">① 种子标题</div></template>
                 <a-descriptions :column="1" size="small">
-                  <a-descriptions-item label="主标题">
+                  <a-descriptions-item label="原始标题">
                     <span style="font-size: 15px; font-weight: 600">{{ form.title || '—' }}</span>
+                  </a-descriptions-item>
+                  <!-- §59.514 附八: 重组标题（§59.86 镜像 Tab1 三行） -->
+                  <a-descriptions-item v-if="form.reassembledTitle" label="重组标题">
+                    <a-tooltip :title="form.reassembledNotes || '无仲裁/归一修正'" placement="topLeft">
+                      <span style="font-size: 15px; font-weight: 600; color: #13c2c2">{{ form.reassembledTitle }}</span>
+                    </a-tooltip>
                   </a-descriptions-item>
                   <a-descriptions-item v-if="form.subtitle" label="副标题">
                     <span style="color: #666">{{ form.subtitle }}</span>
@@ -118,7 +124,14 @@
                   <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">① 种子标题</div>
                 </template>
                 <a-descriptions :column="3" bordered size="small">
-                  <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="原始标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
+                  <!-- §59.514 附八: 重组标题资产列（列=发布·显示错=重组链真错→上报开发者·
+                       tooltip=仲裁/归一明细——用户③定案三行布局） -->
+                  <a-descriptions-item v-if="form.reassembledTitle" label="重组标题" :span="3">
+                    <a-tooltip :title="form.reassembledNotes || '无仲裁/归一修正'" placement="topLeft">
+                      <span style="color: #13c2c2; font-weight: 600">{{ form.reassembledTitle }}</span>
+                    </a-tooltip>
+                  </a-descriptions-item>
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
                 </a-descriptions>
               </a-card>
@@ -414,6 +427,9 @@ async function loadSeedDetail(infoHash: string) {
     if (d) {
       form.value.title = d.title || form.value.title
       form.value.subtitle = d.subtitle || ''
+      // §59.514 附八: 重组标题资产列（Tab1 ①+预览① 分行展示）
+      form.value.reassembledTitle = d.reassembled_title || ''
+      form.value.reassembledNotes = d.reassembled_notes || ''
       form.value.mediaInfo = d.mediainfo || ''
       form.value.description = d.description || ''
       form.value.screenshots = d.screenshots || []
