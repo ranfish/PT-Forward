@@ -52,6 +52,14 @@ type TorrentMetadata struct {
 	// §56.8 合并模式记录（UI toggle 显示）
 	LastMergeMode string `json:"last_merge_mode" gorm:"column:last_merge_mode;size:20;default:'ptgen_first'"`
 
+	// §59.514 附八: 重组标题资产列（FinalizeTitle 共享单点产物——
+	// t0/recompute 生成·发布链锚定消费·Tab1 展示核对。列=发布结构性
+	// 同源：用户看到的=将要发的；显示错=重组链真错→上报开发者。
+	// notes=仲裁/归一明细（Tab1 tooltip/DryRun 可观测）。逻辑升级后
+	// recompute 刷列（§59.500 刀4 运维模式配套）。
+	ReassembledTitle string `json:"reassembled_title" gorm:"size:500"`
+	ReassembledNotes string `json:"reassembled_notes" gorm:"size:1000"`
+
 	// §59.20 源站声明 + BDInfo 持久化
 	// §59.162: 限时禁转让渡截止（keepfrds 24h 窗——added+24h+30m 余量；
 	// 零值=无窗口[永久禁转或可转]；now<until 拦截，过期自动放行）

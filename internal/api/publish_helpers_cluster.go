@@ -415,6 +415,39 @@ func propagateClusterMediainfoDB(db *gorm.DB, logger *zap.Logger, ctx context.Co
 	}
 }
 
+// propagateClusterTitleDB §59.514 附八: 重组标题簇传播——t0 代表行生成
+// reassembled_title 后补簇内空行（蓝军⑥：副本行列空→发布消费副本行
+// fallback 高频触发——传播堵漏）。覆盖条件与 MI 传播同款：空行 +
+// cluster 行（rss_detail 独立获取行不动）。
+func propagateClusterTitleDB(db *gorm.DB, logger *zap.Logger, ctx context.Context, clientUID uint, savePath, name, selfHash, title, notes string) {
+	if db == nil || logger == nil || clientUID == 0 || savePath == "" || name == "" || selfHash == "" || title == "" {
+		return
+	}
+	var siblingHashes []string
+	db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientUID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	res := db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND reassembled_title = '' AND fetch_source = 'cluster'", siblingHashes).
+		Updates(map[string]interface{}{
+			"reassembled_title": title,
+			"reassembled_notes": notes,
+		})
+	if res.Error != nil {
+		logger.Warn("cluster title propagate failed", zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		logger.Info("cluster title propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
+
 // propagateClusterPosters §59.61 附（传播竞态修复）：异步修复（PTGen 海报/简介）
 // 完成后把首副本终态回传簇行——仅覆盖 fetch_source='cluster' 的传播行
 // （独立获取行 rss_detail 不动，尊重显式数据）。243 墓碑镇 57 副本裂图根因：

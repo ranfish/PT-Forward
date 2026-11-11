@@ -345,17 +345,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 1080 归一)/天空之城(audio)/Arco(MI 纠错 DDP)。type/team 域保持原源。
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	tp := titleparser.BuildTechProfile(meta.Title, TechTextOf(meta), domMedium, domRes, domVideo, domAudio)
-	// §59.254 项1: PTGen 第四源合并（year 校正+main_title 兜底+mismatch 可观测）
-	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
-	e.mergePTGenSource(ctx, &tp, meta)
-	// §59.514 刀2: .torrent 证据仲裁（mergePTGen 后——防 PTGen 单年覆盖
-	// 区间；归一前——季集合构造/裸单集修正先于信号归一终态化）
-	arbNotes := e.arbitrateWithTorrent(ctx, meta, &tp, torrentData)
+	// §59.514 附八: tp 终态化走 FinalizeTitle 共享单点（PTGen+仲裁+归一+
+	// 重组——t0/recompute/发布三链结构性同源·原 :349-357 三段收编）
+	finalTitle, arbNotes := e.FinalizeTitle(ctx, meta, &tp, torrentData)
 	if len(arbNotes) > 0 && e.logger != nil {
 		e.logger.Info("torrent-arbitration", zap.String("info_hash", meta.InfoHash), zap.Strings("notes", arbNotes))
 	}
-	// §59.308 完结季包季集归一（单点方法——主管线与 preAuditTitle 同路径）
-	e.normalizeSeasonPackOf(meta, &tp)
 	// §59.424: 系统级禁发剧集分集（用户定案——所有站点仅允许合集/完结/
 	// 全集形态）。挂载点=归一后（tp.SeasonEpisode 已是归一终态）+PushOnly
 	// 分支之后（P1 定案：补推豁免——形态恒定检查与时变检查（flags）挂载
@@ -384,14 +379,27 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
 	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
 	// （预览链展示且警示不拒——预览本身即发布前检查工具）。
+	// §59.514 附八（用户定案）: 标题锚定列——列在场时以列为准（列=发布·
+	// 用户 Tab1 看到的=发出的·结构性一致）；列空（存量/降级场景）fallback
+	// FinalizeTitle 现算产物。逻辑升级后 recompute 刷列（§59.500 刀4 运维
+	// 模式配套）——升级窗口内列=旧逻辑产物·发布随列（用户定案接受）。
 	publishTitle := ""
-	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
-		publishTitle = rt
+	if finalTitle != "" {
+		publishTitle = finalTitle
 	} else {
 		if !tp.MIHasVideo {
 			return fail("failed", "标题重组失败：MI 缺失或视频不可读——检查下载器文件可访问性后重新获取数据")
 		}
 		return fail("failed", "标题重组失败：标题不可解析且 PTGen 无英文名——重新获取数据后再发布")
+	}
+	if meta.ReassembledTitle != "" {
+		if meta.ReassembledTitle != publishTitle && e.logger != nil {
+			e.logger.Info("publish title anchored to stored column (diff with live finalize)",
+				zap.String("info_hash", meta.InfoHash),
+				zap.String("column", meta.ReassembledTitle),
+				zap.String("live", publishTitle))
+		}
+		publishTitle = meta.ReassembledTitle
 	}
 	jobs := []domainJob{
 		{model.FieldDomainType, e.typeMappingOf(cfg, in.TargetSite, meta, tp)},
@@ -1931,6 +1939,11 @@ func detailURLOf(cfg *model.SiteConfig, tid string) string {
 // ——Arco 案预检层旧标题与表单 DDP 对照错位残留）。
 // §59.254 项4：重组空返回 ok=false（DryRun 同拒——预检正是发现问题的工具）。
 func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) (string, bool) {
+	// §59.514 附八: 优先消费重组标题资产列（§59.304 双链分叉防——主管线
+	// 锚定列·兜底链同锚定·列空才降级现算）
+	if meta.ReassembledTitle != "" {
+		return meta.ReassembledTitle, true
+	}
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	tp := titleparser.BuildTechProfile(meta.Title, TechTextOf(meta), domMedium, domRes, domVideo, domAudio)
 	e.normalizeSeasonPackOf(meta, &tp) // §59.308: 预检 name 与上传标题同归一（双链分叉防）

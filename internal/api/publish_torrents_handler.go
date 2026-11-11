@@ -3061,6 +3061,21 @@ fetched:
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
+			// §59.514 附八: 重组标题资产化——FinalizeTitle 共享单点（发布链
+			// 同款终态链：PTGen+仲裁+归一+重组）。torrentData=ExportTorrent
+			// 顺路拉（isLocal 场景·下载器本地 RPC 毫秒级·与 localMI 生成
+			// 同级成本）；拉取失败列降级（归一+重组无仲裁·发布时再终态化）。
+			var torrentData []byte
+			if isLocal && h.clientMgr != nil {
+				if cl, clErr := h.clientMgr.Get(clientUID); clErr == nil && cl != nil {
+					fetchCtx, fetchCancel := context.WithTimeout(ctx, 30*time.Second)
+					if td, tdErr := cl.ExportTorrent(fetchCtx, meta.InfoHash); tdErr == nil {
+						torrentData = td
+					}
+					fetchCancel()
+				}
+			}
+			reassembledTitle, reassembledNotes := h.executor.FinalizeTitle(ctx, &finalMeta, &profile, torrentData)
 			components := titleparser.TechProfileToComponents(profile)
 			// §59.236 ④: InferCategory 的 PTGen 输入（五级链③④级信号）从
 			// 主链唯一账本读（runMainlinePTGen 已先行落库——此处终态 JSON）
@@ -3072,6 +3087,8 @@ fetched:
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, ptgGenre, ptgEpi)
 
 			updates := map[string]interface{}{
+				"reassembled_title": reassembledTitle,
+				"reassembled_notes": strings.Join(reassembledNotes, "；"),
 				"category":        category,
 				"resolution":      profile.Resolution,
 				"video_codec":     profile.VideoCodec,
@@ -3146,6 +3163,12 @@ fetched:
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
+			// §59.514 附八: 重组标题簇传播（蓝军⑥——副本行空列 fallback 高频
+			// 触发堵漏·propagateClusterMediainfoDB 同款语义）
+			if reassembledTitle != "" {
+				propagateClusterTitleDB(h.db, h.logger, ctx, clientUID, savePath, name, meta.InfoHash,
+					reassembledTitle, strings.Join(reassembledNotes, "；"))
+			}
 			// §59.500 刀1: tags 推理换 inferFinalTags 单点——完整性闸门
 			// （截图/BDInfo 未到不推·后续数据源落地触发）；原 t0 内联推理
 			// 段（§59.26/§59.326/§59.496 附二逻辑全收编入单点）
@@ -4023,9 +4046,29 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 		domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
 		profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
 		profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
+		// §59.514 附八: recompute 同走 FinalizeTitle 共享单点（逻辑升级后
+		// 存量刷列通道——torrentData 尽力拉（下载器在场则终态仲裁）·
+		// 失败降级与 t0 同款）
+		var torrentData []byte
+		if h.clientMgr != nil && m.InfoHash != "" {
+			// recompute 无 clientUID 上下文——遍历快照定位该 hash 的下载器
+			var snap model.TorrentSnapshot
+			if err := h.db.WithContext(ctx).Where("hash = ?", m.InfoHash).First(&snap).Error; err == nil {
+				if cl, clErr := h.clientMgr.Get(snap.ClientUID); clErr == nil && cl != nil {
+					fetchCtx, fetchCancel := context.WithTimeout(ctx, 30*time.Second)
+					if td, tdErr := cl.ExportTorrent(fetchCtx, m.InfoHash); tdErr == nil {
+						torrentData = td
+					}
+					fetchCancel()
+				}
+			}
+		}
+		reassembledTitle, reassembledNotes := h.executor.FinalizeTitle(ctx, &m, &profile, torrentData)
 		components := titleparser.TechProfileToComponents(profile)
 		category := titleparser.InferCategory(components, m.SourceCategory, "", "")
 		updates := map[string]interface{}{
+			"reassembled_title": reassembledTitle,
+			"reassembled_notes": strings.Join(reassembledNotes, "；"),
 			"category":        category,
 			"resolution":      profile.Resolution,
 			"video_codec":     profile.VideoCodec,
@@ -4621,6 +4664,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"site_name":       meta.SiteName,
 		"title":           meta.Title,
 		"subtitle":        meta.Subtitle,
+		// §59.514 附八: 重组标题资产列透出（Tab1 ①区展示核对+tooltip notes）
+		"reassembled_title": meta.ReassembledTitle,
+		"reassembled_notes": meta.ReassembledNotes,
 		"poster":          meta.Poster,
 		"description":     descriptionOut,
 		"screenshots":     screenshots,
@@ -4903,7 +4949,39 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(updated.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
-	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
+	// §59.514 附八: PUT 保存后编辑素材可能变化——FinalizeTitle 共享单点
+	// 重算刷列（第四消费方·与发布/t0/recompute 同源）。torrentData 尽力
+	// 拉（无 clientUID 上下文→快照定位·同 recompute 模式）；空列降级
+	// 弱版现算（titleIncomplete 判定用终值）。
+	reassembledTitle := ""
+	{
+		var td []byte
+		if h.clientMgr != nil && updated.InfoHash != "" {
+			var snap model.TorrentSnapshot
+			if err := h.db.WithContext(r.Context()).Where("hash = ?", updated.InfoHash).First(&snap).Error; err == nil {
+				if cl, clErr := h.clientMgr.Get(snap.ClientUID); clErr == nil && cl != nil {
+					fCtx, fCancel := context.WithTimeout(r.Context(), 30*time.Second)
+					if b, bErr := cl.ExportTorrent(fCtx, updated.InfoHash); bErr == nil {
+						td = b
+					}
+					fCancel()
+				}
+			}
+		}
+		rt, notes := h.executor.FinalizeTitle(r.Context(), &updated, &profile, td)
+		if rt != "" {
+			reassembledTitle = rt
+			_ = h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ?", updated.InfoHash).
+				Updates(map[string]interface{}{
+					"reassembled_title": rt,
+					"reassembled_notes": strings.Join(notes, "；"),
+				}).Error
+		}
+	}
+	if reassembledTitle == "" {
+		reassembledTitle = titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
+	}
 	// §59.254 项4 D：预览展示且警示不拒（预览本身即发布前检查工具）——
 	// 重组空=数据不完整（发布链将拒发），此处展示原形态+警示标记
 	titleIncomplete := strings.TrimSpace(reassembledTitle) == ""

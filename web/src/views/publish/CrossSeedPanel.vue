@@ -312,6 +312,8 @@ const currentSourceSite = ref<string>('')
 
 const form = ref({
   title: '',
+  reassembledTitle: '',
+  reassembledNotes: '',
   subtitle: '',
   mediaInfo: '',
   description: '',
@@ -345,7 +347,7 @@ function resetPanel() {
   seedPreviewMode.value = false
   previewRenderedDesc.value = ''
   form.value = {
-    title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [],
+    title: '', reassembledTitle: '', reassembledNotes: '', subtitle: '', mediaInfo: '', description: '', screenshots: [],
     statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '',
     tags: [], removedDeclarations: [], bdinfo: '', anonymous: false, screenshotInDesc: false,
     titleComponents: {},
@@ -376,6 +378,8 @@ function fillFormFromPreset() {
   if (!t) return
   form.value = {
     title: t.name || '',
+    reassembledTitle: '',
+    reassembledNotes: '',
     subtitle: '',
     mediaInfo: '',
     description: '',
@@ -777,8 +781,10 @@ async function saveOnly() {
       if (result.title_incomplete) {
         message.warning('标题数据不完整（重组失败）：发布将被拒——请重新获取数据或检查视频文件可读性')
       }
+      // §59.514 附八: PUT 响应的重组标题（终态·FinalizeTitle 刷列产物）进
+      // 独立字段——原始标题不再被覆盖（Tab1 ①区分行展示）
       if (result.reassembled_title) {
-        form.value.title = result.reassembled_title
+        form.value.reassembledTitle = result.reassembled_title
       }
       // §59.135: PUT result 技术字段回填 form.titleComponents（与 GET 同源 §59.103）——
       // Tab1 与预览②同读一份（预览只消费 Tab 数据）；顺带修保存后 Tab1 不刷新
