@@ -87,13 +87,30 @@ func TestArbitrateTime(t *testing.T) {
 
 // 案例③ From：标题 WEBRip vs name WEB-DL → 规格仲裁修正（站方拒收实证
 // WEB-DL≠WEBRip——发布层严格不等）
+// §59.514 附二重定性（用户定案）：标题 WEBRip 语义正确（MI 压制铁证）——
+// name 的 WEB-DL 是发布组错误标注（站方按文件名字面审核不核对压制参数·
+// From 全系列 WEBRip 10/11 站过审）。WEB 族内 name 不覆盖；MI 铁证单方向
+// 纠正（WEB-DL+压制痕迹→WEBRip）；反方向无铁证不干预。
 func TestArbitrateFrom(t *testing.T) {
 	e := &PublishExecutor{}
 	meta := arbTestMeta("From S04 2026 1080p WEBRip DDP5.1 x265 10bit-Yumi@FRDS", "第四季")
 	tp := titleparser.BuildTechProfile(meta.Title, "", "", "", "", "")
 	notes := e.arbitrateNameTokens(meta, &tp, "From.S04.2026.1080p.WEB-DL.DDP5.1.x265.10bit-Yumi@FRDS")
-	if !strings.EqualFold(tp.Specification, "WEB-DL") {
-		t.Errorf("From 规格仲裁后 Spec=%q want WEB-DL（notes=%v）", tp.Specification, notes)
+	if !strings.EqualFold(tp.Specification, "WEBRip") {
+		t.Errorf("From Spec=%q want WEBRip（name 的 WEB-DL 不得覆盖·notes=%v）", tp.Specification, notes)
+	}
+	// MI 铁证单方向：标题误标 WEB-DL + MIEncoded → 纠正 WEBRip
+	tp2 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
+	tp2.MIEncoded = true
+	notes2 := e.arbitrateNameTokens(arbTestMeta("Some Show S01 1080p WEB-DL x264-GRP", ""), &tp2, "Some.Show.S01.1080p.WEB-DL.x264-GRP")
+	if !strings.EqualFold(tp2.Specification, "WEBRip") {
+		t.Errorf("MI 铁证纠正: Spec=%q want WEBRip（notes=%v）", tp2.Specification, notes2)
+	}
+	// 反方向不纠正（MIEncoded=false 无铁证不干预——§59.226 附五单方向性）
+	tp3 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
+	e.arbitrateNameTokens(arbTestMeta("Some Show S01 1080p WEB-DL x264-GRP", ""), &tp3, "Some.Show.S01.1080p.WEB-DL.x264-GRP")
+	if !strings.EqualFold(tp3.Specification, "WEB-DL") {
+		t.Errorf("无铁证不干预: Spec=%q want WEB-DL", tp3.Specification)
 	}
 }
 
