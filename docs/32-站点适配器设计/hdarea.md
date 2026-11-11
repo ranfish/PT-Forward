@@ -555,3 +555,28 @@ func mapHDAreaCategory(standardCat string) int {
   **type=300**（定案2 生效）+纪录片 WEB-DL→**404** B 组直配
   （定案5）+DTS-HD MA（XLL 别名）直配。
 - 遗留：首颗真实发布。
+
+---
+
+## 改版复验记录（2026-11-11·全链实测）
+
+站方改版（视觉层）后全链摸站复验——**数据结构/表单/端点全部原样，零适配需求**：
+
+| 链路 | 实测 | 结果 |
+|------|------|------|
+| 框架 | generator 仍「HDAREA(基于NexusPHP1.5修改)」·非 SPA | ✓ |
+| 列表/搜索 | 生产 adapter SearchTorrents 解析 50 条（标题/大小/做种数全字段）·search/search_area/search_mode 字段名原样 | ✓ |
+| 详情 | Engine 提取：标题（h1#top）/简介/MI/副标题/大小全绿 | ✓ |
+| 优惠 | DetectDiscount FREE 检测 | ✓ |
+| 下载 | download.php?id&passkey → application/x-bittorrent 真种子（tracker.hdarea.club） | ✓ |
+| RSS | torrentrss.php?https=1&passkey → RSS 2.0 XML（torznab+nexusphp ns） | ✓ |
+| 上传表单 | 12 字段名 + type(18)/medium_sel(9)/codec_sel(10)/audiocodec_sel(28)/standard_sel(5)/team_sel(13) 与 §59.405 migration90 配置逐值比对零漂移 | ✓ |
+
+### 禁转标记形态（§59.369 附·实测负结论）
+
+列表页与详情页实测**零**禁转/限时禁转/独家/首发/exclusive/转载标记形态（无标签区块、无筛选器标记、无字段行标记）——**好大无禁转标记体系**（规则靠论坛公告约束·候选制站点文化）。源站使用时 R7 禁转判定对本站恒放行（无形态可采集即无拦发依据）。
+
+### 环境注意（获取侧前置）
+
+- 243 全局代理（10.0.2.5:7897）访问本站被 Cloudflare 403（curl 实证）·直连正常——启用获取/辅种需站点级直连（ProxyURL 置空且不走全局代理）
+- 探针插曲：adapter 直建未注 Engine 时走 legacy 裸正则（reNexusTitle 抓原始 <title> 含站名前缀+HTML 实体）——生产 Factory.Create 恒注 Engine 不触发；legacy 清理弱点零实证记录
