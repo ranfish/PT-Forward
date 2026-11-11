@@ -118,35 +118,49 @@ func TestTokenExtractRemoveSymmetry(t *testing.T) {
 
 // TestMITitleCanonicalAlignment MI 侧与标题侧 canonical 值域对齐（§59.27 P2）。
 // 同一物理编码：MI Format 值与标题写法必须产出相同 Canonical。
+// §59.514 附十一: 断言值从 docs/31 :71356 设计权威表（13 形态）播种——
+// 从实现播种=把 bug 锁进断言（XLL 三层漂移教训·v0.0.604-1445 实证）。
 func TestMITitleCanonicalAlignment(t *testing.T) {
 	cases := []struct {
 		miFormat  string
+		commName  string // MI Commercial name（Atmos/Auro3D 检测通道·真实 MI 形态）
 		titleForm string
 		want      string
+		wantTech  string // 对象信息（非空才断言——:71356 表 Atmos 标记形态）
 	}{
-		{"MLP FBA", "Movie.TrueHD.5.1", "TrueHD"},
-		{"TrueHD", "Movie TrueHD", "TrueHD"},
-		{"DTS XLL", "Movie.DTS-HD.MA.5.1", "DTS-HD MA"},
-		{"DTS LBR", "Movie.DTS-HD.HR", "DTS-HD HR"},
-		{"DTS ES XLL", "Movie.DTS-HD.MA.7.1", "DTS-HD MA"}, // §59.514 附十 A: XLL=无损→HD MA（原断言编码了 bug·对齐 :71356 设计；配对标题写法同步改 HD MA）
-		{"DTS ES", "Movie.DTS-ES", "DTS-ES"},        // 有损 ES canonical 保持（标题层归一见 normalizeAudio）
-		{"DTS-UHD", "Movie.DTS", "DTS"},
-		{"DTS XLL X", "Movie.DTS", "DTS"}, // DTS:X MI 内部名，v1.05 不标注
-		{"E-AC-3", "Movie.DDP5.1", "DDP"},
-		{"AC-3", "Movie.DD.5.1", "DD"},
-		{"FLAC", "Movie.FLAC.1.0", "FLAC"},
-		{"PCM", "Movie.LPCM", "LPCM"},
-		{"MPEG AUDIO", "Movie.MP2", "MP2"},
-		{"AV3A", "Movie.AV3A", "AV3A"},
-		{"USAC", "Movie.xHE-AAC", "xHE-AAC"},
-		{"Opus", "Movie.Opus", "Opus"},
+		// :71356 十三形态全量（1-13 序对齐设计表）
+		{"AC-3", "", "Movie.DD.5.1", "DD", ""},                                          // 1
+		{"E-AC-3", "", "Movie.DDP5.1", "DDP", ""},                                      // 2
+		{"E-AC-3 JOC", "", "Movie.DDP5.1.Atmos", "DDP", "Atmos"},                       // 3 JOC 标记
+		{"DTS XLL", "", "Movie.DTS-HD.MA.5.1", "DTS-HD MA", ""},                        // 4
+		{"DTS ES XLL", "", "Movie.DTS-HD.MA.7.1", "DTS-HD MA", ""},                     // 5 §59.514 附十 A 修正
+		{"DTS XLL X", "", "Movie.DTS", "DTS", ""},                                      // 6 ⚠️ 偏离记录：:71356 说 DTS:X·实现落 DTS·243 全库 0 行零实证·按需生长（DTS:X 内容出现时对齐）
+		{"MLP FBA 16-ch", "Dolby TrueHD with Dolby Atmos", "Movie.TrueHD.7.1.Atmos", "TrueHD", "Atmos"}, // 7 16-ch=Atmos 嵌入形态（真实 MI 配 Commercial name）
+		{"MLP FBA", "", "Movie.TrueHD.5.1", "TrueHD", ""},                              // 8
+		{"FLAC", "", "Movie.FLAC.1.0", "FLAC", ""},                                     // 9
+		{"AAC LC", "", "Movie.AAC.2.0", "AAC", ""},                                     // 10
+		{"AAC LC SBR", "", "Movie.AAC.2.0", "AAC", ""},                                 // 11 SBR 形态
+		{"PCM", "", "Movie.LPCM", "LPCM", ""},                                          // 12
+		{"DTS", "", "Movie.DTS", "DTS", ""},                                            // 13 直映
+		// 表外补充形态（:64626 搜索侧映射·保持）
+		{"TrueHD", "", "Movie TrueHD", "TrueHD", ""},
+		{"DTS LBR", "", "Movie.DTS-HD.HR", "DTS-HD HR", ""},
+		{"DTS ES", "", "Movie.DTS-ES", "DTS-ES", ""}, // 有损 ES canonical 保持（标题层归一见 normalizeAudio）
+		{"DTS-UHD", "", "Movie.DTS", "DTS", ""},
+		{"MPEG AUDIO", "", "Movie.MP2", "MP2", ""},
+		{"AV3A", "", "Movie.AV3A", "AV3A", ""},
+		{"USAC", "", "Movie.xHE-AAC", "xHE-AAC", ""},
+		{"Opus", "", "Movie.Opus", "Opus", ""},
 	}
 	for _, c := range cases {
-		miCodec, _ := audioFromMI(c.miFormat, "")
-		titleCodec := extractAudio(c.titleForm)
+		miCodec, tech := audioFromMI(c.miFormat, c.commName)
 		if miCodec != c.want {
 			t.Errorf("audioFromMI(%q) = %q, want %q", c.miFormat, miCodec, c.want)
 		}
+		if c.wantTech != "" && tech != c.wantTech {
+			t.Errorf("audioFromMI(%q).tech = %q, want %q", c.miFormat, tech, c.wantTech)
+		}
+		titleCodec := extractAudio(c.titleForm)
 		if titleCodec != c.want {
 			t.Errorf("extractAudio(%q) = %q, want %q", c.titleForm, titleCodec, c.want)
 		}
