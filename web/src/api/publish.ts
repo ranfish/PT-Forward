@@ -283,6 +283,17 @@ export const seedConfigApi = {
   batchFetchCancel() {
     return client.post<ApiResponse<{ message: string; stopped: boolean }>>('/publish/seeds/batch-fetch-cancel')
   },
+
+  // §59.514 附八 P2: 重建重组标题（任务化+进度+graceful 停止）
+  recomputeStart() {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/recompute-profiles-task')
+  },
+  recomputeProgress() {
+    return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; finished: boolean; error?: string }>>('/publish/seeds/recompute-progress')
+  },
+  recomputeCancel() {
+    return client.post<ApiResponse<{ message: string }>>('/publish/seeds/recompute-cancel')
+  },
   snapshotUnconfigured(clientId: number, savePath: string) {
     return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: number; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
   },
