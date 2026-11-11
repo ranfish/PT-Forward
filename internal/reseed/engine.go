@@ -3341,7 +3341,7 @@ func isBrandEdition(ed string) bool {
 		return false
 	}
 	lower := strings.ToLower(ed)
-	for _, b := range []string{"criterion", "moc", "wac", "warner archive"} {
+	for _, b := range []string{"criterion", "moc", "wac", "warner archive", "cc"} { // §59.514: CC 归一值（词表三 pattern 统一后品牌反驳适配）
 		if strings.Contains(lower, b) {
 			return true
 		}

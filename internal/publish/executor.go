@@ -348,6 +348,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.254 项1: PTGen 第四源合并（year 校正+main_title 兜底+mismatch 可观测）
 	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
 	e.mergePTGenSource(ctx, &tp, meta)
+	// §59.514 刀2: .torrent 证据仲裁（mergePTGen 后——防 PTGen 单年覆盖
+	// 区间；归一前——季集合构造/裸单集修正先于信号归一终态化）
+	arbNotes := e.arbitrateWithTorrent(ctx, meta, &tp, torrentData)
+	if len(arbNotes) > 0 && e.logger != nil {
+		e.logger.Info("torrent-arbitration", zap.String("info_hash", meta.InfoHash), zap.Strings("notes", arbNotes))
+	}
 	// §59.308 完结季包季集归一（单点方法——主管线与 preAuditTitle 同路径）
 	e.normalizeSeasonPackOf(meta, &tp)
 	// §59.424: 系统级禁发剧集分集（用户定案——所有站点仅允许合集/完结/
@@ -679,6 +685,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			TagsLabels: buildTagsLabels(cfg, applied)}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
+		}
+		// §59.514 刀2: 仲裁记录透出（DryRun 人工核对通道——标题与实际
+		// 文件一致性的修正明细）
+		if len(arbNotes) > 0 {
+			res.Message = strings.TrimSpace(res.Message + "\n.torrent 仲裁: " + strings.Join(arbNotes, "；"))
 		}
 		return res
 	}
@@ -2025,7 +2036,10 @@ func (e *PublishExecutor) normalizeSeasonPackOf(meta *model.TorrentMetadata, tp 
 	if meta == nil || tp == nil {
 		return
 	}
-	tagsComplete := strings.Contains(meta.Tags, "\"complete\"")
+	// §59.514 通道 C: 副标「全N集/N集全」并入 tagsComplete 同权（信号集
+	// 不对称消除——副标词形此前只在 §59.424 门放行不进归一，Book 型
+	// episode_split 误标场景 E01 形态漏网）
+	tagsComplete := strings.Contains(meta.Tags, "\"complete\"") || subtitleCompleteSignal(meta.Subtitle)
 	ptgenEps := 0
 	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
 		if v, perr := strconv.Atoi(strings.TrimSpace(src.Episodes)); perr == nil {
@@ -2053,8 +2067,10 @@ var mainTitleCompleteRe = regexp.MustCompile(`(\b(?i:COMPLETE)\b|完结|全集|�
 // 第N-M季——无 E 后缀）。归一通道（§59.308）命中的完整季已是纯季号。
 var seasonPackFormRe = regexp.MustCompile(`^S\d{1,2}(-S?\d{1,2})?$`)
 
-// singleEpisodeRe §59.424: 单集形态（S01E02——无区间后缀）。
-var singleEpisodeRe = regexp.MustCompile(`^(S\d{1,2})E(\d{1,4})$`)
+// singleEpisodeRe §59.424: 单集形态（S01E02——无区间后缀）。§59.514
+// 刀1: 裸 Exx 兼容（(?:S\d{1,2})? 可选——Quacks E01 案形态；无信号裸
+// 单集=真分集该拦·此前裸形态提取失明走「无 S/E 信号」豁免漏拦）。
+var singleEpisodeRe = regexp.MustCompile(`^(?:S\d{1,2})?E(\d{1,4})$`)
 
 // haidanCrossSeasonRe §59.472: 跨季形态（S01-S02 / S01-02 尾季无 S 短形态·
 // 单位数 S1-2）——海胆 collages 合集勾选判定。
@@ -2103,7 +2119,7 @@ func episodeReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProf
 		return false, ""
 	}
 	// 全集一集：单集 E01 ∧ PTGen episodes=1（整部剧就一集——完整全集）
-	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil && m[2] == "01" {
+	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil && m[1] == "01" {
 		if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
 			if v, perr := strconv.Atoi(strings.TrimSpace(src.Episodes)); perr == nil && v == 1 {
 				return false, ""
@@ -3475,8 +3491,10 @@ func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormCon
 		return t
 	}
 	if m := singleEpisodeRe.FindStringSubmatch(se); m != nil {
-		// S04E01 单集形态（§59.424 全集豁免放行——整部一集）——剥前导零
-		season, episode = trimLead0(strings.TrimPrefix(m[1], "S")), trimLead0(m[2])
+		// S04E01 单集形态（§59.424 全集豁免放行——整部一集）——剥前导零。
+		// §59.514: 裸 Exx 兼容（(?:S\d{1,2})? 可选——S 前缀从 se 尾剥）
+		sPart := strings.TrimSuffix(se, "E"+m[1])
+		season, episode = trimLead0(strings.TrimPrefix(sPart, "S")), trimLead0(m[1])
 	} else if haidanCrossSeasonRe.MatchString(se) {
 		// S01-S02 / S01-02 跨季——多季=站方合集（§59.471 回归审核修正：
 		// 首版手写 Contains 条件 S1-2 单位数漏判 + S01E02-03 集区间误判——

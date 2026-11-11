@@ -15,6 +15,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/classify"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -141,9 +142,9 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID u
 	siteName, torrentID, method := r.tryDBMatch(ctx, orphan)
 
 	// 分类孤儿类型，按 Form 选择搜索策略
-	var classification *util.DirClassification
+	var classification *classify.DirClassification
 	if siteName == "" && orphan.IsDir {
-		classification, _ = util.ClassifyFromDir(orphan.Path, orphan.Name)
+		classification, _ = classify.ClassifyFromDir(orphan.Path, orphan.Name)
 		if classification != nil {
 			r.logger.Info("orphan classified",
 				zap.String("orphan", orphan.Name),
@@ -249,7 +250,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID u
 
 // expandSameSite 在主恢复命中的站点上，搜索并恢复其他视频文件（同站扩展）。
 // classification.VideoFiles[0] 已被主恢复恢复，从 [1] 开始。
-func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classification *util.DirClassification, siteName string, targetClientUID uint) int {
+func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classification *classify.DirClassification, siteName string, targetClientUID uint) int {
 	if len(classification.VideoFiles) <= 1 {
 		return 0
 	}

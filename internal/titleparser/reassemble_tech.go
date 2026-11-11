@@ -21,22 +21,40 @@ import (
 // 通道 A（tags 含 complete——副标题"全N集"/源站 tag 提取，完结声明权威在标签域）
 // 或通道 B（ptgenEpisodes>0 且区间 E01 起、末集=总集数——PTGen 数据加强）命中时，
 // E01 起始的集区间归一为纯季号。真分集包（非 E01 起）不动。
+// §59.514 刀1: 裸区间兼容（(S\d+)? 可选——Quacks E01-E06 形态站方改坏；
+// 归一输出 S01 是 v1.05 规定写法非编造——信号已确认单季合集身份）。
+// 单集形态（无区间）不进归一：BBC 单剧 E01∧eps=1 是合法完整形态
+// （§59.424 定案不禁亦不归一）；裸单集 E01 错标修正归防线②仲裁层
+// （文件树证据构造 S01——归一无文件证据不敢越权）。
 func NormalizeSeasonPack(se string, tagsComplete bool, ptgenEpisodes int) string {
 	if se == "" {
 		return se
 	}
-	// 匹配 SxxEyy(-SxxEyy | -Eyy) 形态且起始 E01
-	m := reSeasonRangeStartE01.FindStringSubmatch(se)
-	if m == nil {
-		return se
+	// 匹配 SxxEyy(-SxxEyy | -Eyy) 形态且起始 E01（§59.514: 裸 Eyy 同构）
+	if m := reSeasonRangeStartE01.FindStringSubmatch(se); m != nil {
+		if !tagsComplete && !(ptgenEpisodes > 0 && sameAtoi(m[2], ptgenEpisodes)) {
+			return se
+		}
+		if m[1] != "" {
+			return m[1] // 纯季号 S01（标题自带季号）
+		}
+		return "S01" // §59.514: 裸 E01 起区间（无 S 前缀）→ v1.05 单季合集写法
 	}
-	if !tagsComplete && !(ptgenEpisodes > 0 && sameAtoi(m[2], ptgenEpisodes)) {
-		return se
+	// §59.514: 裸单集 E01 归一（Quacks 型错标——合集被标首集号）：完结
+	// 信号在场 ∧ 非 BBC 单剧（PTGen eps=1 是全集一集的合法形态·§59.424
+	// 定案不禁亦不归一）→ S01。无信号裸单集=真分集不归一（§59.424 拦）。
+	if m := reSeasonSingleE01.FindStringSubmatch(se); m != nil {
+		if tagsComplete && ptgenEpisodes != 1 {
+			return "S01"
+		}
 	}
-	return m[1] // 纯季号 S01
+	return se
 }
 
-var reSeasonRangeStartE01 = regexp.MustCompile(`^(S\d+)E01(?:-S?\d*E?(\d+))$`)
+// reSeasonSingleE01 裸单集 E01 形态（无区间后缀·§59.514 归一通道）。
+var reSeasonSingleE01 = regexp.MustCompile(`^(?:S\d+)?E01$`)
+
+var reSeasonRangeStartE01 = regexp.MustCompile(`^(S\d+)?E01-S?\d*E?(\d+)$`)
 
 func sameAtoi(s string, n int) bool {
 	v, err := strconv.Atoi(s)

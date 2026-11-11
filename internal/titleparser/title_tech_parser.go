@@ -138,8 +138,8 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bLimited[-_.\s]*Edition\b`), "Limited Edition"},
 	{regexp.MustCompile(`(?i)\bSpecial[-_.\s]*Edition\b`), "Special Edition"},
 	{regexp.MustCompile(`(?i)\bCollector'?s?[-_.\s]*Edition\b`), "Collector's Edition"},
-	{regexp.MustCompile(`(?i)\bCriterion[-_.\s]*Collection\b`), "Criterion Collection"},
-	{regexp.MustCompile(`(?i)\bCriterion\b`), "Criterion"},
+	{regexp.MustCompile(`(?i)\bCriterion[-_.\s]*Collection\b`), "CC"},
+	{regexp.MustCompile(`(?i)\bCriterion\b`), "CC"},
 	// §59.76: v1.05 W.9 碟片发行商品牌（原盘类内容分发方）——CC 已由 Criterion 覆盖
 	{regexp.MustCompile(`(?i)\bMoC\b`), "MoC"},
 	// §59.219: BFI（British Film Institute 碟标——霸王别姬案：曾误入
@@ -169,7 +169,9 @@ var editionPatterns = []editionPattern{
 	// MiniBD（优先级 9）
 	{regexp.MustCompile(`(?i)\bMiniBD\b`), "MiniBD"},
 	// CC = Criterion Collection 缩写，PT 标题中出现在年份后片源前（如 1972.CC.BluRay）
-	{regexp.MustCompile(`(?i)(?:^|[.\s\-_])CC(?:[.\s\-_]|$)`), "Criterion Collection"},
+	// §59.514: 三 pattern 归一值统一 "CC"（原全称/单词双值——§59.207 品牌反驳链
+	// 同品牌不同串假杀隐患；243 实态 CC 63 vs 全称 59 混用·写作列 Criterion 0 使用）
+	{regexp.MustCompile(`(?i)(?:^|[.\s\-_])CC(?:[.\s\-_]|$)`), "CC"},
 }
 
 // extractEditionInfo 从标题提取版本信息。

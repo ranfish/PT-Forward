@@ -1,4 +1,8 @@
-package util
+// Package classify §59.514 刀1: 孤儿目录分类器独立包（原 util.ClassifyTorrent
+// 迁移）——S/E 形态判定改消费 titleparser.ParseSEForm 单点内核（两套平行
+// 体系归一）；依赖方向 classify→titleparser/util 单向（titleparser 已依赖
+// util 的组名提取，util 不能反向依赖 titleparser——故本包独立）。
+package classify
 
 import (
 	"os"
@@ -7,7 +11,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 )
+
+// videoExtensions 视频后缀（util 同款副本——util.content_type 未导出；
+// 归一时保留副本而非导出 util 变量，避免 util 公共面扩张）。
+var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}
 
 // TorrentType 表示种子的分类结果。
 type TorrentType struct {
@@ -52,7 +63,7 @@ var (
 func ClassifyTorrent(title string, fileTree map[string]int64) TorrentType {
 	// 1. 音乐检测（文件树优先）
 	if len(fileTree) > 0 {
-		if DetectContentType(fileTree) == "music" {
+		if util.DetectContentType(fileTree) == "music" {
 			return TorrentType{Category: "music", Source: "file_tree"}
 		}
 	}
@@ -74,76 +85,18 @@ func classifyFromTitle(title string, result *TorrentType) {
 	if title == "" {
 		return
 	}
-
-	// 中文标记（最显式，优先检查）
-	if reChineseAll.MatchString(title) || reChineseAllEnd.MatchString(title) {
-		result.Category = "tv_series"
-		result.Form = "season_pack"
+	// §59.514 刀1: S/E 形态判定迁移 titleparser.ParseSEForm 单点
+	// （原 reSxxExx/reEPRange/reChineseAll/reChineseRange/reChineseSingle
+	// 五正则退役——裸 Exx 盲区与发布链同步根治；v1.05 语义：S01=单季
+	// 合集声明，原"S01 无 COMPLETE=unknown"保守判定退役，文件树修正层
+	// refineFormFromFileTree 兜底半季场景）
+	sef := titleparser.ParseSEForm(title)
+	if sef.Form == titleparser.FormUnknown {
+		result.Category = "movie" // 无 S/E 信号 → 电影（动漫电影等天然无信号）
 		return
 	}
-	if m := reChineseRange.FindStringSubmatch(title); m != nil {
-		result.Category = "tv_series"
-		start, _ := strconv.Atoi(m[1])
-		if start == 1 {
-			result.Form = "season_pack"
-		} else {
-			result.Form = "partial_pack"
-		}
-		return
-	}
-	if reChineseSingle.MatchString(title) {
-		result.Category = "tv_series"
-		result.Form = "single_episode"
-		return
-	}
-
-	// 英文模式
-	upper := strings.ToUpper(title)
-	hasComplete := strings.Contains(upper, "COMPLETE")
-
-	// §59.187 ②: EP 范围签名（"S01.EP01-E06" 分段形态——reSxxExx 仅捕获 S01，
-	// 无 COMPLETE 词 → 误判 unknown → 文件级搜索单集尺寸误杀季包种子。
-	// 范围起始集=1 → season_pack，否则 partial_pack；Obi-Wan tid=67993 案实证）
-	epRange := reEPRange.FindStringSubmatch(title)
-
-	match := reSxxExx.FindStringSubmatch(title)
-	if match != nil {
-		result.Category = "tv_series"
-		if match[2] != "" {
-			// 有集号
-			if match[3] != "" {
-				// 区间 S01E01-E12
-				startEp, _ := strconv.Atoi(match[2])
-				if startEp == 1 {
-					result.Form = "season_pack"
-				} else {
-					result.Form = "partial_pack"
-				}
-			} else {
-				// 单集 S01E03
-				result.Form = "single_episode"
-			}
-		} else {
-			// 仅季号 S01
-			if hasComplete {
-				result.Form = "season_pack"
-			} else if epRange != nil {
-				// §59.187 ②: EP 范围替代 COMPLETE 词判定季完整性
-				startEp, _ := strconv.Atoi(epRange[1])
-				if startEp == 1 {
-					result.Form = "season_pack"
-				} else {
-					result.Form = "partial_pack"
-				}
-			} else {
-				result.Form = "unknown"
-			}
-		}
-		return
-	}
-
-	// 无季集模式 → 电影
-	result.Category = "movie"
+	result.Category = "tv_series"
+	result.Form = sef.Form
 }
 
 func refineFormFromFileTree(fileTree map[string]int64, result *TorrentType) {
