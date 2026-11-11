@@ -445,6 +445,11 @@ func normalizeAudio(codec string) string {
 		return "DDP"
 	case strings.Contains(upper, "AC-3") || strings.Contains(upper, "AC3"):
 		return "DD"
+	// §59.514 附十 A: 有损 DTS-ES 标题写法归一 DTS——v1.05 音频表无
+	// DTS-ES 行（ES=Extended Surround 有损矩阵变体·家族归属 DTS）；
+	// canonical 身份层不动（匹配/比较仍区分·docs/31 :64626 映射表）
+	case strings.Contains(upper, "DTS-ES") || strings.Contains(upper, "DTS ES"):
+		return "DTS"
 	default:
 		return codec
 	}

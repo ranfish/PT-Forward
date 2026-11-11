@@ -50,3 +50,37 @@ func TestPreAuditTitleReadsColumn(t *testing.T) {
 	}
 }
 
+
+// §59.514 附十 B: MI 证据层恒跑锚——torrentData 空（recompute 降级路径
+// ExportTorrent 失败）时 WEB-DL∧MIEncoded 仍须纠正 WEBRip（原被
+// arbitrateWithTorrent :46 门整体拦——243 全库筛查 35 行漏纠实证）。
+func TestFinalizeTitleMIEvidenceWithoutTorrent(t *testing.T) {
+	e := &PublishExecutor{}
+	meta := &model.TorrentMetadata{
+		Title:    "Movie 2025 1080p WEB-DL x264 AAC-UBWEB",
+		Category: "category.movie",
+	}
+	tp := titleparser.BuildTechProfile(meta.Title, "General\nVideo\nFormat : AVC\nWriting library : x264\nHeight : 1 080 pixels\nAudio #1\nFormat : AAC LC\nChannel(s) : 2 channels\n", "", "", "", "")
+	if !tp.MIEncoded {
+		t.Fatalf("前置失败：MIEncoded 应为 true（Writing library x264）")
+	}
+	if tp.Specification != "WEB-DL" {
+		t.Fatalf("前置失败：Specification=%q want WEB-DL", tp.Specification)
+	}
+	title, notes := e.FinalizeTitle(context.Background(), meta, &tp, nil) // torrentData=nil——降级路径
+	if tp.Specification != "WEBRip" {
+		t.Errorf("降级路径漏纠：Specification=%q want WEBRip（MI 证据层应恒跑）", tp.Specification)
+	}
+	found := false
+	for _, n := range notes {
+		if strings.Contains(n, "规格仲裁(MI铁证)") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("notes 缺 MI 铁证仲裁记录: %v", notes)
+	}
+	if !strings.Contains(title, "WEBRip") {
+		t.Errorf("标题未含 WEBRip: %q", title)
+	}
+}

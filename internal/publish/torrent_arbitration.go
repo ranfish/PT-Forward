@@ -69,6 +69,27 @@ func (e *PublishExecutor) arbitrateWithTorrent(ctx context.Context, meta *model.
 	return notes
 }
 
+// arbitrateMIEvidence §59.514 附十 B：MI 证据层仲裁——不依赖 torrentData，
+// 恒跑（原在 arbitrateNameTokens 内被 torrentData 门整体拦——recompute
+// 降级路径 ExportTorrent 失败时 WEB-DL∧MIEncoded 漏纠 35 行实证）。
+func (e *PublishExecutor) arbitrateMIEvidence(tp *titleparser.TechProfile) []string {
+	if tp == nil {
+		return nil
+	}
+	var notes []string
+	// §59.514 附二修正（用户定案）：WEB 族内细分（WEB-DL vs WEBRip）
+	// name 不参与——From 案实证发布组命名不可信（name/文件名标 WEB-DL
+	// 实为压制·MI Writing library 铁证；站方按文件名字面审核不核对压制
+	// 参数·From 全系列 WEBRip 形态 10/11 站过审）。权威=MI 压制铁证
+	// 单方向纠正（§59.226 附五单方向性——铁证只能证【是压制】，
+	// MIEncoded=false 不反向纠正）。
+	if strings.EqualFold(tp.Specification, "WEB-DL") && tp.MIEncoded {
+		tp.Specification = "WEBRip"
+		notes = append(notes, "规格仲裁(MI铁证): WEB-DL → WEBRip（压制痕迹 Writing library 在场）")
+	}
+	return notes
+}
+
 // arbitrateNameTokens name 的 S/E/年/来源/品牌 token 与标题 tp 仲裁。
 // name 是 .torrent name（发布组命名——下载器做种目录名的数学权威版）。
 func (e *PublishExecutor) arbitrateNameTokens(meta *model.TorrentMetadata, tp *titleparser.TechProfile, name string) []string {
@@ -101,16 +122,6 @@ func (e *PublishExecutor) arbitrateNameTokens(meta *model.TorrentMetadata, tp *t
 		}
 	}
 
-	// §59.514 附二修正（用户定案）：WEB 族内细分（WEB-DL vs WEBRip）
-	// name 不参与——From 案实证发布组命名不可信（name/文件名标 WEB-DL
-	// 实为压制·MI Writing library 铁证；站方按文件名字面审核不核对压制
-	// 参数·From 全系列 WEBRip 形态 10/11 站过审）。权威=MI 压制铁证
-	// 单方向纠正（§59.226 附五单方向性——铁证只能证【是压制】，
-	// MIEncoded=false 不反向纠正）。
-	if strings.EqualFold(tp.Specification, "WEB-DL") && tp.MIEncoded {
-		tp.Specification = "WEBRip"
-		notes = append(notes, "规格仲裁(MI铁证): WEB-DL → WEBRip（压制痕迹 Writing library 在场）")
-	}
 	// 跨族媒介 Spec 冲突——name 证据（WEB 族内冲突已上行排除；
 	// Mauvais sang 型媒介级错标由 ST 分支承载）
 	if np.Specification != "" && tp.Specification != "" &&

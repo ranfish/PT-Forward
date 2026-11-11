@@ -128,7 +128,8 @@ func TestMITitleCanonicalAlignment(t *testing.T) {
 		{"TrueHD", "Movie TrueHD", "TrueHD"},
 		{"DTS XLL", "Movie.DTS-HD.MA.5.1", "DTS-HD MA"},
 		{"DTS LBR", "Movie.DTS-HD.HR", "DTS-HD HR"},
-		{"DTS ES XLL", "Movie.DTS-ES", "DTS-ES"},
+		{"DTS ES XLL", "Movie.DTS-HD.MA.7.1", "DTS-HD MA"}, // §59.514 附十 A: XLL=无损→HD MA（原断言编码了 bug·对齐 :71356 设计；配对标题写法同步改 HD MA）
+		{"DTS ES", "Movie.DTS-ES", "DTS-ES"},        // 有损 ES canonical 保持（标题层归一见 normalizeAudio）
 		{"DTS-UHD", "Movie.DTS", "DTS"},
 		{"DTS XLL X", "Movie.DTS", "DTS"}, // DTS:X MI 内部名，v1.05 不标注
 		{"E-AC-3", "Movie.DDP5.1", "DDP"},

@@ -26,7 +26,10 @@ func (e *PublishExecutor) FinalizeTitle(ctx context.Context, meta *model.Torrent
 		return "", nil
 	}
 	e.mergePTGenSource(ctx, tp, meta)
-	notes := e.arbitrateWithTorrent(ctx, meta, tp, torrentData)
+	// §59.514 附十 B: MI 证据层恒跑（无 torrentData 也执行——recompute
+	// 降级路径漏纠实证）+ torrent 证据层（name 权威/文件树——证据在场才跑）
+	notes := e.arbitrateMIEvidence(tp)
+	notes = append(notes, e.arbitrateWithTorrent(ctx, meta, tp, torrentData)...)
 	e.normalizeSeasonPackOf(meta, tp)
 	rt := titleparser.ReassembleFromTechProfile(*tp, titleparser.V105TitleFormat())
 	return strings.TrimSpace(rt), notes
