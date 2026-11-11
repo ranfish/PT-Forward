@@ -431,8 +431,11 @@ func propagateClusterTitleDB(db *gorm.DB, logger *zap.Logger, ctx context.Contex
 	if len(siblingHashes) == 0 {
 		return
 	}
+	// P1 修（回归审核）：OR 语义对齐 MI 版先例——cluster 行无条件覆盖
+	// （重获场景副本行旧列非空也必须刷新：重获=素材变·陈旧列会被发布
+	// 消费）；rss_detail 独立获取行不动（尊重显式数据）。
 	res := db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash IN ? AND reassembled_title = '' AND fetch_source = 'cluster'", siblingHashes).
+		Where("info_hash IN ? AND (reassembled_title = '' OR fetch_source = 'cluster')", siblingHashes).
 		Updates(map[string]interface{}{
 			"reassembled_title": title,
 			"reassembled_notes": notes,
