@@ -36,6 +36,18 @@
       </div>
     </div>
 
+    <div v-if="batchRunning" class="step-result">
+      <!-- §59.513 附: 一种多站并行批进度态+停止等待（AbortController——
+           已发出的请求不可撤回·后台照常完成落库·结果见发布日志） -->
+      <PublishProgressPanel
+        :progress="{ done: 0, total: selectedSites.length, currentTitle: `并行发布 ${selectedSites.length} 站·等待结果` }"
+        :results="[]"
+        row-mode="site"
+        :stop-requested="false"
+        @stop="stopBatchWait"
+      />
+    </div>
+
     <div v-if="batchResults" class="step-result">
       <PublishProgressPanel :results="batchResults" row-mode="site" @done="emit('update:open', false)" />
     </div>
@@ -188,20 +200,35 @@ async function runDryRun() {
   }
 }
 
+// §59.513 附: 一种多站停止等待——abort 只砍前端等待·后端 Background
+// ctx 照常跑完全部站并落库（已发出的请求不可撤回·发布日志可查结果）
+const batchRunning = ref(false)
+let batchAbort: AbortController | null = null
+function stopBatchWait() {
+  batchAbort?.abort()
+}
 async function runBatch() {
   loading.value = true
+  batchRunning.value = true
+  batchAbort = new AbortController()
   try {
     const res = await client.post('/publish/seeds/execute-batch', {
       info_hash: props.infoHash,
       target_sites: selectedSites.value,
       tag_overrides: tagOverrides.value,
-    })
+    }, { signal: batchAbort.signal })
     batchResults.value = res.data?.data?.results ?? []
     emit('done')
   } catch (e) {
-    message.error(String(e))
+    if (batchAbort?.signal.aborted) {
+      message.warning('已停止等待——已发出的发布会继续完成，结果见发布日志')
+    } else {
+      message.error(String(e))
+    }
   } finally {
     loading.value = false
+    batchRunning.value = false
+    batchAbort = null
   }
 }
 
