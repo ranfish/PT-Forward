@@ -256,27 +256,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		// §59.159 回归审核：补推成功回写原记录（同 tid 最新行 Status/Seeded——
 		// 否则按钮反复可点[幂等无害但状态不收敛]、发布日志页 seeded 恒 0）
 		if res.Status == "pushed" || res.Status == "pushed_existing" {
-			// §59.166 实战修复（探针实证两段错位）：
-			// ①原 Scan(&lastID) 标量 GORM 不支持恒 0 → 回写永不执行
-			// ②改 Pluck 后取"最新行"——同 tid 多行（漏种 uploaded 行 + 二轮复发
-			//   pushed 行）时永远命中新行，漏种行留痕不收敛
-			// 终案：按条件批量收敛**所有 status=uploaded 的同 tid 行**（幂等——
-			// 已 pushed 行不动），回写条数入日志。
-			now := time.Now()
-			res2 := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
-				Where("torrent_id = ? AND target_site = ? AND status = ?",
-					in.TorrentID, in.TargetSite, "uploaded").
-				Updates(map[string]interface{}{
-					"status":     "pushed",
-					"seeded":     true,
-					"seeded_at":  now,
-					"seed_error": "",
-				})
-			if res2.Error != nil {
-				e.logger.Warn("repush 回写失败", zap.Error(res2.Error))
-			} else if res2.RowsAffected > 0 {
-				e.logger.Info("repush 回写收敛", zap.String("tid", in.TorrentID), zap.Int64("rows", res2.RowsAffected))
-			}
+			e.repushConverge(ctx, in, time.Now())
 		}
 		return res
 	}
@@ -3587,4 +3567,38 @@ func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormCon
 // publish 包内私有——executor 局部变量 adapter 遮蔽 adapter 包名）。
 type hdareaPreChecker interface {
 	CheckBeforeUpload(ctx context.Context, config *model.SiteConfig, torrentData []byte) (*adapter.PreCheckResult, error)
+}
+
+// repushConverge 补推成功后的原记录收敛（§59.159 设计意图·提方法可测）：
+// uploaded 行 → status=pushed+seeded（上传未推种→已推种）；
+// duplicate 行 → 仅置 seeded（v0.0.1455 Caddo Lake/Dead Man 双案：§59.509
+// duplicate 成可补推主力后回写漏跟·status 保持「站上已有」事实不变·
+// canRepush 判据 tid 在手且本地未做种——seeded 置位即按钮收敛）。
+func (e *PublishExecutor) repushConverge(ctx context.Context, in ExecuteInput, now time.Time) {
+	res2 := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("torrent_id = ? AND target_site = ? AND status = ?",
+			in.TorrentID, in.TargetSite, "uploaded").
+		Updates(map[string]interface{}{
+			"status":     "pushed",
+			"seeded":     true,
+			"seeded_at":  now,
+			"seed_error": "",
+		})
+	if res2.Error != nil {
+		e.logger.Warn("repush 回写失败", zap.Error(res2.Error))
+	} else if res2.RowsAffected > 0 {
+		e.logger.Info("repush 回写收敛", zap.String("tid", in.TorrentID), zap.Int64("rows", res2.RowsAffected))
+	}
+	res3 := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("torrent_id = ? AND target_site = ? AND status = ? AND seeded = ?",
+			in.TorrentID, in.TargetSite, "duplicate", false).
+		Updates(map[string]interface{}{
+			"seeded":    true,
+			"seeded_at": now,
+		})
+	if res3.Error != nil {
+		e.logger.Warn("repush duplicate 回写失败", zap.Error(res3.Error))
+	} else if res3.RowsAffected > 0 {
+		e.logger.Info("repush duplicate 收敛", zap.String("tid", in.TorrentID), zap.Int64("rows", res3.RowsAffected))
+	}
 }
