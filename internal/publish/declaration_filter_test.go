@@ -37,3 +37,43 @@ func TestDeclarationFilter_SiteDisclaimers(t *testing.T) {
 		t.Errorf("应剥除恰好 2 块，实际 %d", len(got.RemovedDecls))
 	}
 }
+
+// v0.0.1456: 音乐站试听/免责声明族+壹吧两段+禁转PTTime 防重复——真实形态锚
+func TestDeclarationFilter_MusicAndPTBA(t *testing.T) {
+	text := "[quote][color=Red]本站(1PTBA)提供的所有资源均是在网上搜集且由用户上传，任何涉及商业盈利目的均不得使用[/quote]\n" +
+		"[quote]您的保种是(1PTBA)站长久发展的重要保证！只要资源在硬盘上不删，请自觉做到开机即做种！[/quote]\n" +
+		"[quote]请于试听后24小时内删除，如果喜欢请自觉购买正版光碟！[/quote]\n" +
+		"[quote]本原抓作品仅用于试听，严禁用于任何商业用途！[/quote]\n" +
+		"[quote]该下载内容仅做宽带测试使用，请在下载后24小时内删除。[/quote]\n" +
+		"[quote]本资源均通过网络收集，仅用于试听，严禁用于任何商业用途！[/quote]\n" +
+		"[quote]文件来源与网络，试听后请购买支持正版资源。[/quote]\n" +
+		"[quote][b]互珍互重，禁转PTT[/b][/quote]\n" +  // 我方声明——必须保留
+		"◎片名 测试影片\n正文内容保留"
+
+	f := NewDeclarationFilter(nil, nil)
+	got := f.Filter(text, defaultDeclarationPatterns)
+
+	for _, kw := range []string{"1PTBA", "试听", "宽带测试", "保种是"} {
+		if strings.Contains(got.CleanedText, kw) {
+			t.Errorf("声明块未剥净（残留 %q）", kw)
+		}
+	}
+	if !strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
+		t.Error("我方禁转PTT声明被误剥（新词 禁转PTTime 不得误伤前缀 PTT）")
+	}
+	if !strings.Contains(got.CleanedText, "正文内容保留") || !strings.Contains(got.CleanedText, "测试影片") {
+		t.Error("正文误伤")
+	}
+}
+
+// 禁转PTTime 单独锚：站方「禁转PTTime」剥·我方「禁转PTT」保
+func TestDeclarationFilter_PTTimeVsPTT(t *testing.T) {
+	text := "[quote]禁转PTTime 严禁转载[/quote][quote]互珍互重，禁转PTT[/quote]"
+	got := NewDeclarationFilter(nil, nil).Filter(text, defaultDeclarationPatterns)
+	if strings.Contains(got.CleanedText, "PTTime") {
+		t.Error("站方禁转PTTime 未剥除")
+	}
+	if !strings.Contains(got.CleanedText, "禁转PTT") {
+		t.Error("我方禁转PTT 误剥")
+	}
+}
