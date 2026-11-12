@@ -141,6 +141,23 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 			event.Metadata["rss_discount_level"] = string(model.DiscountNone)
 		}
 
+		// §59.515 刀3 D1: 好大增强 RSS 扩展节点消费——
+		// ① nexusphp:promotion_until → FreeEndAt（唯一改变行为的新信息：
+		//   免费截止时间·刷流规则可设「免费剩余>N 才下」防过期误下）
+		// ② torznab:attr downloadvolumefactor=0 → IsFree 兜底
+		//   （标题 [免费] 前缀已有·attr 通道为第二证据源）
+		// 局部名匹配——其他 NP 站无此元素→零值·零影响。
+		if pt := strings.TrimSpace(item.PromotionUntil); pt != "" {
+			if t, err := time.ParseInLocation("2006-01-02 15:04:05", pt, time.Local); err == nil {
+				event.FreeEndAt = &t
+			}
+		}
+		for _, attr := range item.TorznabAttrs {
+			if attr.Name == "downloadvolumefactor" && attr.Value == "0" {
+				event.IsFree = true
+			}
+		}
+
 		if event.TorrentID == "" && event.DownloadURL == "" {
 			continue
 		}
@@ -178,6 +195,17 @@ type RSSItem struct {
 
 	CustomHash string `xml:"hash"`
 	CustomSize string `xml:"size"`
+
+	// §59.515 刀3 D1: 好大增强 RSS 扩展节点（Go encoding/xml
+	// 按局部名匹配——其他 NP 站无此元素→零值·全站解析器零影响）
+	PromotionUntil string        `xml:"promotion_until"`
+	TorznabAttrs   []TorznabAttr `xml:"attr"`
+}
+
+// TorznabAttr 好大 RSS 的 torznab:attr 键值对（name/value 属性）。
+type TorznabAttr struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
 }
 
 type RSSEnclosure struct {
