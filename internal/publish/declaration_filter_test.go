@@ -1,8 +1,13 @@
 package publish
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/setting"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 
@@ -76,4 +81,60 @@ func TestDeclarationFilter_PTTimeVsPTT(t *testing.T) {
 	if !strings.Contains(got.CleanedText, "禁转PTT") {
 		t.Error("我方禁转PTT 误剥")
 	}
+}
+
+// v0.0.1457 锚：随版发布+不可删除+不影响自加——合并语义四态
+func TestDeclarationFilter_MergeSemantics(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := db.AutoMigrate(&setting.Setting{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	f := NewDeclarationFilter(setting.NewRepository(db), nil)
+	ctx := context.Background()
+
+	// ① 保存含内置词的提交 → 只存自定义（内置剔除）
+	if err := f.SetPatterns(ctx, []string{defaultDeclarationPatterns[0], "我的自定义词", "我的自定义词", " "}); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	custom := f.GetCustomPatterns(ctx)
+	if len(custom) != 1 || custom[0] != "我的自定义词" {
+		t.Errorf("custom=%v·内置词应剔除+去重+空串滤", custom)
+	}
+
+	// ② GetPatterns = 内置 ∪ 自定义（合并·随版）
+	got := f.GetPatterns(ctx)
+	has := func(list []string, s string) bool { for _, x := range list { if x == s { return true } } ; return false }
+	if !has(got, defaultDeclarationPatterns[0]) || !has(got, "我的自定义词") {
+		t.Errorf("合并集缺项: builtin=%v custom-in=%v", has(got, defaultDeclarationPatterns[0]), has(got, "我的自定义词"))
+	}
+
+	// ③ 意外删除防御：DB 直接清空 custom → 内置仍全在
+	if err := f.SetPatterns(ctx, nil); err != nil {
+		t.Fatalf("set nil: %v", err)
+	}
+	if len(f.GetPatterns(ctx)) != len(defaultDeclarationPatterns) {
+		t.Error("内置集不完整（应恒等于默认全集）")
+	}
+
+	// ④ 旧 DB 全量快照兼容：DB 存「builtin∪旧词」形态 → 合并集包含之（行为不回退）
+	legacy := append([]string{}, defaultDeclarationPatterns...)
+	legacy = append(legacy, "旧版遗留词")
+	if err := setting.NewRepository(db).Set(ctx, "declaration_filter_patterns",
+		`[`+strings.Join(quote(legacy), `,`)+`]`); err != nil {
+		t.Fatalf("seed legacy: %v", err)
+	}
+	if !has(f.GetPatterns(ctx), "旧版遗留词") || !has(f.GetPatterns(ctx), defaultDeclarationPatterns[0]) {
+		t.Error("旧快照兼容断裂")
+	}
+}
+
+func quote(ss []string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = `"` + s + `"`
+	}
+	return out
 }

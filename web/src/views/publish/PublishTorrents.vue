@@ -155,8 +155,8 @@
         message="过滤规则用于自动从简介中移除 ARDTU/CSAUTO 等工具声明"
         style="margin-bottom: 16px"
       />
-      <div v-if="declFilterIsDefault" style="margin-bottom: 12px">
-        <a-tag color="orange">当前使用默认规则</a-tag>
+      <div style="margin-bottom: 12px">
+        <a-tag color="blue">系统内置 {{ declBuiltinCount }} 条·随版本自动更新·不可删除</a-tag>
       </div>
       <a-list
         :data-source="declFilterPatterns"
@@ -574,7 +574,7 @@ async function deleteMapping(id: number) {
 // --- 声明过滤规则管理 ---
 const declFilterOpen = ref(false)
 const declFilterPatterns = ref<string[]>([])
-const declFilterIsDefault = ref(false)
+const declBuiltinCount = ref(0)
 const declFilterSaving = ref(false)
 const newDeclPattern = ref('')
 
@@ -582,8 +582,8 @@ async function openDeclFilters() {
   try {
     const resp = await publishTorrentsApi.getDeclarationFilters()
     const data = resp.data?.data
-    declFilterPatterns.value = data?.patterns || []
-    declFilterIsDefault.value = data?.is_default ?? true
+    declFilterPatterns.value = data?.custom || []
+    declBuiltinCount.value = (data?.builtin || []).length
   } catch { /* ignore */ }
   newDeclPattern.value = ''
   declFilterOpen.value = true

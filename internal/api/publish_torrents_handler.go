@@ -1338,16 +1338,13 @@ func (h *PublishTorrentsHandler) handleListGroupedSiteNames(w http.ResponseWrite
 
 func (h *PublishTorrentsHandler) handleGetDeclarationFilters(w http.ResponseWriter, r *http.Request) {
 	if h.declFilter == nil {
-		Success(w, map[string]interface{}{"patterns": []string{}, "is_default": true})
+		Success(w, map[string]interface{}{"builtin": []string{}, "custom": []string{}})
 		return
 	}
-	patterns := h.declFilter.GetPatterns(r.Context())
-	// 检查是否是默认值（DB 中没有存储）
-	val, err := h.declFilter.GetRawPatterns(r.Context())
-	isDefault := err != nil || val == ""
+	// §59.516 v0.0.1457：返回 builtin/custom 两组——前端内置锁定+自定义可管理
 	Success(w, map[string]interface{}{
-		"patterns":   patterns,
-		"is_default": isDefault,
+		"builtin": publish.BuiltinPatterns(),
+		"custom":  h.declFilter.GetCustomPatterns(r.Context()),
 	})
 }
 
@@ -1367,9 +1364,11 @@ func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWrit
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("保存失败: %v", err))
 		return
 	}
+	// 回显实际存储的自定义集（内置词剔除后）
 	Success(w, map[string]interface{}{
-		"patterns": req.Patterns,
-		"message":  "已保存",
+		"custom":  h.declFilter.GetCustomPatterns(r.Context()),
+		"builtin": publish.BuiltinPatterns(),
+		"message": "已保存（系统内置词不受影响）",
 	})
 }
 

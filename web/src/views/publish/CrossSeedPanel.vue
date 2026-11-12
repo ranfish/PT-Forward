@@ -608,7 +608,8 @@ const filteredDeclarations = computed(() => {
 async function loadDeclPatterns() {
   try {
     const resp = await publishTorrentsApi.getDeclarationFilters()
-    declPatterns.value = resp.data?.data?.patterns || []
+    const d = resp.data?.data
+    declPatterns.value = [...(d?.builtin || []), ...(d?.custom || [])]
   } catch { /* silent */ }
 }
 
