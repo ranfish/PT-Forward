@@ -86,10 +86,19 @@
   <torznab:attr name="infohash" value="8f4e..."/>
   <torznab:attr name="downloadvolumefactor" value="0"/>
   <torznab:attr name="uploadvolumefactor" value="1"/>
-  <nexusphp:sp_state>free</nexusphp:sp_state>
-  <nexusphp:promotion_until>2026-11-12 18:00:00</nexusphp:promotion_until>
+  <torznab:attr name="freeuntil" value="2026-11-13 12:58:02"/>
+  <nexusphp:sp_state>2</nexusphp:sp_state>
+  <nexusphp:sp_label>免费</nexusphp:sp_label>
+  <nexusphp:free_until>2026-11-13 12:58:02</nexusphp:free_until>
 </item>
 ```
+
+> **实态勘误（2026-11-12 实拉 spstate=9 五条实证）**：生产 feed 无
+> `promotion_until`（上方为官方文档样例形态）——真实免费截止节点=
+> `free_until`（nexusphp 元素）+ `freeuntil`（torznab:attr）双通道；
+> 实态 attr 九个（多 peers/grabs/freeuntil）+ nexusphp 全家
+> （sp_state/sp_label/双 factor/free_until/seeders/leechers/snatched）。
+> 解析层已三通道兼容（v0.0.1452）。
 
 ## 6. 协议三：RESTful JSON API v1 端点全表（按 scope）
 
@@ -239,6 +248,7 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 - 禁转修正：API `forbid_transfer` → Flags["禁转"]（web 负结论被探针⑨反转）
 - **刀3 定案（2026-11-12 用户三轮确认）**：D1 RSS 命名空间解析=最小方案（只加 nexusphp:promotion_until 一个 XML 字段+torznab:attr downloadvolumefactor 兜底免费判定——唯一改变行为的新信息=免费截止时间·其他数据已有渠道·改动小=全站 RSS 解析器零风险）；D2 hashes 接入=adapter 方法+PreChecker 同款类型断言模式（能力属于站点工具箱·引擎消费·第二站零改动先例）；D3 hashes 消费时机=独立信息源（与 IYUU 并行·不 fallback——省 IYUU 配额/站方 API 更准更全/毫秒级/不被 IYUU 卡脖子）。
 - **刀3 实施终局（2026-11-12·v0.0.1451）**：①RSSItem 加 `promotion_until` string+`attr` []TorznabAttr（Go encoding/xml 局部名匹配——其他 NP 站无此元素→零值·102 站解析器零影响）；ParseItems 消费→FreeEndAt（time.ParseInLocation 本地时区）+IsFree（downloadvolumefactor=0 兜底·标题 [免费] 前缀外第二证据源）②HashMatcher 接口+HDAreaAdapter.BatchMatchHashes（POST /api/v1/torrents/hashes·≤200/批自动切分·envelope data.items[] 映射·read scope）。**引擎深度接线按需生长**（实施中发现）：辅种引擎 14k+ 行（RunTask→runSeedFeatureScan/runLegacyScan→matchAtSite·缓存五件套 fpCache/negCache/phCache/cfCache/l2s）——深度接线需理解全套扫描模式·零使用场景下预实施=过度工程；能力已建好（接口+实现+类型断言消费模式锚定）·首次真实辅种任务时按 RunTask IYUU 预载同构位接入（:1411 iyuuResults 之后·独立信息源与 IYUU 并行）。锚 17 枚（RSS 2+hashes 3+刀1 八+刀2 四）·50 包+vet+sqlcheck=0·29 部署 v0.0.1451 数据级验证 ✓。
+- **刀3 OTA 复验抓出文档形态失真·v0.0.1452 根修（2026-11-12·243 复验驱动）**：243 OTA v0.0.1451 复验时实拉 spstate=9 真实 feed（5 条免费种）——**nexusphp:promotion_until 零命中**（官方文档样例形态·生产不存在）；真实免费截止节点=`<nexusphp:free_until>`（元素）+`<torznab:attr name="freeuntil">`（attr 双通道·值相同）；torznab:attr 实态 9 个（size/seeders/leechers/peers/grabs/downloadvolumefactor/uploadvolumefactor/infohash/freeuntil）+nexusphp: sp_state/sp_label/downloadvolumefactor/uploadvolumefactor/free_until/seeders/leechers/snatched 全家。首版只解析 promotion_until→FreeEndAt 生产恒空（D1 核心价值落空·IsFree attr 通道幸存）。修=三通道消费：free_until（实态主通道）>promotion_until（文档形态兜底保留）>attr freeuntil（第二通道）；夹具重写为实拉消毒形态（§59.1339 同族第二例：验证样例必须真实数据源——首版夹具抄官方文档样例未实拉）+真实 feed 离线终验 5/5（临时锚跑完即删·apikey 不入库）。§5 章节样例同步修正为实态形态。
 - **刀2 回归审查定案（2026-11-12 用户确认）**：E1 banned_duplicate→failed 终态+「站方禁发此资源」（不是 duplicate·站方明确拒绝这类内容·不推种不走辅种）；E2 ②路 pieces-hash 对好大恒 miss（SupportsSearchByPiecesHash=false）·executor 跳过标注；E3 check 网络失败→warning 放行（409 兜底第二道防线·网络问题不阻止发布·日志必记）；E4 DryRun 集成 check 结果透出（发布前核对闭环核心价值）；E5 check 必须 file 通道（multipart·才有 normalized_infohash）；B1 409 existing_id 弹性解析（顶层+data 双查·生产首颗自然验证）；B2 existing_torrent 无 sp_state 记录为增强项不阻塞。
 - **D3 source_sel/processing_sel 不配置定案（2026-11-12 用户）**：全站实测 350+ 条（按 medium/cat 分类扫描·WEB-DL/Encode/REMUX/UHD-4K/全站首页）source_id 与 processing_id 恒 0——**站方数据无人填写**。用户解读 B（API 网关 2026.11.11 新出·存量未回填·新种可能逐步启用）。定案=不配置不发送（行为对齐全站现状·站方服务端默认值兜底）。**观察项**：新种出现非 0 值或发布被拒「source/processing 未选择」→ 启用站特化注入补配（mapping 方案已预研：ST 物理媒介族→source 值·WEB 族不填·IsEncode→processing 值）。
 - 凭证 UX 定案（2026-11-12 用户）：apikey+hdarea 下凭证区只显 API Key（Cookie/Passkey 条件隐藏=设计行为·DB 存量保留）——**不加解释文案**：用户无需知晓 Cookie/Passkey/API 关系，按表单要求填写即可；回退阀=framework+auth_type 两字段一对改回（UI 自动恢复显示）
