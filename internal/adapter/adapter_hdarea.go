@@ -733,6 +733,13 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		IDSource:   "api_response", // JSON 信封直读（302 权威同级的 API 通道）
 		TargetSite: config.SiteName,
 	}
+	// 刀4 复验修（2026-11-12 Balls 案）：生产响应无 detail_url 字段
+	// （upload 响应形态文档未记·铁律禁真发从未实测·臆写字段生产恒空
+	// ——§59.1452 同族第三例）。本地兜底拼 details.php（站方 RSS link
+	// 字段实证形态·PushOnly 分支 :244 先例）——tid 在手即链接必有。
+	if pubResp.DetailURL == "" && tid != "" {
+		pubResp.DetailURL = a.base(config) + "/details.php?id=" + tid
+	}
 	// 刀4 D2: base64 解码（失败降级空——pusher 走原路径·天然兜底）
 	if data.TorrentBase64 != "" {
 		if raw, dErr := base64.StdEncoding.DecodeString(data.TorrentBase64); dErr == nil && len(raw) > 0 {
