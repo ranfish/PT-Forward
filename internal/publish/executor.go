@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/ptgen"
 
@@ -691,6 +692,27 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			FormLabels: buildFormLabels(cfg, form),
 			TagAssets: parseTagsAssets(meta.Tags),
 			TagsLabels: buildTagsLabels(cfg, applied)}
+		// §59.515 刀2 E4：check 预查重结果透出（发布前核对闭环核心价值——
+		// read scope 零副作用·网络失败降级为提示不阻断）
+		if e.pipe.siteProvider != nil {
+			if dryAdapter, daErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite); daErr == nil {
+				if dryConfig, dcErr := e.pipe.siteProvider.GetSiteConfig(ctx, in.TargetSite); dcErr == nil {
+					if checker, ok := dryAdapter.(hdareaPreChecker); ok {
+						if pc, pcErr := checker.CheckBeforeUpload(ctx, dryConfig, torrentData); pcErr == nil && pc != nil {
+							if !pc.CanUpload {
+								if pc.IsBanned {
+									res.Message = "⚠ 站方禁发此资源: " + pc.Reason
+								} else {
+									res.Message = "⚠ 站方已有同内容种 tid=" + pc.ExistingID + "（" + pc.ExistingName + "）可辅种"
+								}
+							} else if len(pc.ReplaceableDead) > 0 {
+								res.Message = "将顶替断种 [" + strings.Join(pc.ReplaceableDead, ",") + "]（站方自动删旧上架）"
+							}
+						}
+					}
+				}
+			}
+		}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
 		}
@@ -836,6 +858,36 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 		e.recordResult(ctx, in, meta, rv, "duplicate", msg, tidShown, detailURLOf(siteConfig, tidShown), piecesHash)
 		return fail("duplicate", msg)
+	}
+	// ③ 站方 check 预查重（§59.515 刀2 D1——好大 API 独有·file 通道清洗重算
+	// normalized_infohash 比我们本地指纹更准：源站私有字段清洗后 hash 不同·
+	// 本地指纹对不上。read scope 零副作用·网络失败 warning 放行 409 兜底（E3））
+	// 注：局部变量 adapter（SiteAdapter 接口）遮蔽包名——用 pkg 引用类型
+	if checker, ok := adapter.(hdareaPreChecker); ok {
+		pc, pcErr := checker.CheckBeforeUpload(ctx, siteConfig, torrentData)
+		if pcErr != nil {
+			// E3：check 网络失败 → warning 放行（409 是第二道防线）
+			e.logger.Warn("check 预查重失败（放行·409 兜底）", zap.String("site", in.TargetSite), zap.Error(pcErr))
+		} else if pc != nil && !pc.CanUpload {
+			if pc.IsBanned {
+				// E1：banned_duplicate → failed 终态（站方禁发资源·不是重复是禁止）
+				msg := "站方禁发此资源: " + pc.Reason
+				e.recordResult(ctx, in, meta, rv, "failed", msg, "", "", piecesHash)
+				return fail("failed", msg)
+			}
+			// active_duplicate → duplicate 终态（与①②同语义）
+			msg := "站方 check 拦截: " + pc.Reason
+			if pc.ExistingName != "" {
+				msg += "（" + pc.ExistingName + "）"
+			}
+			e.recordResult(ctx, in, meta, rv, "duplicate", msg, pc.ExistingID, detailURLOf(siteConfig, pc.ExistingID), piecesHash)
+			return fail("duplicate", msg)
+		} else if pc != nil && len(pc.ReplaceableDead) > 0 {
+			// D2：断种顶替——站方将自动删旧上架·日志透出顶替意图
+			e.logger.Info("check 顶替断种（站方将自动删旧上架）",
+				zap.String("site", in.TargetSite),
+				zap.Strings("dead_tids", pc.ReplaceableDead))
+		}
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
@@ -3526,4 +3578,10 @@ func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormCon
 			form[cf] = "1"
 		}
 	}
+}
+
+// hdareaPreChecker 刀2：站方预查重能力接口（好大 API 独有·
+// publish 包内私有——executor 局部变量 adapter 遮蔽 adapter 包名）。
+type hdareaPreChecker interface {
+	CheckBeforeUpload(ctx context.Context, config *model.SiteConfig, torrentData []byte) (*adapter.PreCheckResult, error)
 }
