@@ -575,7 +575,9 @@ func mapHDAreaCategory(standardCat string) int {
 
 ### 禁转标记形态（§59.369 附·实测负结论）
 
-列表页与详情页实测**零**禁转/限时禁转/独家/首发/exclusive/转载标记形态（无标签区块、无筛选器标记、无字段行标记）——**好大无禁转标记体系**（规则靠论坛公告约束·候选制站点文化）。源站使用时 R7 禁转判定对本站恒放行（无形态可采集即无拦发依据）。
+列表页与详情页实测**零**禁转/限时禁转/独家/首发/exclusive/转载标记形态（无标签区块、无筛选器标记、无字段行标记）——web 面无禁转标记形态。
+
+**⚠️ 2026-11-12 API 探针反转修正**：API 网关响应（search/detail item）携带 `forbid_transfer` 布尔字段（上传方 allow_transfer=no 声明的种子侧投影）——**好大有禁转体系，只是 web 面不展示**。HDAreaAdapter 已映射 Flags["禁转"]→compliance R7 消费（详见 hdarea-api.md §11.5 探针⑨）。
 
 ### 环境注意（获取侧前置）
 

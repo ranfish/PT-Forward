@@ -446,7 +446,7 @@ const frameworkColors: Record<string, string> = {
 
 const frameworkLabels: Record<string, string> = {
   nexusphp: 'NexusPHP', unit3d: 'UNIT3D', gazelle: 'Gazelle',
-  mteam: 'M-Team', cola: 'Cola (ReelCore)', rousi: 'Rousi', tnode: 'TNode', luminance: 'Luminance', generic: 'Generic',
+  mteam: 'M-Team', cola: 'Cola (ReelCore)', hdarea: 'HDArea API', rousi: 'Rousi', tnode: 'TNode', luminance: 'Luminance', generic: 'Generic',
 }
 
 const siteFrozen = ref(false)

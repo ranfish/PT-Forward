@@ -4743,8 +4743,8 @@
       "domain": "hdarea.club",
       "name": "好大",
       "base_url": "https://hdarea.club",
-      "framework": "nexusphp",
-      "auth_type": "",
+      "framework": "hdarea",
+      "auth_type": "apikey",
       "download_mode": "",
       "is_source": true,
       "is_target": false,
@@ -5114,7 +5114,8 @@
       "tracker_domains": [
         "tracker.hdarea.club"
       ],
-      "is_reseed_target": true
+      "is_reseed_target": true,
+      "api_key_label": "API Key（控制面板→安全设定→API Key 存取令牌管理）"
     },
     {
       "domain": "hdhome.org",
