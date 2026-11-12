@@ -189,20 +189,65 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 
 **豆瓣合规**：不对外提供独立豆瓣/IMDb 抓取 API（防跨站盗刷）；检索时带出库内已关联评分海报；发种时自动提取关联。
 
-## 10. 与我们系统的映射（2026-11-12 讨论结论）
+## 10. 架构边界与刀序定案（2026-11-12 用户三轮讨论+回归检查定稿）
 
-- 复用面：ColaAdapter 三列分层结构模板 / MTeamAdapter.uploadViaAPI（multipart+FormFields 槽位）/ PublishResponse 四终态 / apikey 配置面（§59.333 needsApiKey 两路）/ factory 注册 / pusher.Push 自走下载 / GlobalLimiter fetch_rps。
-- 修正预期：mtorrentCore=mtorrent 私有协议形态（POST JSON body）；好大=路由别名兼容+GET 形态——协议层结构参考≠代码复用，需自有轻量 API 客户端层。
-- 新研六项：①Adapter 本体 ②check 预查重接入 dedup（断种顶替=发布新语义）③hashes 批量辅种通道 ④RSS promotion_until 解析 ⑤site/metadata 值集自愈 ⑥framework 迁移（nexusphp→hdarea）。
-- 刀序建议（待逐刀讨论定案）：刀1 获取链地基 → 刀2 发布链 API → 刀3 RSS+辅种批量 → 刀4 值集自愈+base64 直推。
+**架构边界（共享机制·不共享方言）**：
+- 三层现实：L1 行业标准（Torznab/RSS attrs·冻结真契约→可共享组件）/ L2 M-Team 方言家族（营销级兼容非契约）/ L3 站点特有（per-site）。
+- HDAreaAdapter 独立（framework=hdarea）·自有轻量 client·**不 import mtorrentCore**。
+- 共享仅发生在机制层：`internal/adapter/apihelper.go`（X-API-Key 注入单点+短效凭证下载流程参数化+可选 429 退避）——字段映射/字典/端点常量全留各方言层。包内私有（消费者仅 adapter 包内·三次法则后再升 util）。
+- mtorrentCore 的 mt↔cola 快照耦合维持 §59.460 既定策略（分叉时演进·馒头改协议时 cola fork 薄 client）；好大从第一天不进共享体。
+- 回退阀：API-only+sites.framework 字段应急回退（updateSiteRequest.Framework 指针可编辑·已验证）——代码零双路。mt 的 viaWeb 五分支=历史沉积准死代码（API-only 政策后不可达）·不复制·清理另行挂账。
 
-## 11. 待实测确认清单（刀1 活体探针·read/download scope 零写操作）
+**刀序定案（回归检查修正版）**：
+
+| 刀 | 范围 | 验证 |
+|----|------|------|
+| 刀1（含刀0 前置） | ①传输诊断（29 Go 直连超时·TLSPretend 应急）②活体探针 11 项→真实夹具 ③HDAreaAdapter **14 方法接口全集**（五获取+基础 API 上传+RSS apikey+SL×2 空实现+DetectHR false+InfoHash/VerifyExists 薄实现+SupportsPiecesHash=false）④apihelper.go 机制层 ⑤framework 注册+存量迁移（sites.framework/form_config.framework np→hdarea 跟随 mteam 惯例/auth_type=apikey/fetch_rps=0.8）⑥双 JSON seed 同步（§59.512）⑦RSS 策略表注册 | 29 端到端获取一颗+DryRun 发布一颗粒子+夹具锚 |
+| 刀2 | 发布深化：check 预查重接入 dedup 链（清洗重算+30min 保护期）/断种顶替=四终态新语义（设计讨论）/409 existing_id↔四终态/成功判定 code===0+IDSource="api_response"/source_sel(6 值)+processing_sel(Raw/Encode) 补配 | DryRun 借壳 PT0 素材+生产首颗挂用户 |
+| 刀3 | RSS 增强（promotion_until→FreeEndAt）/hashes 200 批辅种（QueryIYUULive 同构注入先例） | RSS 一轮+辅种单簇 |
+| 刀4 | site/metadata 值集自愈（formdiff 体系新源）/return_torrent_base64 直推/web 链退役决策 | 值集漂移演练 |
+
+**明确不接**：Torznab 协议（索引器工具向·我们搜索语义全在 REST）/user 互动域（白名单外）/字幕上传与 edit（刀2 后按需）/三协议全接（按链路各取其一）。
+
+**记录不阻塞**：发布等级前置（刀2 首颗验证）/auto_ptgen 不传（自带 PTGen）/令牌=PT-Forward 子令牌（UI 填入·密钥不落码）。
+
+## 11.5 刀1 活体探针终局（2026-11-12·11/11 全通·夹具已入库）
+
+| # | 项 | 结果 |
+|---|----|------|
+| 1 | /api/v1/status | ✓ 身份/权限/三协议入口（gentoken 独立信封 {ok,dl_token,expires_in}） |
+| 2 | 搜索 | ✓ `search=` 参数命中（keyword= 不生效）；统一信封 {success,code,data}；item 含分类 ID 全家桶/sp_state 促销/info_hash/imdb+豆瓣+poster |
+| 3 | 详情 | ✓ 同 search 字段+save_as/descr_bbcode/descr_html/nfo/files/other_copies(30) |
+| 4 | genDlToken | ✓ 1800s+download_url 直链→GET 真种子 84KB（d8:announce） |
+| 5 | hashes | ✓ {count,items}（假 hash 零命中） |
+| 6 | site/metadata | ✓ 10 域字典 |
+| 7 | torznab caps | ✓ 2690B XML |
+| 8 | apikey RSS | ✓ guid=**infohash 真身**（零侧载）·enclosure=apikey 直链·title 带 [免费] 前缀 |
+| 9 | allow_transfer | **✓ 反转发现**：search/detail item 均有 `forbid_transfer` 字段——好大 API 有禁转体系（web 面无标记=隐藏字段·hdarea.md 负结论已修正）；adapter 映射 Flags["禁转"]→R7 消费 |
+| 10 | pieces-hash | 无该参数记载·初版 SupportsSearchByPiecesHash=false |
+| 11 | DetectDiscount | search/detail 响应 sp_state 族+promotion_until+双 factor 直读 |
+
+传输诊断：站点栈对 API 路径 0.8s 通（前日超时为间歇性）；裸 Go 栈 TLS 被 CF 掐（站点栈 smart dialer 必要）。
+
+## 12. 刀1 交付（2026-11-12·v0.0.1446）
+
+- `internal/adapter/apihelper.go`：机制层（setXAPIKey+shortTokenDownload 流程骨架·403 过期重签一次）
+- `internal/adapter/adapter_hdarea.go`：HDAreaAdapter 14 方法接口全集（五获取+基础表单驱动 API 上传+ParseRSS 委托 Generic stub+SL×2 空+DetectHR false+InfoHash/VerifyExists 薄+PiecesHash false）
+- Factory `case "hdarea"`；migration159（framework/auth_type=apikey/fetch_rps=0.8/form_config.framework→hdarea）；双 JSON seed 同步；前端 frameworkLabels+HDArea API
+- RSS=零 adapter 工作（引擎标准 NP 解析·guid 真身·ParseRSS 走 Generic stub——mteam 同款）
+- 锚六枚（真实消毒夹具 testdata/hdarea/）：Search/Detail（MI 提取+forbid_transfer）/Discount/Stats/ThinStubs/InfoHash
+- 禁转修正：API `forbid_transfer` → Flags["禁转"]（web 负结论被探针⑨反转）
+
+## 11. 待实测确认清单（刀1 活体探针·11 项·read/download scope 零写操作）
 
 1. `/api/v1/status` 响应形态（鉴权探活基线）
 2. `/api/v1/torrents` 搜索响应 JSON（分页字段/条目字段名/排序参数实测）
-3. `/api/v1/torrents/{id}` 详情响应（descr BBCode 结构/NFO/文件列表/其它版本字段）
+3. `/api/v1/torrents/{id}` 详情响应（descr BBCode 结构/NFO/文件列表/其它版本字段/**allow_transfer 在场性**——R7 消费判定）
 4. `genDlToken` 请求响应形态（与 mtorrentCore 同名端点对照差异）
 5. `/api/v1/torrents/hashes` 响应结构（辅种匹配字段）
 6. `/api/v1/site/metadata` 响应（值集字典形态）
 7. `torznab.php?t=caps` XML（分类映射）
 8. apikey RSS 实测（现有 NP RSS 解析器对 torznab:attr/promotion_until 扩展节点的容忍度）
+9. detail 响应 allow_transfer 字段在场性（他人禁转声明·在场则 R7 消费）
+10. pieces-hash 搜索能力（SupportsSearchByPiecesHash 定值依据）
+11. DetectDiscount 数据源（无独立端点——search/detail 响应哪个字段带促销）

@@ -75,6 +75,11 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		// 共享 mtorrentCore 协议层（M-Team 兼容面契约）；可乐特化（Web 面
 		// 详情/promotion/myPeerStatus 简名/搜索单轮）全部在 ColaAdapter。
 		return NewColaAdapter(doer, f.logger)
+	case "hdarea":
+		// 好大统一 API 网关 adapter（2026-11-12 刀1·hdarea-api.md）：
+		// 独立方言层（不 import mtorrentCore）+ apihelper 机制层。
+		// API-only 零 web 双路——回退阀=sites.framework 字段应急回 nexusphp。
+		return NewHDAreaAdapter(doer, f.logger)
 	case "unit3d":
 		a := NewUnit3DAdapter(doer, f.logger)
 		if f.engine != nil {
