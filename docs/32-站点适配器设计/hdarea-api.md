@@ -237,6 +237,7 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 - RSS=零 adapter 工作（引擎标准 NP 解析·guid 真身·ParseRSS 走 Generic stub——mteam 同款）
 - 锚六枚（真实消毒夹具 testdata/hdarea/）：Search/Detail（MI 提取+forbid_transfer）/Discount/Stats/ThinStubs/InfoHash
 - 禁转修正：API `forbid_transfer` → Flags["禁转"]（web 负结论被探针⑨反转）
+- **刀2 回归审查定案（2026-11-12 用户确认）**：E1 banned_duplicate→failed 终态+「站方禁发此资源」（不是 duplicate·站方明确拒绝这类内容·不推种不走辅种）；E2 ②路 pieces-hash 对好大恒 miss（SupportsSearchByPiecesHash=false）·executor 跳过标注；E3 check 网络失败→warning 放行（409 兜底第二道防线·网络问题不阻止发布·日志必记）；E4 DryRun 集成 check 结果透出（发布前核对闭环核心价值）；E5 check 必须 file 通道（multipart·才有 normalized_infohash）；B1 409 existing_id 弹性解析（顶层+data 双查·生产首颗自然验证）；B2 existing_torrent 无 sp_state 记录为增强项不阻塞。
 - **D3 source_sel/processing_sel 不配置定案（2026-11-12 用户）**：全站实测 350+ 条（按 medium/cat 分类扫描·WEB-DL/Encode/REMUX/UHD-4K/全站首页）source_id 与 processing_id 恒 0——**站方数据无人填写**。用户解读 B（API 网关 2026.11.11 新出·存量未回填·新种可能逐步启用）。定案=不配置不发送（行为对齐全站现状·站方服务端默认值兜底）。**观察项**：新种出现非 0 值或发布被拒「source/processing 未选择」→ 启用站特化注入补配（mapping 方案已预研：ST 物理媒介族→source 值·WEB 族不填·IsEncode→processing 值）。
 - 凭证 UX 定案（2026-11-12 用户）：apikey+hdarea 下凭证区只显 API Key（Cookie/Passkey 条件隐藏=设计行为·DB 存量保留）——**不加解释文案**：用户无需知晓 Cookie/Passkey/API 关系，按表单要求填写即可；回退阀=framework+auth_type 两字段一对改回（UI 自动恢复显示）
 
