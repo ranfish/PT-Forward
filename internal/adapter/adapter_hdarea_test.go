@@ -21,6 +21,8 @@ func (s *hdareaShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	u := req.URL.String()
 	var file string
 	switch {
+	case strings.Contains(u, "download.php"):
+		file = "testdata/hdarea/dl.bin"
 	case strings.Contains(u, "genDlToken"):
 		file = "testdata/hdarea/gentoken.json"
 	case strings.Contains(u, "user/profile"):
@@ -173,5 +175,17 @@ func TestHDAreaInfoHash(t *testing.T) {
 	}
 	if h != "302426f332ccf0e456dda74186b8786b467e2f4f" {
 		t.Errorf("InfoHash=%q", h)
+	}
+}
+
+// TestHDAreaDownload 短效凭证下载（双层信封解析+直链 GET）。
+func TestHDAreaDownload(t *testing.T) {
+	a, _ := newHDAreaTestAdapter()
+	data, err := a.DownloadTorrent(context.Background(), hdareaTestConfig(), "460261")
+	if err != nil {
+		t.Fatalf("DownloadTorrent: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "d8:announce") {
+		t.Errorf("响应非 bencode: %q", truncate(string(data), 30))
 	}
 }
