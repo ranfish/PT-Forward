@@ -450,6 +450,101 @@ func isHTTP404(err error) bool {
 // ── 发布（刀1 基础版：表单驱动直写——API 域名与 NP 表单同名·
 //     migration90 值集直接复用；深度语义 check/顶替/409 留刀2）──
 
+// PreChecker 刀2：站方预查重能力接口（好大 API 独有·类型断言消费）。
+type PreChecker interface {
+	CheckBeforeUpload(ctx context.Context, config *model.SiteConfig, torrentData []byte) (*PreCheckResult, error)
+}
+
+// PreCheckResult 刀2：站方 check 预查重结果（好大 API 独有能力·
+// 类型断言消费——不在 14 方法接口内）。
+type PreCheckResult struct {
+	CanUpload       bool     // 站方判定可上传
+	Status          string   // exists_active / clean / banned_duplicate 等
+	Reason          string   // 站方文案（透出给用户/日志）
+	ExistingID      string   // 已存在种 tid（can_upload=false 时）
+	ExistingName    string   // 已存在种标题
+	ReplaceableDead []string // 可顶替断种 tid 列表（can_upload=true 时）
+	NormalizedHash  string   // 站方清洗重算 info_hash（file 通道）
+	IsBanned        bool     // banned_duplicate 判定
+}
+
+// CheckBeforeUpload 刀2：站方预查重（POST /api/v1/torrents/check·
+// read scope 零副作用·file 通道 multipart——才有 normalized_infohash）。
+// 调用方：executor dedup 第三路 + DryRun。
+func (a *HDAreaAdapter) CheckBeforeUpload(ctx context.Context, config *model.SiteConfig, torrentData []byte) (*PreCheckResult, error) {
+	if len(torrentData) == 0 {
+		return nil, &model.AppError{Code: 40001, Message: "种子数据为空"}
+	}
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	fw, err := writer.CreateFormFile("file", "check.torrent")
+	if err != nil {
+		return nil, uploadError("创建 check 表单字段失败", err)
+	}
+	if _, err := fw.Write(torrentData); err != nil {
+		return nil, networkError("写入种子数据失败", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, uploadError("关闭 multipart 失败", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		a.base(config)+"/api/v1/torrents/check", &buf)
+	if err != nil {
+		return nil, networkError("构造 check 请求失败", err)
+	}
+	setXAPIKey(req, config.APIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, networkError("check 请求失败: "+err.Error(), err)
+	}
+	defer func() { drainBody(resp) }()
+	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmt.Sprintf("check HTTP %d: %s", resp.StatusCode, truncate(string(rb), 200)), nil)
+	}
+	var env hdareaEnvelope
+	if err := json.Unmarshal(rb, &env); err != nil {
+		return nil, parseError("check 响应解析失败: "+err.Error(), err)
+	}
+	if env.Code != 0 {
+		return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("check code=%d: %s", env.Code, env.Message)}
+	}
+	var data struct {
+		CanUpload       bool   `json:"can_upload"`
+		Status          string `json:"status"`
+		Reason          string `json:"reason"`
+		NormalizedHash  string `json:"normalized_infohash"`
+		ExistingTorrent *struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"existing_torrent"`
+		ReplaceableDead []struct {
+			ID int `json:"id"`
+		} `json:"replaceable_dead_torrents"`
+	}
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		return nil, parseError("check data 解析失败: "+err.Error(), err)
+	}
+	result := &PreCheckResult{
+		CanUpload:       data.CanUpload,
+		Status:          data.Status,
+		Reason:          data.Reason,
+		NormalizedHash:  data.NormalizedHash,
+		IsBanned:        strings.Contains(data.Status, "banned") || strings.Contains(data.Reason, "banned"),
+	}
+	if data.ExistingTorrent != nil {
+		result.ExistingID = strconv.Itoa(data.ExistingTorrent.ID)
+		result.ExistingName = data.ExistingTorrent.Name
+	}
+	for _, d := range data.ReplaceableDead {
+		result.ReplaceableDead = append(result.ReplaceableDead, strconv.Itoa(d.ID))
+	}
+	return result, nil
+}
+
 func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
@@ -512,19 +607,25 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	defer func() { drainBody(resp) }()
 	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if resp.StatusCode == http.StatusConflict {
-		// 409 重复发种：existing_id 消费细化留刀2——先按 existing 终态
-		var e struct {
-			Data struct {
-				ExistingID any `json:"existing_id"`
-			} `json:"data"`
-		}
-		_ = json.Unmarshal(rb, &e)
+		// 409 重复发种：existing_id 弹性解析（刀2 B1——顶层+data 双查·
+		// 站方文档只说「响应体中」·生产首颗自然验证具体位置）
+		var raw map[string]interface{}
+		_ = json.Unmarshal(rb, &raw)
 		exID := ""
-		switch v := e.Data.ExistingID.(type) {
-		case float64:
-			exID = strconv.FormatInt(int64(v), 10)
-		case string:
-			exID = v
+		// 先查 data.existing_id
+		if data, ok := raw["data"].(map[string]interface{}); ok {
+			if v, ok := data["existing_id"]; ok {
+				exID = fmt.Sprintf("%v", v)
+			}
+		}
+		// 再查顶层 existing_id
+		if exID == "" || exID == "<nil>" {
+			if v, ok := raw["existing_id"]; ok {
+				exID = fmt.Sprintf("%v", v)
+			}
+		}
+		if exID == "<nil>" {
+			exID = ""
 		}
 		return &model.PublishResponse{
 			IsExisting: true,
