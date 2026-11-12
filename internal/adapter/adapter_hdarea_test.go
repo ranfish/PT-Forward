@@ -229,4 +229,9 @@ func TestHDAreaUploadReturnTorrent(t *testing.T) {
 	if string(resp.TorrentData[:11]) != "d8:announce" {
 		t.Errorf("TorrentData 前 11 字节=%q want d8:announce（站方重写终版）", string(resp.TorrentData[:11]))
 	}
+	// 刀4 复验修（Balls 案）：生产响应无 detail_url → 本地兜底拼
+	// details.php（站方 RSS link 实证形态）
+	if resp.DetailURL != "https://hdarea.club/details.php?id=460596" {
+		t.Errorf("DetailURL=%q want 本地拼 https://hdarea.club/details.php?id=460596", resp.DetailURL)
+	}
 }
