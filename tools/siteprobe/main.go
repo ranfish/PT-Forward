@@ -20,6 +20,7 @@
 package main
 
 import (
+	"encoding/json"
 	"context"
 	"flag"
 	"fmt"
@@ -46,6 +47,7 @@ var (
 	cred      = flag.String("cred", "", "解密凭证输出：cookie | passkey | apikey")
 	fetch     = flag.String("fetch", "", "逗号分隔页面路径列表（相对站根）")
 	verify    = flag.Bool("verify", false, "离线验证模式（货架 HTML→生产 adapter）")
+	metadata  = flag.Bool("metadata", false, "值集对账模式（好大 API·站方 site/metadata ↔ DB form_config）")
 	framework = flag.String("framework", "nexusphp", "adapter 框架（verify 用）")
 	kw        = flag.String("kw", "PROBE", "搜索关键词（verify·对应 search.html）")
 	tid       = flag.String("tid", "", "详情页种子 ID（verify·对应 detail.html）")
@@ -78,6 +80,8 @@ func main() {
 		}
 	case *fetch != "":
 		doFetch(s, base)
+	case *metadata:
+		doMetadata(s, base)
 	case *verify:
 		doVerify(base)
 	default:
@@ -239,4 +243,107 @@ func (s *shelf) RoundTrip(req *http.Request) (*http.Response, error) {
 		Body:       io.NopCloser(strings.NewReader(string(body))),
 		Request:    req,
 	}, nil
+}
+
+// ── 刀4 D1：值集对账模式（好大 API·§59.515）──
+// 站方实时字典 GET /api/v1/site/metadata ↔ DB publish_form_config 六域对比。
+// 退出码：0=干净 1=有差异（危险项=我方 ID 站方已删→发布会失败；
+// 信息项=站方新增未映射/名称漂移）。只读零修改。
+
+// metaDomain 站方 metadata 域 → 我方 value_mappings 标准键。
+var metaDomain = map[string]string{
+	"categories":   "type",
+	"media":        "medium",
+	"codecs":       "codec",
+	"audiocodecs":  "audiocodec",
+	"standards":    "standard",
+	"teams":        "team",
+	// sources→source_sel / processings→processing_sel：刀2 D3 定案不配置
+	// （全站实测恒 0·观察项挂账）——不对账。subtitle_languages/sp_states
+	// 非发布表单域。
+}
+
+type metaItem struct {
+	// id 双形态（字符串为主+数字形态·§59.1324 json.Number 同族兼容）
+	ID   json.Number `json:"id"`
+	Name string      `json:"name"`
+}
+
+func doMetadata(s *model.Site, base string) {
+	if s.APIKey == "" {
+		fmt.Fprintln(os.Stderr, "❌ 站点无 API Key")
+		os.Exit(2)
+	}
+	req, _ := http.NewRequest("GET", base+"/api/v1/site/metadata", nil)
+	req.Header.Set("x-api-key", s.APIKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("❌ 请求失败:", err)
+		os.Exit(2)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if resp.StatusCode != 200 {
+		fmt.Printf("❌ HTTP %d: %.200s\n", resp.StatusCode, string(body))
+		os.Exit(2)
+	}
+	var env struct {
+		Code int `json:"code"`
+		Data map[string][]metaItem `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil || env.Code != 0 {
+		fmt.Printf("❌ 信封解析失败（code=%d err=%v）\n", env.Code, err)
+		os.Exit(2)
+	}
+
+	// DB 侧 value_mappings
+	if s.PublishFormConfig == "" {
+		fmt.Println("❌ 站点无 publish_form_config")
+		os.Exit(2)
+	}
+	var fc struct {
+		ValueMappings map[string][]struct {
+			Label string `json:"label"`
+			Value string `json:"value"`
+		} `json:"value_mappings"`
+	}
+	if err := json.Unmarshal([]byte(s.PublishFormConfig), &fc); err != nil {
+		fmt.Println("❌ form_config 解析失败:", err)
+		os.Exit(2)
+	}
+
+	danger, info := 0, 0
+	for metaDomainKey, stdKey := range metaDomain {
+		siteItems := env.Data[metaDomainKey]
+		ours := fc.ValueMappings[stdKey]
+		siteByID := map[string]metaItem{}
+		for _, it := range siteItems {
+			siteByID[it.ID.String()] = it
+		}
+		ourIDs := map[string]bool{}
+		for _, o := range ours {
+			ourIDs[o.Value] = true
+			si, ok := siteByID[o.Value]
+			switch {
+			case !ok:
+				fmt.Printf("‼️ [%s] 我方 %q(id=%s) 站方已删除——发布会失败\n", stdKey, o.Label, o.Value)
+				danger++
+			case si.Name != o.Label:
+				fmt.Printf("ℹ️ [%s] id=%s 名称漂移: %q → %q\n", stdKey, o.Value, o.Label, si.Name)
+				info++
+			}
+		}
+		for _, it := range siteItems {
+			if !ourIDs[it.ID.String()] {
+				fmt.Printf("ℹ️ [%s] 站方新增未映射: id=%s %q\n", stdKey, it.ID.String(), it.Name)
+				info++
+			}
+		}
+	}
+	fmt.Printf("对账域=%d 危险=%d 信息=%d —— ", len(metaDomain), danger, info)
+	if danger > 0 {
+		fmt.Println("存在危险项（我方引用站方已删 ID）")
+		os.Exit(1)
+	}
+	fmt.Println("干净")
 }

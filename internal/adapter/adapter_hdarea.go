@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"encoding/base64"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -647,6 +648,9 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	if req.Anonymous {
 		fw.writeField("uplver", "yes")
 	}
+	// §59.515 刀4 D2: 站方回传终版种子（省 pusher 一次 DownloadTorrent——
+	// 站方未回/解码失败时 TorrentData 空·pusher 自然走原路径下载）
+	fw.writeField("return_torrent_base64", "1")
 	// 表单驱动槽位：FormFields 键即 API 域名（type/medium_sel/codec_sel/
 	// audiocodec_sel/standard_sel/team_sel——migration90 配置直产）
 	for k, v := range req.FormFields {
@@ -711,6 +715,8 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	var data struct {
 		TorrentID any    `json:"id"`
 		DetailURL string `json:"detail_url"`
+		// 刀4 D2: 站方回传终版种子（base64——重算 InfoHash+注入 Passkey）
+		TorrentBase64 string `json:"torrent_base64"`
 	}
 	_ = json.Unmarshal(env.Data, &data)
 	tid := ""
@@ -720,13 +726,23 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	case string:
 		tid = v
 	}
-	return &model.PublishResponse{
+	pubResp := &model.PublishResponse{
 		Success:    true,
 		TorrentID:  tid,
 		DetailURL:  data.DetailURL,
 		IDSource:   "api_response", // JSON 信封直读（302 权威同级的 API 通道）
 		TargetSite: config.SiteName,
-	}, nil
+	}
+	// 刀4 D2: base64 解码（失败降级空——pusher 走原路径·天然兜底）
+	if data.TorrentBase64 != "" {
+		if raw, dErr := base64.StdEncoding.DecodeString(data.TorrentBase64); dErr == nil && len(raw) > 0 {
+			pubResp.TorrentData = raw
+		} else if a.logger != nil {
+			a.logger.Warn("torrent_base64 decode failed, fallback to download",
+				zap.String("site", config.SiteName), zap.Error(dErr))
+		}
+	}
+	return pubResp, nil
 }
 
 // urlQueryEscape P1 修（回归审核）：真 net/url.QueryEscape——首版只
