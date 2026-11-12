@@ -1524,6 +1524,32 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	if s.Framework == "mteam" || s.Framework == "cola" {
 		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
 	}
+	// §59.515 刀1 生产首验：API 网关站（好大）探活走 /api/v1/status——
+	// 通用分支 POST 站点根 URL 会 302（→index/login）误报「被重定向」。
+	// status 为 GET 探活端点（任意有效 Key·返回身份与协议入口）。
+	if s.Framework == "hdarea" {
+		statusURL := strings.TrimRight(s.BaseURL, "/") + "/api/v1/status"
+		req, err := http.NewRequest("GET", statusURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+		if err != nil {
+			return false, "构造请求失败: " + err.Error()
+		}
+		req.Header.Set("X-API-Key", s.APIKey)
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+		req.Header.Set("Accept", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "连接失败: " + err.Error()
+		}
+		defer func() { httpclient.DrainBody(resp) }()
+		switch {
+		case resp.StatusCode == http.StatusOK:
+			return true, "API Key 认证成功（/api/v1/status）"
+		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+			return false, "API Key 无效或权限不足（" + strconv.Itoa(resp.StatusCode) + "）"
+		default:
+			return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+	}
 	req, err := http.NewRequest("POST", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
