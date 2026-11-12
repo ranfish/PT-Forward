@@ -149,12 +149,25 @@
         </a-modal>
       </a-tab-pane>
 
-      <!-- §59.20 Tab 3: 声明过滤规则 -->
+      <!-- §59.20 Tab 3: 声明过滤规则（§59.516 v0.0.1457：内置锁定+自定义两组） -->
       <a-tab-pane key="decl-filters" tab="声明过滤">
         <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center">
           <a-switch v-model:checked="declFiltersEnabled" />
           <span style="font-size: 13px; color: #666">启用声明过滤（发布时自动移除匹配的 [quote] 块）</span>
         </div>
+
+        <!-- 系统内置（锁定·随版本更新） -->
+        <div style="margin-bottom: 6px; font-size: 13px; font-weight: 600">
+          系统内置（{{ declBuiltin.length }} 条·随版本自动更新·不可删除）
+        </div>
+        <div style="margin-bottom: 4px; max-height: 160px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 6px; background: #fafafa">
+          <a-tag v-for="p in declBuiltin" :key="p" style="margin: 2px; max-width: 100%; white-space: normal" :title="p">
+            🔒 {{ p.length > 40 ? p.slice(0, 40) + '…' : p }}
+          </a-tag>
+        </div>
+
+        <!-- 用户自定义（可增删） -->
+        <div style="margin: 12px 0 6px; font-size: 13px; font-weight: 600">自定义（{{ declPatterns.length }} 条·可增删）</div>
         <div style="margin-bottom: 8px">
           <a-button type="primary" size="small" @click="addDeclPattern">添加模式</a-button>
         </div>
@@ -387,7 +400,8 @@ onMounted(() => {
   fetchGroupMappings()
 })
 
-// ============ §59.20 Tab 3: 声明过滤 ============
+// ============ §59.20 Tab 3: 声明过滤（§59.516 v0.0.1457：内置锁定+自定义） ============
+const declBuiltin = ref<string[]>([])
 const declPatterns = ref<string[]>([])
 const declFiltersEnabled = ref(true)
 const declSaving = ref(false)
@@ -395,7 +409,8 @@ const declSaving = ref(false)
 async function fetchDeclPatterns() {
   try {
     const resp = await publishTorrentsApi.getDeclarationFilters()
-    declPatterns.value = resp.data?.data?.patterns || []
+    declBuiltin.value = resp.data?.data?.builtin || []
+    declPatterns.value = resp.data?.data?.custom || []
   } catch { /* silent */ }
 }
 
@@ -406,10 +421,11 @@ function addDeclPattern() {
 async function saveDeclPatterns() {
   declSaving.value = true
   try {
+    // 只提交自定义集（内置由系统维护·后端保存时也会剔除兜底）
     const filtered = declPatterns.value.filter(p => p.trim() !== '')
     await publishTorrentsApi.setDeclarationFilters(filtered)
     declPatterns.value = filtered
-    message.success('声明过滤规则已保存')
+    message.success('自定义声明过滤规则已保存（系统内置不受影响）')
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

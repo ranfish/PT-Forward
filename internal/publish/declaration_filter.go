@@ -64,28 +64,75 @@ type DeclarationFilter struct {
 	logger *zap.Logger
 }
 
+
+// BuiltinPatterns 内置默认清单（只读导出——handler 透出给前端锁定展示）。
+func BuiltinPatterns() []string {
+	out := make([]string, len(defaultDeclarationPatterns))
+	copy(out, defaultDeclarationPatterns)
+	return out
+}
+
 func NewDeclarationFilter(repo *setting.Repository, logger *zap.Logger) *DeclarationFilter {
 	return &DeclarationFilter{repo: repo, logger: logger}
 }
 
+// GetPatterns 生效集 = 内置默认 ∪ 用户自定义（§59.516 v0.0.1457 用户定案：
+// 随版发布+不可删除+不影响自加——DB 历史全量快照天然兼容：旧快照 ⊇ 老默认·
+// 合并后行为不变；用户保存一次即自愈为新语义（纯 custom））。
 func (f *DeclarationFilter) GetPatterns(ctx context.Context) []string {
+	seen := make(map[string]bool, len(defaultDeclarationPatterns)+8)
+	merged := make([]string, 0, len(defaultDeclarationPatterns)+8)
+	for _, p := range defaultDeclarationPatterns {
+		if !seen[p] {
+			seen[p] = true
+			merged = append(merged, p)
+		}
+	}
+	for _, p := range f.GetCustomPatterns(ctx) {
+		if !seen[p] {
+			seen[p] = true
+			merged = append(merged, p)
+		}
+	}
+	return merged
+}
+
+// GetCustomPatterns 用户自定义集（DB 存储·可增删；内置词剔除不落 DB）。
+func (f *DeclarationFilter) GetCustomPatterns(ctx context.Context) []string {
 	val, err := f.repo.Get(ctx, "declaration_filter_patterns")
 	if err != nil || val == "" {
-		return defaultDeclarationPatterns
+		return nil
 	}
 	var patterns []string
-	if err := json.Unmarshal([]byte(val), &patterns); err != nil || len(patterns) == 0 {
-		return defaultDeclarationPatterns
+	if err := json.Unmarshal([]byte(val), &patterns); err != nil {
+		return nil
 	}
 	return patterns
 }
 
+// GetRawPatterns 兼容保留（原调用方）。
 func (f *DeclarationFilter) GetRawPatterns(ctx context.Context) (string, error) {
 	return f.repo.Get(ctx, "declaration_filter_patterns")
 }
 
+// SetPatterns 只存用户自定义（剔除内置词——内置不可通过保存删除；
+// 旧客户端提交全量集时自动剥离内置·DB 自愈为纯 custom 语义）。
 func (f *DeclarationFilter) SetPatterns(ctx context.Context, patterns []string) error {
-	data, _ := json.Marshal(patterns)
+	builtin := make(map[string]bool, len(defaultDeclarationPatterns))
+	for _, p := range defaultDeclarationPatterns {
+		builtin[p] = true
+	}
+	seen := make(map[string]bool, len(patterns))
+	custom := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		p = strings.TrimSpace(p)
+		if p == "" || builtin[p] || seen[p] {
+			continue
+		}
+		seen[p] = true
+		custom = append(custom, p)
+	}
+	data, _ := json.Marshal(custom)
 	return f.repo.Set(ctx, "declaration_filter_patterns", string(data))
 }
 

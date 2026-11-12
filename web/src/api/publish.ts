@@ -67,10 +67,10 @@ export const publishTorrentsApi = {
     return client.get<ApiResponse<{ sites: string[] }>>('/publish/torrents/group-mappings/sites')
   },
   getDeclarationFilters() {
-    return client.get<ApiResponse<{ patterns: string[]; is_default: boolean }>>('/publish/torrents/declaration-filters')
+    return client.get<ApiResponse<{ builtin: string[]; custom: string[] }>>('/publish/torrents/declaration-filters')
   },
   setDeclarationFilters(patterns: string[]) {
-    return client.put<ApiResponse<{ patterns: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
+    return client.put<ApiResponse<{ builtin: string[]; custom: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
   },
 }
 
