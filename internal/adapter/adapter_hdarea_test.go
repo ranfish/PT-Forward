@@ -32,7 +32,7 @@ func (s *hdareaShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	case strings.Contains(u, "/torrents?"):
 		file = "testdata/hdarea/search.json"
 	case strings.Contains(u, "/torrents/upload"):
-		file = "testdata/hdarea/gentoken.json" // 上传响应形态借用（刀2 夹具化）
+		file = "testdata/hdarea/upload.json" // 刀4 D2：真实信封+torrent_base64 夹具
 	default:
 		file = "testdata/hdarea/search.json"
 	}
@@ -203,5 +203,30 @@ func TestHDAreaQueryEscape(t *testing.T) {
 		if got := urlQueryEscape(in); got != want {
 			t.Errorf("urlQueryEscape(%q)=%q want %q", in, got, want)
 		}
+	}
+}
+
+// TestHDAreaUploadReturnTorrent 刀4 D2：return_torrent_base64 回传解码。
+func TestHDAreaUploadReturnTorrent(t *testing.T) {
+	a, _ := newHDAreaTestAdapter()
+	resp, err := a.UploadTorrent(context.Background(), hdareaTestConfig(), &model.PublishRequest{
+		TorrentData: []byte("d4:infod6:lengthi1eee"),
+		Title:       "Test Torrent 2026",
+	})
+	if err != nil {
+		t.Fatalf("UploadTorrent: %v", err)
+	}
+	if !resp.Success {
+		t.Fatal("resp.Success 应 true")
+	}
+	if resp.TorrentID != "460596" {
+		t.Errorf("TorrentID=%q want 460596", resp.TorrentID)
+	}
+	if len(resp.TorrentData) == 0 {
+		t.Fatal("TorrentData 应非空（torrent_base64 回传解码）")
+	}
+	// 夹具 base64 = d8:announce... 开头的最小 bencode（好大重写终版形态）
+	if string(resp.TorrentData[:11]) != "d8:announce" {
+		t.Errorf("TorrentData 前 11 字节=%q want d8:announce（站方重写终版）", string(resp.TorrentData[:11]))
 	}
 }

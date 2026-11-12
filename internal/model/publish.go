@@ -236,6 +236,10 @@ type PublishResponse struct {
 	ErrorMessage string `json:"error_message"`
 	TargetSite   string `json:"target_site"`
 	InfoHash     string `json:"info_hash"`
+	// §59.515 刀4 D2: 站方回传终版种子（好大 return_torrent_base64——
+	// 已重算 InfoHash+注入 Passkey）。注意与 PublishRequest.TorrentData
+	// （上传方向·我方原种）同名不同义。json:"-" 防二进制进日志/审计。
+	TorrentData []byte `json:"-"`
 }
 
 // §46 — SitePublishLimit: 站点发布限制配置

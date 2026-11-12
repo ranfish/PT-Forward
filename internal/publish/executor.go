@@ -978,6 +978,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——已存在辅种快路径
 			Title:     meta.Title,
 			SavePath:  rv.SavePath,
+			// §59.515 刀4 D2: 站方回传终版种子直传（好大 return_torrent_base64
+			// 通道·非空时 pusher 跳过 DownloadTorrent；其他站/未回传=空零影响）
+			TorrentData: resp.TorrentData,
 		}
 		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
 			// §59.471 附: 推种分支消息与超时复查消息拼接（非覆盖——

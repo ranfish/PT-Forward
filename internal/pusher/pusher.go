@@ -15,22 +15,28 @@ import (
 )
 
 type PushRequest struct {
-	ClientUID     uint
-	SiteName      string
-	TorrentID     string
-	InfoHash      string
-	Title         string
-	HasHR         bool
-	Discount      model.DiscountLevel
-	IsFree        bool
-	FreeEndAt     *time.Time
-	SavePath      string
-	Category      string
-	Tags          string
-	AddPaused     bool
-	AutoTMM       bool
-	UploadLimitKB int64
+	ClientUID       uint
+	SiteName        string
+	TorrentID       string
+	InfoHash        string
+	Title           string
+	HasHR           bool
+	Discount        model.DiscountLevel
+	IsFree          bool
+	FreeEndAt       *time.Time
+	SavePath        string
+	Category        string
+	Tags            string
+	AddPaused       bool
+	AutoTMM         bool
+	UploadLimitKB   int64
 	DownloadLimitKB int64
+	// §59.515 刀4 D2: 站方回传终版种子（好大 return_torrent_base64——
+	// 上传响应自带·重算 InfoHash+注入 Passkey）。非空=跳过
+	// DownloadTorrent（省一次站方调用）；空=所有其他站/DryRun/
+	// 超时复查/站方未回的旧行为。与 model.PublishRequest.TorrentData
+	// （上传方向我方原种）同名不同义。
+	TorrentData []byte
 }
 
 type PushResult struct {
@@ -46,21 +52,21 @@ type PushResult struct {
 }
 
 type PushedEvent struct {
-	ClientUID       uint
-	SiteName        string
-	TorrentID       string
-	InfoHash        string
-	Title           string
-	Size            int64
-	Role            string
-	Discount        model.DiscountLevel
-	HasHR           bool
-	IsFree          bool
-	FreeEndAt       *time.Time
-	SubscriptionID   string
-	AutoTransfer     bool
+	ClientUID          uint
+	SiteName           string
+	TorrentID          string
+	InfoHash           string
+	Title              string
+	Size               int64
+	Role               string
+	Discount           model.DiscountLevel
+	HasHR              bool
+	IsFree             bool
+	FreeEndAt          *time.Time
+	SubscriptionID     string
+	AutoTransfer       bool
 	TransferClientUIDs []uint
-	PushedAt         time.Time
+	PushedAt           time.Time
 	// §55.19 根本修复：携带 detect 阶段提取的 SL，评分时直接用，避免二次抓详情页。
 	Seeders  int
 	Leechers int
@@ -76,9 +82,9 @@ type ClientProvider interface {
 }
 
 type Pusher struct {
-	db            *gorm.DB
-	logger        *zap.Logger
-	siteProvider  SiteProvider
+	db             *gorm.DB
+	logger         *zap.Logger
+	siteProvider   SiteProvider
 	clientProvider ClientProvider
 }
 
@@ -175,36 +181,42 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 	// （下载器自动校验）。Skip 类不进本段（语义不变）。
 	var torrentData []byte
 	err = nil
-	dlBackoffs := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}
-	for i, backoff := range dlBackoffs {
-		if backoff > 0 {
-			select {
-			case <-time.After(backoff):
-			case <-ctx.Done():
-				result.Error = fmt.Errorf("download torrent (retry %d): ctx canceled: %w", i, ctx.Err())
+	if len(req.TorrentData) > 0 {
+		// §59.515 刀4 D2: 站方回传终版种子直用（好大 return_torrent_base64
+		// 通道）——跳过下载与退避重试（数据已在手·无需网络往返）。
+		torrentData = req.TorrentData
+	} else {
+		dlBackoffs := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}
+		for i, backoff := range dlBackoffs {
+			if backoff > 0 {
+				select {
+				case <-time.After(backoff):
+				case <-ctx.Done():
+					result.Error = fmt.Errorf("download torrent (retry %d): ctx canceled: %w", i, ctx.Err())
+					return result
+				}
+			}
+			dlCtx, dlCancel := context.WithTimeout(ctx, 30*time.Second)
+			torrentData, err = adapter.DownloadTorrent(dlCtx, siteCfg, req.TorrentID)
+			dlCancel()
+			if err == nil && len(torrentData) > 0 {
+				break
+			}
+			if i == len(dlBackoffs)-1 {
+				// §59.374 回归修复：err==nil 且空数据时 %w wrap nil 会产出
+				// "%!w(<nil>)" 脏消息——synthetic error 兜底
+				if err == nil {
+					err = errors.New("empty torrent data")
+				}
+				result.Error = fmt.Errorf("download torrent: %w (已自动重推 3 次)", err)
 				return result
 			}
+			p.logger.Warn("push: download torrent retry",
+				zap.String("site", req.SiteName),
+				zap.String("torrent_id", req.TorrentID),
+				zap.Int("attempt", i+1), zap.Duration("next_backoff", dlBackoffs[i+1]),
+				zap.Error(err))
 		}
-		dlCtx, dlCancel := context.WithTimeout(ctx, 30*time.Second)
-		torrentData, err = adapter.DownloadTorrent(dlCtx, siteCfg, req.TorrentID)
-		dlCancel()
-		if err == nil && len(torrentData) > 0 {
-			break
-		}
-		if i == len(dlBackoffs)-1 {
-			// §59.374 回归修复：err==nil 且空数据时 %w wrap nil 会产出
-			// "%!w(<nil>)" 脏消息——synthetic error 兜底
-			if err == nil {
-				err = errors.New("empty torrent data")
-			}
-			result.Error = fmt.Errorf("download torrent: %w (已自动重推 3 次)", err)
-			return result
-		}
-		p.logger.Warn("push: download torrent retry",
-			zap.String("site", req.SiteName),
-			zap.String("torrent_id", req.TorrentID),
-			zap.Int("attempt", i+1), zap.Duration("next_backoff", dlBackoffs[i+1]),
-			zap.Error(err))
 	}
 	// §59.159 四轮定案（用户）：加种 id 唯一来源=发布成功页 302 权威——下载源
 	// 正确即无需校验（body fallback 已删，52394 误推源头不存在了）。
