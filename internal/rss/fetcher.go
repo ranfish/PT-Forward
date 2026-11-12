@@ -142,14 +142,28 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 		}
 
 		// §59.515 刀3 D1: 好大增强 RSS 扩展节点消费——
-		// ① nexusphp:promotion_until → FreeEndAt（唯一改变行为的新信息：
-		//   免费截止时间·刷流规则可设「免费剩余>N 才下」防过期误下）
+		// ① 免费截止时间 → FreeEndAt（唯一改变行为的新信息：
+		//   刷流规则可设「免费剩余>N 才下」防过期误下）。三通道：
+		//   nexusphp:free_until（生产实态主通道）> promotion_until
+		//   （官方文档形态兜底）> torznab:attr freeuntil（第二通道）
 		// ② torznab:attr downloadvolumefactor=0 → IsFree（好大 feed 内
 		//   唯一 IsFree 证据源——回归审核实证 RSS 链路无 [免费] 前缀
 		//   判定通道；downloadvolumefactor 是 Torznab 行业标准权威数据）
 		// 局部名匹配——其他 NP 站无此元素→零值·零影响。
-		if pt := strings.TrimSpace(item.PromotionUntil); pt != "" {
-			if t, err := time.ParseInLocation("2006-01-02 15:04:05", pt, time.Local); err == nil {
+		freeUntil := strings.TrimSpace(item.FreeUntil)
+		if freeUntil == "" {
+			freeUntil = strings.TrimSpace(item.PromotionUntil)
+		}
+		if freeUntil == "" {
+			for _, attr := range item.TorznabAttrs {
+				if attr.Name == "freeuntil" && attr.Value != "" {
+					freeUntil = strings.TrimSpace(attr.Value)
+					break
+				}
+			}
+		}
+		if freeUntil != "" {
+			if t, err := time.ParseInLocation("2006-01-02 15:04:05", freeUntil, time.Local); err == nil {
 				event.FreeEndAt = &t
 			}
 		}
@@ -199,7 +213,11 @@ type RSSItem struct {
 
 	// §59.515 刀3 D1: 好大增强 RSS 扩展节点（Go encoding/xml
 	// 按局部名匹配——其他 NP 站无此元素→零值·全站解析器零影响）
+	// 生产实态（2026-11-12 实拉 spstate=9 五条实证）：免费截止
+	// 元素=free_until（官方文档样例为 promotion_until——文档形态
+	// 保留兜底·两形态同解析）。
 	PromotionUntil string        `xml:"promotion_until"`
+	FreeUntil      string        `xml:"free_until"`
 	TorznabAttrs   []TorznabAttr `xml:"attr"`
 }
 
