@@ -237,6 +237,7 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 - RSS=零 adapter 工作（引擎标准 NP 解析·guid 真身·ParseRSS 走 Generic stub——mteam 同款）
 - 锚六枚（真实消毒夹具 testdata/hdarea/）：Search/Detail（MI 提取+forbid_transfer）/Discount/Stats/ThinStubs/InfoHash
 - 禁转修正：API `forbid_transfer` → Flags["禁转"]（web 负结论被探针⑨反转）
+- 凭证 UX 定案（2026-11-12 用户）：apikey+hdarea 下凭证区只显 API Key（Cookie/Passkey 条件隐藏=设计行为·DB 存量保留）——**不加解释文案**：用户无需知晓 Cookie/Passkey/API 关系，按表单要求填写即可；回退阀=framework+auth_type 两字段一对改回（UI 自动恢复显示）
 
 ## 11. 待实测确认清单（刀1 活体探针·11 项·read/download scope 零写操作）
 
