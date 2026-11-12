@@ -335,13 +335,18 @@ func (a *HDAreaAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, networkError("构造 genDlToken 请求失败", err)
 	}
-	// 短效凭证流程骨架（apihelper）——重签时重建请求（ctx/body 复用）
+	// 短效凭证流程骨架（apihelper）——重签时重建请求（ctx/body 复用）。
+	// 实测修正（探针字符串搜索曾掩盖包裹）：genDlToken=统一信封双层
+	// {success,code,data:{ok,dl_token,download_url}}——先解信封再取内层。
 	return shortTokenDownload(a.doer.Client, req, func(b []byte) (string, error) {
+		var env hdareaEnvelope
+		if err := json.Unmarshal(b, &env); err != nil {
+			return "", err
+		}
 		var gt struct {
-			Ok          bool   `json:"ok"`
 			DownloadURL string `json:"download_url"`
 		}
-		if err := json.Unmarshal(b, &gt); err != nil {
+		if err := json.Unmarshal(env.Data, &gt); err != nil {
 			return "", err
 		}
 		return gt.DownloadURL, nil
