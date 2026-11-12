@@ -163,11 +163,11 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 |----|-----|------|
 | 主分类 | `type`/`cat` | 300 UHD-4K·401 Blu-ray·415 REMUX·416 3D·410 1080p·411 720p·414 DVD·412 WEB-DL·413 HDTV·417 iPad·404 纪录·405 动漫·402 剧集·403 综艺·406 MV·407 体育·409 Misc·408 HQ Audio（18） |
 | 媒介 | `medium_sel` | 1 Blu-ray·3 REMUX·7 Encode·9 WEB-DL·4 MiniBD·5 HDTV·2 HD DVD·6 DVDR·8 CD（9） |
-| 来源 | `source_sel` | 1 Blu-ray·2 HD DVD·3 DVD·4 HDTV·5 TV·6 Other（6）——**网页表单无此域·API 独有** |
+| 来源 | `source_sel` | 1 Blu-ray·2 HD DVD·3 DVD·4 HDTV·5 TV·6 Other（6）——API 独有·**2026-11-12 实测全站 350+ 条 source_id 恒 0（无人填写·含原盘/REMUX/Encode）**——不配置（刀2 D3 定案）|
 | 视频编码 | `codec_sel` | 7 H.264·1 MPEG-4·6 H.265·4 MPEG-2·3 Xvid·2 VC-1·5 Other·8 AV1·9 VP8/9·10 AVS（10） |
 | 音频编码 | `audiocodec_sel` | 28 项（6 AAC·5 DD5.1·7 TrueHD·3 DTS·4 DTS-HD MA·8 LPCM·9 WAV·2 APE·1 FLAC·10 TrueHD Atmos·11 DD2.0·12 DTS:X·13 DTS-HD HR·14 DSD·15 DDP Atmos·16 DDP·17 MPEG·18 Vorbis·19 TTA·20 AV3A·21 MP3·22 ALAC·25 Opus·26 WMA·27 AC-4·28 MPEG-H·29 MQA·24 Other） |
 | 分辨率 | `standard_sel` | 3 720p·1 1080p·4 SD·2 1080i·5 4K（5） |
-| 处理 | `processing_sel` | 1 Raw·2 Encode（2）——**网页表单无此域·API 独有** |
+| 处理 | `processing_sel` | 1 Raw·2 Encode（2）——API 独有·**实测全站 processing_id 恒 0**——不配置（刀2 D3 定案）|
 | 制作组 | `team_sel` | 1 EPiC·2 HDArea·3 HDWING·4 WiKi·5 TTG·6 other·7 MTeam·8 HDApad·9 CHD·10 HDAccess·11 HDATV·12 cXcY·13 CMCT（13） |
 | 促销 | `spstate` | 1 普通·2 Free·3 2X·4 2X Free·5 50%·8 任意促销·9 所有免费(Free+2XFree) |
 | 字幕语言 | `lang_id` | 31 项（25 简体中文·28 繁體中文·6 English·15 日本語…） |
@@ -203,7 +203,7 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 | 刀 | 范围 | 验证 |
 |----|------|------|
 | 刀1（含刀0 前置） | ①传输诊断（29 Go 直连超时·TLSPretend 应急）②活体探针 11 项→真实夹具 ③HDAreaAdapter **14 方法接口全集**（五获取+基础 API 上传+RSS apikey+SL×2 空实现+DetectHR false+InfoHash/VerifyExists 薄实现+SupportsPiecesHash=false）④apihelper.go 机制层 ⑤framework 注册+存量迁移（sites.framework/form_config.framework np→hdarea 跟随 mteam 惯例/auth_type=apikey/fetch_rps=0.8）⑥双 JSON seed 同步（§59.512）⑦RSS 策略表注册 | 29 端到端获取一颗+DryRun 发布一颗粒子+夹具锚 |
-| 刀2 | 发布深化：check 预查重接入 dedup 链（清洗重算+30min 保护期）/断种顶替=四终态新语义（设计讨论）/409 existing_id↔四终态/成功判定 code===0+IDSource="api_response"/source_sel(6 值)+processing_sel(Raw/Encode) 补配 | DryRun 借壳 PT0 素材+生产首颗挂用户 |
+| 刀2 | 发布深化：check 预查重接入 dedup 链（第三路·站方清洗重算）/断种顶替=pushed 直接记（站方自动删旧上架·DryRun/日志透出顶替意图）/409 existing_id↔四终态/**source_sel+processing_sel 不配置**（D3 修订·见观察项） | DryRun 借壳 PT0 素材+生产首颗挂用户 |
 | 刀3 | RSS 增强（promotion_until→FreeEndAt）/hashes 200 批辅种（QueryIYUULive 同构注入先例） | RSS 一轮+辅种单簇 |
 | 刀4 | site/metadata 值集自愈（formdiff 体系新源）/return_torrent_base64 直推/web 链退役决策 | 值集漂移演练 |
 
@@ -237,6 +237,7 @@ check（file 上传预查重）→ upload（file+表单+return_torrent_base64=1�
 - RSS=零 adapter 工作（引擎标准 NP 解析·guid 真身·ParseRSS 走 Generic stub——mteam 同款）
 - 锚六枚（真实消毒夹具 testdata/hdarea/）：Search/Detail（MI 提取+forbid_transfer）/Discount/Stats/ThinStubs/InfoHash
 - 禁转修正：API `forbid_transfer` → Flags["禁转"]（web 负结论被探针⑨反转）
+- **D3 source_sel/processing_sel 不配置定案（2026-11-12 用户）**：全站实测 350+ 条（按 medium/cat 分类扫描·WEB-DL/Encode/REMUX/UHD-4K/全站首页）source_id 与 processing_id 恒 0——**站方数据无人填写**。用户解读 B（API 网关 2026.11.11 新出·存量未回填·新种可能逐步启用）。定案=不配置不发送（行为对齐全站现状·站方服务端默认值兜底）。**观察项**：新种出现非 0 值或发布被拒「source/processing 未选择」→ 启用站特化注入补配（mapping 方案已预研：ST 物理媒介族→source 值·WEB 族不填·IsEncode→processing 值）。
 - 凭证 UX 定案（2026-11-12 用户）：apikey+hdarea 下凭证区只显 API Key（Cookie/Passkey 条件隐藏=设计行为·DB 存量保留）——**不加解释文案**：用户无需知晓 Cookie/Passkey/API 关系，按表单要求填写即可；回退阀=framework+auth_type 两字段一对改回（UI 自动恢复显示）
 
 ## 11. 待实测确认清单（刀1 活体探针·11 项·read/download scope 零写操作）
