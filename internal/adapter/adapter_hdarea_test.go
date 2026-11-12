@@ -189,3 +189,19 @@ func TestHDAreaDownload(t *testing.T) {
 		t.Errorf("响应非 bencode: %q", truncate(string(data), 30))
 	}
 }
+
+// TestHDAreaQueryEscape P1 锚（回归审核）：中文/&/空格关键词正确编码。
+func TestHDAreaQueryEscape(t *testing.T) {
+	cases := map[string]string{
+		"Dune":            "Dune",
+		"Dune Part Two":   "Dune+Part+Two",
+		"沙丘2":            "%E6%B2%99%E4%B8%982",
+		"Tom & Jerry":     "Tom+%26+Jerry",
+		"a=b?c":           "a%3Db%3Fc",
+	}
+	for in, want := range cases {
+		if got := urlQueryEscape(in); got != want {
+			t.Errorf("urlQueryEscape(%q)=%q want %q", in, got, want)
+		}
+	}
+}

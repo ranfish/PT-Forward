@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -562,6 +563,9 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}, nil
 }
 
+// urlQueryEscape P1 修（回归审核）：真 net/url.QueryEscape——首版只
+// 换空格的假实现让中文关键词/含 &/= 字符原样进 URL（获取链中文
+// 关键词+§59.192 & 分隔符场景错发）。
 func urlQueryEscape(s string) string {
-	return strings.ReplaceAll(strings.TrimSpace(s), " ", "+")
+	return url.QueryEscape(strings.TrimSpace(s))
 }
