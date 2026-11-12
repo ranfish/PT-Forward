@@ -450,6 +450,71 @@ func isHTTP404(err error) bool {
 // ── 发布（刀1 基础版：表单驱动直写——API 域名与 NP 表单同名·
 //     migration90 值集直接复用；深度语义 check/顶替/409 留刀2）──
 
+// HashMatcher 刀3：站方批量 hash 匹配能力接口（好大 API 独有·
+// PreChecker 同款类型断言消费——辅种引擎独立信息源）。
+type HashMatcher interface {
+	BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*HashMatchResult, error)
+}
+
+// HashMatchResult 刀3：hash 匹配结果（数学身份·无需标题验证）。
+type HashMatchResult struct {
+	InfoHash    string // 查询的 40 位 hex
+	TorrentID   string // 本站 tid
+	Title       string
+	Size        int64
+	Seeders     int
+	DownloadURL string // 短效直链（dl_token）
+}
+
+// BatchMatchHashes 刀3 D2+D3：批量 hash 匹配（POST /api/v1/torrents/hashes·
+// ≤200/批自动切分）。read scope·独立信息源（与 IYUU 并行·不 fallback）。
+func (a *HDAreaAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*HashMatchResult, error) {
+	if len(hashes) == 0 {
+		return nil, nil
+	}
+	if config.APIKey == "" {
+		return nil, &model.AppError{Code: 40001, Message: "好大 hash 匹配需要 API Key"}
+	}
+	var all []*HashMatchResult
+	for start := 0; start < len(hashes); start += 200 {
+		end := start + 200
+		if end > len(hashes) {
+			end = len(hashes)
+		}
+		batch := hashes[start:end]
+		payload, err := json.Marshal(map[string][]string{"hashes": batch})
+		if err != nil {
+			return nil, parseError("构造 hashes 请求失败: "+err.Error(), err)
+		}
+		var data struct {
+			Items []struct {
+				InfoHash    string `json:"info_hash"`
+				ID          int    `json:"id"`
+				Name        string `json:"name"`
+				Size        int64  `json:"size"`
+				Seeders     int    `json:"seeders"`
+				DownloadURL string `json:"download_url"`
+			} `json:"items"`
+		}
+		if err := a.apiCall(ctx, config, http.MethodPost,
+			a.base(config)+"/api/v1/torrents/hashes",
+			strings.NewReader(string(payload)), &data); err != nil {
+			return nil, err
+		}
+		for _, it := range data.Items {
+			all = append(all, &HashMatchResult{
+				InfoHash:    it.InfoHash,
+				TorrentID:   strconv.Itoa(it.ID),
+				Title:       it.Name,
+				Size:        it.Size,
+				Seeders:     it.Seeders,
+				DownloadURL: it.DownloadURL,
+			})
+		}
+	}
+	return all, nil
+}
+
 // PreChecker 刀2：站方预查重能力接口（好大 API 独有·类型断言消费）。
 type PreChecker interface {
 	CheckBeforeUpload(ctx context.Context, config *model.SiteConfig, torrentData []byte) (*PreCheckResult, error)
