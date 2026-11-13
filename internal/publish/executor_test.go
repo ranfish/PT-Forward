@@ -381,3 +381,79 @@ func TestTagApplierTaglistValueMapping(t *testing.T) {
 		t.Errorf("taglist 无映射：应标准键直出: %+v", kvs)
 	}
 }
+
+// TestAssembleTagsAdjustOrder §59.518: 调整层原料放行——值集无 complete 的站
+// （优堡）先滤后转=转的原料没了（243 DryRun 复验 tags=['6'] 无合集 20 实锤）。
+// 全链组合：assembleTags（过滤+放行）× adjustTagsForSite（转换）。
+func TestAssembleTagsAdjustOrder(t *testing.T) {
+	// 优堡值集形态（243 实态：中字 6/合集 20·无 complete 条目）
+	cfg := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTags: {
+				{Label: "中字", Value: "6", StandardKeys: []string{"tag.chinese_subtitle"}},
+				{Label: "合集", Value: "20", StandardKeys: []string{"tag.collection"}},
+			},
+		},
+	}
+	e := &PublishExecutor{}
+	meta := &model.TorrentMetadata{
+		Title:    "Quacks S01 2017 1080p AMZN WEBRip HEVC DDP 2.0-cXcY@FRDS",
+		Subtitle: "【江湖郎中/怪诞医生】全一季 | 中英字幕",
+		Tags:     `["10_bit","chinese_subtitle","english_subtitle","complete","high_rating"]`,
+	}
+
+	// ① 优堡：complete 放行 → adjust 转 collection → 映射面两个都在
+	out := e.assembleTags(cfg, meta, nil)
+	out = adjustTagsForSite(out, "优堡", meta.Title, meta.Subtitle)
+	hasC, hasCol, hasSub := false, false, false
+	for _, t := range out {
+		switch t {
+		case "complete":
+			hasC = true
+		case "collection":
+			hasCol = true
+		case "chinese_subtitle":
+			hasSub = true
+		}
+	}
+	if hasC || !hasCol || !hasSub {
+		t.Errorf("优堡全链：应去 complete 留 collection+chinese_subtitle: %v", out)
+	}
+
+	// ② 幸运语义回归：值集有 complete 的站正常投 complete（放行不改变有值集站行为）
+	cfgLuck := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTags: {
+				{Label: "完结", Value: "10", StandardKeys: []string{"tag.complete"}},
+				{Label: "中字", Value: "6", StandardKeys: []string{"tag.chinese_subtitle"}},
+			},
+		},
+	}
+	out2 := e.assembleTags(cfgLuck, meta, nil)
+	out2 = adjustTagsForSite(out2, "幸运", meta.Title, meta.Subtitle)
+	found := map[string]bool{}
+	for _, t := range out2 {
+		found[t] = true
+	}
+	if !found["complete"] || !found["chinese_subtitle"] {
+		t.Errorf("幸运回归：complete 应保留: %v", out2)
+	}
+
+	// ③ 值集无 complete 的非优堡站：complete 放行但 adjust 不转 → 留在 tags
+	// 由映射层自然蒸发（applier miss 跳过=原行为）——本测试只验放行语义
+	cfgNone := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTags: {
+				{Label: "中字", Value: "6", StandardKeys: []string{"tag.chinese_subtitle"}},
+			},
+		},
+	}
+	out3 := e.assembleTags(cfgNone, meta, nil)
+	found3 := map[string]bool{}
+	for _, t := range out3 {
+		found3[t] = true
+	}
+	if !found3["complete"] {
+		t.Errorf("放行语义：值集无 complete 的站 complete 应放行进调整层: %v", out3)
+	}
+}

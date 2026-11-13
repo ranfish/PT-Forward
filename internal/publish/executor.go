@@ -1742,8 +1742,15 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 	}
 	out := []string{}
 	seen := map[string]bool{}
+	// §59.518: 调整层工作标签放行——complete/collection/ongoing 是
+	// adjustTagsForSite（§59.177/§59.518）的转换原料：值集无 complete 的站
+	// （优堡）先滤后转=转的原料没了（243 DryRun 复验抓出：tags=['6'] 无合集
+	// 20）。放行进调整层转换·产物再走正常映射（miss 自然蒸发=原行为）。
+	adjustSourceTags := map[string]bool{
+		"complete": true, "collection": true, "ongoing": true,
+	}
 	for _, t := range storedTags {
-		if _, ok := allowed[t]; ok && !seen[t] {
+		if _, okAll := allowed[t]; (okAll || adjustSourceTags[t]) && !seen[t] {
 			out = append(out, t)
 			seen[t] = true
 		}
