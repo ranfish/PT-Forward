@@ -272,3 +272,29 @@ func TestWEBdlIsEncodeExemption(t *testing.T) {
 		t.Errorf("非 WEB 族 MIEncoded 语义应不变（IsEncode=true）")
 	}
 }
+
+// TestWEBdlCivilianEncoderBlacklist §59.517 追记：Video WL 民用编码器
+// 黑名单纵深——裸 Lavc（FFmpeg 直调）/MainConcept/DivX/XviD；顺序锚
+// （hevc_nvenc 形态由 GPU 规则先消费）。
+func TestWEBdlCivilianEncoderBlacklist(t *testing.T) {
+	base := "General\nWriting application: mkvmerge v94.0 64-bit\nWriting library: libebml v1.4.5\n\n" +
+		"Video\nFormat: AVC\nWriting library: %s\nEncoding settings: crf=18\nBit depth: 8 bits\nFrame rate: 25.000 FPS\n"
+	cases := []struct {
+		name, wl, rule string
+	}{
+		{"裸Lavc直调", "Lavc61.9.100", "铁证①FFmpeg直调"},
+		{"nvenc先GPU消费", "Lavc61.31.101 hevc_nvenc", "铁证①GPU硬编码"},
+		{"MainConcept", "MainConcept HEVC Encoder 16.20", "铁证①民用编码器"},
+		{"XviD", "XviD", "铁证①民用编码器"},
+	}
+	for _, c := range cases {
+		v, r := ExtractWEBdlVerdict(ParseMISections(fmt1(base, c.wl)))
+		if v != WEBVerdictCivilian || r != c.rule {
+			t.Errorf("[%s] 判定=%q 规则=%q（期望 civilian/%q）", c.name, v, r, c.rule)
+		}
+	}
+}
+
+func fmt1(format string, arg string) string {
+	return strings.Replace(format, "%s", arg, 1)
+}
