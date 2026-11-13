@@ -297,6 +297,16 @@ export const seedConfigApi = {
   recomputeCancel() {
     return client.post<ApiResponse<{ message: string }>>('/publish/seeds/recompute-cancel')
   },
+  // §59.516 v0.0.1461: 简介引用清洗（任务化·进度·graceful 停止）
+  declBackfillStart() {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/declaration-backfill-task')
+  },
+  declBackfillProgress() {
+    return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; changed: number; finished: boolean; error?: string }>>('/publish/seeds/declaration-backfill-progress')
+  },
+  declBackfillCancel() {
+    return client.post<ApiResponse<{ message: string }>>('/publish/seeds/declaration-backfill-cancel')
+  },
   snapshotUnconfigured(clientId: number, savePath: string) {
     return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: number; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
   },

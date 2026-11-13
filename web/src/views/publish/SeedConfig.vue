@@ -100,6 +100,12 @@
             <SyncOutlined /> 全库重建重组标题{{ recomputeProgressText }}
           </a-button>
         </a-tooltip>
+        <!-- §59.516 v0.0.1461: 简介引用清洗——版本过滤词扩充后原地清洗存量获取数据 -->
+        <a-tooltip title="按当前生效的声明过滤规则（内置∪自定义）原地清洗已获取的简介与声明引用块——过滤词新版本扩充后点一次即可清洗存量（幂等·只更新有变化的行）">
+          <a-button style="margin-left: 8px" :loading="declBackfillActive" @click="startDeclBackfill">
+            <ClearOutlined /> 简介引用清洗{{ declBackfillProgressText }}
+          </a-button>
+        </a-tooltip>
       </div>
     </div>
 
@@ -746,6 +752,45 @@ function pollRecompute() {
     } catch {
       recomputeActive.value = false
       recomputeProgressText.value = ''
+    }
+  }, 3000)
+}
+
+// ==================== §59.516 v0.0.1461: 简介引用清洗 ====================
+const declBackfillActive = ref(false)
+const declBackfillProgressText = ref('')
+let declBackfillTimer: ReturnType<typeof setTimeout> | undefined
+
+async function startDeclBackfill() {
+  try {
+    const resp = await seedConfigApi.declBackfillStart()
+    const total = resp.data?.data?.total ?? 0
+    message.success(`清洗任务已开始（预筛 ${total} 行）`)
+    declBackfillActive.value = true
+    pollDeclBackfill()
+  } catch (e) {
+    message.error(String(e))
+  }
+}
+
+function pollDeclBackfill() {
+  if (declBackfillTimer) clearTimeout(declBackfillTimer)
+  declBackfillTimer = setTimeout(async () => {
+    try {
+      const resp = await seedConfigApi.declBackfillProgress()
+      const d = resp.data?.data
+      if (!d || !d.active) {
+        declBackfillActive.value = false
+        declBackfillProgressText.value = ''
+        message.success(`清洗完成（处理 ${d?.done ?? 0} 行·更新 ${d?.changed ?? 0} 行${d?.failed ? ` 失败 ${d.failed}` : ''}）`)
+        await fetchList()
+        return
+      }
+      declBackfillProgressText.value = `（${d.done}/${d.total}）`
+      pollDeclBackfill()
+    } catch {
+      declBackfillActive.value = false
+      declBackfillProgressText.value = ''
     }
   }, 3000)
 }

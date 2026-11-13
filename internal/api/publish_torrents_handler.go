@@ -63,6 +63,7 @@ type PublishTorrentsHandler struct {
 	batchFetch          batchFetchState
 	siteBatch           siteBatchState // §59.166 一站多种批量任务
 	recompute           recomputeState // §59.514 附八 P2: 重建任务化
+	declBackfill        declBackfillState // §59.516 v0.0.1461: 简介引用清洗任务
 	strategySem         chan struct{}  // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 }
 
@@ -480,6 +481,12 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleRecomputeProgress(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/recompute-cancel") && r.Method == http.MethodPost:
 		h.handleRecomputeCancel(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/declaration-backfill-task") && r.Method == http.MethodPost:
+		h.handleDeclBackfillTask(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/declaration-backfill-progress") && r.Method == http.MethodGet:
+		h.handleDeclBackfillProgress(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/declaration-backfill-cancel") && r.Method == http.MethodPost:
+		h.handleDeclBackfillCancel(w, r)
 		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/backfill") && r.Method == http.MethodPost:
 		h.handleBDInfoBackfill(w, r)
