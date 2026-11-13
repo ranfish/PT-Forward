@@ -172,3 +172,42 @@ func TestBareE01GateAndNormalize(t *testing.T) {
 	}
 }
 
+
+// TestArbitrateMIEngine §59.517: WEB 族判定引擎收编 arbitrateMIEvidence——
+// 四态：civilian 纠正 WEB-DL→WEBRip（规则名透出）/ official∧WEBRip 反向
+// 观察（单方向不改）/ 引擎缺席旧规则兜底 / official∧WEB-DL 零干预。
+func TestArbitrateMIEngine(t *testing.T) {
+	e := &PublishExecutor{}
+
+	// ① civilian 裁决 → WEB-DL 纠正为 WEBRip + 规则名透出
+	tp := &titleparser.TechProfile{Specification: "WEB-DL",
+		MIWebVerdict: titleparser.WEBVerdictCivilian, MIWebRule: "交叉:x265+sc40+crf小数"}
+	notes := e.arbitrateMIEvidence(tp)
+	if tp.Specification != "WEBRip" || len(notes) != 1 || !strings.Contains(notes[0], "x265+sc40+crf小数") {
+		t.Errorf("① civilian 纠正失效: spec=%q notes=%v", tp.Specification, notes)
+	}
+
+	// ② official ∧ WEBRip name → 反向观察（单方向不改·§59.517 十二③）
+	tp2 := &titleparser.TechProfile{Specification: "WEBRip",
+		MIWebVerdict: titleparser.WEBVerdictOfficial, MIWebRule: "铁证②DV P5"}
+	notes2 := e.arbitrateMIEvidence(tp2)
+	if tp2.Specification != "WEBRip" || len(notes2) != 1 || !strings.Contains(notes2[0], "观察") {
+		t.Errorf("② 反向观察失效: spec=%q notes=%v", tp2.Specification, notes2)
+	}
+
+	// ③ 引擎缺席（B1）+ 旧规则兜底：WEB-DL ∧ MIEncoded → WEBRip
+	tp3 := &titleparser.TechProfile{Specification: "WEB-DL", MIEncoded: true}
+	notes3 := e.arbitrateMIEvidence(tp3)
+	if tp3.Specification != "WEBRip" || len(notes3) != 1 {
+		t.Errorf("③ 旧规则兜底失效: spec=%q notes=%v", tp3.Specification, notes3)
+	}
+
+	// ④ official ∧ WEB-DL → 零干预（良性混合防御——平台 x264 形态）
+	tp4 := &titleparser.TechProfile{Specification: "WEB-DL",
+		MIEncoded: true, // 原始 WL 信号在场
+		MIWebVerdict: titleparser.WEBVerdictOfficial, MIWebRule: "交叉:x264+stitchable"}
+	notes4 := e.arbitrateMIEvidence(tp4)
+	if tp4.Specification != "WEB-DL" || len(notes4) != 0 {
+		t.Errorf("④ official 零干预失效: spec=%q notes=%v", tp4.Specification, notes4)
+	}
+}

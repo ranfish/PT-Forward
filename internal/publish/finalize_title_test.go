@@ -60,12 +60,18 @@ func TestFinalizeTitleMIEvidenceWithoutTorrent(t *testing.T) {
 		Title:    "Movie 2025 1080p WEB-DL x264 AAC-UBWEB",
 		Category: "category.movie",
 	}
-	tp := titleparser.BuildTechProfile(meta.Title, "General\nVideo\nFormat : AVC\nWriting library : x264\nHeight : 1 080 pixels\nAudio #1\nFormat : AAC LC\nChannel(s) : 2 channels\n", "", "", "", "")
+	// §59.517: MI 升级为引擎裁决消费——合成真实民压形态（x264+sc40+crf
+	// 非零小数+开源 keyint 组合·Kanjoos 同族）。裸 x264 WL 零参数形态引擎
+	// 按 B2 先验判官方不再无条件翻转（平台 x264 流语义——§59.517 交叉层）。
+	tp := titleparser.BuildTechProfile(meta.Title, "General\nVideo\nFormat : AVC\nWriting library : x264 core 148\nEncoding settings : scenecut=40 / crf=20.5 / keyint=250 / keyint-min=25\nWidth : 1 920 pixels\nHeight : 816 pixels\nAudio #1\nFormat : AAC LC\nChannel(s) : 2 channels\n", "", "", "", "")
 	if !tp.MIEncoded {
 		t.Fatalf("前置失败：MIEncoded 应为 true（Writing library x264）")
 	}
 	if tp.Specification != "WEB-DL" {
 		t.Fatalf("前置失败：Specification=%q want WEB-DL", tp.Specification)
+	}
+	if tp.MIWebVerdict != titleparser.WEBVerdictCivilian {
+		t.Fatalf("前置失败：引擎裁决=%q want civilian", tp.MIWebVerdict)
 	}
 	title, notes := e.FinalizeTitle(context.Background(), meta, &tp, nil) // torrentData=nil——降级路径
 	if tp.Specification != "WEBRip" {
@@ -73,12 +79,12 @@ func TestFinalizeTitleMIEvidenceWithoutTorrent(t *testing.T) {
 	}
 	found := false
 	for _, n := range notes {
-		if strings.Contains(n, "规格仲裁(MI铁证)") {
+		if strings.Contains(n, "规格仲裁(MI引擎)") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("notes 缺 MI 铁证仲裁记录: %v", notes)
+		t.Errorf("notes 缺 MI 引擎仲裁记录: %v", notes)
 	}
 	if !strings.Contains(title, "WEBRip") {
 		t.Errorf("标题未含 WEBRip: %q", title)

@@ -30,6 +30,12 @@ type MediaInfoTech struct {
 	// 此前局部变量 BDAV 门用完即弃；好学格式槽（文件格式语义）消费，
 	// 通用投资（未来容器维度判定站自动受益）。
 	ContainerFormat string
+	// §59.517: WEB 族引擎裁决（official/civilian·空=MI 无 Video 段不
+	// 判定——B1 契约）。BDInfo 报告路径恒空（原盘语境非 WEB）。
+	WEBVerdict string
+	// §59.517: 命中规则名（铁证①软件名/交叉:x264+stitchable/...——
+	// 仲裁 note/DryRun 透出）。
+	WEBRule string
 }
 
 // miStream MediaInfo 纯文本中的一个段（Video / Audio #N）。
@@ -72,6 +78,9 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	result.Encoded = generalReencoderDetected(sections.General)
 	// §59.453: 容器 Format 透出（§59.235 P3 局部变量升格字段）
 	result.ContainerFormat = strings.TrimSpace(containerFormat)
+	// §59.517: WEB 族判定引擎（分层二值裁决——ExtractWEBdlVerdict 单点）。
+	// BDInfo 路径提前返回不经过此处（原盘语境恒空）。
+	result.WEBVerdict, result.WEBRule = ExtractWEBdlVerdict(sections)
 	for _, s := range streams {
 		if s.name == "video" {
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])

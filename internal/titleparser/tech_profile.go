@@ -38,6 +38,8 @@ type TechProfile struct {
 	BitDepth        string `json:"bit_depth"`        // 11. bit 信息（8bit/10bit）
 	MIEncoded       bool   `json:"-"`                // §59.151: MI Writing library 重编码铁证
 	MIHasVideo      bool   `json:"-"`                // §59.151: MI 存在 Video 层（判据可信前提）
+	MIWebVerdict    string `json:"-"`                // §59.517: WEB 族引擎裁决（official/civilian/空=不判定）
+	MIWebRule       string `json:"-"`                // §59.517: 引擎命中规则名（仲裁 note 透出）
 	FromBDInfo      bool   `json:"-"`                // §59.319 附十六: MI 输入为 BDInfo 报告（原盘铁证——报告仅原盘存在）
 	VideoCodec      string `json:"video_codec"`      // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
 	AudioCodec      string `json:"audio_codec"`      // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
@@ -158,6 +160,13 @@ func IsEncode(p TechProfile) bool {
 	// §59.151: MI Writing library 铁证优先（Encoded=有编码器写入痕迹——
 	// WEB-DL 同 spec 双种子 MI 一编码一原生的实证；spec/标题循环依赖废除）
 	if p.MIEncoded {
+		// §59.517: WEB 族引擎裁决优先——平台 x264 流（sc0/stitchable 等
+		// 组合官方信号）Writing library 在场但视频流未二压 → 非 Encode。
+		// 良性混合防御同源：official 裁决只对 WEB 族规格生效（原盘/压制
+		// 语境的 Encoded 语义不变）。
+		if p.MIWebVerdict == WEBVerdictOfficial && isWebSpecToken(p.Specification) {
+			return false
+		}
 		return true
 	}
 	if p.MIHasVideo && !p.MIEncoded {
