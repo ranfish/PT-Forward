@@ -305,6 +305,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	setForm(model.FieldDomainSmallDescr, meta.Subtitle)
 	// §59.164: 修道院 cnname 独立中文名（FormFields 未配站点自然跳过）
 	setForm(model.FieldDomainCNName, chineseTitleOf(meta.Title))
+	// §59.510: 海报外链 URL 直填（瓷器 cover 表单域——PTGen 简介首行
+	// [img]URL[/img] 剥壳得裸地址·hdwing.md 站方文档「海报外链 URL 直填
+	// （非 BBCode）」·未配 cover 域的站自然跳过零影响）
+	setForm(model.FieldDomainCover, coverURLOfDescription(meta.Description))
 	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
 	// §59.319 P2: 原盘 tech 文本源 BDInfo 优先（表单 techinfo 域/推断/审计同源）
 	setForm(model.FieldDomainTechInfo, TechTextOf(meta))

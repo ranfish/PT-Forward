@@ -95,3 +95,23 @@ func trimQuoteWrapper(q string) string {
 	}
 	return q
 }
+
+// coverURLOfDescription §59.510: 从 PTGen 简介首行提取封面裸 URL。
+// 首行形态 "[img]https://...[/img]" → 剥 BBCode 壳 → "https://..."
+// 非 [img] 开头或剥壳后空 → 返回空（setForm 空值守卫自然跳过）。
+func coverURLOfDescription(desc string) string {
+	if desc == "" {
+		return ""
+	}
+	firstLine := desc
+	if i := strings.IndexByte(desc, '\n'); i >= 0 {
+		firstLine = desc[:i]
+	}
+	firstLine = strings.TrimSpace(firstLine)
+	// 剥 [img]...[/img] 壳
+	if strings.HasPrefix(firstLine, "[img]") && strings.HasSuffix(firstLine, "[/img]") {
+		url := firstLine[len("[img]") : len(firstLine)-len("[/img]")]
+		return strings.TrimSpace(url)
+	}
+	return ""
+}

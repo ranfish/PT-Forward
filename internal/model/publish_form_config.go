@@ -65,6 +65,7 @@ const (
 	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
+	FieldDomainCover       = "cover"    // §59.510: 海报外链 URL 直填（瓷器——PTGen 简介首行剥壳）
 )
 
 // FormValueMapping 单个下拉/checkbox 选项的三方绑定。
