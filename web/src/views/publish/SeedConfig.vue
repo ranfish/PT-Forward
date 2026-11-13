@@ -101,7 +101,7 @@
           </a-button>
         </a-tooltip>
         <!-- §59.516 v0.0.1461: 简介引用清洗——版本过滤词扩充后原地清洗存量获取数据 -->
-        <a-tooltip title="按当前生效的声明过滤规则（内置∪自定义）原地清洗已获取的简介与声明引用块——过滤词新版本扩充后点一次即可清洗存量（幂等·只更新有变化的行）">
+        <a-tooltip title="按当前生效的声明过滤规则原地清洗已获取的简介与声明引用块——过滤词新版本扩充后点一次即可清洗存量">
           <a-button style="margin-left: 8px" :loading="declBackfillActive" @click="startDeclBackfill">
             <ClearOutlined /> 简介引用清洗{{ declBackfillProgressText }}
           </a-button>
