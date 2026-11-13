@@ -2182,26 +2182,27 @@ func episodeReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProf
 }
 
 // crossSeasonCollectionSites §59.177: 覆写组——跨季=合集（Session Pack 语义）。
-// 藏宝阁: 多季合集规范（S01-SXX 专门命名规范）; ubits: 整季包/跨季包。
+// 藏宝阁: 多季合集规范（S01-SXX 专门命名规范）; 优堡: 整季包/跨季包;
+// 野马 §59.518 用户定案: 完结(12)=单季完结状态·完结全集(18)=多季打包。
 // 新站实测冲突时加条目（两层架构——通用=幸运，差异按站扩展）。
+// §59.518 键修正："ubits"（英文）→"优堡"（name 列中文真相）——原键自
+// v0.0.895 起恒 miss，覆写组在优堡从未生效（Quacks/Ambassadors 站方审核
+// 「完结剧集请添加合集标签」实锤）。
 var crossSeasonCollectionSites = map[string]bool{
 	"藏宝阁": true,
-	"ubits": true,
+	"优堡":   true,
+	"野马":   true,
 }
 
 // adjustTagsForSite §59.177: 发布时标签按目标站调整（两层架构的站点扩展层）。
 // 通用规则=幸运语义：合集=多部不同作品的集合；S01-S02=单作品系列→完结。
-// 覆写组（藏宝阁/ubits）：S01-S02=多季合集→合集（去完结）。
+// 覆写组（藏宝阁/优堡/野马）：S01-S02=多季合集→合集（去完结）。
 // 用户意图保护：副标题含"合集/集全/期全"（真多作品合集）时调整层不动。
+//
+// §59.518 优堡特化：站方无「完结」标签（值集只有连载23/合集20）——合集=
+// Session Pack（整季包/跨季包），完结剧一律转合集。complete 产出词形=剧终
+// 语境（全集/全季/完结/全N集/全剧终/COMPLETE），电影副标不含→不误触发。
 func adjustTagsForSite(tags []string, siteName, title, subtitle string) []string {
-	if !crossSeasonTagRe.MatchString(title + " " + subtitle) {
-		return tags
-	}
-	// 用户意图保护——真多作品合集不调整
-	if multiWorkCollectionRe.MatchString(subtitle) {
-		return tags
-	}
-
 	has := func(t string) bool {
 		for _, x := range tags {
 			if x == t {
@@ -2218,6 +2219,27 @@ func adjustTagsForSite(tags []string, siteName, title, subtitle string) []string
 			}
 		}
 		return out
+	}
+
+	// 用户意图保护——真多作品合集不调整（§59.518 前置：原在跨季闸门后，
+	// 前置后非跨季场景语义等价——两分支都不动；优堡单季分支同受保护）
+	if multiWorkCollectionRe.MatchString(subtitle) {
+		return tags
+	}
+
+	// §59.518 优堡特化——完结剧→合集（站方审核实锤+值集无完结）。
+	// 跨季+complete 在场也走此分支（去完结加合集·与覆写组结果收敛）；
+	// 跨季+complete 缺席则落到下方覆写组补合集——双路径收敛。
+	if siteName == "优堡" && has("complete") {
+		adjusted := remove("complete")
+		if !has("collection") {
+			adjusted = append(adjusted, "collection")
+		}
+		return adjusted
+	}
+
+	if !crossSeasonTagRe.MatchString(title + " " + subtitle) {
+		return tags
 	}
 
 	if crossSeasonCollectionSites[siteName] {

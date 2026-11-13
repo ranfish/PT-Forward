@@ -303,3 +303,81 @@ func TestSjtuRegionCategoryValue(t *testing.T) {
 		t.Errorf("非葡萄站应回退 got %+v", v)
 	}
 }
+
+// TestAdjustTagsForSiteUbitsYema §59.518: 优堡键修正+单季完结转合集+野马入覆写组。
+func TestAdjustTagsForSiteUbitsYema(t *testing.T) {
+	quacksTitle := "Quacks S01 2017 1080p AMZN WEBRip HEVC DDP 2.0-cXcY@FRDS"
+	quacksSub := "【江湖郎中/怪诞医生】全一季 | 中英字幕 | 简中字幕"
+	crossTitle := "Masters of Horror S01-S02 2005-2006 1080p Blu-ray x265 DTS"
+	crossSub := "【恐怖大师】全两季 全剧终 | 中英字幕"
+
+	// ① 优堡单季完结（Quacks 实案）——complete→collection（站方无完结标签）
+	out1 := adjustTagsForSite([]string{"10_bit", "chinese_subtitle", "complete"}, "优堡", quacksTitle, quacksSub)
+	if contains(out1, "complete") || !contains(out1, "collection") {
+		t.Errorf("优堡单季：应去 complete 加 collection: %v", out1)
+	}
+
+	// ② 优堡跨季+complete 在场——特化分支命中（与覆写组收敛同果）
+	out2 := adjustTagsForSite([]string{"complete"}, "优堡", crossTitle, crossSub)
+	if contains(out2, "complete") || !contains(out2, "collection") {
+		t.Errorf("优堡跨季+complete：应去 complete 加 collection: %v", out2)
+	}
+
+	// ③ 优堡跨季+complete 缺席——落覆写组补 collection（键修正后优堡在组内）
+	out3 := adjustTagsForSite([]string{"10_bit"}, "优堡", crossTitle, crossSub)
+	if !contains(out3, "collection") {
+		t.Errorf("优堡跨季无complete：覆写组应加 collection: %v", out3)
+	}
+
+	// ④ 优堡电影不误转——无 complete 非跨季 → 不动
+	out4 := adjustTagsForSite([]string{"high_rating"}, "优堡", "Oppenheimer 2023 1080p", "奥本海默")
+	if len(out4) != 1 || out4[0] != "high_rating" {
+		t.Errorf("优堡电影：不应误转: %v", out4)
+	}
+
+	// ⑤ 优堡用户意图保护——副标含「合集」不调整
+	out5 := adjustTagsForSite([]string{"complete"}, "优堡", quacksTitle, "【杜比全家桶合集】Top250 精选")
+	if !contains(out5, "complete") || contains(out5, "collection") {
+		t.Errorf("优堡保护：真多作品合集不应被转: %v", out5)
+	}
+
+	// ⑥ 野马跨季——覆写组：去完结加合集（完结全集 18）
+	out6 := adjustTagsForSite([]string{"complete"}, "野马", crossTitle, crossSub)
+	if contains(out6, "complete") || !contains(out6, "collection") {
+		t.Errorf("野马跨季：应去 complete 加 collection（完结全集）: %v", out6)
+	}
+
+	// ⑦ 野马单季完结——通用：complete 保留（站方「完结」12）
+	out7 := adjustTagsForSite([]string{"complete"}, "野马", quacksTitle, quacksSub)
+	if !contains(out7, "complete") || contains(out7, "collection") {
+		t.Errorf("野马单季：应保留 complete（完结）: %v", out7)
+	}
+}
+
+// TestTagApplierTaglistValueMapping §59.518: taglist 模式值映射修复——
+// 显示层（applied）与上传层（TagArrayFields）同源（朱雀/野马 DryRun 假绿根修）。
+func TestTagApplierTaglistValueMapping(t *testing.T) {
+	var kvs []model.TagKV
+	write := func(field, value string) {
+		kvs = append(kvs, model.TagKV{Key: field, Value: value})
+	}
+
+	// ① 有映射 → 写站方值（野马 tagList 数字 ID 形态）
+	a1 := NewTagApplier(&model.SiteTagConfig{
+		Mode: model.TagModeTaglist,
+		Tags: map[string]string{"complete": "12", "collection": "18"},
+	})
+	kvs = nil
+	a1.Apply([]string{"complete", "collection"}, write)
+	if len(kvs) != 2 || kvs[0].Key != "tagList" || kvs[0].Value != "12" || kvs[1].Value != "18" {
+		t.Errorf("taglist 有映射：应写站方值: %+v", kvs)
+	}
+
+	// ② 无映射 → 标准键直出（零值集站兼容）
+	a2 := NewTagApplier(&model.SiteTagConfig{Mode: model.TagModeTaglist})
+	kvs = nil
+	a2.Apply([]string{"complete"}, write)
+	if len(kvs) != 1 || kvs[0].Value != "complete" {
+		t.Errorf("taglist 无映射：应标准键直出: %+v", kvs)
+	}
+}

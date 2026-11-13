@@ -40,8 +40,15 @@ func (a *TagApplier) Apply(tags []string, write TagApplyFunc) {
 		}
 		switch a.config.Mode {
 		case model.TagModeTaglist:
-			// taglist 模式：直接用标准键
-			write("tagList", tag)
+			// §59.518 值映射修复：有映射写站方值（野马 tagList 数字 ID·朱雀
+			// tags 数字串），无映射标准键直出（兼容零值集站）。与 executor
+			// applied 显示层同构——显示/上传同源（§59.309 教训镜像：原实现
+			// 显示层数字·上传层标准键·DryRun 假绿）。
+			if v, ok := a.config.Tags[tag]; ok {
+				write("tagList", v)
+			} else {
+				write("tagList", tag)
+			}
 		case model.TagModeCheckboxID:
 			// PTer 类：selector 是 checkbox name
 			if selector, ok := a.config.Tags[tag]; ok {
