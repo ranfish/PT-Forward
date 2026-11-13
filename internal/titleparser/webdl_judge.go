@@ -41,6 +41,12 @@ var (
 	webVerNumIPRE       = regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+$`)
 	// 铁证①-GPU 显卡/硬件编码器（Video WL——民用硬件编码·平台用自家编码器）
 	webHWEncRE = regexp.MustCompile(`(?i)nvenc|qsv\b|videotoolbox|amf\b`)
+	// 铁证①-FFmpeg直调：Video 段裸 Lavc（区别于 General 段 Lavf 官方合并
+	// 指纹——Sin Trade 官方变体实证；GPU 检查在前·hevc_nvenc 形态已消费）
+	webBareLavcRE = regexp.MustCompile(`^lavc\d+\.\d+`)
+	// 铁证①-民用编码器：民用剪辑软件内核/上古民用编码器（不可能出现在
+	// 平台流——§59.517 追记·全库零命中纯纵深）
+	webCivEncoderRE = regexp.MustCompile(`(?i)mainconcept|divx|xvid`)
 	// 交叉: CDN 资产 ID（General Comment "vid:v[hex]"——西瓜视频等平台）
 	webCDNVIDRE = regexp.MustCompile(`(?i)^vid:v[0-9a-f]+`)
 	// 交叉: Source 洗版声明（Video Source 字段——发布组自留来源标注）
@@ -259,6 +265,16 @@ func judgeWEBDL(ev webdlEvidence) (string, string) {
 	}
 	if ev.hwEncoder {
 		return WEBVerdictCivilian, "铁证①GPU硬编码"
+	}
+	// §59.517 追记（用户讨论吸收）：Video 段裸 Lavc = ffmpeg -c:v 直调
+	// 痕迹（原厂封装工业编码头绝不留此名）。
+	if webBareLavcRE.MatchString(ev.vidWL) {
+		return WEBVerdictCivilian, "铁证①FFmpeg直调"
+	}
+	// §59.517 追记（用户讨论吸收）：民用编码器黑名单——MainConcept
+	// （Premiere 等民用剪辑软件导出内核）/DivX/XviD（上古民用编码器）。
+	if webCivEncoderRE.MatchString(ev.vidWL) {
+		return WEBVerdictCivilian, "铁证①民用编码器"
 	}
 	if ev.dvP5 {
 		return WEBVerdictOfficial, "铁证②DV P5"
