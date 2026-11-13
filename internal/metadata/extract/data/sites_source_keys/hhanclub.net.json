@@ -118,10 +118,6 @@
         " - Powered"
       ]
     },
-    "description_from_range": {
-      "start_pattern": "id=['\"]cover-content['\"][^>]*src=['\"][^'\"]+['\"][^>]*>",
-      "end_pattern": "<div\\s+id=['\"]footer['\"][^>]*>"
-    },
     "poster_from_pattern": "id=['\"]cover-content['\"][^>]*src=['\"]([^'\"]+)['\"]",
     "basic_info_div_label": {
       "label_selector": "div[class*='font-bold'][class*='leading-6']",

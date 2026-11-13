@@ -487,6 +487,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleDeclBackfillProgress(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/declaration-backfill-cancel") && r.Method == http.MethodPost:
 		h.handleDeclBackfillCancel(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/fix-source-description") && r.Method == http.MethodPost:
+		h.handleFixSourceDescription(w, r)
 		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/backfill") && r.Method == http.MethodPost:
 		h.handleBDInfoBackfill(w, r)
