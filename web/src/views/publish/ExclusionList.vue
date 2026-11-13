@@ -167,7 +167,7 @@
         </div>
 
         <!-- 用户自定义（可增删） -->
-        <div style="margin: 12px 0 6px; font-size: 13px; font-weight: 600">自定义（{{ declPatterns.length }} 条·可增删）</div>
+        <div style="margin: 12px 0 6px; font-size: 13px; font-weight: 600">自定义（{{ declPatterns.length }} 条·可增删·删除即生效不再恢复）</div>
         <div style="margin-bottom: 8px">
           <a-button type="primary" size="small" @click="addDeclPattern">添加模式</a-button>
         </div>

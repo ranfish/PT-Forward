@@ -129,6 +129,13 @@ func TestDeclarationFilter_MergeSemantics(t *testing.T) {
 	if !has(f.GetPatterns(ctx), "旧版遗留词") || !has(f.GetPatterns(ctx), defaultDeclarationPatterns[0]) {
 		t.Error("旧快照兼容断裂")
 	}
+
+	// ⑤ v0.0.1460 读取即自愈：旧快照 DB → GetCustomPatterns 只回真自定义
+	//（内置剔除·不等保存）——243 实测 19 条残留形态的根修锚
+	lc := f.GetCustomPatterns(ctx)
+	if len(lc) != 1 || lc[0] != "旧版遗留词" {
+		t.Errorf("读取自愈失败：custom=%v（应仅 [旧版遗留词]——内置旧拷贝应剔除）", lc)
+	}
 }
 
 func quote(ss []string) []string {

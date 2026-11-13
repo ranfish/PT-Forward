@@ -97,7 +97,13 @@ func (f *DeclarationFilter) GetPatterns(ctx context.Context) []string {
 	return merged
 }
 
-// GetCustomPatterns 用户自定义集（DB 存储·可增删；内置词剔除不落 DB）。
+// GetCustomPatterns 用户自定义集（DB 存储·可增删；读取时剔除内置词）。
+// §59.516 v0.0.1460：读取即自愈——历史全量快照（旧客户端保存语义为
+// 整集落 DB·后被版本收编为内置的旧拷贝）不再等待下次保存，显示层立即
+// 纯 custom 化。243 实测 19 条旧快照残留与内置完全相同·用户删除后词条
+// 仍显内置锁定组，造成「删不掉/自动回来」心智错位——根修=本函数兑现
+// 「内置词剔除」的既有文档契约于读取路径。过滤行为零变化（GetPatterns
+// 合并去重本就不受影响）。
 func (f *DeclarationFilter) GetCustomPatterns(ctx context.Context) []string {
 	val, err := f.repo.Get(ctx, "declaration_filter_patterns")
 	if err != nil || val == "" {
@@ -107,7 +113,20 @@ func (f *DeclarationFilter) GetCustomPatterns(ctx context.Context) []string {
 	if err := json.Unmarshal([]byte(val), &patterns); err != nil {
 		return nil
 	}
-	return patterns
+	builtin := make(map[string]bool, len(defaultDeclarationPatterns))
+	for _, p := range defaultDeclarationPatterns {
+		builtin[p] = true
+	}
+	seen := make(map[string]bool, len(patterns))
+	custom := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		if p == "" || builtin[p] || seen[p] {
+			continue
+		}
+		seen[p] = true
+		custom = append(custom, p)
+	}
+	return custom
 }
 
 // GetRawPatterns 兼容保留（原调用方）。
