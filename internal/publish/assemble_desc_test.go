@@ -178,3 +178,24 @@ func TestHasMinBDToken(t *testing.T) {
 		t.Error("普通压制不应命中")
 	}
 }
+
+// TestCoverURLOfDescription §59.510: PTGen 简介首行封面 URL 提取。
+func TestCoverURLOfDescription(t *testing.T) {
+	cases := []struct {
+		name, in, want string
+	}{
+		{"标准形态", "[img]https://doubaninfo.com/dbposter/doubaninfo_com_3434070.jpg[/img]\n◎片名 测试", "https://doubaninfo.com/dbposter/doubaninfo_com_3434070.jpg"},
+		{"空简介", "", ""},
+		{"非img开头", "◎片名 测试\n正文", ""},
+		{"只有img壳", "[img][/img]", ""},
+		{"img后有空白", "[img]  https://example.com/p.jpg  [/img]\n正文", "https://example.com/p.jpg"},
+		{"无换行整段img", "[img]https://pixhost.to/poster.jpg[/img]", "https://pixhost.to/poster.jpg"},
+		{"多行img非首行", "正文\n[img]https://example.com/x.jpg[/img]", ""},
+	}
+	for _, c := range cases {
+		got := coverURLOfDescription(c.in)
+		if got != c.want {
+			t.Errorf("[%s] got=%q want=%q", c.name, got, c.want)
+		}
+	}
+}
