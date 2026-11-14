@@ -648,8 +648,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.309: TagArrayFields 前置构建（上传 tags 真相源——预检与 pubReq 同一产物，
 	// 按构造同源。原预检消费 applied 表示层（值反查 label miss 静默丢）+上传独立
 	// applier.Apply=双链分叉三案病根：§59.304 英语注入、§59.308 标题、本次审计）
+	// §59.529: 同域同值去重——双 canonical 映射同 value（财神双 11：dolby_vision
+	// 与 dolby_atmos 都命中「杜比」词条）时只投一次。站方表单对重复 checkbox 值
+	// 会整栏作废（Ip Man 实证：标签全丢+Bot 拒）——投递层兜底防御，键层修正之外
+	// 的第二道防线。
 	var tagArrayFields []model.TagKV
+	tagValueSeen := map[string]bool{}
 	applier.Apply(tags, func(field, value string) {
+		dedup := field + "\x00" + value
+		if tagValueSeen[dedup] {
+			return
+		}
+		tagValueSeen[dedup] = true
 		tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: value})
 	})
 	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {

@@ -530,7 +530,7 @@ banPictureBed = ['rains3.com', 'img.m-team.cc', 'totheglory.im/details', 'i.miji
   "喜剧": 8,
   "完结": 9,
   "Remux": 10,
-  "杜比": 11,
+  "杜比": 11,  # §59.529: 语义只指 Dolby Vision（标签层视频增强）——Atmos 走质量层 audiocodec(TrueHD Atmos 11)；双键致同值双投被站方整栏作废（Ip Man 案实证）
   "粤语": 12,
   "独家": 13,
   "自压": 14,
