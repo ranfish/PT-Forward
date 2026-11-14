@@ -103,6 +103,17 @@
 
 > **注意**：音频编码ID排序非字母序（AC3=8, AAC=6），与标准NexusPHP不同。
 
+**§59.520 复拉与归并定案（2026-11-14·实时 upload.php 登录态 57KB 逐字）**：
+站方 10 项确认无 DTS-HD MA/TrueHD/LPCM 词条。原「DTS-HD MA→Other=音乐向
+站语义正确」定案**作废**——织梦是综合站（影视区）·审核脚本音频识别表含
+DTS/TrueHD/LPCM/DDP=影视语义·站方拒「音频类: Other」（四颗 UHD DoVi 案
+Who Am I/When Harry Met Sally 实证）。归并：DTS(3) 承接 DTS 家族
+[dts, dts_hd_ma, dts_hd_hr, dts_x]·WAV(10) 承接 [wav, lpcm]（无压缩语义
+精准）。TrueHD/Atmos 归并挂账（10 项无贴切·等重发后站方反馈）。tags 的
+「杜比(14)/HDR(7)」词条在场但适配期漏接键（只配 6 键·杜比/HDR 被标
+「✅ 交叉验证」却零键=站方校验标签漏投必拒）——migration161 补
+tag.dolby_vision/tag.hdr10。
+
 ## 制作组映射 (team_sel[4])
 
 | ID | 名称 | 备注 |
