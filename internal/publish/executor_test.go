@@ -1,9 +1,12 @@
 package publish
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -455,5 +458,54 @@ func TestAssembleTagsAdjustOrder(t *testing.T) {
 	}
 	if !found3["complete"] {
 		t.Errorf("放行语义：值集无 complete 的站 complete 应放行进调整层: %v", out3)
+	}
+}
+
+// TestExportClusterFallback §59.519: 毒副本导出失败时簇内健康副本兜底。
+// Flight/BoyMeetsGirl 案：TR 4.0.5 Malformed benc 副本 .torrent 缺失·
+// 同簇（client+path+name）12-14 个健康副本在——fallback 三态。
+func TestExportClusterFallback(t *testing.T) {
+	e := &PublishExecutor{}
+	rv := &ResourceView{ClientUID: 2, SavePath: "/home/pt/pt1/FRDS",
+		Name: "Flight.2012", Hashes: []string{"poison", "dead", "healthy1", "healthy2"}}
+
+	// ① 毒 hash 失败 → 跳过 dead → healthy1 命中
+	mc := &mocks.DownloaderClient{
+		ExportTorrentFn: func(_ context.Context, hash string) ([]byte, error) {
+			switch hash {
+			case "poison", "dead":
+				return nil, fmt.Errorf("torrent 文件缺失")
+			default:
+				return []byte("d4:infod"), nil // bencode 首字节
+			}
+		},
+	}
+	data, alt := e.exportClusterFallback(context.Background(), mc, rv, "poison")
+	if data == nil || alt != "healthy1" {
+		t.Errorf("fallback 应命中 healthy1: alt=%q", alt)
+	}
+
+	// ② 簇内全毒 → nil
+	mc2 := &mocks.DownloaderClient{
+		ExportTorrentFn: func(_ context.Context, _ string) ([]byte, error) {
+			return nil, fmt.Errorf("全灭")
+		},
+	}
+	if d, a := e.exportClusterFallback(context.Background(), mc2, rv, "poison"); d != nil || a != "" {
+		t.Errorf("全灭簇应返回 nil: %q", a)
+	}
+
+	// ③ 非 bencode 数据（防御）→ 跳过不误用
+	mc3 := &mocks.DownloaderClient{
+		ExportTorrentFn: func(_ context.Context, hash string) ([]byte, error) {
+			if hash == "junk" {
+				return []byte("<html>not bencode</html>"), nil
+			}
+			return []byte("d4:infod"), nil
+		},
+	}
+	rv3 := &ResourceView{Hashes: []string{"poison", "junk", "good"}}
+	if _, a := e.exportClusterFallback(context.Background(), mc3, rv3, "poison"); a != "good" {
+		t.Errorf("非 bencode 应跳过: alt=%q", a)
 	}
 }

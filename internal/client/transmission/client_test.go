@@ -1,6 +1,7 @@
 package transmission
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -911,5 +912,34 @@ func TestTRClient_SetCategory(t *testing.T) {
 	}
 	if err := c.SetCategory(context.Background(), "h1", "new-cat"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestTRClient_ExportTorrent_ErrPhrasing §59.519: 导出错误三态文案——
+// 「TR 无此种子」/「torrent_dir 未配置」/「文件缺失」三分（原兜底文案把
+// 文件缺失谎报成「no torrent_dir configured」·torrent_dir 冤枉背锅）。
+func TestTRClient_ExportTorrent_ErrPhrasing(t *testing.T) {
+	// 构造：rpc 返回种子存在（ TorrentFile 空）+ torrent_dir 指向不存在目录 → 文件缺失态
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"arguments":{"torrents":[{"id":1,"hashString":"aabb","name":"x"}]},"result":"success"}`))
+	}))
+	defer srv.Close()
+	c, err := NewTRClient(&model.ClientConfig{
+		URL: srv.URL, Username: "u", Password: "p",
+		Config: `{"torrent_dir":"/nonexistent-59-519"}`,
+	}, nil, zap.NewNop())
+	if err != nil {
+		t.Skipf("connect: %v", err)
+	}
+	_, expErr := c.ExportTorrent(context.Background(), "aabb")
+	if expErr == nil {
+		t.Fatal("应报错")
+	}
+	msg := expErr.Error()
+	if strings.Contains(msg, "no torrent_dir configured") {
+		t.Errorf("旧谎报文案残留: %s", msg)
+	}
+	if !strings.Contains(msg, "文件缺失") {
+		t.Errorf("应为文件缺失态文案: %s", msg)
 	}
 }
