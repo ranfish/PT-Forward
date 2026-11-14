@@ -97,13 +97,20 @@
           <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
         </template>
         <template v-if="column.key === 'sites'">
-          <a-tooltip v-if="record.sites?.length" :title="record.sites.join('、')">
-            <span>
-              <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
-              <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
-            </span>
-          </a-tooltip>
-          <span v-else style="color: #999; font-size: 12px">未知</span>
+          <!-- §59.521: 已有站点=做种面（tracker 归属）——前 7 tag + +N 悬浮卡片（Popover）全量网格 -->
+          <template v-if="record.sites?.length">
+            <a-tag v-for="s in record.sites.slice(0, 7)" :key="s" style="margin: 1px">{{ s }}</a-tag>
+            <a-popover v-if="record.sites.length > 7" trigger="click" placement="left">
+              <template #content>
+                <div style="max-width: 360px">
+                  <div style="margin-bottom: 6px; color: #999; font-size: 12px">共 {{ record.sites.length }} 站做种</div>
+                  <a-tag v-for="s in record.sites" :key="s" style="margin: 2px">{{ s }}</a-tag>
+                </div>
+              </template>
+              <a-tag color="blue" style="margin: 1px; cursor: pointer">+{{ record.sites.length - 7 }}</a-tag>
+            </a-popover>
+          </template>
+          <span v-else style="color: #999; font-size: 12px">—</span>
         </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)" style="margin: 0">{{ statusLabel(record.status) }}</a-tag>
@@ -331,7 +338,7 @@ const columns = [
   { title: '类型', key: 'category', width: 80, sorter: (a: SeedListItem, b: SeedListItem) => (a.category || '').localeCompare(b.category || '') },
   { title: '大小', key: 'size', width: 90, sorter: (a: SeedListItem, b: SeedListItem) => a.size - b.size },
   { title: '副本', key: 'copies', width: 90, align: 'center' as const, sorter: (a: SeedListItem, b: SeedListItem) => (a.copy_count ?? 1) - (b.copy_count ?? 1) },
-  { title: '已有站点', key: 'sites', width: 220 },
+  { title: '已有站点', key: 'sites', width: 300, sorter: (a: SeedListItem, b: SeedListItem) => (a.sites?.length ?? 0) - (b.sites?.length ?? 0) },
   { title: '数据状态', key: 'status', width: 110 },
   { title: '操作', key: 'actions', width: 200 },
 ]
