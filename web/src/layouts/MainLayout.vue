@@ -283,10 +283,15 @@ const reSectionPrefix = /^(\s*(?:[-*]\s*)?)§\d+(?:\.\d+)?(?:\s*附[一二三四
 const reListMark = /^\s*[-*]\s+/
 const reTailAuthor = /\s+by\s+@\S+\s+in\s+\S+\s*$/
 const reStructLine = /^\s*(?:##\s|\*\*Full Changelog\*\*)/
+// §59.522: 内部维护 commit 行过滤——「AGENTS.md: vX 版本行」纯流程行/
+// 「docs: §X 追记…落盘」纯补充行（内容与主 commit 重复）对用户是噪声
+// （git log 生成形态带「- 」列表前缀——正则需兼容）
+const reInternalLine = /^\s*(?:[-*]\s*)?(?:AGENTS\.md:\s*|docs:\s*)/
 function stripSectionPrefix(notes: string): string {
   return notes
     .split('\n')
     .filter((line) => !reStructLine.test(line))
+    .filter((line) => !reInternalLine.test(line))
     .map((line) =>
       line.replace(reSectionPrefix, '$1').replace(reListMark, '').replace(reTailAuthor, ''),
     )
