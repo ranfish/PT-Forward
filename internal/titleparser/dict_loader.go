@@ -199,7 +199,7 @@ func loadDict() (*dictState, error) {
 					continue
 				}
 				switch sc {
-				case "all", "all_raw", "all_mi", "title", "title_raw", "subtitle_raw", "desc_raw", "statement_raw":
+				case "all", "all_raw", "all_mi", "mi", "title", "title_raw", "subtitle_raw", "desc_raw", "statement_raw":
 				default:
 					return nil, fmt.Errorf("dict/%s: token %q unknown infer_scope %q", e.Name(), t.Canonical, sc)
 				}
@@ -394,6 +394,11 @@ func tagMatchOne(pattern, scope string, all, title string, in TagInferInput, neg
 	switch scope {
 	case "all", "all_raw", "all_mi":
 		text = all
+	case "mi":
+		// §59.529: MI 专属范围——音频技术族（dolby_atmos）只认 MediaInfo 铁证，
+		// 标题词形不再触发（Scarlet 案：源站错标 "TrueHD 7.1 Atmos" 而 MI 无
+		// Atmos——§59.1438「音频族只信 MI」在标签层推理的延伸）。
+		text = in.MediaInfo
 	case "title", "title_raw":
 		text = title
 	case "subtitle_raw":

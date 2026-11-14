@@ -31,16 +31,27 @@ func TestAuro3DTagInfer(t *testing.T) {
 	if !found {
 		t.Errorf("Auro-3D 标题应推断 auro_3d 标签, got %v", hits)
 	}
-	// Atmos 标签回归
+	// §59.529 语义修正锚：dolby_atmos 推理范围收窄为 MI 专属（mi scope）——
+	// 标题词形不再触发（Scarlet 案：源站错标 "TrueHD 7.1 Atmos" 而 MI 无
+	// Atmos·错勾杜比被拒）；MI Commercial name 含 Atmos 才产出。
 	hits2 := TagInferMatches(TagInferInput{Title: "Movie Atmos 2024"})
-	hasAtmos := false
 	for _, h := range hits2 {
 		if h == "dolby_atmos" {
-			hasAtmos = true
+			t.Error("标题-only Atmos 不应再推断 dolby_atmos（§59.529 mi scope——标题错标防污染）")
 		}
 	}
-	if !hasAtmos {
-		t.Error("Atmos 标题应推断 dolby_atmos（回归）")
+	hits3 := TagInferMatches(TagInferInput{
+		Title:     "Movie 2024 UHD BluRay DoVi HDR TrueHD 7.1-FRDS",
+		MediaInfo: "Audio\nFormat : MLP FBA\nCommercial name : Dolby TrueHD with Dolby Atmos",
+	})
+	hasAtmosMI := false
+	for _, h := range hits3 {
+		if h == "dolby_atmos" {
+			hasAtmosMI = true
+		}
+	}
+	if !hasAtmosMI {
+		t.Error("MI 含 Atmos 应推断 dolby_atmos（§59.529 mi scope 正通道）")
 	}
 }
 

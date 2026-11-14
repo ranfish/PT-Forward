@@ -74,7 +74,7 @@
       "aliases": "全景声",
       "group": "音频编码",
       "infer_pattern": "dolby atmos|atmos",
-      "infer_scope": "all",
+      "infer_scope": "mi",
       "standard_key": "tag.dolby_atmos",
       "variants": [
         "Atmos",
