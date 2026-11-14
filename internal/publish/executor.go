@@ -544,98 +544,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
-	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),
-		in.TargetSite, meta.Title, meta.Subtitle)
-	// §59.273: 幸运中字启发（站方种审判据——MI 无中文字幕但产地为华语区且
-	// 副标题带硬字幕/中英字幕说明时仍须选中字；The Furious/I Know Who You
-	// Are 八案。站点特化——统一方法待其它站适配时再议，用户定案）
-	tags = luckptChineseSubtitleHeuristic(in.TargetSite, meta, tags)
-	// §59.278: HDR 标签标题对齐——组装标题的 HDR token（tp.HDR 标题/DOM 源）
-	// 与标签勾选一致（幸运种审判据"标题包含 HDR10→勾 HDR10 标签"）。MI 缺
-	// HDR 行时推断器（§59.151 MI 唯一真相）不产 HDR 族标签——标题/DOM 源
-	// 证据补位；站方无对应标签选项时 applier 自然丢弃（跨站安全）。
-	tags = syncHDRTagFromProfile(tp.HDR, tags)
+	// §59.531: 段提取为 AssembleTagArrayForSite——发布链与修复工具（tools/fix-site-tags）
+	// 同源消费（单源防双链分叉）；行为零变化（§59.309/§59.529 全链随迁）。
+	tags, tagArrayFields, applied := e.AssembleTagArrayForSite(meta, cfg, in.TargetSite, tp.HDR, in.TagOverrides)
 	// §59.454: 城市站标签依赖注入（chnize 消费 meta.Tags 的
 	// chinese_subtitle——不经 assembleTags 过滤：城市站无 tags 域配置
 	// → allowed 空 → 全部标签被滤（首版传 tags 变量恒空实测抓出）；
 	// 挂 DryRun 检查点前——§59.453 挂载教训）。
 	if in.TargetSite == "城市" {
 		hdcityTagDependentFill(form, meta.Tags)
-	}
-	tagCfg := &model.SiteTagConfig{
-		Mode:     model.TagModeTaglist,
-		Tags:     map[string]string{},
-		SpanField: cfg.FormFields[model.FieldDomainTags],
-	}
-	if cfg.TagConfig != nil && cfg.TagConfig.Mode != "" {
-		tagCfg.Mode = cfg.TagConfig.Mode
-	} else if fieldName := cfg.FormFields[model.FieldDomainTags]; strings.Contains(fieldName, "[") {
-		// §59.269 兜底: TagConfig 缺失但字段名是数组形态（tags[4][]）→ 推断
-		// checkbox_span（推断源=显式 FormFields 数据派生；空配置现状=默认
-		// taglist → 字段名硬编码 tagList → 标签全丢，兜底严格更好）
-		tagCfg.Mode = model.TagModeCheckboxSpan
-		if e.logger != nil {
-			e.logger.Info("tag config missing, inferred checkbox_span from field name",
-				zap.String("field", fieldName))
-		}
-	}
-	// Tags map 从 ValueMappings 构造（双形态键——standard_key + canonical）
-	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
-		if m.Auto != nil && !*m.Auto {
-			continue
-		}
-		// §59.164 转存发布禁勾"首发"（PT 圈通用铁律：圈首次发布=站管/压制组
-		// 官方专属，转载人员不允许使用——用户 2026-09-02 权威定义，全站适用）
-		if m.Label == "首发" {
-			continue
-		}
-		for _, k := range m.StandardKeys {
-			tagCfg.Tags[k] = m.Value
-			if i := strings.Index(k, "."); i > 0 {
-				tagCfg.Tags[k[i+1:]] = m.Value
-			}
-		}
-	}
-	applier := NewTagApplier(tagCfg)
-	applied := []string{}
-	for _, t := range tags {
-		if applier.IsSupported(t) {
-			if v, ok := tagCfg.Tags[t]; ok {
-				applied = append(applied, v)
-			} else {
-				applied = append(applied, t) // taglist 模式直出标准键
-			}
-		}
-	}
-	// §59.277: 幸运英语标签站规注入——TAGS_MISSING_ENGLISH_AUDIO 判据（无
-	// 国语/粤语/中字且英语音轨→必须选英语）。§59.151 附7 的 lucky_english_audio
-	// 通道被"英语选项 auto:false × 无 standard_keys"双卡断（allowed/tagCfg.Tags
-	// 均按 StandardKeys 构建，英语选项零键恒 miss）——站规强制属 auto:false
-	// 例外路径，Label 直配注入 applied。
-	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
-		dup := false
-		for _, a := range applied {
-			if a == v {
-				dup = true
-				break
-			}
-		}
-		if !dup {
-			applied = append(applied, v)
-		}
-	}
-	// §59.400: 财神题材标签注入（喜剧——◎类别行同源消费）
-	if v := csptGenreTagValue(cfg, in.TargetSite, meta); v != "" {
-		dup := false
-		for _, a := range applied {
-			if a == v {
-				dup = true
-				break
-			}
-		}
-		if !dup {
-			applied = append(applied, v)
-		}
 	}
 
 	// ⑥ 描述组装——纯本地资产消费（§59.159 白名单：替代 renderDescription
@@ -644,49 +561,6 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return failRec("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
 	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta, cfg)
-
-	// §59.309: TagArrayFields 前置构建（上传 tags 真相源——预检与 pubReq 同一产物，
-	// 按构造同源。原预检消费 applied 表示层（值反查 label miss 静默丢）+上传独立
-	// applier.Apply=双链分叉三案病根：§59.304 英语注入、§59.308 标题、本次审计）
-	// §59.529: 同域同值去重——双 canonical 映射同 value（财神双 11：dolby_vision
-	// 与 dolby_atmos 都命中「杜比」词条）时只投一次。站方表单对重复 checkbox 值
-	// 会整栏作废（Ip Man 实证：标签全丢+Bot 拒）——投递层兜底防御，键层修正之外
-	// 的第二道防线。
-	var tagArrayFields []model.TagKV
-	tagValueSeen := map[string]bool{}
-	applier.Apply(tags, func(field, value string) {
-		dedup := field + "\x00" + value
-		if tagValueSeen[dedup] {
-			return
-		}
-		tagValueSeen[dedup] = true
-		tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: value})
-	})
-	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
-		dup := false
-		for _, kv := range tagArrayFields {
-			if kv.Value == v {
-				dup = true
-				break
-			}
-		}
-		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
-			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
-		}
-	}
-	// §59.400: 财神题材标签注入（喜剧）——上传真相源同构
-	if v := csptGenreTagValue(cfg, in.TargetSite, meta); v != "" {
-		dup := false
-		for _, kv := range tagArrayFields {
-			if kv.Value == v {
-				dup = true
-				break
-			}
-		}
-		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
-			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
-		}
-	}
 
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
 	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）
@@ -3677,4 +3551,145 @@ func (e *PublishExecutor) repushConverge(ctx context.Context, in ExecuteInput, n
 	} else if res3.RowsAffected > 0 {
 		e.logger.Info("repush duplicate 收敛", zap.String("tid", in.TorrentID), zap.Int64("rows", res3.RowsAffected))
 	}
+}
+
+// AssembleTagArrayForSite §59.531: 目标站 tags 组装单源——发布链 Execute ⑤段
+// 与站上标签修复工具（tools/fix-site-tags）同源消费（防双链分叉）。
+// 返回三元组：tags（canonical 列表——M-Team labels 位等消费）·
+// tagArrayFields（上传真相源：field+value·§59.529 同域同值去重）·
+// applied（表示层值——DryRun Tags/labels 显示）。
+// 行为零变化：段整体自 Execute 迁移（§59.309 构造同源/§59.400 财神喜剧/
+// §59.277 幸运英语/§59.273 中字启发/§59.278 HDR 对齐全链随迁）。
+func (e *PublishExecutor) AssembleTagArrayForSite(meta *model.TorrentMetadata,
+	cfg *model.PublishFormConfig, targetSite, hdrProfile string,
+	overrides []string) ([]string, []model.TagKV, []string) {
+	tags := adjustTagsForSite(e.assembleTags(cfg, meta, overrides),
+		targetSite, meta.Title, meta.Subtitle)
+	// §59.273: 幸运中字启发（站方种审判据——MI 无中文字幕但产地为华语区且
+	// 副标题带硬字幕/中英字幕说明时仍须选中字；The Furious/I Know Who You
+	// Are 八案。站点特化——统一方法待其它站适配时再议，用户定案）
+	tags = luckptChineseSubtitleHeuristic(targetSite, meta, tags)
+	// §59.278: HDR 标签标题对齐——组装标题的 HDR token（tp.HDR 标题/DOM 源）
+	// 与标签勾选一致（幸运种审判据"标题包含 HDR10→勾 HDR10 标签"）。MI 缺
+	// HDR 行时推断器（§59.151 MI 唯一真相）不产 HDR 族标签——标题/DOM 源
+	// 证据补位；站方无对应标签选项时 applier 自然丢弃（跨站安全）。
+	tags = syncHDRTagFromProfile(hdrProfile, tags)
+	tagCfg := &model.SiteTagConfig{
+		Mode:      model.TagModeTaglist,
+		Tags:      map[string]string{},
+		SpanField: cfg.FormFields[model.FieldDomainTags],
+	}
+	if cfg.TagConfig != nil && cfg.TagConfig.Mode != "" {
+		tagCfg.Mode = cfg.TagConfig.Mode
+	} else if fieldName := cfg.FormFields[model.FieldDomainTags]; strings.Contains(fieldName, "[") {
+		// §59.269 兜底: TagConfig 缺失但字段名是数组形态（tags[4][]）→ 推断
+		// checkbox_span（推断源=显式 FormFields 数据派生；空配置现状=默认
+		// taglist → 字段名硬编码 tagList → 标签全丢，兜底严格更好）
+		tagCfg.Mode = model.TagModeCheckboxSpan
+		if e.logger != nil {
+			e.logger.Info("tag config missing, inferred checkbox_span from field name",
+				zap.String("field", fieldName))
+		}
+	}
+	// Tags map 从 ValueMappings 构造（双形态键——standard_key + canonical）
+	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
+		if m.Auto != nil && !*m.Auto {
+			continue
+		}
+		// §59.164 转存发布禁勾"首发"（PT 圈通用铁律：圈首次发布=站管/压制组
+		// 官方专属，转载人员不允许使用——用户 2026-09-02 权威定义，全站适用）
+		if m.Label == "首发" {
+			continue
+		}
+		for _, k := range m.StandardKeys {
+			tagCfg.Tags[k] = m.Value
+			if i := strings.Index(k, "."); i > 0 {
+				tagCfg.Tags[k[i+1:]] = m.Value
+			}
+		}
+	}
+	applier := NewTagApplier(tagCfg)
+	applied := []string{}
+	for _, t := range tags {
+		if applier.IsSupported(t) {
+			if v, ok := tagCfg.Tags[t]; ok {
+				applied = append(applied, v)
+			} else {
+				applied = append(applied, t) // taglist 模式直出标准键
+			}
+		}
+	}
+	// §59.277: 幸运英语标签站规注入——TAGS_MISSING_ENGLISH_AUDIO 判据（无
+	// 国语/粤语/中字且英语音轨→必须选英语）。§59.151 附7 的 lucky_english_audio
+	// 通道被"英语选项 auto:false × 无 standard_keys"双卡断（allowed/tagCfg.Tags
+	// 均按 StandardKeys 构建，英语选项零键恒 miss）——站规强制属 auto:false
+	// 例外路径，Label 直配注入 applied。
+	if v := luckptEnglishTagValue(cfg, targetSite, meta, tags); v != "" {
+		dup := false
+		for _, a := range applied {
+			if a == v {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			applied = append(applied, v)
+		}
+	}
+	// §59.400: 财神题材标签注入（喜剧——◎类别行同源消费）
+	if v := csptGenreTagValue(cfg, targetSite, meta); v != "" {
+		dup := false
+		for _, a := range applied {
+			if a == v {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			applied = append(applied, v)
+		}
+	}
+	// §59.309: TagArrayFields（上传 tags 真相源——预检与 pubReq 同一产物，
+	// 按构造同源。原预检消费 applied 表示层（值反查 label miss 静默丢）+上传独立
+	// applier.Apply=双链分叉三案病根：§59.304 英语注入、§59.308 标题、本次审计）
+	// §59.529: 同域同值去重——双 canonical 映射同 value（财神双 11：dolby_vision
+	// 与 dolby_atmos 都命中「杜比」词条）时只投一次。站方表单对重复 checkbox 值
+	// 会整栏作废（Ip Man 实证：标签全丢+Bot 拒）——投递层兜底防御，键层修正之外
+	// 的第二道防线。
+	var tagArrayFields []model.TagKV
+	tagValueSeen := map[string]bool{}
+	applier.Apply(tags, func(field, value string) {
+		dedup := field + "\x00" + value
+		if tagValueSeen[dedup] {
+			return
+		}
+		tagValueSeen[dedup] = true
+		tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: value})
+	})
+	if v := luckptEnglishTagValue(cfg, targetSite, meta, tags); v != "" {
+		dup := false
+		for _, kv := range tagArrayFields {
+			if kv.Value == v {
+				dup = true
+				break
+			}
+		}
+		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
+			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
+		}
+	}
+	// §59.400: 财神题材标签注入（喜剧）——上传真相源同构
+	if v := csptGenreTagValue(cfg, targetSite, meta); v != "" {
+		dup := false
+		for _, kv := range tagArrayFields {
+			if kv.Value == v {
+				dup = true
+				break
+			}
+		}
+		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
+			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
+		}
+	}
+	return tags, tagArrayFields, applied
 }
