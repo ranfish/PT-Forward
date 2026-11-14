@@ -240,6 +240,37 @@
       ]
     },
     {
+      "canonical": "bilingual_subtitle",
+      "label": "双语字幕",
+      "aliases": "中英对照字幕",
+      "group": "字幕",
+      "standard_key": "tag.bilingual_subtitle",
+      "variants": [
+        "双语字幕",
+        "中英字幕",
+        "简英字幕",
+        "繁英字幕"
+      ],
+      "infer_pattern": "(CHS&ENG|CHT&ENG|ENG&CHS|ENG&CHT)",
+      "infer_scope": "mi",
+      "infer_pattern2": "(双语字幕)",
+      "infer_scope2": "title_raw",
+      "note": "§59.530 用户定案：字幕双语=单轨内两种文字同显（对照形态）——MI Text Title 的 & 双码形态=技术指纹（主通道·mi scope 铁证）；副标/标题『XX双语字幕』声明词形=补充通道（自带字幕锚·不误触音轨『国英双语』）。与 bilingual_audio（音轨跨轨集合）结构不同·不可互替"
+    },
+    {
+      "canonical": "bilingual_subtitle_chs_eng",
+      "label": "简英双语字幕",
+      "aliases": "简中英对照",
+      "group": "字幕",
+      "standard_key": "tag.bilingual_subtitle_chs_eng",
+      "variants": [
+        "简英双语字幕"
+      ],
+      "infer_pattern": "(CHS&ENG|ENG&CHS)",
+      "infer_scope": "mi",
+      "note": "§59.530 简英精确键：仅 MI 铁证（CHS&ENG Title）——声明词形不进精确键（发布者写『简英』不严谨可能是繁英·铁证才算数）。垃圾堆『简英双语字幕』专用。守则：与泛键互含·不得同接同一词条"
+    },
+    {
       "canonical": "hardcoded_subs",
       "label": "硬字幕",
       "aliases": "硬字",
