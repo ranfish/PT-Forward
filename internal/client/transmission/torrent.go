@@ -198,7 +198,7 @@ func (c *TRClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 func (c *TRClient) ExportTorrent(ctx context.Context, hash string) ([]byte, error) {
 	torrents, err := c.getTorrents(ctx, []string{hash}, []string{"torrentFile"})
 	if err != nil || len(torrents) == 0 {
-		return nil, c.newErr(11005, "torrent not found for export")
+		return nil, c.newErr(11005, fmt.Sprintf("TR 无此种子 hash=%s（rpc torrent-get 未返回）", hash))
 	}
 	torrentPath := torrents[0].TorrentFile
 	if torrentPath != "" {
@@ -214,15 +214,19 @@ func (c *TRClient) ExportTorrent(ctx context.Context, hash string) ([]byte, erro
 	if c.cfg.Config != "" {
 		_ = json.Unmarshal([]byte(c.cfg.Config), &cfg)
 	}
-	if cfg.TorrentDir != "" {
-		localPath := filepath.Join(cfg.TorrentDir, hash+".torrent")
-		data, err := os.ReadFile(localPath) //nolint:gosec // controlled by admin config
-		if err == nil {
-			return data, nil
-		}
+	if cfg.TorrentDir == "" {
+		// §59.519 三态文案：真未配置（区别于文件缺失——Flight/BoyMeetsGirl
+		// 案原文案把「文件缺失」谎报成「未配置」·torrent_dir 冤枉背锅）
+		return nil, c.newErr(11005, "torrent_dir 未配置（无法从文件系统导出）")
 	}
-
-	return nil, c.newErr(11005, "torrent file not accessible (remote path unavailable, no torrent_dir configured)")
+	localPath := filepath.Join(cfg.TorrentDir, hash+".torrent")
+	data, err := os.ReadFile(localPath) //nolint:gosec // controlled by admin config
+	if err == nil {
+		return data, nil
+	}
+	// §59.519 三态文案：配置在场但文件缺失——TR 4.0.5 对部分种子
+	// （Malformed benc·TR 日志可见）不落 .torrent·rpc metainfo 字段亦空。
+	return nil, c.newErr(11005, fmt.Sprintf("torrent 文件缺失 %s（TR metainfo 异常——TR 日志 Malformed benc 同案·metainfo rpc 通道亦空）", filepath.Base(localPath)))
 }
 
 func (c *TRClient) DeleteTorrent(ctx context.Context, hash string, deleteFiles bool) error {

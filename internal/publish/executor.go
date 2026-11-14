@@ -175,6 +175,24 @@ func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.T
 	return false, ""
 }
 
+// exportClusterFallback §59.519: 导出失败时按资源键（rv.Hashes=同 client+
+// path+name 的全部活跃 hash）逐副本尝试导出——毒副本（Flight/BoyMeetsGirl 案：
+// TR 4.0.5 Malformed benc·.torrent 不落盘且 metainfo rpc 空）由簇内健康
+// 副本兜底。首字节 'd' 校验与主路径同源（bencode 嗅探）。返回 nil=全败。
+func (e *PublishExecutor) exportClusterFallback(ctx context.Context, client model.DownloaderClient, rv *ResourceView, failedHash string) ([]byte, string) {
+	for _, alt := range rv.Hashes {
+		if alt == failedHash {
+			continue
+		}
+		data, err := client.ExportTorrent(ctx, alt)
+		if err != nil || len(data) == 0 || data[0] != 'd' {
+			continue
+		}
+		return data, alt
+	}
+	return nil, ""
+}
+
 func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *ExecuteResult {
 	fail := func(status, msg string) *ExecuteResult {
 		return &ExecuteResult{Status: status, Message: msg}
@@ -271,7 +289,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	torrentData, err := client.ExportTorrent(ctx, in.InfoHash)
 	if err != nil || len(torrentData) == 0 {
-		return failRec("failed", fmt.Sprintf("本地导出种子失败: %v", err))
+		// §59.519 簇内健康副本 fallback：毒副本（TR 4.0.5 Malformed benc——
+		// .torrent 不落盘+metainfo 空）导出失败时·用同资源键（client+path+
+		// name=文件树同构）其它副本导出。与 pusher「using actual hash」
+		// 同族语义（推送链早已按本地实际 hash 推·导出链对齐）。
+		alt, altHash := e.exportClusterFallback(ctx, client, rv, in.InfoHash)
+		if alt != nil {
+			torrentData = alt
+			if e.logger != nil {
+				e.logger.Info("export fallback: cluster sibling used",
+					zap.String("hash", in.InfoHash), zap.String("alt_hash", altHash),
+					zap.Uint("client", rv.ClientUID), zap.String("site", in.TargetSite))
+			}
+		} else {
+			return failRec("failed", fmt.Sprintf(
+				"本地导出种子失败: %v（簇内共 %d 个副本均不可导出——TR metainfo 异常见 TR 日志）", err, len(rv.Hashes)))
+		}
 	}
 	// §59.159 源头嗅探：导出数据必须是 bencode（实战排查——.torrent 无效时
 	// 站方静默回表单页，错误不可见）
