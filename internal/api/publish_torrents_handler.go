@@ -3718,16 +3718,22 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// 列表假阴性标 unfetched。H1 只放宽了 metas 查询没放宽映射域，半修）
 	// §59.316 附 C: 键值 name → triple key（与 copyCountByKey 同格式）
 	tripleByHash := make(map[string]string, len(rawSnapshots)*2)
+	// §59.521: 簇内 tracker 域名聚合——「已有站点」列换做种面（tracker 归属）。
+	// 原 metadata 行 site_name 集合失真（簇行复制代表行 site_name·Flight 案
+	// 14 站在种只显示 1 站）；tracker 域名是快照扫描持久化的真实归属
+	// （243 实测填充率 100%）。零新增查询——hashQ 顺路多取一列。
+	domainByCluster := make(map[string][]string, len(rawSnapshots)*2)
 	{
 		var hashKeyRows []struct {
-			Hash      string
-			ClientUID uint
-			SavePath  string
-			Name      string
+			Hash          string
+			ClientUID     uint
+			SavePath      string
+			Name          string
+			TrackerDomain string
 		}
 		hashQ := h.db.WithContext(r.Context()).
 			Table("torrent_snapshots").
-			Select("hash, client_uid, save_path, name").
+			Select("hash, client_uid, save_path, name, tracker_domain").
 			Where("is_hidden = ? AND name != ''", false)
 		if clientUID != 0 {
 			hashQ = hashQ.Where("client_uid = ?", clientUID)
@@ -3741,7 +3747,11 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 		hashQ.Find(&hashKeyRows)
 		for _, r := range hashKeyRows {
-			tripleByHash[r.Hash] = fmt.Sprintf("%d|%s|%s", r.ClientUID, r.SavePath, r.Name)
+			key := fmt.Sprintf("%d|%s|%s", r.ClientUID, r.SavePath, r.Name)
+			tripleByHash[r.Hash] = key
+			if r.TrackerDomain != "" {
+				domainByCluster[key] = append(domainByCluster[key], r.TrackerDomain)
+			}
 		}
 	}
 	metaByCluster := make(map[string][]model.TorrentMetadata, len(snapshots))
@@ -3794,6 +3804,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		return false
 	}
 	needFullCompliance := statusFilter == "system_forbidden"
+	// §59.521: 「已有站点」tracker 匹配器单例（循环内逐行 New 会重查 sites 表）
+	var seedTrackerMatcher *site.TrackerMatcher
 	items := make([]map[string]interface{}, 0, len(snapshots))
 	for _, snap := range snapshots {
 		item := map[string]interface{}{
@@ -3921,10 +3933,20 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			cc = 1
 		}
 		item["copy_count"] = cc
+		// §59.521: 已有站点=簇内做种面（tracker 归属·trackerMatcher.Match）。
+		// 原 metadata 行 site_name 集合失真（簇行建行复制代表行 site_name——
+		// §59.519 Flight 案 14 站在种只显示「朋友」1 站）；tracker 域名=快照
+		// 持久化的真实归属（与 .torrent comment 教训同源：归属看 tracker）。
+		// trackerMatcher 函数级单例（循环内逐行 New 会每行重查 sites 表）。
+		if seedTrackerMatcher == nil {
+			seedTrackerMatcher = site.NewTrackerMatcher(h.db)
+		}
 		siteSet := make(map[string]bool)
-		for _, m := range metaByCluster[clusterKey] {
-			if m.SiteName != "" {
-				siteSet[m.SiteName] = true
+		if seedTrackerMatcher != nil {
+			for _, d := range domainByCluster[clusterKey] {
+				if sn := seedTrackerMatcher.Match(d); sn != "" {
+					siteSet[sn] = true
+				}
 			}
 		}
 		sites := make([]string, 0, len(siteSet))
