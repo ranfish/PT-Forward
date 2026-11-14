@@ -56,11 +56,11 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 57 {
-		t.Errorf("tag 词条 %d, want 56（+§59.85 A类缺口）", total)
+	if total != 59 {
+		t.Errorf("tag 词条 %d, want 57（+§59.85 A类缺口+§59.530 双语字幕两键）", total)
 	}
 	// 关键词条锚定
-	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {
+	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d", "bilingual_subtitle", "bilingual_subtitle_chs_eng"} {
 		if !seen[k] {
 			t.Errorf("tag 缺关键词条 %q", k)
 		}

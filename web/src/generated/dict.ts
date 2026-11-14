@@ -480,6 +480,16 @@ export const TAG_GROUPS: TagGroup[] = [
           "aliases": "ENG"
         },
         {
+          "key": "bilingual_subtitle",
+          "label": "双语字幕",
+          "aliases": "中英对照字幕"
+        },
+        {
+          "key": "bilingual_subtitle_chs_eng",
+          "label": "简英双语字幕",
+          "aliases": "简中英对照"
+        },
+        {
           "key": "hardcoded_subs",
           "label": "硬字幕",
           "aliases": "硬字"
