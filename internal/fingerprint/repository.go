@@ -47,7 +47,45 @@ func (r *Repository) Save(ctx context.Context, fp *model.ContentFingerprint) err
 	if fp.InfoHash == "" {
 		return &model.AppError{Code: 40001, Message: "info_hash is required"}
 	}
-	return r.db.WithContext(ctx).Save(fp).Error
+	if err := r.db.WithContext(ctx).Save(fp).Error; err != nil {
+		return err
+	}
+	// §59.535 刀4: 获取链采集成功即同步覆盖表——「知道即落库」（指纹存在=
+	// 从该站该 tid 的真 torrent 算出=站上有·铁证 1.0）。指纹表保留内部用途。
+	r.syncFetchCoverage(ctx, fp.InfoHash, fp.SiteName, fp.TorrentID)
+	return nil
+}
+
+// syncFetchCoverage §59.535 刀4: 单条指纹→覆盖表同步。先到优先（对齐
+// reseed.syncMatchCoverage 先例）：INSERT OR IGNORE 不覆盖已有行；已有行仅
+// 补空缺 torrent_id+刷新 queried_at。expires_at 远期（§59.535 废弃）。
+func (r *Repository) syncFetchCoverage(ctx context.Context, infoHash, siteName, torrentID string) {
+	if infoHash == "" || siteName == "" {
+		return
+	}
+	now := time.Now()
+	res := r.db.WithContext(ctx).Exec(`INSERT OR IGNORE INTO site_coverage_cache
+		(info_hash, site_name, status, source, confidence, torrent_id, queried_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		infoHash, siteName, model.CoverageConfirmedHas, model.CoverageSourceFetch,
+		1.0, torrentID, now, now.Add(365*24*time.Hour))
+	if res.Error != nil {
+		r.logger.Debug("sync fetch coverage insert failed",
+			zap.String("hash", infoHash), zap.String("site", siteName), zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		return
+	}
+	upd := r.db.WithContext(ctx).Exec(`UPDATE site_coverage_cache SET
+		torrent_id = CASE WHEN (torrent_id = '' OR torrent_id IS NULL) AND ? != '' THEN ? ELSE torrent_id END,
+		queried_at = ?
+		WHERE info_hash = ? AND site_name = ?`,
+		torrentID, torrentID, now, infoHash, siteName)
+	if upd.Error != nil {
+		r.logger.Debug("sync fetch coverage update failed",
+			zap.String("hash", infoHash), zap.String("site", siteName), zap.Error(upd.Error))
+	}
 }
 
 // UpdateField §59.25: 更新单个字段（懒计算回写用）
@@ -192,9 +230,18 @@ func (r *Repository) populateParsed(fp *model.ContentFingerprint) {
 }
 
 func (r *Repository) BatchSave(ctx context.Context, fps []*model.ContentFingerprint) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return tx.Create(&fps).Error
-	})
+	}); err != nil {
+		return err
+	}
+	// §59.535 刀4: 批量指纹落库→批量同步覆盖表（同 Save 单条语义）
+	for _, fp := range fps {
+		if fp != nil {
+			r.syncFetchCoverage(ctx, fp.InfoHash, fp.SiteName, fp.TorrentID)
+		}
+	}
+	return nil
 }
 
 func (r *Repository) CleanupOrphans(ctx context.Context, maxAgeDays int) (int64, error) {
