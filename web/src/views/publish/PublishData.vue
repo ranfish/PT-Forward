@@ -202,6 +202,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import client from '@/api/client'
 import { executeApi, type SiteBatchTask } from '@/api/formConfig'
 import SiteTiles from './SiteTiles.vue'
 import PublishProgressPanel from './PublishProgressPanel.vue'
@@ -305,6 +306,10 @@ async function previewSeed(record: SeedListItem) {
 
 // §59.166 选站弹窗状态（pickerValue 即时同步 selectedTarget——工具栏按钮显示）
 const pickerOpen = ref(false)
+// §59.535 刀5: picker 打开时刷新单选簇已有站判据（选择集可能变化）
+watch(pickerOpen, (v) => {
+  if (v) fetchPickerCovered()
+})
 const pickerValue = ref('')
 watch(pickerValue, (v) => { selectedTarget.value = v || undefined })
 
@@ -313,7 +318,25 @@ const pickerSiteBusy = computed(() => {
   return t !== null && !t.finished && t.target_site === pickerValue.value
 })
 
-const tileSites = computed(() => targetSites.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit })))
+// §59.535 刀5: 单选簇时该簇已有站（三面并集）置灰+「已有」标记；多选簇
+// 不过滤（用户定案——N 对 N 在 UI 层无解·执行层逐对跳过兜底）。
+const pickerCovered = ref<string[]>([])
+async function fetchPickerCovered() {
+  if (selectedInjectHashes.value.length !== 1) {
+    pickerCovered.value = []
+    return
+  }
+  try {
+    const res = await client.get('/publish/seeds/covered-sites', { params: { hash: selectedInjectHashes.value[0] } })
+    pickerCovered.value = res.data?.data?.sites || []
+  } catch {
+    pickerCovered.value = []
+  }
+}
+const tileSites = computed(() => {
+  const covered = new Set(pickerCovered.value)
+  return targetSites.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit, covered: covered.has(t.name) }))
+})
 
 function onSelectionChange(keys: (string | number)[]) {
   selectedInjectHashes.value = keys.map(String)

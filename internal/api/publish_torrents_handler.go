@@ -522,6 +522,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleSeedUniquePaths(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/observing/purge") && r.Method == http.MethodPost:
 		h.handlePurgeObserving(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/covered-sites") && r.Method == http.MethodGet:
+		h.handleCoveredSites(w, r)
 	case strings.Contains(path, "/publish/seeds/") && strings.HasSuffix(path, "/fetch") && r.Method == http.MethodPost:
 		h.handleFetchSingleSeed(w, r)
 	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodGet:
@@ -5831,6 +5833,9 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 		return
 	}
 
+	// §59.535 刀6: 覆盖判据 matcher——在 var site 局部变量遮蔽包名前构建
+	covTM := site.NewTrackerMatcher(h.db)
+
 	// 目标站校验：存在 + 发布配置启用
 	var site model.Site
 	if err := h.db.WithContext(r.Context()).Where("name = ?", req.TargetSite).First(&site).Error; err != nil {
@@ -5913,6 +5918,23 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 			h.siteBatch.mu.Lock()
 			task.CurrentTitle = curTitle
 			h.siteBatch.mu.Unlock()
+
+			// §59.535 刀6 执行层 3b: 逐 (簇,站) 对覆盖过滤——簇已有该站→跳过
+			// （不发请求不烧站方配额·记「站上已有·跳过」终态）。多选 UI 不过
+			// 滤的兜底（N 对 N 在 UI 层无解·执行层逐格独立判断）。判据失败保
+			// 守放行（发布链自有 dedup 三路防线）。
+			if covered := publish.CoveredSitesOfCluster(ctx, h.db, covTM, hash); covered[req.TargetSite] {
+				h.logger.Info("site-batch: 簇已有该站·跳过（覆盖过滤 §59.535 刀6）",
+					zap.String("hash", hash), zap.String("site", req.TargetSite))
+				h.siteBatch.mu.Lock()
+				task.Results = append(task.Results, siteBatchResult{
+					InfoHash: hash, Title: curTitle,
+					Status: "skipped", Message: "站上已有·跳过（覆盖判据）",
+				})
+				task.Done++
+				h.siteBatch.mu.Unlock()
+				continue
+			}
 
 			// §59.166 回归审核补：per-seed recover——executor panic 若穿透会把任务
 			// goroutine 炸掉（finishSiteBatch 永不调用 → 同站互斥永久锁死直到重启）。
@@ -6592,4 +6614,23 @@ func (h *PublishTorrentsHandler) musicSiblingTitleBridge(ctx context.Context, cl
 		}
 	}
 	return nil
+}
+
+
+// handleCoveredSites §59.535 刀5: 簇已有站三面并集（GET /publish/seeds/covered-sites?hash=）
+// ——选站发布弹窗置灰判据（单簇过滤·宁可多置灰：站方 dedup 兜底·不漏放）。
+func (h *PublishTorrentsHandler) handleCoveredSites(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(r.URL.Query().Get("hash"))
+	if hash == "" {
+		Error(w, http.StatusBadRequest, 40001, "缺少 hash 参数")
+		return
+	}
+	tm := site.NewTrackerMatcher(h.db)
+	covered := publish.CoveredSitesOfCluster(r.Context(), h.db, tm, hash)
+	names := make([]string, 0, len(covered))
+	for name := range covered {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	Success(w, map[string]interface{}{"hash": hash, "sites": names})
 }

@@ -118,9 +118,21 @@ const selectedSites = ref<string[]>([])
 // §59.166: SiteTiles 公共组件（has_pre_audit→hasPreAudit 适配）
 // §59.485 刀3: 音乐种目标站过滤——乌托邦 only（唯一音乐目标站·后端
 // executor 分流双重收口·前端过滤为体验层防选错站）
+// §59.535 刀5: 簇已有站（三面并集）——目标站置灰+「已有」标记（无需重复发布）
+const coveredSites = ref<string[]>([])
+async function fetchCoveredSites() {
+  if (!props.infoHash) return
+  try {
+    const res = await client.get('/publish/seeds/covered-sites', { params: { hash: props.infoHash } })
+    coveredSites.value = res.data?.data?.sites || []
+  } catch {
+    coveredSites.value = [] // 判据失败保守放行（发布链自有 dedup 防线）
+  }
+}
 const tileSites = computed(() => {
   const list = props.isMusic ? targets.value.filter(t => t.name === '乌托邦') : targets.value
-  return list.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit }))
+  const covered = new Set(coveredSites.value)
+  return list.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit, covered: covered.has(t.name) }))
 })
 const batchResults = ref<Array<{ site: string; status: string; message?: string; url?: string }> | null>(null)
 const tagOverrides = ref<string[]>([])
@@ -163,6 +175,7 @@ watch(
       } catch {
         targets.value = []
       }
+      fetchCoveredSites() // §59.535 刀5: 簇已有站（置灰判据·并行不阻塞）
       conditionalTagOptions.value = []
     }
   },
