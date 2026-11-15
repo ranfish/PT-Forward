@@ -1449,6 +1449,14 @@ type matchConfig struct {
 	// 跳过该站 hash 通道（站方不可达时防逐源种超时爬行·243 实证 820 源
 	// ×30s≈6.8h 零产出）。成功一次即清零。
 	hashBatchFailures map[string]int
+	// §59.534 附二：站级批量预查缓存（site→info_hash→result）。站方
+	// hashes 端点限流 30 req/min（243 实证 429）——逐源种单查必撞限
+	// （820 源÷30≈27min）；BatchMatchHashes ≤200/批 → 820 hash=5 请求
+	// 一次查完缓存内存态。nil=该站未预查（回退单查+熔断）。
+	// 并发：站 worker 并发写各自 site 键+matchAtSite 并发读——map 读写
+	// 必须锁保护（Go map 并发写 panic 即使不同键）。
+	hashBatchMu      sync.Mutex
+	hashBatchResults map[string]map[string]*model.HashMatchResult
 }
 
 func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model.SiteInfo) *model.Candidate {
@@ -1491,20 +1499,43 @@ func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model
 			// §59.534: L0 实时通道——站方批量 hash 精确匹配（好大 API 独有·
 			// info_hash 数学身份）。pieces-hash 缓存 miss 时兜底（缓存命中
 			// 路径不变）。站级熔断：连续 3 次失败跳过（防超时爬行）。
-			if mc.hashBatchFailures == nil {
-				mc.hashBatchFailures = map[string]int{}
-			}
-			if mc.hashBatchFailures[siteInfo.Name] < 3 {
-				hb, failed := e.matchLayer0HashBatch(mc.ctx, adapter, siteConfig, src.InfoHash, siteInfo.Name)
-				if failed {
-					mc.hashBatchFailures[siteInfo.Name]++
-					if mc.hashBatchFailures[siteInfo.Name] == 3 && e.logger != nil {
-						e.logger.Info("L0 hash batch 站级熔断（连续 3 次失败·本任务内跳过）",
-							zap.String("site", siteInfo.Name))
+			// §59.534 附二：批量预查缓存优先（一次 5 请求 vs 逐源 820 请求
+			// ——hashes 端点 30 req/min 限流下唯一可行形态）。
+			mc.hashBatchMu.Lock()
+			siteCache := mc.hashBatchResults[siteInfo.Name]
+			r := siteCache[strings.ToLower(src.InfoHash)]
+			mc.hashBatchMu.Unlock()
+			if r != nil {
+				c = &model.Candidate{
+					TargetSite:      siteInfo.Name,
+					TargetTorrentID: r.TorrentID,
+					TargetInfoHash:  r.InfoHash,
+					Confidence:      1.0,
+					MatchMethod:     "pieces_hash",
+				}
+			} else if siteCache != nil {
+				// 预查已做过：缓存 miss=站上无此 hash（零请求）
+			} else {
+				mc.hashBatchMu.Lock()
+				fails := mc.hashBatchFailures[siteInfo.Name]
+				mc.hashBatchMu.Unlock()
+				if fails < 3 {
+					hb, failed := e.matchLayer0HashBatch(mc.ctx, adapter, siteConfig, src.InfoHash, siteInfo.Name)
+					if failed {
+						mc.hashBatchMu.Lock()
+						mc.hashBatchFailures[siteInfo.Name]++
+						tripped := mc.hashBatchFailures[siteInfo.Name] == 3
+						mc.hashBatchMu.Unlock()
+						if tripped && e.logger != nil {
+							e.logger.Info("L0 hash batch 站级熔断（连续 3 次失败·本任务内跳过）",
+								zap.String("site", siteInfo.Name))
+						}
+					} else if hb != nil {
+						mc.hashBatchMu.Lock()
+						mc.hashBatchFailures[siteInfo.Name] = 0
+						mc.hashBatchMu.Unlock()
+						c = hb
 					}
-				} else if hb != nil {
-					mc.hashBatchFailures[siteInfo.Name] = 0
-					c = hb
 				}
 			}
 		}
@@ -1628,6 +1659,8 @@ func (e *Engine) runSeedFeatureScan(
 		l2s:              l2s,
 		confirmedTargets: confirmedTargets,
 		nameSites:        nameSites,
+		// §59.534 附二：预初始化（map 并发写 panic 防御——多站 worker 并发）
+		hashBatchFailures: map[string]int{},
 	}
 
 	workerCtx, workerCancel := context.WithCancel(ctx)
@@ -1645,6 +1678,13 @@ func (e *Engine) runSeedFeatureScan(
 						zap.Any("panic", r))
 				}
 			}()
+			// §59.534 附二：站级批量预查——matchAtSite 循环前一次查完
+			// 该站全部源 hash（BatchMatchHashes ≤200/批自动切批）。hashes
+			// 端点限流 30 req/min——批量预查 5 请求 vs 逐源 820 请求（必
+			// 撞限流）。失败静默跳过（回退单查+熔断路径）。mc 并发写：各
+			// worker 只写自己的 site 键——map 按键隔离（预查结果写入时
+			// 无并发冲突·读侧在 matchAtSite 同 worker 内）。
+			e.preloadHashBatchForSite(mc, workerCtx, siteInfo, eligible)
 			for _, src := range eligible {
 				if workerCtx.Err() != nil {
 					return
@@ -2277,6 +2317,68 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 
 	e.logger.Info("syncIYUUCoverage: synced",
 		zap.Int("entries", len(entries)))
+}
+
+// preloadHashBatchForSite §59.534 附二：站级批量预查——该站全部源 hash
+// 一次查完（≤200/批自动切批）。成功填 mc.hashBatchResults[site]（含空
+// map=已查无命中语义——缓存 miss 与未预查可区分）；失败留 nil（回退
+// 逐源单查+熔断）。仅 HashBatchMatcher 站且任务勾选 pieces_hash 时执行。
+func (e *Engine) preloadHashBatchForSite(mc *matchConfig, ctx context.Context, siteInfo *model.SiteInfo, eligible []sourceTorrent) {
+	if mc.task == nil || !hasMatchMethod(mc.task.MatchMethods, "pieces_hash") {
+		return
+	}
+	adapter := mc.ps.adapters[siteInfo.Name]
+	config := mc.ps.configs[siteInfo.Name]
+	if adapter == nil || config == nil {
+		return
+	}
+	hm, ok := adapter.(model.HashBatchMatcher)
+	if !ok {
+		return
+	}
+	if config.APIKey == "" && config.Cookie == "" && config.Passkey == "" {
+		return
+	}
+	seen := map[string]bool{}
+	hashes := make([]string, 0, len(eligible))
+	for _, src := range eligible {
+		h := strings.ToLower(src.InfoHash)
+		if h != "" && !seen[h] {
+			seen[h] = true
+			hashes = append(hashes, h)
+		}
+	}
+	if len(hashes) == 0 {
+		return
+	}
+	start := time.Now()
+	results, err := hm.BatchMatchHashes(ctx, config, hashes)
+	if err != nil {
+		if e.logger != nil {
+			e.logger.Info("L0 hash batch 预查失败（回退逐源单查+熔断）",
+				zap.String("site", siteInfo.Name), zap.Int("hashes", len(hashes)),
+				zap.Duration("elapsed", time.Since(start)), zap.Error(err))
+		}
+		return
+	}
+	cache := make(map[string]*model.HashMatchResult, len(results))
+	for _, r := range results {
+		if r != nil && r.InfoHash != "" {
+			cache[strings.ToLower(r.InfoHash)] = r
+		}
+	}
+	mc.hashBatchMu.Lock()
+	if mc.hashBatchResults == nil {
+		mc.hashBatchResults = map[string]map[string]*model.HashMatchResult{}
+	}
+	mc.hashBatchResults[siteInfo.Name] = cache
+	mc.hashBatchMu.Unlock()
+	if e.logger != nil {
+		e.logger.Info("L0 hash batch 预查完成",
+			zap.String("site", siteInfo.Name),
+			zap.Int("queried", len(hashes)), zap.Int("hits", len(cache)),
+			zap.Duration("elapsed", time.Since(start)))
+	}
 }
 
 // matchLayer0HashBatch §59.534: L0 站方批量 hash 实时通道（model.HashBatchMatcher
