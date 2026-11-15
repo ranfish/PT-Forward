@@ -80,6 +80,11 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		// 独立方言层（不 import mtorrentCore）+ apihelper 机制层。
 		// API-only 零 web 双路——回退阀=sites.framework 字段应急回 nexusphp。
 		return NewHDAreaAdapter(doer, f.logger)
+	case "hxpt":
+		// 好学 API adapter（§59.533 刀2·2026-11-15）：站方改版离开 NP
+		// （Next.js + /api/v1 REST·cookie 同域直用）。API-only——
+		// 回退阀=sites.framework 字段应急回 nexusphp。
+		return NewHxptAdapter(doer, f.logger)
 	case "unit3d":
 		a := NewUnit3DAdapter(doer, f.logger)
 		if f.engine != nil {

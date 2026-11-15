@@ -16031,7 +16031,7 @@
       "domain": "www.hxpt.org",
       "name": "好学",
       "base_url": "https://www.hxpt.org",
-      "framework": "nexusphp",
+      "framework": "hxpt",
       "auth_type": "",
       "download_mode": "",
       "is_source": true,

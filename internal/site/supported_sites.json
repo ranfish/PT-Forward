@@ -901,10 +901,10 @@
   "www.hxpt.org": {
     "domain": "www.hxpt.org",
     "name_cn": "好学",
-    "framework": "nexusphp",
+    "framework": "hxpt",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hxpt.org",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "download_url_template": "api/v1/torrents/{id}/download",
     "verification_status": "verified",
     "publish_supported": true
   },
