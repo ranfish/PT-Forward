@@ -2,6 +2,7 @@ package coverage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +22,8 @@ type TrackerResolver interface {
 type SiteQueryer interface {
 	GetSeededSites(ctx context.Context, infoHash string) ([]string, error)
 	BatchGetSeededSites(ctx context.Context, infoHashes []string) (map[string][]string, error)
+	// BatchGetCoverageHits §59.535: 共享查询层专用——完整三元组（站/tid/目标站 hash）。
+	BatchGetCoverageHits(ctx context.Context, infoHashes []string) (map[string][]model.CoverageHit, error)
 }
 
 type Service struct {
@@ -356,6 +359,143 @@ func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverage
 
 func (s *Service) UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
 	return s.upsertCoverage(ctx, record)
+}
+
+// QuerySharedCoverage §59.535: IYUU 共享查询层——两通道（辅种任务/定时覆盖任务）
+// 共用「问 IYUU」公共段，同一 hash 窗口内全局只被问一次（谁先问都落库共享）。
+// 窗口语义=「多久查一轮，缓存就保鲜多久」（窗口=调度周期·调用方推导传入）：
+//  1. 窗口内已查（coverage_query_state.queried_at·hash 级不分来源）→零请求，
+//     直接返回覆盖表现存行
+//  2. 窗口外的 hash 打包问 IYUU（BatchGetCoverageHits·QueryReseed 内部 200/批
+//     +批间延迟+连续错误熔断——分批续跑基础已有）
+//  3. 结果落库：probably_has·source=iyuu·含 target_info_hash；先到优先（同
+//     (hash,site) 已有 tracker/pieces_hash 高置信行不降级·只补 tid/target_hash）
+//  4. MarkQueried 标记本轮已查（含 IYUU 返回空的——查过了没有新信息）
+//  5. 聚合返回全量（confirmed_has/probably_has·降级含窗口外旧数据）
+//
+// IYUU 失败降级：返回现存行 + err 透出（调用方决策——辅种宁可旧数据不断流）。
+func (s *Service) QuerySharedCoverage(ctx context.Context, infoHashes []string, window time.Duration) (map[string][]model.SiteCoverageCache, error) {
+	cleaned := make([]string, 0, len(infoHashes))
+	seen := make(map[string]bool, len(infoHashes))
+	for _, h := range infoHashes {
+		if h != "" && !seen[h] {
+			seen[h] = true
+			cleaned = append(cleaned, h)
+		}
+	}
+	if len(cleaned) == 0 {
+		return map[string][]model.SiteCoverageCache{}, nil
+	}
+	now := time.Now()
+	freshBefore := now.Add(-window)
+
+	// ① 窗口分流
+	var states []model.CoverageQueryState
+	if err := s.db.WithContext(ctx).Where("info_hash IN ?", cleaned).Find(&states).Error; err != nil {
+		s.logger.Warn("shared coverage: load query state failed", zap.Error(err))
+	}
+	freshSet := make(map[string]bool, len(states))
+	for _, st := range states {
+		if st.QueriedAt.After(freshBefore) {
+			freshSet[st.InfoHash] = true
+		}
+	}
+	stale := make([]string, 0, len(cleaned))
+	for _, h := range cleaned {
+		if !freshSet[h] {
+			stale = append(stale, h)
+		}
+	}
+
+	// ②③④ 窗口外问 IYUU + 落库 + 标记
+	var iyuuErr error
+	if len(stale) > 0 && s.iyuu != nil {
+		hits, err := s.iyuu.BatchGetCoverageHits(ctx, stale)
+		if err != nil {
+			iyuuErr = err
+			s.logger.Warn("shared coverage: IYUU query failed, degrading to cached rows",
+				zap.Int("hashes", len(stale)), zap.Error(err))
+		} else {
+			ttl := now.Add(365 * 24 * time.Hour) // §59.535: expires_at 废弃（站上有=事实不因时间失效·站方删种才失效）
+			for hash, list := range hits {
+				for _, hit := range list {
+					rec := &model.SiteCoverageCache{
+						InfoHash:       hash,
+						SiteName:       hit.SiteName,
+						Status:         model.CoverageProbablyHas,
+						Source:         model.CoverageSourceIYUU,
+						Confidence:     0.9,
+						TorrentID:      hit.TorrentID,
+						TargetInfoHash: hit.TargetInfoHash,
+						QueriedAt:      now,
+						ExpiresAt:      ttl,
+					}
+					if uerr := s.upsertCoverageIYUU(ctx, rec); uerr != nil {
+						s.logger.Warn("shared coverage: upsert failed",
+							zap.String("hash", hash), zap.String("site", hit.SiteName), zap.Error(uerr))
+					}
+				}
+			}
+			for _, h := range stale {
+				if merr := s.upsertQueryState(ctx, h, now, now.Add(window)); merr != nil {
+					s.logger.Warn("shared coverage: mark queried failed", zap.String("hash", h), zap.Error(merr))
+				}
+			}
+			s.logger.Info("shared coverage: IYUU query done",
+				zap.Int("queried", len(stale)), zap.Int("hit_hashes", len(hits)))
+		}
+	}
+
+	// ⑤ 聚合返回（全量 cleaned·has 两态·降级含旧数据）
+	var rows []model.SiteCoverageCache
+	if err := s.db.WithContext(ctx).
+		Where("info_hash IN ? AND status IN ?", cleaned,
+			[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string][]model.SiteCoverageCache, len(cleaned))
+	for _, r := range rows {
+		out[r.InfoHash] = append(out[r.InfoHash], r)
+	}
+	return out, iyuuErr
+}
+
+// upsertCoverageIYUU §59.535: IYUU 行先到优先——同 (hash,site) 已有行（tracker/
+// pieces_hash 等高置信源）不降级（status/source/confidence 保留），只补齐 IYUU
+// 明细（torrent_id/target_info_hash）+刷新 queried_at；无行则插入 probably_has。
+func (s *Service) upsertCoverageIYUU(ctx context.Context, rec *model.SiteCoverageCache) error {
+	var existing model.SiteCoverageCache
+	err := s.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).
+		First(&existing).Error
+	if err == nil {
+		return s.db.WithContext(ctx).Model(&existing).
+			Updates(map[string]interface{}{
+				"torrent_id":       rec.TorrentID,
+				"target_info_hash": rec.TargetInfoHash,
+				"queried_at":       rec.QueriedAt,
+			}).Error
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if cerr := s.db.WithContext(ctx).Create(rec).Error; cerr != nil {
+		// 并发首写竞争（两通道同 (hash,site) 同时 Create 撞唯一索引）→回退补明细
+		var exist model.SiteCoverageCache
+		if serr := s.db.WithContext(ctx).
+			Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).
+			First(&exist).Error; serr == nil {
+			return s.db.WithContext(ctx).Model(&exist).
+				Updates(map[string]interface{}{
+					"torrent_id":       rec.TorrentID,
+					"target_info_hash": rec.TargetInfoHash,
+					"queried_at":       rec.QueriedAt,
+				}).Error
+		}
+		return cerr
+	}
+	return nil
 }
 
 func (s *Service) GetCoveredSiteNames(ctx context.Context, infoHash string) ([]string, error) {

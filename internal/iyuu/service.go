@@ -355,6 +355,38 @@ func (s *Service) BatchGetSeededSites(ctx context.Context, infoHashes []string) 
 	return out, nil
 }
 
+// BatchGetCoverageHits §59.535: 批量 IYUU 覆盖查询——返回完整三元组（站/tid/
+// 目标站 hash）。区别于 BatchGetSeededSites 只回站名（丢 tid/target_hash——辅
+// 种注入 Candidate.TargetInfoHash 依赖）。共享查询层（coverage.QuerySharedCoverage）专用。
+func (s *Service) BatchGetCoverageHits(ctx context.Context, infoHashes []string) (map[string][]model.CoverageHit, error) {
+	if len(infoHashes) == 0 {
+		return map[string][]model.CoverageHit{}, nil
+	}
+	results, err := s.QueryReseed(ctx, infoHashes)
+	if err != nil {
+		return nil, err
+	}
+	mappings := s.getSiteMappings(ctx)
+	out := make(map[string][]model.CoverageHit)
+	for _, result := range results {
+		if result == nil {
+			continue
+		}
+		for _, t := range result.Targets {
+			siteName, ok := mappings[t.Sid]
+			if !ok || siteName == "" {
+				continue
+			}
+			out[result.SourceInfoHash] = append(out[result.SourceInfoHash], model.CoverageHit{
+				SiteName:       siteName,
+				TorrentID:      strconv.Itoa(t.TorrentID),
+				TargetInfoHash: strings.ToLower(t.InfoHash),
+			})
+		}
+	}
+	return out, nil
+}
+
 func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 	if !s.syncRunning.CompareAndSwap(false, true) {
 		s.logger.Info("IYUU site sync already in progress, skipping")
