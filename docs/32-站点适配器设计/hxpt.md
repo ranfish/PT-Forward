@@ -29,14 +29,18 @@
 - **created_at**: RFC3339 纳秒精度（`2026-11-06T01:27:35.361831Z`）
 - **分类树**: 1电影/2电视剧/3短剧/4音乐/5游戏/6软件/7动漫/8纪录片/9电子书/10有声书/11体育/12综艺/13教育资源（+101 幼儿园 grade 维度）
 
-## 二、发布契约（摸底完成·刀3 待实施）
+## 二、发布契约（刀3 摸底定案+实施完成）
 
-- **上传**: POST `/api/v1/torrents`（FormData 15 字段：category_id/anonymous/name/imdb/douban/tmdb/price/small_descr/descr/poster/mediainfo/sections/tags/pos_state/pick_type/hr_punish/file/log/nfo）
-- **sections 提交形态**: JSON 类型化包装（按 field_type：number/bool/date/text）——`{域名: {number: 123}}` 形态
-- **tags 提交形态**: JSON id 数组
-- **响应**: `{code:0}` 成功；1002=字段校验错误（errors map）
-- **CSRF**: POST 必带 x-csrf-token（cookie flux_csrf 同值）
+- **上传**: POST `/api/v1/torrents`（FormData·cookie+CSRF double-submit）
+- **恒发字段**: category_id（必填·1-13 分类树）/anonymous（"true"/"false"）/file（种子文件）
+- **条件发字段**（非空才发·对齐站方 l() 语义）: name/imdb/douban/tmdb/small_descr/descr/poster/mediainfo/sections/tags
+- **恒不发字段**（用户定案/站方管理功能）: price（恒免费）/pos_state/pick_type/hr_punish/log/nfo
+- **sections 提交形态**: `{"media":443,"codec":435,...}` **纯数字 dict_id**（select 类型不包装——UploadForm JS 逆向；multiselect=`{dict_ids:[]}` 站内无实例不实现）；四维=media/codec/source/team **全站统一值集**（五分类对照实证·section-dict 参数化只是形式）
+- **tags 提交形态**: `[9,10]` 数值 id 数组 JSON（tags-dict 9 项：6首发/8禁转/9国语/10中字/11DIY/3官种/4合集/14完结/15独家）
+- **响应**: code=0→`data.id`（detail=`/torrent/{id}`）；1002→data=errors map `{field:[msgs]}`；group_suggest.same_source=同组提示（不拦上传）
+- **detail 端点的 sections（filetype/standard/year）**=站方自动分析回填维度（非用户提交面——最新种子实证）
 - **用户定案**: price 恒不传（免费发布）+ anonymous 系统级默认匿名
+- **形态未实证**（首颗暴露）: 重复发种 code/HTTP 形态；上传权限 403 文案
 
 ## 三、值集（section-dict 按分类拉取）
 
@@ -60,7 +64,14 @@ GET `/api/v1/section-dict?category_id=N`（分类 8 纪录片实测）：
 - **端到端七链验证**（§59.338 离线驱动·真实站点数据）：搜索 8 条/详情双端点合并/HR 96h/折扣 NONE/stats ratio 124.51/下载真 bencode 7657B/VerifyExists 404→false ✓
 - 测试锚八枚（adapter_hxpt_test.go·消毒夹具 testdata/hxpt/ 实测形态）
 
-### 刀3-5（待实施）
+### 刀3 发布链（2026-11-15·§59.533）
+
+- **UploadTorrent**：FormData 契约全实施（恒发/条件发/恒不发三段）+CSRF+sections dict_id 数值化+tags 数组聚合+1002 校验错误透出
+- **摸底定案**：sections=纯数字 dict_id（select 不包装）；四维全站统一（五分类对照）；detail 的 filetype/standard/year=站方自动分析维度
+- 测试锚五枚（捕获型 RoundTripper 形态断言）——好学锚累计 13 枚
+- 与刀4 合并发版（publish enabled=false 期间无用户可见变化）
+
+### 刀4-5（待实施）
 
 - 刀3：发布链 adapter（FormData 契约+CSRF+sections 组装）
 - 刀4：值集键映射 form_config 重造+旧特化清理（hxptOnlyDocumentary/hxptDocumentaryPrefill）+re-enable

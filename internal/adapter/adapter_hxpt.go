@@ -1,10 +1,12 @@
 package adapter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -454,4 +456,198 @@ func (a *HxptAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConf
 		out[id] = sl
 	}
 	return out, nil
+}
+
+// ── 发布（§59.533 刀3）──
+
+// hxptSectionKinds 好学 sections 维度（全站统一实证——五分类对照
+// category 1/2/4/7/8/12 kinds 恒为四维全 select·值集数量全同；
+// section-dict 参数化只是形式）。提交形态=纯数字 dict_id（select
+// 类型·UploadForm JS 逆向 a[n]=Number(r) 不包装；multiselect 等
+// field_type 分支站内无实例不实现——按需生长）。
+var hxptSectionKinds = []string{"media", "codec", "source", "team"}
+
+// UploadTorrent POST /api/v1/torrents（FormData·cookie+CSRF double-submit）。
+//
+// 契约（UploadForm chunk 逆向+tags-dict 实测·2026-11-15）：
+//   - 恒发：category_id/anonymous/file
+//   - 条件发（非空才发·对齐站方 l() 语义）：name/imdb/douban/tmdb/
+//     small_descr/descr/poster/mediainfo/sections/tags
+//   - 恒不发：price（用户定案免费发布）/pos_state/pick_type（站方
+//     管理功能）/hr_punish（HR 自愿）/log/nfo（音乐向）
+//   - sections：{"media":443,...} 纯数字 dict_id JSON
+//   - tags：[9,10] 数值 id 数组 JSON（TagArrayFields 聚合）
+//   - 响应：code=0 → data.id（detail=/torrent/{id}）；1002=字段校验
+//     errors map；其他 code=message
+//
+// 形态未实证项（DryRun/首颗暴露·不臆造）：重复发种 code/HTTP 形态
+// （JS 无 409 分支）；上传权限 403 文案。
+func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+	if len(req.TorrentData) == 0 {
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
+	}
+	if config.Cookie == "" {
+		return nil, &model.AppError{Code: 40001, Message: "好学 API 发布需要 cookie（站点配置认证凭证）"}
+	}
+	csrf := hxptCSRFToken(config)
+	if csrf == "" && a.logger != nil {
+		a.logger.Warn("hxpt upload: cookie 无 flux_csrf 项（POST 可能被站方 403）",
+			zap.String("site", config.SiteName))
+	}
+	categoryID := strings.TrimSpace(req.FormFields["category_id"])
+	if categoryID == "" {
+		return nil, &model.AppError{Code: 40001, Message: "好学发布缺 category_id（刀4 值集映射产出——form_fields.category_id）"}
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	fw, err := writer.CreateFormFile("file", "upload.torrent")
+	if err != nil {
+		return nil, uploadError("创建表单文件字段失败", err)
+	}
+	if _, err := fw.Write(req.TorrentData); err != nil {
+		return nil, networkError("写入种子数据失败", err)
+	}
+	if err := writer.WriteField("category_id", categoryID); err != nil {
+		return nil, uploadError("写入 category_id 失败", err)
+	}
+	if err := writer.WriteField("anonymous", strconv.FormatBool(req.Anonymous)); err != nil {
+		return nil, uploadError("写入 anonymous 失败", err)
+	}
+	writeIf := func(key, val string) {
+		if val == "" || err != nil {
+			return
+		}
+		err = writer.WriteField(key, val)
+	}
+	writeIf("name", strings.TrimSpace(req.Title))
+	writeIf("imdb", strings.TrimSpace(req.IMDbLink))
+	writeIf("douban", strings.TrimSpace(req.DoubanLink))
+	writeIf("tmdb", strings.TrimSpace(req.FormFields["tmdb"]))
+	writeIf("small_descr", strings.TrimSpace(req.Subtitle))
+	writeIf("descr", req.Description)
+	writeIf("poster", strings.TrimSpace(req.FormFields["poster"]))
+	writeIf("mediainfo", strings.TrimSpace(req.MediaInfo))
+	if err != nil {
+		return nil, uploadError("写入文本字段失败", err)
+	}
+
+	// sections：四维 dict_id 数值化（值=值集词条 id 字符串）。
+	sections := make(map[string]int64, len(hxptSectionKinds))
+	for _, kind := range hxptSectionKinds {
+		v := strings.TrimSpace(req.FormFields[kind])
+		if v == "" {
+			continue
+		}
+		n, perr := strconv.ParseInt(v, 10, 64)
+		if perr != nil || n <= 0 {
+			return nil, &model.AppError{Code: 40001,
+				Message: fmt.Sprintf("好学 sections[%s]=%q 非 dict_id 数值（值集映射应产出词条 id）", kind, v)}
+		}
+		sections[kind] = n
+	}
+	if len(sections) > 0 {
+		if b, merr := json.Marshal(sections); merr == nil {
+			if werr := writer.WriteField("sections", string(b)); werr != nil {
+				return nil, uploadError("写入 sections 失败", werr)
+			}
+		}
+	}
+
+	// tags：TagArrayFields 聚合数值 id 数组（系统 tag 组装单点
+	// AssembleTagArrayForSite 产物；非数值项跳过——miss 自然蒸发）。
+	var tagIDs []int64
+	for _, kv := range req.TagArrayFields {
+		if kv.Key != "tags" {
+			continue
+		}
+		if n, perr := strconv.ParseInt(strings.TrimSpace(kv.Value), 10, 64); perr == nil && n > 0 {
+			tagIDs = append(tagIDs, n)
+		}
+	}
+	if len(tagIDs) > 0 {
+		if b, merr := json.Marshal(tagIDs); merr == nil {
+			if werr := writer.WriteField("tags", string(b)); werr != nil {
+				return nil, uploadError("写入 tags 失败", werr)
+			}
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, uploadError("关闭 multipart 失败", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		a.base(config)+"/api/v1/torrents", &buf)
+	if err != nil {
+		return nil, networkError("构造上传请求失败", err)
+	}
+	httpReq.Header.Set("Cookie", config.Cookie)
+	if csrf != "" {
+		httpReq.Header.Set("x-csrf-token", csrf)
+	}
+	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
+	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+	resp, err := a.doer.Client.Do(httpReq)
+	if err != nil {
+		return nil, networkError("上传请求失败: "+err.Error(), err)
+	}
+	defer func() { drainBody(resp) }()
+	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmt.Sprintf("好学上传 HTTP %d: %s", resp.StatusCode, truncate(string(rb), 300)), nil)
+	}
+	var env struct {
+		Code    int             `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(rb, &env); err != nil {
+		return nil, parseError("上传响应解析失败: "+err.Error(), err)
+	}
+	if env.Code == 0 {
+		var data struct {
+			ID any `json:"id"`
+		}
+		_ = json.Unmarshal(env.Data, &data)
+		tid := ""
+		switch v := data.ID.(type) {
+		case float64:
+			tid = strconv.FormatInt(int64(v), 10)
+		case string:
+			tid = v
+		}
+		pubResp := &model.PublishResponse{
+			Success:    true,
+			TorrentID:  tid,
+			IDSource:   "api_response", // JSON 信封直读（与 302 权威同级的 API 通道）
+			TargetSite: config.SiteName,
+		}
+		if tid != "" {
+			pubResp.DetailURL = a.base(config) + "/torrent/" + tid
+		}
+		return pubResp, nil
+	}
+	if env.Code == 1002 {
+		// 字段校验错误：data={field: [msgs]} errors map（UploadForm JS
+		// Object.entries 逆向）——拼接透出给用户/DryRun。
+		var errs map[string]any
+		msgs := make([]string, 0, 4)
+		if jerr := json.Unmarshal(env.Data, &errs); jerr == nil {
+			for field, v := range errs {
+				switch vv := v.(type) {
+				case []any:
+					for _, m := range vv {
+						msgs = append(msgs, fmt.Sprintf("%s: %v", field, m))
+					}
+				default:
+					msgs = append(msgs, fmt.Sprintf("%s: %v", field, v))
+				}
+			}
+		}
+		if len(msgs) > 0 {
+			return nil, &model.AppError{Code: 40001, Message: "好学字段校验失败: " + strings.Join(msgs, "; ")}
+		}
+	}
+	return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("好学上传 code=%d: %s", env.Code, env.Message)}
 }

@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -206,6 +207,228 @@ func TestHxptGroupOfName(t *testing.T) {
 	for _, c := range cases {
 		if got := hxptGroupOfName(c.in); got != c.want {
 			t.Errorf("hxptGroupOfName(%q)=%q want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// ── 发布（刀3）──
+
+// hxptUploadCapture 捕获型 RoundTripper：记录 multipart 字段+header，
+// 回放预设响应（断言请求形态用）。
+type hxptUploadCapture struct {
+	respBody string
+	status   int
+	fields   map[string]string
+	fileSize int
+	headers  http.Header
+}
+
+func (c *hxptUploadCapture) RoundTrip(req *http.Request) (*http.Response, error) {
+	c.headers = req.Header.Clone()
+	rb, _ := io.ReadAll(req.Body)
+	if err := req.Body.Close(); err != nil {
+		return nil, err
+	}
+	// 重放 body 供 multipart 解析
+	req.Body = io.NopCloser(bytes.NewReader(rb))
+	if strings.Contains(req.Header.Get("Content-Type"), "multipart/form-data") {
+		req.Header.Set("Content-Type", strings.SplitN(req.Header.Get("Content-Type"), ";", 2)[0]+"; boundary="+extractBoundary(req.Header.Get("Content-Type")))
+		r, err := req.MultipartReader()
+		if err == nil {
+			c.fields = map[string]string{}
+			for {
+				p, perr := r.NextPart()
+				if perr == io.EOF {
+					break
+				}
+				if perr != nil {
+					break
+				}
+				name := p.FormName()
+				if p.FileName() != "" {
+					b, _ := io.ReadAll(p)
+					c.fileSize = len(b)
+					continue
+				}
+				b, _ := io.ReadAll(p)
+				if old, ok := c.fields[name]; ok {
+					c.fields[name] = old + "," + string(b) // 数组语义聚合（断言用）
+				} else {
+					c.fields[name] = string(b)
+				}
+			}
+		}
+	}
+	status := c.status
+	if status == 0 {
+		status = 200
+	}
+	return &http.Response{
+		StatusCode: status, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(c.respBody)),
+		Request:    req,
+	}, nil
+}
+
+func extractBoundary(ct string) string {
+	i := strings.Index(ct, "boundary=")
+	if i < 0 {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(ct[i+len("boundary="):]), `"`)
+}
+
+func newHxptUploadAdapter(capture *hxptUploadCapture) *HxptAdapter {
+	return NewHxptAdapter(&HTTPDoer{Client: &http.Client{Transport: capture}}, zap.NewNop())
+}
+
+func hxptUploadReq() *model.PublishRequest {
+	return &model.PublishRequest{
+		TorrentData: []byte("d8:announce"),
+		FormFields: map[string]string{
+			"category_id": "8",
+			"media":       "443",
+			"codec":       "435",
+			"source":      "451",
+			"team":        "469",
+		},
+		TagArrayFields: []model.TagKV{
+			{Key: "tags", Value: "9"},
+			{Key: "tags", Value: "10"},
+		},
+		Title:       "Test Doc 2026 1080p WEB-DL H264-UBWEB",
+		Subtitle:    "测试副标题",
+		Description: "[quote]简介[/quote]",
+		MediaInfo:   "General\nComplete name: test.mkv",
+		IMDbLink:    "https://www.imdb.com/title/tt1234567/",
+		Anonymous:   true,
+	}
+}
+
+// TestHxptUploadForm 上传 FormData 形态断言（字段完整/sections 数值/tags
+// 数组/CSRF header/恒不发字段缺席）。
+func TestHxptUploadForm(t *testing.T) {
+	capture := &hxptUploadCapture{
+		respBody: `{"code":0,"message":"ok","data":{"id":23999}}`,
+	}
+	a := newHxptUploadAdapter(capture)
+	resp, err := a.UploadTorrent(context.Background(), hxptTestConfig(), hxptUploadReq())
+	if err != nil {
+		t.Fatalf("UploadTorrent: %v", err)
+	}
+	// 响应解析
+	if !resp.Success || resp.TorrentID != "23999" {
+		t.Errorf("resp=%+v want tid 23999", resp)
+	}
+	if resp.DetailURL != "https://www.hxpt.org/torrent/23999" {
+		t.Errorf("DetailURL=%q", resp.DetailURL)
+	}
+	if resp.IDSource != "api_response" {
+		t.Errorf("IDSource=%q", resp.IDSource)
+	}
+	// header
+	if got := capture.headers.Get("x-csrf-token"); got != "TESTCSRF123" {
+		t.Errorf("x-csrf-token=%q want TESTCSRF123（double-submit）", got)
+	}
+	if got := capture.headers.Get("Cookie"); !strings.Contains(got, "flux_session") {
+		t.Errorf("Cookie header=%q", got)
+	}
+	// FormData 字段
+	if capture.fields["category_id"] != "8" {
+		t.Errorf("category_id=%q", capture.fields["category_id"])
+	}
+	if capture.fields["anonymous"] != "true" {
+		t.Errorf("anonymous=%q", capture.fields["anonymous"])
+	}
+	if capture.fields["name"] == "" || capture.fields["small_descr"] == "" ||
+		capture.fields["descr"] == "" || capture.fields["mediainfo"] == "" {
+		t.Errorf("文本字段缺失: %v", capture.fields)
+	}
+	if capture.fields["imdb"] != "https://www.imdb.com/title/tt1234567/" {
+		t.Errorf("imdb=%q", capture.fields["imdb"])
+	}
+	// sections：纯数字 dict_id JSON
+	if capture.fields["sections"] != `{"codec":435,"media":443,"source":451,"team":469}` {
+		t.Errorf("sections=%q", capture.fields["sections"])
+	}
+	// tags：数值数组 JSON
+	if capture.fields["tags"] != "[9,10]" {
+		t.Errorf("tags=%q", capture.fields["tags"])
+	}
+	// file
+	if capture.fileSize != len("d8:announce") {
+		t.Errorf("file size=%d", capture.fileSize)
+	}
+	// 恒不发字段缺席（用户定案 price 不传+站方管理功能+音乐向）
+	for _, absent := range []string{"price", "pos_state", "pick_type", "hr_punish", "log", "nfo", "tmdb"} {
+		if v, ok := capture.fields[absent]; ok {
+			t.Errorf("字段 %s 恒不发却出现=%q", absent, v)
+		}
+	}
+}
+
+// TestHxptUploadValidation1002 code=1002 字段校验错误透出。
+func TestHxptUploadValidation1002(t *testing.T) {
+	capture := &hxptUploadCapture{
+		respBody: `{"code":1002,"message":"validation failed","data":{"name":["标题不能为空"],"category_id":["分类必选"]}}`,
+	}
+	a := newHxptUploadAdapter(capture)
+	_, err := a.UploadTorrent(context.Background(), hxptTestConfig(), hxptUploadReq())
+	if err == nil {
+		t.Fatal("1002 应返回错误")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "name") || !strings.Contains(msg, "标题不能为空") {
+		t.Errorf("校验错误应透出字段明细: %s", msg)
+	}
+}
+
+// TestHxptUploadMissingCategory category_id 缺失 fail-fast。
+func TestHxptUploadMissingCategory(t *testing.T) {
+	capture := &hxptUploadCapture{}
+	a := newHxptUploadAdapter(capture)
+	req := hxptUploadReq()
+	delete(req.FormFields, "category_id")
+	_, err := a.UploadTorrent(context.Background(), hxptTestConfig(), req)
+	if err == nil || !strings.Contains(err.Error(), "category_id") {
+		t.Errorf("缺 category_id 应 fail-fast: %v", err)
+	}
+}
+
+// TestHxptUploadSectionsNonNumeric sections 非数值 dict_id 拒绝（防
+// 值集映射误配 label 值静默错投）。
+func TestHxptUploadSectionsNonNumeric(t *testing.T) {
+	capture := &hxptUploadCapture{}
+	a := newHxptUploadAdapter(capture)
+	req := hxptUploadReq()
+	req.FormFields["media"] = "视频" // label 误配形态
+	_, err := a.UploadTorrent(context.Background(), hxptTestConfig(), req)
+	if err == nil || !strings.Contains(err.Error(), "media") {
+		t.Errorf("非 dict_id 值应拒绝: %v", err)
+	}
+}
+
+// TestHxptUploadEmptyFieldsOptional 空字段不发+空 sections/tags 整体缺席
+// （对齐站方 l() 条件追加语义）。
+func TestHxptUploadEmptyFieldsOptional(t *testing.T) {
+	capture := &hxptUploadCapture{
+		respBody: `{"code":0,"message":"ok","data":{"id":1}}`,
+	}
+	a := newHxptUploadAdapter(capture)
+	req := hxptUploadReq()
+	req.Subtitle = ""
+	req.Description = ""
+	req.MediaInfo = ""
+	req.IMDbLink = ""
+	req.FormFields = map[string]string{"category_id": "1"} // 四维全空
+	req.TagArrayFields = nil
+	if _, err := a.UploadTorrent(context.Background(), hxptTestConfig(), req); err != nil {
+		t.Fatalf("全可选空应成功: %v", err)
+	}
+	for _, absent := range []string{"small_descr", "descr", "mediainfo", "imdb", "sections", "tags"} {
+		if v, ok := capture.fields[absent]; ok {
+			t.Errorf("空字段 %s 不应出现=%q", absent, v)
 		}
 	}
 }
