@@ -24,6 +24,8 @@ func (s *hxptShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
 	case strings.Contains(u, "/api/v1/users/"):
 		file = "testdata/hxpt/users.json"
+	case strings.Contains(u, "/api/v1/me/csrf"):
+		file = "testdata/hxpt/csrf.json"
 	case strings.Contains(u, "/api/v1/me"):
 		file = "testdata/hxpt/me.json"
 	case strings.Contains(u, "/download"):
@@ -225,6 +227,7 @@ func TestHxptGroupOfName(t *testing.T) {
 // 回放预设响应（断言请求形态用）。
 type hxptUploadCapture struct {
 	respBody string
+	csrfBody string // freshCSRF GET 的分路径响应（空=统一 respBody）
 	status   int
 	fields   map[string]string
 	fileSize int
@@ -233,6 +236,9 @@ type hxptUploadCapture struct {
 
 func (c *hxptUploadCapture) RoundTrip(req *http.Request) (*http.Response, error) {
 	c.headers = req.Header.Clone()
+	if req.Body == nil { // GET 请求（freshCSRF 等）无 body
+		return c.reply(req)
+	}
 	rb, _ := io.ReadAll(req.Body)
 	if err := req.Body.Close(); err != nil {
 		return nil, err
@@ -267,9 +273,21 @@ func (c *hxptUploadCapture) RoundTrip(req *http.Request) (*http.Response, error)
 			}
 		}
 	}
+	return c.reply(req)
+}
+
+func (c *hxptUploadCapture) reply(req *http.Request) (*http.Response, error) {
 	status := c.status
 	if status == 0 {
 		status = 200
+	}
+	if c.csrfBody != "" && strings.Contains(req.URL.Path, "/me/csrf") {
+		return &http.Response{
+			StatusCode: 200, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
+			Header:  http.Header{"Content-Type": []string{"application/json"}},
+			Body:    io.NopCloser(strings.NewReader(c.csrfBody)),
+			Request: req,
+		}, nil
 	}
 	return &http.Response{
 		StatusCode: status, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
@@ -320,6 +338,7 @@ func hxptUploadReq() *model.PublishRequest {
 func TestHxptUploadForm(t *testing.T) {
 	capture := &hxptUploadCapture{
 		respBody: `{"code":0,"message":"ok","data":{"id":23999}}`,
+		csrfBody: `{"csrf_token":"1de0527218dec2445f417bc564e14705b2b4d33703b25857a67d4f5d4bac183d"}`,
 	}
 	a := newHxptUploadAdapter(capture)
 	resp, err := a.UploadTorrent(context.Background(), hxptTestConfig(), hxptUploadReq())
@@ -336,9 +355,9 @@ func TestHxptUploadForm(t *testing.T) {
 	if resp.IDSource != "api_response" {
 		t.Errorf("IDSource=%q", resp.IDSource)
 	}
-	// header
+	// header（§59.533 附三：cookie 静态值优先——web 端 csrf() 同构；cookie 缺失才动态）
 	if got := capture.headers.Get("x-csrf-token"); got != "TESTCSRF123" {
-		t.Errorf("x-csrf-token=%q want TESTCSRF123（double-submit）", got)
+		t.Errorf("x-csrf-token=%q want TESTCSRF123（cookie 静态优先）", got)
 	}
 	if got := capture.headers.Get("Cookie"); !strings.Contains(got, "flux_session") {
 		t.Errorf("Cookie header=%q", got)

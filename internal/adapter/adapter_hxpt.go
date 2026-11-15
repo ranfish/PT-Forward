@@ -143,8 +143,8 @@ func (a *HxptAdapter) apiCall(ctx context.Context, config *model.SiteConfig, met
 	return nil
 }
 
-// hxptCSRFToken 从 cookie 提取 flux_csrf 值（double-submit：POST/PUT 时
-// 塞 x-csrf-token header·与 cookie 同值；4710 chunk 逆向实证）。
+// hxptCSRFToken 从 cookie 提取 flux_csrf 值（静态 fallback——好学主通道
+// 是 freshCSRF 动态获取·见 UploadTorrent 注释）。
 func hxptCSRFToken(config *model.SiteConfig) string {
 	for _, part := range strings.Split(config.Cookie, ";") {
 		kv := strings.TrimSpace(part)
@@ -153,6 +153,39 @@ func hxptCSRFToken(config *model.SiteConfig) string {
 		}
 	}
 	return ""
+}
+
+// freshCSRF GET /api/v1/me/csrf 获取新鲜 token（web 端 csrf() 机制对齐）。
+// 响应=裸形态 {"csrf_token":"..."}（无统一信封 code/data 包装——不能走
+// apiCall 信封解包）。
+func (a *HxptAdapter) freshCSRF(ctx context.Context, config *model.SiteConfig) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.base(config)+"/api/v1/me/csrf", nil)
+	if err != nil {
+		return "", networkError("构造 csrf 请求失败: "+err.Error(), err)
+	}
+	if config.Cookie != "" {
+		req.Header.Set("Cookie", config.Cookie)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return "", networkError("csrf 请求失败: "+err.Error(), err)
+	}
+	defer func() { drainBody(resp) }()
+	rb, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", parseError("读取 csrf 响应失败", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", httpError(fmt.Sprintf("好学 csrf HTTP %d: %s", resp.StatusCode, truncate(string(rb), 120)), nil)
+	}
+	var out struct {
+		CSRFToken string `json:"csrf_token"`
+	}
+	if err := json.Unmarshal(rb, &out); err != nil {
+		return "", parseError("csrf 响应解析失败: "+err.Error(), err)
+	}
+	return out.CSRFToken, nil
 }
 
 // ── 获取方法 ──
@@ -510,10 +543,18 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	if config.Cookie == "" {
 		return nil, &model.AppError{Code: 40001, Message: "好学 API 发布需要 cookie（站点配置认证凭证）"}
 	}
+	// §59.533 附三 403 破案：好学上传 403 code 2003「无权限」=账号上传权限
+	// 未开（全分类实证·web 端同端点同凭证——浏览器手动传同样 403·联系站方）。
+	// CSRF 通道澄清：web 端 csrf() **cookie 静态值优先**（有值直接用·me/csrf
+	// 仅缺 cookie 兜底——4710 chunk p() 函数逆向）——cookie 缺失时动态获取。
 	csrf := hxptCSRFToken(config)
-	if csrf == "" && a.logger != nil {
-		a.logger.Warn("hxpt upload: cookie 无 flux_csrf 项（POST 可能被站方 403）",
-			zap.String("site", config.SiteName))
+	if csrf == "" {
+		if fresh, err := a.freshCSRF(ctx, config); err == nil && fresh != "" {
+			csrf = fresh
+		} else if a.logger != nil {
+			a.logger.Warn("hxpt upload: cookie 无 flux_csrf 且动态获取失败（POST 可能被站方 403）",
+				zap.String("site", config.SiteName), zap.Error(err))
+		}
 	}
 	categoryID := strings.TrimSpace(req.FormFields["category_id"])
 	if categoryID == "" {
