@@ -5149,7 +5149,7 @@ func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, 
 }
 
 func (e *Engine) SaveMatch(ctx context.Context, match *model.ReseedMatch) error {
-	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
+	err := e.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "client_uid"},
 			{Name: "source_site"},
@@ -5162,6 +5162,51 @@ func (e *Engine) SaveMatch(ctx context.Context, match *model.ReseedMatch) error 
 			"decision_type", "status", "fail_reason",
 		}),
 	}).Create(match).Error
+	if err != nil {
+		return err
+	}
+	// §59.535 刀2: 辅种匹配落库即同步覆盖表——「知道即落库」，消灭 matches
+	// 表与覆盖表两张皮（任务天天跑覆盖表不涨的断层）。仅 matched/injected
+	// （failed=匹配失败≠站上有）。
+	e.syncMatchCoverage(ctx, match)
+	return nil
+}
+
+// syncMatchCoverage §59.535 刀2: 单条 match→覆盖表同步。先到优先（对齐
+// syncIYUUCoverage 先例与 QuerySharedCoverage.upsertCoverageIYUU 语义）：
+// INSERT OR IGNORE 不覆盖已有行（tracker/pieces_hash 等先到高置信源保留）；
+// 已有行仅补注入明细（torrent_id/target_info_hash 空缺时）+刷新 queried_at。
+// expires_at 远期（§59.535 废弃——站上有=事实不因时间失效）。
+func (e *Engine) syncMatchCoverage(ctx context.Context, m *model.ReseedMatch) {
+	if m == nil || (m.Status != model.MatchStatusMatched && m.Status != model.MatchStatusInjected) {
+		return
+	}
+	now := time.Now()
+	res := e.db.WithContext(ctx).Exec(`INSERT OR IGNORE INTO site_coverage_cache
+		(info_hash, site_name, status, source, confidence, torrent_id, target_info_hash, queried_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.SourceInfoHash, m.TargetSite, model.CoverageConfirmedHas, m.MatchMethod,
+		m.Confidence, m.TargetTorrentID, m.TargetInfoHash, now, now.Add(365*24*time.Hour))
+	if res.Error != nil {
+		e.logger.Debug("sync match coverage insert failed",
+			zap.String("hash", m.SourceInfoHash), zap.String("site", m.TargetSite), zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		return
+	}
+	// 已有行：仅补空缺明细（不覆盖 status/source/confidence——先到优先）
+	upd := e.db.WithContext(ctx).Exec(`UPDATE site_coverage_cache SET
+		torrent_id = CASE WHEN (torrent_id = '' OR torrent_id IS NULL) AND ? != '' THEN ? ELSE torrent_id END,
+		target_info_hash = CASE WHEN (target_info_hash = '' OR target_info_hash IS NULL) AND ? != '' THEN ? ELSE target_info_hash END,
+		queried_at = ?
+		WHERE info_hash = ? AND site_name = ?`,
+		m.TargetTorrentID, m.TargetTorrentID, m.TargetInfoHash, m.TargetInfoHash,
+		now, m.SourceInfoHash, m.TargetSite)
+	if upd.Error != nil {
+		e.logger.Debug("sync match coverage update failed",
+			zap.String("hash", m.SourceInfoHash), zap.String("site", m.TargetSite), zap.Error(upd.Error))
+	}
 }
 
 func (e *Engine) FindMatchesByInfoHash(ctx context.Context, infoHash string) ([]model.ReseedMatch, error) {
