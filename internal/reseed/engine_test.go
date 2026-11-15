@@ -3078,26 +3078,26 @@ func (f *fakeHashBatchAdapter) BatchMatchHashes(ctx context.Context, config *mod
 func TestMatchLayer0HashBatch(t *testing.T) {
 	e := &Engine{}
 	cfg := &model.SiteConfig{APIKey: "k"}
-	// ① 命中：hash 精确匹配→Candidate（Confidence 1.0·match=pieces_hash）
+	// ① 命中：hash 精确匹配→Candidate（Confidence 1.0·match=pieces_hash·failed=false）
 	hit := &fakeHashBatchAdapter{results: []*model.HashMatchResult{{
 		InfoHash: "ABCDEF0123456789ABCDEF0123456789ABCDEF01", TorrentID: "460885", Seeders: 3,
 	}}}
-	c := e.matchLayer0HashBatch(context.Background(), hit, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大")
-	if c == nil || c.TargetTorrentID != "460885" || c.Confidence != 1.0 {
-		t.Errorf("命中形态: %+v", c)
+	c, failed := e.matchLayer0HashBatch(context.Background(), hit, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大")
+	if c == nil || c.TargetTorrentID != "460885" || c.Confidence != 1.0 || failed {
+		t.Errorf("命中形态: %+v failed=%v", c, failed)
 	}
-	// ② miss：无匹配结果→nil（降级 L1/L2）
+	// ② miss：无匹配结果→(nil,false)（降级 L1/L2·不计熔断）
 	miss := &fakeHashBatchAdapter{results: nil}
-	if c := e.matchLayer0HashBatch(context.Background(), miss, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil {
-		t.Errorf("miss 应 nil: %+v", c)
+	if c, failed := e.matchLayer0HashBatch(context.Background(), miss, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil || failed {
+		t.Errorf("miss 应 (nil,false): %+v %v", c, failed)
 	}
-	// ③ 错误：静默 nil（独立信息源不阻塞）
+	// ③ 错误：静默 (nil,true)——调用方计数熔断（§59.534 附·243 爬行实证）
 	failing := &fakeHashBatchAdapter{err: errors.New("api down")}
-	if c := e.matchLayer0HashBatch(context.Background(), failing, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil {
-		t.Errorf("错误应静默 nil: %+v", c)
+	if c, failed := e.matchLayer0HashBatch(context.Background(), failing, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil || !failed {
+		t.Errorf("错误应 (nil,true): %+v %v", c, failed)
 	}
-	// ④ 非 HashBatchMatcher adapter（裸 mocks 桩无扩展）：断言失败 nil
-	if c := e.matchLayer0HashBatch(context.Background(), &mocks.SiteAdapter{}, cfg, "x", "站"); c != nil {
-		t.Errorf("无能力 adapter 应 nil")
+	// ④ 非 HashBatchMatcher adapter（裸 mocks 桩无扩展）：断言失败 (nil,false)
+	if c, failed := e.matchLayer0HashBatch(context.Background(), &mocks.SiteAdapter{}, cfg, "x", "站"); c != nil || failed {
+		t.Errorf("无能力 adapter 应 (nil,false)")
 	}
 }

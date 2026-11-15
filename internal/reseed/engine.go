@@ -1445,6 +1445,10 @@ type matchConfig struct {
 	l2s              *l2Stats
 	confirmedTargets map[string]bool
 	nameSites        map[string]map[string]bool
+	// §59.534 附：L0 hash batch 站级熔断——连续失败 3 次后本次任务内
+	// 跳过该站 hash 通道（站方不可达时防逐源种超时爬行·243 实证 820 源
+	// ×30s≈6.8h 零产出）。成功一次即清零。
+	hashBatchFailures map[string]int
 }
 
 func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model.SiteInfo) *model.Candidate {
@@ -1486,8 +1490,23 @@ func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model
 		if c == nil {
 			// §59.534: L0 实时通道——站方批量 hash 精确匹配（好大 API 独有·
 			// info_hash 数学身份）。pieces-hash 缓存 miss 时兜底（缓存命中
-			// 路径不变）。
-			c = e.matchLayer0HashBatch(mc.ctx, adapter, siteConfig, src.InfoHash, siteInfo.Name)
+			// 路径不变）。站级熔断：连续 3 次失败跳过（防超时爬行）。
+			if mc.hashBatchFailures == nil {
+				mc.hashBatchFailures = map[string]int{}
+			}
+			if mc.hashBatchFailures[siteInfo.Name] < 3 {
+				hb, failed := e.matchLayer0HashBatch(mc.ctx, adapter, siteConfig, src.InfoHash, siteInfo.Name)
+				if failed {
+					mc.hashBatchFailures[siteInfo.Name]++
+					if mc.hashBatchFailures[siteInfo.Name] == 3 && e.logger != nil {
+						e.logger.Info("L0 hash batch 站级熔断（连续 3 次失败·本任务内跳过）",
+							zap.String("site", siteInfo.Name))
+					}
+				} else if hb != nil {
+					mc.hashBatchFailures[siteInfo.Name] = 0
+					c = hb
+				}
+			}
 		}
 		if c != nil {
 			targetKey := siteInfo.Name + ":" + c.TargetTorrentID
@@ -2263,13 +2282,13 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 // matchLayer0HashBatch §59.534: L0 站方批量 hash 实时通道（model.HashBatchMatcher
 // 类型断言——好大 API BatchMatchHashes）。单 hash 查询（批 API 的单元素形态·
 // 站内 worker 顺序消费自然限流）。失败静默降级 L1/L2（独立信息源不阻塞）。
-func (e *Engine) matchLayer0HashBatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, siteName string) *model.Candidate {
+func (e *Engine) matchLayer0HashBatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, siteName string) (*model.Candidate, bool) {
 	hm, ok := adapter.(model.HashBatchMatcher)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	if config.APIKey == "" && config.Cookie == "" && config.Passkey == "" {
-		return nil
+		return nil, false
 	}
 	results, err := hm.BatchMatchHashes(ctx, config, []string{strings.ToLower(sourceInfoHash)})
 	if err != nil {
@@ -2277,7 +2296,7 @@ func (e *Engine) matchLayer0HashBatch(ctx context.Context, adapter model.SiteAda
 			e.logger.Debug("L0 hash batch query failed",
 				zap.String("site", siteName), zap.Error(err))
 		}
-		return nil
+		return nil, true // true=请求失败（调用方计数熔断）
 	}
 	for _, r := range results {
 		if strings.EqualFold(r.InfoHash, sourceInfoHash) && r.TorrentID != "" {
@@ -2287,10 +2306,10 @@ func (e *Engine) matchLayer0HashBatch(ctx context.Context, adapter model.SiteAda
 				TargetInfoHash:  r.InfoHash,
 				Confidence:      1.0,
 				MatchMethod:     "pieces_hash",
-			}
+			}, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
