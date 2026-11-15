@@ -593,9 +593,32 @@ func main() {
 	orphanRecovery.SetCoverageService(coverageSvc) // §59.196: 恢复链 tid 回写
 	router.SetupOrphan(orphanScanner, orphanRecovery, db)
 	router.SetupDebug(siteProvider)
-	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
-		log.Warn("failed to register coverage refresh schedule", zap.Error(err))
+	// §59.535 刀3: IYUU 覆盖定时任务——配置驱动（开关默认停+cron 可配·
+	// 替代旧无条件每 12h 增量刷新）。任务体=全量轮询 100% 完成 hash 走共享
+	// 查询层（窗口=调度周期·窗口内零请求=断点续跑）。
+	syncCoverageSchedule := func() {
+		const covTask = "iyuu-coverage-sync"
+		_ = taskRegistry.Unregister(covTask) // 幂等注销（配置变化重注册）
+		enabled, schedule, err := iyuuService.CoverageTaskConfig(context.Background())
+		if err != nil {
+			log.Warn("coverage schedule: read config failed", zap.Error(err))
+			return
+		}
+		if !enabled {
+			log.Info("IYUU 覆盖任务未启用（iyuu 配置 coverage_enabled=false）")
+			return
+		}
+		window := model.CoverageWindow(schedule)
+		if err := taskRegistry.Register(covTask, "coverage", schedule, func(ctx context.Context) error {
+			return coverageSvc.RunCoverageSync(ctx, window)
+		}); err != nil {
+			log.Warn("coverage schedule register failed", zap.Error(err))
+			return
+		}
+		log.Info("IYUU 覆盖任务已注册", zap.String("schedule", schedule), zap.Duration("window", window))
 	}
+	router.SetIyuuCoverageSync(syncCoverageSchedule)
+	syncCoverageSchedule()
 
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)

@@ -1077,7 +1077,16 @@
     "requestTimeout": "请求超时(秒)",
     "syncIntervalHours": "站点同步间隔(小时)",
     "syncSites": "IYUU 同步站点",
-    "sid": "SID"
+    "sid": "SID",
+    "coverageEnabled": "覆盖查询任务",
+    "coverageEnabledHint": "定时全量轮询本地做种种子的 IYUU 覆盖（仅供发布选站过滤；无发布需求可关闭）",
+    "coverageSchedule": "调度计划",
+    "coverageScheduleHint": "cron 表达式（如 0 */12 * * * = 每 12 小时）；缓存保鲜窗口=调度周期",
+    "coverageTask": "覆盖查询任务",
+    "coverageRunNow": "立即执行",
+    "coverageRunning": "执行中",
+    "coverageLastRun": "上次运行",
+    "coverageRunStarted": "覆盖同步已启动（后台执行）"
   },
   "cloudFp": {
     "title": "云指纹服务",

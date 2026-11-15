@@ -994,6 +994,25 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 	}
 }
 
+// iyuuCoverageWindow §59.535 刀3: 从 iyuu 配置读覆盖任务窗口（调度周期推导）。
+// 配置未启用/读取失败返回 false——辅种查询保守放行（不剔除）零行为变化。
+func (e *Engine) iyuuCoverageWindow(ctx context.Context) (time.Duration, bool) {
+	if e.iyuuService == nil {
+		return 0, false
+	}
+	getCfg, ok := e.iyuuService.(interface {
+		CoverageTaskConfig(ctx context.Context) (bool, string, error)
+	})
+	if !ok {
+		return 0, false
+	}
+	enabled, schedule, err := getCfg.CoverageTaskConfig(ctx)
+	if err != nil || !enabled {
+		return 0, false
+	}
+	return model.CoverageWindow(schedule), true
+}
+
 func (e *Engine) preloadIYUUResults(ctx context.Context, taskID uint, infoHashes []string) map[string][]*model.IYUUReseedResult {
 	if e.iyuuService == nil || len(infoHashes) == 0 {
 		return nil
@@ -1006,6 +1025,38 @@ func (e *Engine) preloadIYUUResults(ctx context.Context, taskID uint, infoHashes
 			seen[ih] = true
 			deduped = append(deduped, ih)
 		}
+	}
+
+	// §59.535 刀3: 共享层配额保护——窗口内已查过的 hash 剔除（它们的上次
+	// 匹配在 matches 表·confirmedTargets 已覆盖防重复·新转发站等窗口过期
+	// 后下轮发现——「多久查一轮缓存保鲜多久」辅种侧消费同一语义）。
+	if len(deduped) > 0 {
+		if window, ok := e.iyuuCoverageWindow(ctx); ok {
+			var states []model.CoverageQueryState
+			if err := e.db.WithContext(ctx).
+				Where("info_hash IN ? AND queried_at > ?", deduped, time.Now().Add(-window)).
+				Find(&states).Error; err == nil && len(states) > 0 {
+				fresh := make(map[string]bool, len(states))
+				for _, st := range states {
+					fresh[st.InfoHash] = true
+				}
+				kept := deduped[:0]
+				for _, h := range deduped {
+					if !fresh[h] {
+						kept = append(kept, h)
+					}
+				}
+				if skipped := len(deduped) - len(kept); skipped > 0 {
+					e.logger.Info("IYUU 查询共享窗口剔除（新鲜 hash 走缓存）",
+						zap.Int("skipped", skipped), zap.Int("remaining", len(kept)),
+						zap.Duration("window", window))
+				}
+				deduped = kept
+			}
+		}
+	}
+	if len(deduped) == 0 {
+		return nil
 	}
 
 	start := time.Now()

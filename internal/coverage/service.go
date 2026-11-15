@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/fingerprint"
@@ -31,6 +32,7 @@ type Service struct {
 	iyuu            SiteQueryer
 	trackerResolver TrackerResolver
 	logger          *zap.Logger
+	covRun          coverageRunState // §59.535 刀3: 定时任务运行态
 }
 
 func NewService(db *gorm.DB, iyuu SiteQueryer, resolver TrackerResolver, logger *zap.Logger) *Service {
@@ -359,6 +361,82 @@ func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverage
 
 func (s *Service) UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
 	return s.upsertCoverage(ctx, record)
+}
+
+// coverageRunState §59.535 刀3: 覆盖定时任务运行态（防重入+状态透出）。
+type coverageRunState struct {
+	mu        sync.Mutex
+	running   bool
+	lastRun   time.Time
+	lastErr   string
+	lastStats string
+}
+
+// RunCoverageSync §59.535 刀3: 覆盖定时任务体——全量轮询快照表 100% 完成
+// hash（做种中+暂停均含·progress>=1.0·未完成不查）走共享查询层（窗口=调度
+// 周期：窗口内零请求跳过=天然断点续跑；窗口外打包问 IYUU 落库）。防重入：
+// 已在跑返回 ErrCoverageRunning。
+var ErrCoverageRunning = errors.New("coverage sync already running")
+
+func (s *Service) RunCoverageSync(ctx context.Context, window time.Duration) error {
+	s.covRun.mu.Lock()
+	if s.covRun.running {
+		s.covRun.mu.Unlock()
+		return ErrCoverageRunning
+	}
+	s.covRun.running = true
+	s.covRun.mu.Unlock()
+	defer func() {
+		s.covRun.mu.Lock()
+		s.covRun.running = false
+		s.covRun.lastRun = time.Now()
+		s.covRun.mu.Unlock()
+	}()
+
+	start := time.Now()
+	var hashes []string
+	if err := s.db.WithContext(ctx).
+		Model(&model.TorrentSnapshot{}).
+		Where("progress >= ?", 1.0).
+		Pluck("hash", &hashes).Error; err != nil {
+		s.setCovStats("", err)
+		return err
+	}
+	if len(hashes) == 0 {
+		s.setCovStats("0 hashes", nil)
+		return nil
+	}
+	res, err := s.QuerySharedCoverage(ctx, hashes, window)
+	stats := fmt.Sprintf("hashes=%d covered=%d elapsed=%s", len(hashes), len(res), time.Since(start).Round(time.Second))
+	s.setCovStats(stats, err)
+	if err != nil {
+		s.logger.Warn("coverage sync finished with IYUU error (cached rows still returned)", zap.String("stats", stats), zap.Error(err))
+	}
+	s.logger.Info("coverage sync done", zap.String("stats", stats))
+	return nil
+}
+
+func (s *Service) setCovStats(stats string, err error) {
+	s.covRun.mu.Lock()
+	defer s.covRun.mu.Unlock()
+	s.covRun.lastStats = stats
+	if err != nil {
+		s.covRun.lastErr = err.Error()
+	} else {
+		s.covRun.lastErr = ""
+	}
+}
+
+// CoverageStatus §59.535 刀3: 任务状态透出（running/last_run/last_stats）。
+func (s *Service) CoverageStatus() map[string]interface{} {
+	s.covRun.mu.Lock()
+	defer s.covRun.mu.Unlock()
+	return map[string]interface{}{
+		"running":    s.covRun.running,
+		"last_run":   s.covRun.lastRun,
+		"last_stats": s.covRun.lastStats,
+		"last_error": s.covRun.lastErr,
+	}
 }
 
 // QuerySharedCoverage §59.535: IYUU 共享查询层——两通道（辅种任务/定时覆盖任务）

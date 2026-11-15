@@ -25,6 +25,14 @@
         <a-form-item :label="t('iyuu.syncIntervalHours')">
           <a-input-number v-model:value="form.syncIntervalHours" :min="1" :max="168" style="width: 100%" />
         </a-form-item>
+        <a-form-item :label="t('iyuu.coverageEnabled')">
+          <a-switch v-model:checked="form.coverageEnabled" />
+          <span class="coverage-hint">{{ t('iyuu.coverageEnabledHint') }}</span>
+        </a-form-item>
+        <a-form-item v-if="form.coverageEnabled" :label="t('iyuu.coverageSchedule')">
+          <a-input v-model:value="form.coverageSchedule" placeholder="0 */12 * * *" />
+          <span class="coverage-hint">{{ t('iyuu.coverageScheduleHint') }}</span>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</a-button>
@@ -59,6 +67,20 @@
 
     <a-divider />
 
+    <a-card :title="t('iyuu.coverageTask')" style="margin-top: 16px">
+      <a-space direction="vertical" style="width: 100%">
+        <a-space>
+          <a-button type="primary" :loading="covRunning" :disabled="covStatus.running" @click="handleCoverageRun">{{ t('iyuu.coverageRunNow') }}</a-button>
+          <a-tag v-if="covStatus.running" color="processing">{{ t('iyuu.coverageRunning') }}</a-tag>
+          <a-tag v-else-if="covStatus.last_run" color="default">{{ t('iyuu.coverageLastRun') }}: {{ covStatus.last_run }}</a-tag>
+        </a-space>
+        <div v-if="covStatus.last_stats" class="coverage-hint">{{ covStatus.last_stats }}</div>
+        <div v-if="covStatus.last_error" class="coverage-hint" style="color: #cf1322">{{ covStatus.last_error }}</div>
+      </a-space>
+    </a-card>
+
+    <a-divider />
+
     <a-card :title="t('iyuu.manualQuery')" style="margin-top: 16px">
       <a-form layout="vertical">
         <a-form-item :label="t('iyuu.infoHashes')">
@@ -83,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { iyuuApi } from '@/api/iyuu'
@@ -105,7 +127,35 @@ const form = reactive({
   version: '1.0.0',
   requestTimeoutSec: 60,
   syncIntervalHours: 24,
+  coverageEnabled: false,
+  coverageSchedule: '0 */12 * * *',
 })
+
+// §59.535 刀3: 覆盖任务状态
+const covRunning = ref(false)
+const covStatus = ref<{ running: boolean; last_run: string; last_stats: string; last_error: string }>({ running: false, last_run: '', last_stats: '', last_error: '' })
+let covTimer: ReturnType<typeof setInterval> | null = null
+
+async function fetchCoverageStatus() {
+  try {
+    const resp = await iyuuApi.coverageStatus()
+    covStatus.value = resp.data?.data || covStatus.value
+  } catch {
+  }
+}
+
+async function handleCoverageRun() {
+  covRunning.value = true
+  try {
+    await iyuuApi.coverageRun()
+    message.success(t('iyuu.coverageRunStarted'))
+    fetchCoverageStatus()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    covRunning.value = false
+  }
+}
 
 const siteColumns = [
   { title: t('iyuu.sid'), dataIndex: 'IYUUSid', key: 'IYUUSid', width: 80 },
@@ -164,6 +214,8 @@ async function fetchConfig() {
     form.version = data.version ?? '1.0.0'
     form.requestTimeoutSec = data.requestTimeoutMs ? Math.round(data.requestTimeoutMs / 1000) : 60
     form.syncIntervalHours = data.syncIntervalHours ?? 24
+    form.coverageEnabled = data.coverageEnabled ?? false
+    form.coverageSchedule = data.coverageSchedule || '0 */12 * * *'
   } catch {
   } finally {
     loading.value = false
@@ -185,6 +237,8 @@ async function handleSave() {
       version: form.version,
       requestTimeoutMs: form.requestTimeoutSec * 1000,
       syncIntervalHours: form.syncIntervalHours,
+      coverageEnabled: form.coverageEnabled,
+      coverageSchedule: form.coverageSchedule,
     })
     message.success(t('common.saveSuccess'))
     fetchSites()
@@ -235,5 +289,22 @@ async function handleSyncSites() {
 onMounted(() => {
   fetchConfig()
   fetchSites()
+  fetchCoverageStatus()
+  covTimer = setInterval(() => {
+    fetchCoverageStatus()
+  }, 10000)
+})
+
+onBeforeUnmount(() => {
+  if (covTimer) clearInterval(covTimer)
 })
 </script>
+
+<style scoped>
+.coverage-hint {
+  display: inline-block;
+  margin-left: 8px;
+  color: #999;
+  font-size: 12px;
+}
+</style>

@@ -358,6 +358,21 @@ func (s *Service) BatchGetSeededSites(ctx context.Context, infoHashes []string) 
 // BatchGetCoverageHits §59.535: 批量 IYUU 覆盖查询——返回完整三元组（站/tid/
 // 目标站 hash）。区别于 BatchGetSeededSites 只回站名（丢 tid/target_hash——辅
 // 种注入 Candidate.TargetInfoHash 依赖）。共享查询层（coverage.QuerySharedCoverage）专用。
+// CoverageTaskConfig §59.535 刀3: 覆盖定时任务配置读取（开关+调度计划）。
+// 未配置 schedule 默认每 12h（旧 coverage-refresh 行为对齐）。
+func (s *Service) CoverageTaskConfig(ctx context.Context) (enabled bool, schedule string, err error) {
+	cfg, err := s.getConfig(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	if cfg.CoverageSchedule == "" {
+		schedule = "0 */12 * * *"
+	} else {
+		schedule = cfg.CoverageSchedule
+	}
+	return cfg.CoverageEnabled, schedule, nil
+}
+
 func (s *Service) BatchGetCoverageHits(ctx context.Context, infoHashes []string) (map[string][]model.CoverageHit, error) {
 	if len(infoHashes) == 0 {
 		return map[string][]model.CoverageHit{}, nil

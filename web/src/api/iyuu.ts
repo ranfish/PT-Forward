@@ -1,5 +1,5 @@
 import client from './client'
-import type { ApiResponse, IYUUConfig } from './types'
+import type { ApiResponse, IYUUConfig, IYUUCoverageStatus } from './types'
 
 export const iyuuApi = {
   getConfig() {
@@ -22,6 +22,13 @@ export const iyuuApi = {
   },
   status() {
     return client.get<ApiResponse<{ available: boolean; domains: string[] }>>('/iyuu/status')
+  },
+  // §59.535 刀3: 覆盖定时任务——手动触发+状态
+  coverageRun() {
+    return client.post<ApiResponse<{ message: string }>>('/iyuu/coverage/run')
+  },
+  coverageStatus() {
+    return client.get<ApiResponse<IYUUCoverageStatus>>('/iyuu/coverage/status')
   },
   supportedTargets() {
     return client.get<ApiResponse<{ sites: Array<{ site_id: number; name: string; domain: string; iyuu_sid: number }>; total: number }>>('/iyuu/supported-targets')

@@ -1075,7 +1075,16 @@
     "requestTimeout": "Request Timeout (s)",
     "syncIntervalHours": "Site Sync Interval (hours)",
     "syncSites": "Sync Sites",
-    "sid": "SID"
+    "sid": "SID",
+    "coverageEnabled": "Coverage Sync Task",
+    "coverageEnabledHint": "Periodically poll IYUU coverage for all seeding torrents (for publish site filtering; disable if not publishing)",
+    "coverageSchedule": "Schedule",
+    "coverageScheduleHint": "Cron expression (e.g. 0 */12 * * * = every 12h); cache freshness window = schedule period",
+    "coverageTask": "Coverage Sync Task",
+    "coverageRunNow": "Run Now",
+    "coverageRunning": "Running",
+    "coverageLastRun": "Last Run",
+    "coverageRunStarted": "Coverage sync started (background)"
   },
   "cloudFp": {
     "title": "Cloud Fingerprint Service",

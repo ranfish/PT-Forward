@@ -262,8 +262,10 @@ func (rt *Router) SetBDInfoQueue(q *publish.BDInfoScanQueue, s *publish.BDInfoSc
 	rt.manualForwardHandler.SetBDInfoQueue(q)
 }
 
-func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
-	return scheduler.Register("coverage-refresh", "coverage", "0 */12 * * *", rt.publishTorrentsHandler.ScheduledRefresh)
+// SetIyuuCoverageSync §59.535 刀3: main 注入调度同步闭包（iyuu 配置保存后
+// 立即生效）。
+func (rt *Router) SetIyuuCoverageSync(fn func()) {
+	rt.iyuuHandler.SetCoverageScheduleSync(fn)
 }
 
 func (rt *Router) SetSiteProvider(p interface {
@@ -536,6 +538,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	iyuuHandler := rt.chain(rt.rateLimitMW, rt.iyuuHandler.ServeHTTP)
 	mux.Handle("/api/v1/iyuu/config", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/config/", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/coverage/run", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/coverage/status", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/sites", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/sites/", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/query", iyuuHandler)

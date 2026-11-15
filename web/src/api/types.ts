@@ -609,6 +609,16 @@ export interface IYUUConfig {
   version: string
   requestTimeoutMs: number
   syncIntervalHours: number
+  // §59.535 刀3: 覆盖定时任务（开关+cron·「多久查一轮缓存保鲜多久」）
+  coverageEnabled?: boolean
+  coverageSchedule?: string
+}
+
+export interface IYUUCoverageStatus {
+  running: boolean
+  last_run: string
+  last_stats: string
+  last_error: string
 }
 
 export interface CloudFPConfig {

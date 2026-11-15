@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/ranfish/pt-forward/internal/coverage"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,7 +22,17 @@ type IYUUHandler struct {
 	logger     *zap.Logger
 	iyuuSvc    IYUUQueryService
 	httpClient *http.Client
+	// §59.535 刀3: 覆盖定时任务——coverage service（run/status 端点）+
+	// 配置保存后调度同步回调（main 注入·读配置 Register/Unregister）。
+	coverageSvc *coverage.Service
+	covSyncFn   func()
 }
+
+// SetCoverageService §59.535 刀3: 注入覆盖服务（run/status 端点依赖）。
+func (h *IYUUHandler) SetCoverageService(svc *coverage.Service) { h.coverageSvc = svc }
+
+// SetCoverageScheduleSync §59.535 刀3: 配置保存后触发调度重注册。
+func (h *IYUUHandler) SetCoverageScheduleSync(fn func()) { h.covSyncFn = fn }
 
 type IYUUQueryService interface {
 	QueryReseed(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
@@ -89,6 +100,22 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case trimmed == "/api/v1/iyuu/test" || trimmed == "/api/v1/iyuu/test/":
 		if r.Method == http.MethodPost {
 			h.handleTest(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+
+	case trimmed == "/api/v1/iyuu/coverage/run":
+		if r.Method == http.MethodPost {
+			h.handleCoverageRun(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+
+	case trimmed == "/api/v1/iyuu/coverage/status":
+		if r.Method == http.MethodGet {
+			h.handleCoverageStatus(w, r)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
@@ -185,6 +212,9 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		RequestTimeoutMs  *int   `json:"requestTimeoutMs"`
 		SyncIntervalHours *int   `json:"syncIntervalHours"`
 		Version           string `json:"version,omitempty"`
+		// §59.535 刀3: 覆盖定时任务（开关+cron）
+		CoverageEnabled  *bool  `json:"coverageEnabled"`
+		CoverageSchedule string `json:"coverageSchedule,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -226,6 +256,12 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		}
 		if req.SyncIntervalHours != nil && *req.SyncIntervalHours > 0 {
 			cfg.SyncIntervalHours = *req.SyncIntervalHours
+		}
+		if req.CoverageEnabled != nil {
+			cfg.CoverageEnabled = *req.CoverageEnabled
+		}
+		if req.CoverageSchedule != "" {
+			cfg.CoverageSchedule = req.CoverageSchedule
 		}
 		if err := h.db.Create(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
@@ -269,6 +305,12 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.SyncIntervalHours != nil && *req.SyncIntervalHours > 0 {
 			cfg.SyncIntervalHours = *req.SyncIntervalHours
 		}
+		if req.CoverageEnabled != nil {
+			cfg.CoverageEnabled = *req.CoverageEnabled
+		}
+		if req.CoverageSchedule != "" {
+			cfg.CoverageSchedule = req.CoverageSchedule
+		}
 		if err := h.db.Save(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
 			return
@@ -287,6 +329,11 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 				h.logger.Info("auto-synced IYUU sites after config save")
 			}
 		}()
+	}
+
+	// §59.535 刀3: 覆盖任务配置变化→调度重注册（开关/cron 即时生效）
+	if h.covSyncFn != nil && (req.CoverageEnabled != nil || req.CoverageSchedule != "") {
+		h.covSyncFn()
 	}
 
 	Success(w, map[string]interface{}{"message": "配置已更新"})
@@ -494,4 +541,49 @@ func normalizeIYUUDomain(s string) string {
 	s = strings.TrimPrefix(s, "www.")
 	s = strings.TrimSuffix(s, "/")
 	return s
+}
+
+
+// handleCoverageRun §59.535 刀3: 手动触发一轮覆盖同步（异步·防重入 409）。
+func (h *IYUUHandler) handleCoverageRun(w http.ResponseWriter, r *http.Request) {
+	if h.coverageSvc == nil {
+		Error(w, http.StatusServiceUnavailable, 50300, "覆盖服务未就绪")
+		return
+	}
+	// 窗口=当前配置调度周期推导（与定时任务同参——手动触发不烧多余配额）
+	window := 24 * time.Hour
+	if enabled, schedule, err := h.iyuuSvcCoverageTaskConfig(r); err == nil && enabled {
+		window = model.CoverageWindow(schedule)
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+		defer cancel()
+		if err := h.coverageSvc.RunCoverageSync(ctx, window); err != nil && !errors.Is(err, coverage.ErrCoverageRunning) {
+			h.logger.Warn("manual coverage sync failed", zap.Error(err))
+		}
+	}()
+	Success(w, map[string]interface{}{"message": "覆盖同步已启动（后台执行·状态见 coverage/status）"})
+}
+
+// iyuuSvcCoverageTaskConfig: 从 DB 直读覆盖任务配置（iyuuSvc 接口不扩——
+// 最小依赖·db 在手）。
+func (h *IYUUHandler) iyuuSvcCoverageTaskConfig(r *http.Request) (bool, string, error) {
+	var cfg model.IYUUConfig
+	if err := h.db.WithContext(r.Context()).First(&cfg).Error; err != nil {
+		return false, "", err
+	}
+	schedule := cfg.CoverageSchedule
+	if schedule == "" {
+		schedule = "0 */12 * * *"
+	}
+	return cfg.CoverageEnabled, schedule, nil
+}
+
+// handleCoverageStatus §59.535 刀3: 任务状态（running/last_run/last_stats）。
+func (h *IYUUHandler) handleCoverageStatus(w http.ResponseWriter, r *http.Request) {
+	if h.coverageSvc == nil {
+		Error(w, http.StatusServiceUnavailable, 50300, "覆盖服务未就绪")
+		return
+	}
+	Success(w, h.coverageSvc.CoverageStatus())
 }
