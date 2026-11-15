@@ -71,7 +71,14 @@ GET `/api/v1/section-dict?category_id=N`（分类 8 纪录片实测）：
 - 测试锚五枚（捕获型 RoundTripper 形态断言）——好学锚累计 13 枚
 - 与刀4 合并发版（publish enabled=false 期间无用户可见变化）
 
-### 刀4-5（待实施）
+### 刀4 值集重造+re-enable（2026-11-15·§59.533）
+
+- **migration170 整体替换 form_config**：六键映射（type→category_id/medium→media/codec/team/tags+cover→poster 复用瓷器通道）；type 13 分类（music 大键集归并）；media 视频=14 影视媒介键归并；codec H.264/H.265 双键归并（x264/x265 编码器实现→格式词条）；team 70 组+其他；tags 五键四不接
+- **source 域不配置**（处理来源语义——medium 键已消费防一键双域·首颗观察）
+- **旧特化清理** -115 行（拦截段+prefill 段+三函数）；enabled=true re-enable
+- 三守则自检零违规·TestFreshInstallChain 过·50 包全绿
+
+### 刀5（待实施）
 
 - 刀3：发布链 adapter（FormData 契约+CSRF+sections 组装）
 - 刀4：值集键映射 form_config 重造+旧特化清理（hxptOnlyDocumentary/hxptDocumentaryPrefill）+re-enable
