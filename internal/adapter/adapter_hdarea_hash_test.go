@@ -67,3 +67,24 @@ func TestHDAreaBatchMatchEmpty(t *testing.T) {
 func TestHDAreaHashMatcher(t *testing.T) {
 	var _ HashMatcher = NewHDAreaAdapter(nil, nil)
 }
+
+// TestHDAreaSLData §59.534 补全：SL 直读（search item seeders/leechers）。
+func TestHDAreaSLData(t *testing.T) {
+	shelf := &hdareaShelf{hits: map[string]int{}}
+	a := NewHDAreaAdapter(&HTTPDoer{Client: &http.Client{Transport: shelf}}, zap.NewNop())
+	sl, err := a.GetPreciseSLData(context.Background(), hdareaTestConfig(), "460261")
+	if err != nil {
+		t.Fatalf("GetPreciseSLData: %v", err)
+	}
+	// 夹具 detail.json 的 seeders/leechers
+	if sl.Seeders == 0 && sl.Leechers == 0 {
+		t.Errorf("SL 数据空（seeders=%d leechers=%d）——应从 item 直读", sl.Seeders, sl.Leechers)
+	}
+	batch, err := a.GetBatchSLData(context.Background(), hdareaTestConfig(), []string{"460261"})
+	if err != nil {
+		t.Fatalf("GetBatchSLData: %v", err)
+	}
+	if batch["460261"] == nil {
+		t.Error("批量通道应含查询条目")
+	}
+}

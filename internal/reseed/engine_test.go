@@ -3061,3 +3061,43 @@ func TestTitleKeywordRelevant_SequelMismatch(t *testing.T) {
 		t.Errorf("白发魔女传I vs White Hair I should be RELEVANT (I excluded from English)")
 	}
 }
+
+// TestMatchLayer0HashBatch §59.534: L0 站方批量 hash 实时通道
+// （好大 BatchMatchHashes——info_hash 数学身份·cache miss 兜底）。
+// fake=mocks.SiteAdapter（全接口桩）+BatchMatchHashes（HashBatchMatcher 扩展）。
+type fakeHashBatchAdapter struct {
+	mocks.SiteAdapter
+	results []*model.HashMatchResult
+	err     error
+}
+
+func (f *fakeHashBatchAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*model.HashMatchResult, error) {
+	return f.results, f.err
+}
+
+func TestMatchLayer0HashBatch(t *testing.T) {
+	e := &Engine{}
+	cfg := &model.SiteConfig{APIKey: "k"}
+	// ① 命中：hash 精确匹配→Candidate（Confidence 1.0·match=pieces_hash）
+	hit := &fakeHashBatchAdapter{results: []*model.HashMatchResult{{
+		InfoHash: "ABCDEF0123456789ABCDEF0123456789ABCDEF01", TorrentID: "460885", Seeders: 3,
+	}}}
+	c := e.matchLayer0HashBatch(context.Background(), hit, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大")
+	if c == nil || c.TargetTorrentID != "460885" || c.Confidence != 1.0 {
+		t.Errorf("命中形态: %+v", c)
+	}
+	// ② miss：无匹配结果→nil（降级 L1/L2）
+	miss := &fakeHashBatchAdapter{results: nil}
+	if c := e.matchLayer0HashBatch(context.Background(), miss, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil {
+		t.Errorf("miss 应 nil: %+v", c)
+	}
+	// ③ 错误：静默 nil（独立信息源不阻塞）
+	failing := &fakeHashBatchAdapter{err: errors.New("api down")}
+	if c := e.matchLayer0HashBatch(context.Background(), failing, cfg, "abcdef0123456789abcdef0123456789abcdef01", "好大"); c != nil {
+		t.Errorf("错误应静默 nil: %+v", c)
+	}
+	// ④ 非 HashBatchMatcher adapter（裸 mocks 桩无扩展）：断言失败 nil
+	if c := e.matchLayer0HashBatch(context.Background(), &mocks.SiteAdapter{}, cfg, "x", "站"); c != nil {
+		t.Errorf("无能力 adapter 应 nil")
+	}
+}

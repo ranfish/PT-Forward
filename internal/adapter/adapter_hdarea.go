@@ -409,12 +409,28 @@ func (a *HDAreaAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, 
 	return &model.HRResult{HasHR: false}, nil
 }
 
-func (a *HDAreaAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
-	return map[string]*model.SLData{}, nil
+// GetPreciseSLData §59.534 补全：API search item 的 seeders/leechers 直读
+// （v0.0.1446 薄实现定案时辅种未消费好大 SL——辅种目标开闸后两消费面
+// （辅种评分权重+free_wait/recheck 做种检查）需要真实数据）。
+func (a *HDAreaAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
+	it, err := a.fetchItem(ctx, config, torrentID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.SLData{Seeders: it.Seeders, Leechers: it.Leechers}, nil
 }
 
-func (a *HDAreaAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	return nil, nil
+// GetBatchSLData 逐条循环（站方无批量 SL 端点·单请求/条限流保护内）。
+func (a *HDAreaAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	out := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			continue // 单条失败不废批次
+		}
+		out[id] = sl
+	}
+	return out, nil
 }
 
 func (a *HDAreaAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
@@ -448,32 +464,19 @@ func isHTTP404(err error) bool {
 // ── 发布（刀1 基础版：表单驱动直写——API 域名与 NP 表单同名·
 //     migration90 值集直接复用；深度语义 check/顶替/409 留刀2）──
 
-// HashMatcher 刀3：站方批量 hash 匹配能力接口（好大 API 独有·
-// PreChecker 同款类型断言消费——辅种引擎独立信息源）。
-type HashMatcher interface {
-	BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*HashMatchResult, error)
-}
-
-// HashMatchResult 刀3：hash 匹配结果（数学身份·无需标题验证）。
-type HashMatchResult struct {
-	InfoHash    string // 查询的 40 位 hex
-	TorrentID   string // 本站 tid
-	Title       string
-	Size        int64
-	Seeders     int
-	DownloadURL string // 短效直链（dl_token）
-}
+// HashMatcher §59.534: alias 到 model 公共接口（类型下沉——reseed L0 消费）。
+type HashMatcher = model.HashBatchMatcher
 
 // BatchMatchHashes 刀3 D2+D3：批量 hash 匹配（POST /api/v1/torrents/hashes·
 // ≤200/批自动切分）。read scope·独立信息源（与 IYUU 并行·不 fallback）。
-func (a *HDAreaAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*HashMatchResult, error) {
+func (a *HDAreaAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*model.HashMatchResult, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
 	if config.APIKey == "" {
 		return nil, &model.AppError{Code: 40001, Message: "好大 hash 匹配需要 API Key"}
 	}
-	var all []*HashMatchResult
+	var all []*model.HashMatchResult
 	for start := 0; start < len(hashes); start += 200 {
 		end := start + 200
 		if end > len(hashes) {
@@ -500,7 +503,7 @@ func (a *HDAreaAdapter) BatchMatchHashes(ctx context.Context, config *model.Site
 			return nil, err
 		}
 		for _, it := range data.Items {
-			all = append(all, &HashMatchResult{
+			all = append(all, &model.HashMatchResult{
 				InfoHash:    it.InfoHash,
 				TorrentID:   strconv.Itoa(it.ID),
 				Title:       it.Name,

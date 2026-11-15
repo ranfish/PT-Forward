@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // §33.1.33 — ContentFingerprint: 内容指纹统一（12 字段 DB 模型）
 type ContentFingerprint struct {
@@ -235,3 +238,21 @@ type ReseedFeatureLog struct {
 }
 
 func (ReseedFeatureLog) TableName() string { return "reseed_feature_logs" }
+
+// HashMatchResult §59.515 刀3 D2/§59.534: 站方批量 hash 匹配结果
+// （数学身份·无需标题验证）——公共类型（adapter 产出/reseed L0 消费）。
+type HashMatchResult struct {
+	InfoHash    string // 查询的 40 位 hex
+	TorrentID   string // 本站 tid
+	Title       string
+	Size        int64
+	Seeders     int
+	DownloadURL string // 短效直链（dl_token）
+}
+
+// HashBatchMatcher §59.534: 站方批量 hash 精确匹配能力（好大 API 独有·
+// POST hashes ≤200/批）——辅种引擎 L0 层实时通道（info_hash 数学身份·
+// 免 size 验证——同一 bencode info 字典必然同 size）。
+type HashBatchMatcher interface {
+	BatchMatchHashes(ctx context.Context, config *SiteConfig, hashes []string) ([]*HashMatchResult, error)
+}

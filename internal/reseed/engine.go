@@ -1483,6 +1483,12 @@ func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model
 
 	if hasMatchMethod(mc.task.MatchMethods, "pieces_hash") {
 		c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, mc.fc, mc.phCache)
+		if c == nil {
+			// §59.534: L0 实时通道——站方批量 hash 精确匹配（好大 API 独有·
+			// info_hash 数学身份）。pieces-hash 缓存 miss 时兜底（缓存命中
+			// 路径不变）。
+			c = e.matchLayer0HashBatch(mc.ctx, adapter, siteConfig, src.InfoHash, siteInfo.Name)
+		}
 		if c != nil {
 			targetKey := siteInfo.Name + ":" + c.TargetTorrentID
 			if mc.confirmedTargets != nil && mc.confirmedTargets[targetKey] {
@@ -2252,6 +2258,39 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 
 	e.logger.Info("syncIYUUCoverage: synced",
 		zap.Int("entries", len(entries)))
+}
+
+// matchLayer0HashBatch §59.534: L0 站方批量 hash 实时通道（model.HashBatchMatcher
+// 类型断言——好大 API BatchMatchHashes）。单 hash 查询（批 API 的单元素形态·
+// 站内 worker 顺序消费自然限流）。失败静默降级 L1/L2（独立信息源不阻塞）。
+func (e *Engine) matchLayer0HashBatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, siteName string) *model.Candidate {
+	hm, ok := adapter.(model.HashBatchMatcher)
+	if !ok {
+		return nil
+	}
+	if config.APIKey == "" && config.Cookie == "" && config.Passkey == "" {
+		return nil
+	}
+	results, err := hm.BatchMatchHashes(ctx, config, []string{strings.ToLower(sourceInfoHash)})
+	if err != nil {
+		if e.logger != nil {
+			e.logger.Debug("L0 hash batch query failed",
+				zap.String("site", siteName), zap.Error(err))
+		}
+		return nil
+	}
+	for _, r := range results {
+		if strings.EqualFold(r.InfoHash, sourceInfoHash) && r.TorrentID != "" {
+			return &model.Candidate{
+				TargetSite:      siteName,
+				TargetTorrentID: r.TorrentID,
+				TargetInfoHash:  r.InfoHash,
+				Confidence:      1.0,
+				MatchMethod:     "pieces_hash",
+			}
+		}
+	}
+	return nil
 }
 
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {

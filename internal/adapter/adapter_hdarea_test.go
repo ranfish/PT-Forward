@@ -156,13 +156,11 @@ func TestHDAreaThinStubs(t *testing.T) {
 	if a.SupportsSearchByPiecesHash() {
 		t.Error("SupportsSearchByPiecesHash 应 false（API 无该能力记载）")
 	}
-	sl, err := a.GetPreciseSLData(ctx, cfg, "1")
-	if sl != nil || err != nil {
-		t.Errorf("GetPreciseSLData 应空: %v %v", sl, err)
-	}
-	batch, err := a.GetBatchSLData(ctx, cfg, []string{"1"})
-	if err != nil || len(batch) != 0 {
-		t.Errorf("GetBatchSLData 应空 map: %v %v", batch, err)
+	// §59.534 补全：SL 改 item 直读（薄实现锚已废——辅种目标开闸后
+	// 两消费面需要真实数据·语义见 TestHDAreaSLData）。
+	if _, err := a.GetPreciseSLData(ctx, cfg, "1"); err == nil {
+		// 薄桩环境 err==nil 且数据空也可接受——具体数据锚在 TestHDAreaSLData
+		_ = err
 	}
 }
 
