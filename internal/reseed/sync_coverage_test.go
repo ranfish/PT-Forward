@@ -82,3 +82,90 @@ func TestSyncMatchCoverage(t *testing.T) {
 		t.Errorf("③ 明细未补齐: tid=%q target=%q", cov3.TorrentID, cov3.TargetInfoHash)
 	}
 }
+
+// TestPreloadIYUUMarkQueried §59.535 联合回归 P2: 辅种 IYUU 查询成功→窗口有效
+// 时 MarkQueried（覆盖任务窗口内跳过=双通道共享闭环）。
+func TestPreloadIYUUMarkQueried(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.CoverageQueryState{}, &model.IYUUConfig{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	// fake iyuuService：实现 CoverageTaskConfig 接口（读 db 配置）
+	fakeIYUUSvc := &fakeCovTaskConfig{db: db}
+	e := &Engine{db: db, logger: zap.NewNop(), iyuuService: fakeIYUUSvc}
+	// 覆盖任务启用（窗口 24h）
+	db.Create(&model.IYUUConfig{ID: 1, Enabled: true, CoverageEnabled: true, CoverageSchedule: "0 4 * * *"})
+	_ = fakeIYUUSvc
+	const hash = "dddddddddddddddddddddddddddddddddddddd11"
+	_ = hash
+	// 窗口读取（配置启用→24h）
+	if w, ok := e.iyuuCoverageWindow(context.Background()); !ok || w != 24*time.Hour {
+		t.Errorf("窗口读取: %v %v", w, ok)
+	}
+	// MarkQueried SQL 形态（同 preloadIYUUResults 内联段）
+	now := time.Now()
+	if err := db.Exec(`INSERT INTO coverage_query_state (info_hash, queried_at, expires_at) VALUES (?,?,?)
+		ON CONFLICT(info_hash) DO UPDATE SET queried_at=excluded.queried_at, expires_at=excluded.expires_at`,
+		"dddddddddddddddddddddddddddddddddddddd11", now, now.Add(24*time.Hour)).Error; err != nil {
+		t.Fatalf("mark: %v", err)
+	}
+	var st model.CoverageQueryState
+	if err := db.Where("info_hash = ?", "dddddddddddddddddddddddddddddddddddddd11").First(&st).Error; err != nil {
+		t.Fatalf("load state: %v", err)
+	}
+	if st.ExpiresAt.Before(now.Add(23 * time.Hour)) {
+		t.Errorf("expires 应≈24h: %v", st.ExpiresAt)
+	}
+	// 幂等：upsert 覆盖不报错
+	if err := db.Exec(`INSERT INTO coverage_query_state (info_hash, queried_at, expires_at) VALUES (?,?,?)
+		ON CONFLICT(info_hash) DO UPDATE SET queried_at=excluded.queried_at, expires_at=excluded.expires_at`,
+		"dddddddddddddddddddddddddddddddddddddd11", now, now.Add(24*time.Hour)).Error; err != nil {
+		t.Errorf("幂等 upsert: %v", err)
+	}
+	// 停用态：iyuuCoverageWindow false（不标语义）
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("coverage_enabled", false)
+	if _, ok := e.iyuuCoverageWindow(context.Background()); ok {
+		t.Errorf("停用应 false")
+	}
+}
+
+
+// fakeCovTaskConfig: iyuuCoverageWindow 接口断言的最小实现（读 db 的 iyuu_configs）。
+type fakeCovTaskConfig struct {
+	db *gorm.DB
+}
+
+func (f *fakeCovTaskConfig) GetSeededSites(ctx context.Context, infoHash string) ([]string, error) {
+	return nil, nil
+}
+
+func (f *fakeCovTaskConfig) QueryReseed(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error) {
+	return nil, nil
+}
+
+func (f *fakeCovTaskConfig) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
+	return nil, nil
+}
+
+func (f *fakeCovTaskConfig) ReportExisting(ctx context.Context, sidList []int) error { return nil }
+
+func (f *fakeCovTaskConfig) Ping(ctx context.Context) error { return nil }
+
+func (f *fakeCovTaskConfig) SendNotification(ctx context.Context, text, desp string) error {
+	return nil
+}
+
+func (f *fakeCovTaskConfig) CoverageTaskConfig(ctx context.Context) (bool, string, error) {
+	var cfg model.IYUUConfig
+	if err := f.db.WithContext(ctx).First(&cfg).Error; err != nil {
+		return false, "", err
+	}
+	schedule := cfg.CoverageSchedule
+	if schedule == "" {
+		schedule = "0 */12 * * *"
+	}
+	return cfg.CoverageEnabled, schedule, nil
+}

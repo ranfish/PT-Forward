@@ -83,18 +83,22 @@ const percent = computed(() => {
 
 const okStatuses = ['pushed', 'pushed_existing']
 const existStatuses = ['duplicate', 'existing']
+// §59.535 刀6 联合回归 P1: skipped=站上已有·主动跳过（覆盖判据）——正常终态
+// 非失败（首版误入 attentionRows 失败明细区+alertType 警告色双错）。
+const skipStatuses = ['skipped']
 const okCount = computed(() => props.results.filter(r => okStatuses.includes(r.status)).length)
 const existCount = computed(() => props.results.filter(r => existStatuses.includes(r.status)).length)
 const failCount = computed(() => props.results.filter(r => r.status === 'failed').length)
 // §59.505: 明细只列需关注行=failed+未知状态（ok/exist 之外的防御集合）——
 // 成功/已存在是正常终态（§59.502 定案），汇总计数已表达，详情走发布日志页
 const attentionRows = computed(() =>
-  props.results.filter(r => !okStatuses.includes(r.status) && !existStatuses.includes(r.status)),
+  props.results.filter(r => !okStatuses.includes(r.status) && !existStatuses.includes(r.status) && !skipStatuses.includes(r.status)),
 )
 const alertType = computed(() => (attentionRows.value.length > 0 ? 'warning' : 'success'))
 
 const STATUS_LABEL: Record<string, string> = {
   pushed: '发布成功', pushed_existing: '已推种', duplicate: '站上已有', existing: '站上已有', failed: '失败',
+  skipped: '站上已有·跳过', // §59.535 刀6: 覆盖判据跳过终态
 }
 function rowLabel(st: string): string {
   return STATUS_LABEL[st] || st

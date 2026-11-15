@@ -1076,6 +1076,21 @@ func (e *Engine) preloadIYUUResults(ctx context.Context, taskID uint, infoHashes
 			byHash[r.SourceInfoHash] = append(byHash[r.SourceInfoHash], r)
 			responseTargets += len(r.Targets)
 		}
+		// §59.535 联合回归 P2: 查询成功→MarkQueried（窗口有效时）——双通道
+		// 共享窗口闭环：辅种问过的 hash 覆盖任务窗口内跳过（此前辅种落库行
+		// 但不标 query_state→覆盖任务启用后重问一次=共享层设计初衷漏洞）。
+		// 停用时（无窗口）不标——停用态两通道独立无重问问题。
+		if w, ok := e.iyuuCoverageWindow(ctx); ok {
+			now := time.Now()
+			for _, h := range deduped {
+				if merr := e.db.WithContext(ctx).Exec(
+					`INSERT INTO coverage_query_state (info_hash, queried_at, expires_at) VALUES (?,?,?)
+					 ON CONFLICT(info_hash) DO UPDATE SET queried_at=excluded.queried_at, expires_at=excluded.expires_at`,
+					h, now, now.Add(w)).Error; merr != nil {
+					e.logger.Debug("IYUU mark queried failed", zap.String("hash", h), zap.Error(merr))
+				}
+			}
+		}
 	}
 
 	if taskID > 0 {
@@ -2304,9 +2319,10 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 
 	// 收集所有 (hash, site, torrent_id) 三元组
 	type covEntry struct {
-		infoHash  string
-		siteName  string
-		torrentID string
+		infoHash   string
+		siteName   string
+		torrentID  string
+		targetHash string // §59.535 联合回归 P3: 注入依赖列（对齐共享层落库形态）
 	}
 	var entries []covEntry
 	for hash, results := range iyuuResults {
@@ -2317,9 +2333,10 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 					continue
 				}
 				entries = append(entries, covEntry{
-					infoHash:  hash,
-					siteName:  siteName,
-					torrentID: strconv.Itoa(t.TorrentID),
+					infoHash:   hash,
+					siteName:   siteName,
+					torrentID:  strconv.Itoa(t.TorrentID),
+					targetHash: strings.ToLower(t.InfoHash),
 				})
 			}
 		}
@@ -2341,13 +2358,13 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 		var placeholders []string
 		var args []interface{}
 		for _, e := range batch {
-			placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?, ?, ?)")
+			placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
 			args = append(args,
 				e.infoHash, e.siteName, "probably_has", "iyuu",
-				0.9, e.torrentID, now, ttl,
+				0.9, e.torrentID, e.targetHash, now, ttl,
 			)
 		}
-		sql := "INSERT OR IGNORE INTO site_coverage_cache (info_hash, site_name, status, source, confidence, torrent_id, queried_at, expires_at) VALUES " +
+		sql := "INSERT OR IGNORE INTO site_coverage_cache (info_hash, site_name, status, source, confidence, torrent_id, target_info_hash, queried_at, expires_at) VALUES " +
 			strings.Join(placeholders, ", ")
 		e.db.WithContext(ctx).Exec(sql, args...)
 	}
@@ -2360,9 +2377,10 @@ func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]
 		e.db.WithContext(ctx).Model(&model.SiteCoverageCache{}).
 			Where("info_hash = ? AND site_name = ? AND (torrent_id = '' OR torrent_id IS NULL) AND confidence >= ?", ent.infoHash, ent.siteName, 0.9).
 			Updates(map[string]interface{}{
-				"torrent_id": ent.torrentID,
-				"expires_at": ttl,
-				"queried_at": now,
+				"torrent_id":       ent.torrentID,
+				"target_info_hash": ent.targetHash, // §59.535 联合回归 P3
+				"expires_at":       ttl,
+				"queried_at":       now,
 			})
 	}
 
