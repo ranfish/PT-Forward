@@ -24,11 +24,7 @@ func (a *NexusPHPAdapter) GetEditForm(ctx context.Context, config *model.SiteCon
 	if config == nil || torrentID == "" {
 		return nil, fmt.Errorf("config and torrentID required")
 	}
-	baseURL := config.BaseURL
-	if baseURL == "" {
-		baseURL = "https://" + config.Domain
-	}
-	editURL := strings.TrimRight(baseURL, "/") + "/edit.php?id=" + torrentID
+	editURL := siteBaseURL(config) + "/edit.php?id=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", editURL, nil)
 	if err != nil {

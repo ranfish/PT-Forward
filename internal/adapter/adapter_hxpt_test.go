@@ -433,3 +433,23 @@ func TestHxptUploadEmptyFieldsOptional(t *testing.T) {
 		}
 	}
 }
+
+// TestSiteBaseURL §59.533 联合回归补修：请求基址公共构造四态
+// （stats_sync 生产链把 site.BaseURL 塞 config.Domain——好学/好大
+// 双协议爆雷实证）。
+func TestSiteBaseURL(t *testing.T) {
+	cases := []struct {
+		baseURL, domain, want string
+	}{
+		{"", "www.hxpt.org", "https://www.hxpt.org"},                                 // 裸域（标准形态）
+		{"https://hdarea.club/", "", "https://hdarea.club"},                         // BaseURL 优先
+		{"", "https://www.hxpt.org", "https://www.hxpt.org"},                        // ★ stats_sync 塞法（本案）
+		{"", "http://old.example.com", "http://old.example.com"},                    // http 协议域
+	}
+	for _, c := range cases {
+		cfg := &model.SiteConfig{BaseURL: c.baseURL, Domain: c.domain}
+		if got := siteBaseURL(cfg); got != c.want {
+			t.Errorf("siteBaseURL(base=%q domain=%q)=%q want %q", c.baseURL, c.domain, got, c.want)
+		}
+	}
+}

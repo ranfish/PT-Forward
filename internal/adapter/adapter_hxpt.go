@@ -96,10 +96,7 @@ var hxptCategoryNames = map[int]string{
 // ── 内部请求骨架 ──
 
 func (a *HxptAdapter) base(config *model.SiteConfig) string {
-	if config.BaseURL != "" {
-		return strings.TrimRight(config.BaseURL, "/")
-	}
-	return "https://" + config.Domain
+	return siteBaseURL(config)
 }
 
 // apiCall 统一请求：cookie 同域直用 + JSON 信封解包（GET 免 CSRF）。

@@ -120,10 +120,7 @@ type hdareaItem struct {
 // ── 内部请求骨架 ──
 
 func (a *HDAreaAdapter) base(config *model.SiteConfig) string {
-	if config.BaseURL != "" {
-		return strings.TrimRight(config.BaseURL, "/")
-	}
-	return "https://" + config.Domain
+	return siteBaseURL(config)
 }
 
 // apiCall 统一请求：X-API-Key + JSON 信封解包。rawURL=true 时 url 为完整地址。

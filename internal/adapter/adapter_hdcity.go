@@ -30,10 +30,7 @@ import (
 // tfu 实效短（实测 ~10 分钟过期——过期后 GET 返回 ASCII art 彩蛋页
 // 无表单），第二步紧跟第一步即可。
 func (a *NexusPHPAdapter) hdcityUploadTwoStep(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	baseURL := "https://" + config.Domain
-	if strings.HasPrefix(config.Domain, "http") {
-		baseURL = config.Domain
-	}
+	baseURL := siteBaseURL(config)
 
 	// ① 第一步页面：解析动态 vf 字段（vf+YYYYMMDD 每日轮换）/uid/action
 	page1, err := a.hdcityGet(ctx, config, baseURL+"/upload")

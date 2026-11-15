@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -131,4 +132,19 @@ func readBody(resp *http.Response) ([]byte, error) {
 
 func drainBody(resp *http.Response) {
 	httpclient.DrainBody(resp)
+}
+
+// siteBaseURL §59.533 联合回归补修：SiteConfig 请求基址公共构造。
+// 防御形态=stats_sync 等生产构造链把 site.BaseURL（含协议完整 URL）
+// 塞进 config.Domain（老 NP 惯例）——裸拼 "https://" 会产双协议 URL
+// （好学/好大 stats 链爆雷实证：https://https//domain）。hdcity 上传
+// 两步链 HasPrefix 防御先例收编公共。
+func siteBaseURL(config *model.SiteConfig) string {
+	if config.BaseURL != "" {
+		return strings.TrimRight(config.BaseURL, "/")
+	}
+	if strings.HasPrefix(config.Domain, "http://") || strings.HasPrefix(config.Domain, "https://") {
+		return strings.TrimRight(config.Domain, "/")
+	}
+	return "https://" + config.Domain
 }
