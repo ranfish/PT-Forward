@@ -22,6 +22,8 @@ func (s *hxptShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	u := req.URL.String()
 	var file string
 	switch {
+	case strings.Contains(u, "/api/v1/users/"):
+		file = "testdata/hxpt/users.json"
 	case strings.Contains(u, "/api/v1/me"):
 		file = "testdata/hxpt/me.json"
 	case strings.Contains(u, "/download"):
@@ -174,6 +176,12 @@ func TestHxptUserStats(t *testing.T) {
 	}
 	if st.SeedingCount != 22 {
 		t.Errorf("SeedingCount=%d want 22", st.SeedingCount)
+	}
+	if st.BonusPoints != 2275805 {
+		t.Errorf("BonusPoints=%v want 2275805（me/spark balance）", st.BonusPoints)
+	}
+	if st.SeedingSize != 1347914317403 {
+		t.Errorf("SeedingSize=%d want 1347914317403（users/{id} 全量做种体积）", st.SeedingSize)
 	}
 	wantRatio := float64(5878089979811) / float64(47209923087)
 	if st.Ratio < wantRatio-0.01 || st.Ratio > wantRatio+0.01 {

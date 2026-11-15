@@ -384,13 +384,14 @@ func (a *HxptAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, to
 
 func (a *HxptAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
 	var me struct {
-		Username   string `json:"username"`
-		ClassName  string `json:"class_name"`
-		Uploaded   int64  `json:"uploaded"`
-		Downloaded int64  `json:"downloaded"`
-		Seeding    int    `json:"seeding"`
-		Leeching   int    `json:"leeching"`
-		Uploads    int    `json:"uploads"`
+		ID          int64  `json:"id"`
+		Username    string `json:"username"`
+		ClassName   string `json:"class_name"`
+		Uploaded    int64  `json:"uploaded"`
+		Downloaded  int64  `json:"downloaded"`
+		Seeding     int    `json:"seeding"`
+		Leeching    int    `json:"leeching"`
+		Uploads     int    `json:"uploads"`
 	}
 	if err := a.apiCall(ctx, config, http.MethodGet, a.base(config)+"/api/v1/me", nil, &me); err != nil {
 		return nil, err
@@ -404,6 +405,29 @@ func (a *HxptAdapter) FetchUserStats(ctx context.Context, config *model.SiteConf
 	}
 	if me.Downloaded > 0 {
 		res.Ratio = float64(me.Uploaded) / float64(me.Downloaded)
+	}
+	// ② /api/v1/users/{id}（个人主页——用户实测指引）：seeding_size 全量
+	// 做种体积（me/spark 只有官种子集）+spark_balance 魔力单点拿全。
+	// me.id 提供用户 id（users/10056 页面 SSR+API 实测）。
+	// UploadBytes/Downloaded 保持 me 端点显示值（users 的 real_* 是考核
+	// 真实账本·两套语义——顶栏展示口径与 me 一致）。
+	var uid int64
+	if id, err := strconv.ParseInt(strings.TrimSpace(fmt.Sprint(me.ID)), 10, 64); err == nil && id > 0 {
+		uid = id
+	}
+	if uid > 0 {
+		var up struct {
+			SeedingSize  int64   `json:"seeding_size"`
+			SparkBalance float64 `json:"spark_balance"`
+		}
+		u := fmt.Sprintf("%s/api/v1/users/%d", a.base(config), uid)
+		if err := a.apiCall(ctx, config, http.MethodGet, u, nil, &up); err == nil {
+			res.SeedingSize = up.SeedingSize
+			res.BonusPoints = up.SparkBalance
+		} else if a.logger != nil {
+			a.logger.Warn("hxpt users/{id} 拉取失败（做种体积/魔力降级）",
+				zap.String("site", config.SiteName), zap.Error(err))
+		}
 	}
 	return res, nil
 }
