@@ -555,10 +555,12 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	}
 
 	// tags：TagArrayFields 聚合数值 id 数组（系统 tag 组装单点
-	// AssembleTagArrayForSite 产物；非数值项跳过——miss 自然蒸发）。
+	// AssembleTagArrayForSite 产物·Taglist applier 硬编码 Key="tagList"——
+	// TNode/Yemapt 同款匹配约定；非数值项（站方值集 miss 的标准键直出）
+	// ParseInt 跳过自然蒸发——好学只收数值 id）。
 	var tagIDs []int64
 	for _, kv := range req.TagArrayFields {
-		if kv.Key != "tags" {
+		if kv.Key != "tagList" {
 			continue
 		}
 		if n, perr := strconv.ParseInt(strings.TrimSpace(kv.Value), 10, 64); perr == nil && n > 0 {

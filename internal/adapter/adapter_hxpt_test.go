@@ -294,8 +294,9 @@ func hxptUploadReq() *model.PublishRequest {
 			"team":        "469",
 		},
 		TagArrayFields: []model.TagKV{
-			{Key: "tags", Value: "9"},
-			{Key: "tags", Value: "10"},
+			{Key: "tagList", Value: "9"},
+			{Key: "tagList", Value: "10"},
+			{Key: "tagList", Value: "dolby_vision"}, // 站方值集 miss 标准键直出→ParseInt 蒸发
 		},
 		Title:       "Test Doc 2026 1080p WEB-DL H264-UBWEB",
 		Subtitle:    "测试副标题",
