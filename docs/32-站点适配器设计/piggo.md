@@ -559,3 +559,8 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **media_info 特判撤销**（用户纠正）：审核门 9 字段含 MI（§59.500 完整才推理）——MI 缺失过不了审核发不出·猪猪特判多余。
 - 新遗漏四项定处理：①执行层内置站级限流（exec 绕过 GlobalLimiter·API 各端点 30-60/min）②做种体积分页成本高——首版 total 一发做种数·体积按需③音乐种不发 piggo（正确表述·用户纠正：音乐发布链目标站=已做音乐发布适配的站·目前仅乌托邦 §59.485——piggo 音乐分区未做音乐发布适配故音乐链不路由到它；未来按需单独立项（乌托邦同款流程）·非「piggo 走影视链」）④small_descr 必填——审核门不含副标题·空副标题 422 字典透出。
 - 顺路确认：图片零下载（MD 直链内嵌·不触发图片白名单流程）；tags 完结 11/合集 9 入映射表·分集永不勾；exec 数组参数注入免疫。
+
+**§59.540 架构反转定案（2026-11-16 晚·用户拍板）**：
+- **猪猪 tls 通道=azuretls chromeTransport**（§59.334 附二既有基建·RoundTripper·Session 复用·重试内置）——实测全绿：ping/搜索+Bearer/RSS feed GET（29KB）/稳定 3 连发 0.1s 级。**curl-impersonate 执行层方案整体撤销**（零新包零二进制零打包）。差异原因：azuretls 自研 HTTP/2 实现未踩中 CF 检测特征（tls-client 的 fhttp 已被识破）。备胎记录：若未来 azuretls 被识破切回 curl-impersonate（验证数据在本档）。
+- **猪猪接入形态**：adapter client 走 TLSPretend="chrome"（§59.333 既有配置通道·sites.tls_pretend 列）；RSS 同列配置——纯配置级。
+- **好大迁移定案（用户 b）**：243 现场实证 azuretls 3 连发 200（§59.1487 挂起现场根治）→ migration172 hdarea tls_pretend='chrome'（消费面零改动·adapter+RSS 全链自动生效·现状 proxy_url 空 use_global_proxy=0 即无代理直连·迁移后指纹直连根治）。
