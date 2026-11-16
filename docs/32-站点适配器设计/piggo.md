@@ -492,3 +492,10 @@ func canPublishToPiggo(req *PublishRequest) bool {
      作为输入。
 - 站点定位不变（§7.1：仅发布站+禁做源站+全站官种禁转——is_source=
   false 已落库验证 ✓）。
+
+**API 上线实测打通（2026-11-16 晚·用户供新版文档 366 行）**：
+- **文档升级**：完整端点示例（发布 422 dedup 带 torrent_id、download-link 24h 签发、pieces-hash 批量 100 反查、/catalog taxonomies 二级分类树、/me can_upload 等真实形态）——权威端点域名=api.piggo.me。
+- **部署确认**：浏览器地址栏 GET→405 应用层错误页（非 CF 非 SPA 壳）；浏览器同源 POST ping→`{"code":0,"data":{"ok":true}}`；/me→user 对象（id=22479 <作者>·can_upload=true·has_passkey=false 印证 Tracker 换令牌）。
+- **CF 破解=TLS 指纹**：curl-impersonate chrome116 POST→200（同 IP 同秒裸 curl→403 铁证）；**无需 cf_clearance**；主域 /v1/api/* 仍 nginx 静态 405（未代理）——生产走 api.piggo.me。
+- **实测链**：ping ✓ / me ✓（Bearer+IPv6 出口 2408:...）/ torrents 搜索 ✓（q=Dune→60 条真实结果全字段：name/small_descr/cover/size/section/category/taxonomy/media{douban,imdb}/seeders/times_completed/added_at/page_url/tag_ids·分页 total_capped）。
+- **生产架构方向**：Go 客户端需浏览器 TLS 指纹（bogdanfinn/tls-client 或 utls 方案）——CF 指纹墙唯一障碍已破；Bearer+POST JSON+统一信封+九端点全契约在手。
