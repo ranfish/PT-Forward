@@ -517,3 +517,9 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **禁转体系在 API 面**：tags id=2=禁转——tag_ids 含 2 即禁转种（§59.539 复检通用路径天然覆盖：catalog 翻译 tag_ids→名称「禁转」→extractFlags 命中）。
 - 官方请求头三元组：Accept+Content-Type application/json+Bearer。
 - 文档用户版 v3=625 行（含每端点 cURL 权威形态）。
+
+**curl-impersonate 方案复验（2026-11-16·定案版）**：
+- **tls-client 库全灭**：Go 内嵌指纹伪装全 Chrome profile（120/124/131/133/PSK 族）对猪猪 CF 皆 403——CF 检测已深入 Go 程序化 TLS 全族（H2 帧序层），只有真 BoringSSL 二进制（curl-impersonate）能过。
+- **猪猪复验**：POST 3 连发全 200（4.7~9s 偏慢·生产超时配 15s+）；**下载链端到端通**（签发→主域 GET→真 torrent 25.6KB bencode）；api 子域 GET 403 无生产影响（API 全 POST·下载走主域 piggo.me/v1/web/）。
+- **好大结论修正：不迁移**——243 复验 3 连发 200/200/25s 超时——CF 判罚=「指纹+频率」组合，curl-impersonate 单发改善但**连发仍触发静默挂起**；好大维持既有「全局代理+批量预查+熔断」体系（§59.1487 工作正常）。**curl-impersonate=猪猪专属**。
+- **兼容性定案（用户拍板）**：x86_64 only（ARM 不支持）；glibc 最高引用 2.17（CentOS 7 级·2013 后所有 x86 兼容·J1900 老机覆盖）；动态库仅 zlib/pthread/libc（BoringSSL 静态编入近乎自包含）；CA 路径自适应（Debian /etc/ssl/certs/ca-certificates.crt vs RH 系 /etc/pki/tls/certs/ca-bundle.crt——243 Rocky 实证）；Docker 镜像预装零感知·systemd 版随发行二进制分发·缺工具环境猪猪功能 fail-fast 不拖垮主程序。
