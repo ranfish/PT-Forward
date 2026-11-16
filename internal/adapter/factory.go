@@ -75,6 +75,11 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		// 共享 mtorrentCore 协议层（M-Team 兼容面契约）；可乐特化（Web 面
 		// 详情/promotion/myPeerStatus 简名/搜索单轮）全部在 ColaAdapter。
 		return NewColaAdapter(doer, f.logger)
+	case "piggo":
+		// §59.538/§59.540: 猪猪令牌 API adapter（Vite SPA 改版后 API 通道）
+		// ——Bearer+/v1/api+信封；CF 指纹墙走 sites.tls_pretend='chrome'
+		// （provider 透传 azuretls 通道·零 adapter 侧处理）。
+		return NewPiggoAdapter(doer, f.logger)
 	case "hdarea":
 		// 好大统一 API 网关 adapter（2026-11-12 刀1·hdarea-api.md）：
 		// 独立方言层（不 import mtorrentCore）+ apihelper 机制层。

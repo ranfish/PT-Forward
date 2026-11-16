@@ -233,7 +233,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 
 	var dbSub model.RSSSubscription
 	require.NoError(t, db.First(&dbSub).Error)
-	t.Logf("F4 debug: sub.ID=%d Enabled=%v ClientID=%q ScoringCfg.MaxCandidates=%d ScoringCfg.MaxActiveSeeding=%d",
+	t.Logf("F4 debug: sub.ID=%d Enabled=%v ClientID=%d ScoringCfg.MaxCandidates=%d ScoringCfg.MaxActiveSeeding=%d",
 		dbSub.ID, dbSub.Enabled, dbSub.ClientUID, dbSub.ScoringConfig.MaxCandidates, dbSub.ScoringConfig.MaxActiveSeeding)
 
 	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID)) //nolint:staticcheck // 集成测试锁定 legacy 通道

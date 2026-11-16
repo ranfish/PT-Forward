@@ -429,12 +429,13 @@
   "piggo.me": {
     "domain": "piggo.me",
     "name_cn": "二师兄",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
+    "framework": "piggo",
+    "auth_type": "apikey",
     "cookiecloud_domain": "piggo.me",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": "RSS/下载直连可用；cookie 页面(details/upload)被 WAF+异地登录 2FA 拦截，需关闭 ScrapeFree"
+    "publish_supported": false,
+    "api_key_label": "存取令牌（个人中心→存取令牌）",
+    "special_notes": "§59.538 改版后 Vite SPA+令牌 API（api.piggo.me/v1/api·Bearer）；CF 按 TLS 指纹判罚→tls_pretend=chrome（azuretls）"
   },
   "playlet.cc": {
     "domain": "playlet.cc",

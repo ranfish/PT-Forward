@@ -1,0 +1,167 @@
+package adapter
+
+// §59.540 锚：PiggoAdapter 契约核心——信封/公告门/搜索映射/发布 422 dedup/
+// multipart 形态/单位解析。夹具来源：piggo.md 2026-11-16 九端点实测真实形态
+// （§59.1339 教训：验证样例必须真实数据源）。
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/ranfish/pt-forward/internal/model"
+	"go.uber.org/zap"
+)
+
+func newPiggoTestAdapter(handler http.HandlerFunc) (*PiggoAdapter, *httptest.Server) {
+	srv := httptest.NewServer(handler)
+	a := NewPiggoAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	return a, srv
+}
+
+func piggoCfg(srvURL string) *model.SiteConfig {
+	return &model.SiteConfig{Domain: "piggo.me", BaseURL: srvURL, APIKey: "testkey"}
+}
+
+// ① 信封+搜索映射：条目字段→SeedingSearchResult（tid/title/size/seeders）。
+func TestPiggoSearch(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("want POST, got %s", r.Method)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer testkey" {
+			t.Errorf("Bearer 缺失: %q", got)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"data": map[string]any{
+				"items": []map[string]any{{
+					"id": 57277, "name": "变形金刚 2023 2160P", "size": 1073741824,
+					"seeders": 16, "leechers": 0, "page_url": "https://piggo.me/detail/57277",
+				}},
+				"total": 1,
+			},
+			"msg": "ok",
+		})
+	})
+	defer srv.Close()
+	res, err := a.SearchTorrents(context.Background(), piggoCfg(srv.URL), "变形金刚", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 1 || res[0].TorrentID != "57277" || res[0].Seeders != 16 || res[0].Size != 1073741824 {
+		t.Fatalf("映射错: %+v", res[0])
+	}
+}
+
+// ② 公告门特殊形态：403+code=0+data.code=notice_unread → 明确文案。
+func TestPiggoNoticeGate(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"data": map[string]any{"code": "notice_unread", "unread_notices": 1},
+			"msg":  "请先阅读公告",
+		})
+	})
+	defer srv.Close()
+	_, err := a.SearchTorrents(context.Background(), piggoCfg(srv.URL), "x", nil)
+	if err == nil || !strings.Contains(err.Error(), "必读公告") {
+		t.Fatalf("公告门文案缺失: %v", err)
+	}
+}
+
+// ③ 422 dedup：errors.file 含「已存在」→ IsExisting 终态（duplicate 语义）。
+func TestPiggoPublishDedup(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"code": 422,
+			"data": map[string]any{
+				"message":     "种子已存在 #57218",
+				"errors":      map[string][]string{"file": {"种子已存在 #57218"}},
+				"torrent_id":  57218,
+			},
+		})
+	})
+	defer srv.Close()
+	resp, err := a.UploadTorrent(context.Background(), piggoCfg(srv.URL), &model.PublishRequest{
+		Title: "t", Subtitle: "s", Description: "d", MediaInfo: "mi",
+		TorrentData: []byte("xx"),
+		FormFields:  map[string]string{"section_id": "1", "category_ids": "[3,5]"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.IsExisting || resp.ExistingID != "57218" {
+		t.Fatalf("dedup 终态错: %+v", resp)
+	}
+}
+
+// ④ 201 成功：成功判定=StatusCreated（非 NP 302 习惯）。
+func TestPiggoPublish201(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		// multipart 内容校验：必填字段在场
+		if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+			t.Errorf("非 multipart: %s", r.Header.Get("Content-Type"))
+		}
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"data": map[string]any{"id": 57300, "name": "t", "page_url": "https://piggo.me/detail/57300"},
+		})
+	})
+	defer srv.Close()
+	resp, err := a.UploadTorrent(context.Background(), piggoCfg(srv.URL), &model.PublishRequest{
+		Title: "t", Subtitle: "s", Description: "d", MediaInfo: "mi",
+		TorrentData: []byte("xx"), Anonymous: true,
+		FormFields: map[string]string{"section_id": "1", "category_ids": "[3,5]"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Success || resp.TorrentID != "57300" || resp.IDSource != "api_201" {
+		t.Fatalf("201 终态错: %+v", resp)
+	}
+}
+
+// ⑤ 缺 section_id fail-fast（配置异常静默不发 §59.289 先例）。
+func TestPiggoPublishMissingSection(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("不应发请求")
+	})
+	defer srv.Close()
+	_, err := a.UploadTorrent(context.Background(), piggoCfg(srv.URL), &model.PublishRequest{
+		Title: "t", FormFields: map[string]string{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "section_id") {
+		t.Fatalf("fail-fast 缺失: %v", err)
+	}
+}
+
+// ⑥ 人类可读体积解析："11.50 TB"→字节。
+func TestParseHumanSize(t *testing.T) {
+	cases := map[string]uint64{
+		"1.00 GB": 1073741824, "11.50 TB": 12644383719424, "512 B": 512,
+		"2 MB": 2097152,
+	}
+	for in, want := range cases {
+		got, err := parseHumanSize(in)
+		if err != nil || got != want {
+			t.Errorf("%s → %d (want %d, err %v)", in, got, want, err)
+		}
+	}
+}
+
+// ⑦ HR 恒 false（用户定案：系统零处理）。
+func TestPiggoHRFalse(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {})
+	defer srv.Close()
+	hr, err := a.DetectHR(context.Background(), piggoCfg(srv.URL), "1")
+	if err != nil || hr.HasHR {
+		t.Fatalf("HR 应恒 false: %+v %v", hr, err)
+	}
+}
