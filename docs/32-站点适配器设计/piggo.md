@@ -448,6 +448,22 @@ func canPublishToPiggo(req *PublishRequest) bool {
 
 **Tracker 改制资产影响**：243 库 10 颗·29 库 656 颗 piggo 种 100% 做种中——旧 passkey tracker 停用后汇报即断（公告"上传量白干"）。**换种=用户手动**（个人中心打包入口/详情页重下·SPA 操作不可自动化）。
 
+**令牌 API 契约（2026-11-16 用户供文档 /tmp/piggo-api.txt·「实验室接口」）**：
+- **认证**：`Authorization: Bearer <32位hex令牌>`（个人中心→存取令牌生成·等同账号密码）；根路径 `/v1/api`；`/ping` 免令牌探活
+- **查询类用 JSON 正文**（POST·无参发 `{}`）；发种 `POST /torrents/publish`（字段 file/name/section_id 等）
+- **端点与限流**：/ping(—)·/me(—)·/me/torrents(30/min 本人发布/做种/下载/完成/未完成)·/catalog(60/min 分区/分类/二级分类/标签)·/torrents(30/min 搜索)·/torrents/pieces-hash(30/min)·/torrents/publish(10/min)·/torrents/{id}(60/min 详情)·/torrents/{id}/download-link(20/min)
+- **信封**：`{code:0, data:{}, msg:"", time:0.012}`·业务字段在 data·成功外层 code=0
+- **公告门特殊形态**：未读必读公告时除 /ping 外全 HTTP 403 但**外层 code 仍 0**——判 `data.code=="notice_unread"`（含 notice_gate.id/title/body_md/read_wait·前台读完才能用·实验室不能标已读）
+- **错误**：200 成功/401 令牌无效或通道关/403 无权或公告未读/404 不存在或不区分/422 参数无效（如有 tmdb_id 无 tmdb_kind）/429 超限退避/500 错误
+- **可见范围**：仅当前账号默认可见分区分类种子；详情无权=404 不区分；搜索/详情带 page_url（前台 /detail/{id}）；无简介/无 passkey/无权限列表
+
+**API 部署状态实证（2026-11-16·用户浏览器九点测绘交叉校验）**：
+- **两层封锁同时存在**：①CF 边缘对非浏览器客户端挑战（curl/wget/curl-impersonate chrome116/edge101 + 三精确 UA + 新鲜 cf_clearance 重放全灭——API 路径规则比主站严·JA4 需精确匹配真浏览器）②**源站 nginx 无 /v1/api 路由**——真浏览器穿透 CF 后 GET /v1/api/* 落 SPA try_files fallback 壳（200+HTML）/POST 405（nginx 静态页特征）
+- **定案：令牌 API 文档先行、接口未部署**（对应公告「加急开发中」）
+- 主站 SPA 路由（/torrents/* 等）对**任何客户端开放**（裸 curl 200 壳）——CF 仅保护 index.php 等老路径与 /v1/api/*
+- **上线判据**：GET `https://piggo.me/v1/api/ping` 返回 JSON（而非 HTML 壳）= API 已部署
+- 预期：站方部署 API 时会同步放开 CF 对非浏览器客户端的限制（否则第三方程序全灭与 API 目的矛盾）——适配器建好后等阀门即通
+
 **适配定案（2026-11-16）**：
 - **等令牌 API 上线再适配**（获取链+发布链 API 直连·形态待站方放出；届时以 `/v1/` 命名空间为首要假设）
 - **现在不爬 SPA**（站方明令+CF 技术双锁）·获取链猪猪本就 publish-only 不受影响
