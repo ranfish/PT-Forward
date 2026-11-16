@@ -2112,11 +2112,14 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
-		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) ||
-			publish.IsHardcodedOneWayExclusion(req.SourceSite, req.TargetSite) {
+		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) {
 			Error(w, http.StatusForbidden, 40300, "硬编码互斥规则不可删除")
 			return
 		}
+		// §59.539 回归审核 P1 修正：单向硬编码不加 DELETE 拦截——DELETE 只
+		// 影响 DB 行（硬编码拦截在代码层 Eligibility·不依赖 DB 行存在）；
+		// 若拦截会造成用户自建同键行死锁（POST 无拦可建→展示被硬编码去重
+		// 吞→DELETE 被拒永删不掉）。用户行该删就删·删后单向拦截依然生效。
 		result := h.db.WithContext(r.Context()).
 			Where("target_site = ? AND source_site = ?", req.TargetSite, req.SourceSite).
 			Delete(&model.PublishExclusion{})

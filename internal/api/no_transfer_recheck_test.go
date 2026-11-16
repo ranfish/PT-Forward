@@ -220,12 +220,13 @@ func TestIsNoTransferWord(t *testing.T) {
 			t.Fatalf("%s 应属禁转族", w)
 		}
 	}
-	for _, w := range []string{"分集", "adult", "禁止转载"} {
-		if w == "禁止转载" {
-			continue // 变体由子串匹配兜住
-		}
+	for _, w := range []string{"分集", "adult"} {
 		if isNoTransferWord(w) {
 			t.Fatalf("%s 不应属禁转族（系统级禁发）", w)
 		}
+	}
+	// §59.539 P7: 禁止转载=禁转族第八词（子串兜不住·显式列名）
+	if !isNoTransferWord("禁止转载") {
+		t.Fatal("禁止转载应属禁转族（P7 补词）")
 	}
 }

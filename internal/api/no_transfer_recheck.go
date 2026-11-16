@@ -35,9 +35,12 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// noTransferForbiddenWords 禁转族七词（§59.539 定案——不含分集/adult）。
+// noTransferForbiddenWords 禁转族八词（§59.539 定案+回归审核 P7 补
+// 「禁止转载」——extract 词表全集对齐去分集；注意「禁止转载」不含相邻
+// 「禁转」子串·子串匹配兜不住必须显式列名·否则该 flag 种子永卡禁转列表
+// 无复检——与限转原缺口同型）。
 var noTransferForbiddenWords = []string{
-	"禁转", "限时禁转", "限转", "谢绝转载", "独占", "严禁转载", "谢决搬运",
+	"禁转", "禁止转载", "限时禁转", "限转", "谢绝转载", "独占", "严禁转载", "谢决搬运",
 }
 
 // isNoTransferWord 是否禁转族词（含子串匹配——flags 里存的是精确词，
@@ -99,8 +102,8 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 	// 兜底分集/adult 不被触碰）。
 	var metas []model.TorrentMetadata
 	h.db.WithContext(ctx).
-		Where("flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ?",
-			`%"禁转"%`, `%"限时禁转"%`, `%"限转"%`, `%"谢绝转载"%`, `%"独占"%`, `%"严禁转载"%`, `%"谢决搬运"%`).
+		Where("flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ?",
+			`%"禁转"%`, `%"禁止转载"%`, `%"限时禁转"%`, `%"限转"%`, `%"谢决转载"%`, `%"独占"%`, `%"严禁转载"%`, `%"谢决搬运"%`).
 		Where("torrent_id != ''").
 		Find(&metas)
 
