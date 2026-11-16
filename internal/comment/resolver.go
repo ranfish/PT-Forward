@@ -4,7 +4,9 @@
 // 出现详情页 URL 或 tid 即代表对应站有此种子，可直达。
 // 五方言（全量 20 万种子实测锚定）：
 //
-//	标准 URL   https?://域/(details?.php?id=|t/)(\d+)
+//	标准 URL   https?://域/(details?.php?id=|details?/数字|t/数字)(\d+)
+//	           NP 查询串形态（details.php?id=123）+ REST 路径形态
+//	           （detail/123——§59.540 附四 猪猪新架构 Vite SPA 实测）
 //	ob_tid     [(,]ob_tid=(\d+)                 → 我堡
 //	HDHx       ^HDHx(\d+)x\d+x[0-9a-f]{8}$       → 家园（A=tid B=发布epoch C=校验）
 //	馒头纯数字  ^(\d{5,10})$（仅 tracker 域=馒头） → 馒头
@@ -24,7 +26,10 @@ type DirectTarget struct {
 }
 
 var (
-	urlPattern = regexp.MustCompile(`https?://([^/\s,\]\)]+)/(?:details?\.php\?id=|t/)(\d+)`)
+	// §59.540 附四: 补 REST 路径形态 details?/数字（猪猪 https://piggo.me/detail/2915——
+	// 无 .php 无 ?id=。域名捕获后紧跟 /，somedetail/details-page 等前缀干扰形态
+	// 因字面量 detail 开头约束天然不命中）
+	urlPattern = regexp.MustCompile(`https?://([^/\s,\]\)]+)/(?:details?\.php\?id=|details?/|t/)(\d+)`)
 	obTidP     = regexp.MustCompile(`(?:^|[\s,])ob_tid[=:](\d+)`)
 	hdhP       = regexp.MustCompile(`^HDHx(\d+)x\d+x[0-9a-f]{8}$`)
 	plainNumP  = regexp.MustCompile(`^(\d{5,10})$`)

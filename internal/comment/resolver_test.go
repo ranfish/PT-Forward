@@ -12,6 +12,7 @@ func stubResolver(host string) string {
 		"tracker.m-team.cc":  "馒头",
 		"pt.tjupt.org":       "不可羊",
 		"ourbits.club":       "我堡",
+		"piggo.me":           "二师兄",
 	}
 	if v, ok := table[host]; ok {
 		return v
@@ -32,6 +33,10 @@ func TestResolve_FiveDialects(t *testing.T) {
 		{"HDHx家园", "HDHx277116x1769321369x3c9d2ccc", "", "家园", "277116"},
 		{"馒头纯数字", "1115950", "tracker.m-team.cc", "馒头", "1115950"},
 		{"相对路径-不可羊", "/details.php?id=512640", "pt.tjupt.org", "不可羊", "512640"},
+		// §59.540 附四: REST 路径形态（猪猪新架构——Fiksik 种实测 comment）
+		{"REST路径-猪猪单数", "https://piggo.me/detail/2915", "", "二师兄", "2915"},
+		{"REST路径-猪猪带空格", "转自 https://piggo.me/detail/2915 谢谢", "", "二师兄", "2915"},
+		{"REST路径-复数形态", "https://pt.keepfrds.com/details/2781947", "", "朋友", "2781947"},
 	}
 	for _, c := range cases {
 		got := Resolve(c.comment, stubResolver, c.trackerHost)
@@ -83,5 +88,20 @@ func TestResolve_Empty(t *testing.T) {
 	}
 	if Resolve("   ", stubResolver, "") != nil {
 		t.Error("空白 comment 应返回 nil")
+	}
+}
+
+// §59.540 附四: REST 路径形态负样本——前缀干扰/后缀粘连不得误命中
+func TestResolve_RestPathNegative(t *testing.T) {
+	neg := []string{
+		"https://piggo.me/details-page/2915", // details 后是 - 非 /
+		"https://piggo.me/somedetail/2915",   // detail 前有干扰词（域名捕获后须紧跟 /detail）
+		"https://piggo.me/detail/",           // 无 tid
+		"https://piggo.me/detail/abc",        // tid 非数字
+	}
+	for i, s := range neg {
+		if got := Resolve(s, stubResolver, ""); len(got) != 0 {
+			t.Errorf("负样本[%d] %q 不应命中: %v", i, s, got)
+		}
 	}
 }
