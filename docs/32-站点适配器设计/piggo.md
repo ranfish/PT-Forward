@@ -544,3 +544,13 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - 考核 enabled·挡位制（一档 72h 做种/480h 窗/0.2·二档 120h/480h/0.2）·各分区现均未设挡位→回退窗口 72h+完成率 1
 - **发布者不记**（发种无 H&R ✓）·下载他人种（辅种场景）会记——长期做种天然满足
 - 停下载阈值 10 条·饲料消一条 100000
+
+**§59.538 回归审核+补齐定案（2026-11-16 晚·用户逐项拍板）**：
+- **P1 RSS 全链路接 impersonate 执行层**（回归审核实锤：feed XML+enclosure 下载裸 Go 栈全 403·impersonate 全 200——RSS 引擎对 framework=piggo 走站级执行层通道·原「标准消费」设计作废）。
+- **收费种扣费**：用户定案「RSS 由用户创建·风险自担·系统只消费不判断」。
+- **待审种自己下载**：按常规可以·首颗实测验证项。
+- **官组映射**：catalog 制作组 5 项与用户给 4 官组完全吻合（PigoWeb=1/PigoHD=2/PigoNF=3/PigoAD=4/Other=5 兜底非官组）→ is_source=1 需 release_group_mappings 四行 is_official=1。
+- **publish 三件定案**：成功判定=201 Created（非 NP 302 习惯）；422 errors 字典逐项透出（不笼统报错）；media_info 以 API 文档必填为准·素材 MI 缺失发布前 fail-fast（规则页「非必填」矛盾以 API 为准）。
+- **taxonomy 处理维度**：4 选项 SDR/HDR10/HDR10+/DV 对 standard_keys（hdr10/hdr10plus/dolby_vision）一一配对·catalog 快照核对后进 migration。
+- **H&R 系统零处理（用户定案）**：辅种不考核·RSS 下载用户自担·只消费不判断→adapter HR 恒 false；真实规则备查=HR3（480h 窗保 72h）/HR5（480h 窗保 120h）·带对应标签的种子才考核。
+- **好大偶发挂起补录**：间隔 1s 十连发 2 挂（第 2/4 发·后 6 发全过）=随机 ~20% 黑洞节点非频率惩罚·好大维持不迁移·若未来迁移重试链可兜。
