@@ -2412,6 +2412,42 @@ func interleaveBySourceSite[T any](detector *publish.SourceSiteDetector, ctx con
 	return out
 }
 
+// snapshotProgressOf §59.537: 查快照最新 progress（无行 false——无快照颗
+// 维持原行为不拦）。
+func (h *PublishTorrentsHandler) snapshotProgressOf(ctx context.Context, hash string) (float64, bool) {
+	if hash == "" {
+		return 0, false
+	}
+	var row struct {
+		Progress float64
+	}
+	err := h.db.WithContext(ctx).
+		Table("torrent_snapshots").
+		Select("progress").
+		Where("hash = ? AND is_hidden = ?", hash, false).
+		Order("updated_at DESC").First(&row).Error
+	if err != nil {
+		return 0, false
+	}
+	return row.Progress, true
+}
+
+// markBatchItemFailed §59.537: 按 Hash 定位批量槽位记 failed（interleave
+// 重排后索引错位防御）+done/failed 计数。
+func (h *PublishTorrentsHandler) markBatchItemFailed(hash, msg string) {
+	h.batchFetch.mu.Lock()
+	defer h.batchFetch.mu.Unlock()
+	for i := range h.batchFetch.items {
+		if h.batchFetch.items[i].Hash == hash {
+			h.batchFetch.items[i].Status = "failed"
+			h.batchFetch.items[i].Error = msg
+			break
+		}
+	}
+	h.batchFetch.done++
+	h.batchFetch.failed++
+}
+
 func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
@@ -2456,6 +2492,15 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 		}
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
+
+		// §59.537: 完成度边界——未 100% 不获取（数据不完整；做种/暂停不限
+		// 只看完成度·用户定案）。列表已过滤·此为 API 直调防御层。Hash 定位
+		// 槽位（interleave 重排后 i 与槽位索引错位——§59.340 既有形态·
+		// Hash 扫描 ≤100 颗可接受）。
+		if p, ok := h.snapshotProgressOf(ctx, item.Hash); ok && p < 1.0 {
+			h.markBatchItemFailed(item.Hash, fmt.Sprintf("未下载完成（%.1f%%）·数据不完整不获取", p*100))
+			continue
+		}
 
 		// §59.476 位置3: 代表 hash 换簇内音乐源站副本（辅种代表→皇后副本
 		// →S1 天然命中）。影视簇/无音乐副本原样。name/savePath 簇内恒同。
@@ -3505,17 +3550,26 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// 避免 Go 全量载入）。同 client+path+name 的多站点 hash 只取 updated_at 最新一行。
 	// 无 name 的行按 hash 自成一组（name='' 时 MAX(hash) 无意义但保持行为：空名行退化
 	// 为按 hash 去重等价于不去重）。
+	// §59.537: 完成度 100% 边界（用户定案）——获取/展示只认数据完整的种子
+	// （做种中/暂停均可·不考虑做种状态只看完成度；reseed 引擎 Progress<1.0
+	// continue 同款语义对齐）。未完成副本被剔除后完成副本成为簇代表；整簇
+	// 未完成则整簇不出现（未完成不是可获取/可发布素材——重庆森林 pausedDL
+	// 0% 案族）。
 	snapQuery := h.db.WithContext(r.Context()).
 		Table("torrent_snapshots AS s").
 		Select("s.*").
-		Where("s.is_hidden = ?", false)
+		Where("s.is_hidden = ?", false).
+		Where("s.progress >= ?", 1.0)
 
 	// SQLite/MySQL 兼容的"组内最新行"：子查询取每组 MAX(id)。
 	// name 为空时用 hash 作为组键（等效不去重）。
+	// §59.537: sub 同滤 progress（组代表选择必须先剔未完成——否则代表 id
+	// 是未完成行，主查询 IN 匹配后过滤会误杀整簇完成副本）。
 	sub := h.db.WithContext(r.Context()).
 		Table("torrent_snapshots").
 		Select("MAX(id) AS id").
 		Where("is_hidden = ?", false).
+		Where("progress >= ?", 1.0).
 		Group("client_uid, save_path, CASE WHEN name = '' THEN hash ELSE name END")
 	if clientUID != 0 {
 		snapQuery = snapQuery.Where("s.client_uid = ?", clientUID)
@@ -4079,6 +4133,7 @@ func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r 
 	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
 		Select("client_uid, save_path, COUNT(*) as count").
 		Where("is_hidden = ?", false).
+		Where("progress >= ?", 1.0). // §59.537: 完成度边界同列表
 		Group("client_uid, save_path").
 		Order("client_uid, save_path").
 		Find(&rows)
@@ -5059,6 +5114,21 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 	}
 	if clientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "client_id 为必填")
+		return
+	}
+
+	// §59.537: 完成度边界——未 100% 不获取（数据不完整不是可获取素材；
+	// 做种/暂停不限只看完成度·用户定案）。查代表快照行校验。
+	var snapProg struct {
+		Progress float64
+		State    string
+	}
+	if err := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select("progress, state").
+		Where("hash = ? AND is_hidden = ?", infoHash, false).
+		Order("updated_at DESC").First(&snapProg).Error; err == nil && snapProg.Progress < 1.0 {
+		Error(w, http.StatusBadRequest, 40006, fmt.Sprintf("种子未下载完成（%.1f%%·%s）——数据不完整不获取，完成后重试", snapProg.Progress*100, snapProg.State))
 		return
 	}
 

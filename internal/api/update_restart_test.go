@@ -107,11 +107,11 @@ func TestBatchReviewClusterResolution(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 	// 簇：代表 hash 只有快照；元数据挂在兄弟 hash（甲站）
-	db.Create(&model.TorrentSnapshot{Hash: "rephash000000000000000000000000000000000", ClientUID: 1, SavePath: "/v", Name: "n"})
-	db.Create(&model.TorrentSnapshot{Hash: "sibhash000000000000000000000000000000000", ClientUID: 1, SavePath: "/v", Name: "n"})
+	db.Create(&model.TorrentSnapshot{Hash: "rephash000000000000000000000000000000000", ClientUID: 1, SavePath: "/v", Name: "n", Progress: 1})
+	db.Create(&model.TorrentSnapshot{Hash: "sibhash000000000000000000000000000000000", ClientUID: 1, SavePath: "/v", Name: "n", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: "sibhash000000000000000000000000000000000", SiteName: "甲站", Title: "t", Reviewed: false})
 	// 无关簇：不受牵连
-	db.Create(&model.TorrentSnapshot{Hash: "othhash000000000000000000000000000000000", ClientUID: 2, SavePath: "/v", Name: "o"})
+	db.Create(&model.TorrentSnapshot{Hash: "othhash000000000000000000000000000000000", ClientUID: 2, SavePath: "/v", Name: "o", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: "othhash000000000000000000000000000000000", SiteName: "丙站", Title: "o", Reviewed: false})
 
 	body := `{"info_hashes":["rephash000000000000000000000000000000000"],"reviewed":true}`
@@ -151,8 +151,8 @@ func TestSiteBatchCurTitleClusterResolution(t *testing.T) {
 	sib := "sib" + strings.Repeat("0", 37)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop(),
 		resourceResolver: publish.NewResourceResolver(db)}
-	db.Create(&model.TorrentSnapshot{Hash: rep, ClientUID: 1, SavePath: "/v", Name: "n"})
-	db.Create(&model.TorrentSnapshot{Hash: sib, ClientUID: 1, SavePath: "/v", Name: "n"})
+	db.Create(&model.TorrentSnapshot{Hash: rep, ClientUID: 1, SavePath: "/v", Name: "n", Progress: 1})
+	db.Create(&model.TorrentSnapshot{Hash: sib, ClientUID: 1, SavePath: "/v", Name: "n", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: sib, SiteName: "A", Title: "漂移簇标题", Reviewed: false})
 	if got := h.siteBatchCurTitle(context.Background(), rep); got != "漂移簇标题" {
 		t.Errorf("漂移簇代表 hash 应解析到标题, got %q", got)
@@ -175,11 +175,11 @@ func TestListSeedsTightClusterScope(t *testing.T) {
 		resourceResolver: publish.NewResourceResolver(db)}
 	Zeros := func(n int) string { return strings.Repeat("0", n) }
 	// 簇 A（client 1 /v）：代表 hash 仅快照，元数据挂兄弟 hash（漂移簇）
-	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
-	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023", Progress: 1})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: "a" + "sib" + Zeros(36), SiteName: "A", Title: "T", Poster: "p", Description: "d", Screenshots: `["u"]`, Tags: `["x"]`, MediaInfo: "mi", DoubanURL: "https://d", Reviewed: true})
 	// 簇 B（client 2 /w）：同名、无任何元数据
-	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023", Progress: 1})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/publish/seeds?page=1&page_size=50", nil)
 	rec := httptest.NewRecorder()
@@ -209,10 +209,10 @@ func TestDeleteSeedTightScope(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 	Zeros := func(n int) string { return strings.Repeat("0", n) }
-	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
-	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023", Progress: 1})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: "a" + "sib" + Zeros(36), SiteName: "A", Title: "T"})
-	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023", Progress: 1})
 	db.Create(&model.TorrentMetadata{InfoHash: "b" + "rep" + Zeros(36), SiteName: "B", Title: "T"})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/publish/seeds/"+"a"+"rep"+Zeros(36), nil)
