@@ -736,10 +736,9 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	// 窗判定用 torrent_metadata 首见时间近似（官种 RSS 即时抓首见≈发布，
 	// 误差小；老种首采低估窗=放行偏宽可接受——方案 A 用户确认）。
 	if containsStr(flags, "限转") {
-		// 72h 全站窗语义仅限名单映射站（深度站 rules.php 定义）——
+		// 72h 全站窗+定向名单语义仅深度站（rules.php 定义）——
 		// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
-		// 优堡虽在名单表（§59.409 附官种通道）但非"限转"语义站，排除。
-		if _, ok := siteDirectedNoTransferTargets[siteName]; ok && siteName != "优堡" {
+		if siteName == "深度" {
 			for _, t := range siteDirectedNoTransferTargets[siteName] {
 				if t == targetSite {
 					return true, fmt.Sprintf("源站 %s 限转规则永久禁转至 %s（站规定向名单），跳过发布", siteName, targetSite)
@@ -751,6 +750,12 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 			if meta.NoTransferUntil != nil && meta.NoTransferUntil.After(time.Now()) {
 				return true, fmt.Sprintf("源站 %s 限转标签 72h 发布窗口内（至 %s），跳过发布", siteName, meta.NoTransferUntil.Format("01-02 15:04"))
 			}
+		} else {
+			// §59.539: 非深度站「限转」通用拦截——标记在=拦（对齐列表
+			// forbiddenSet 语义·消除两端口径不一致）；复检发现站方摘除
+			// 标记后自动放行（标记跟随·用户定案）。优堡同名历史遗留条目
+			// 一并收敛到通用语义。
+			return true, fmt.Sprintf("源站 %s 限转标记在效（站方解除后复检自动放行），跳过发布", siteName)
 		}
 	}
 	forbiddenFlags := map[string]bool{
@@ -778,6 +783,8 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 //     为 4 月分析杜撰——实时 rules.php 无 HDSky（2026-11-01 实证勘误）。
 var siteDirectedNoTransferTargets = map[string][]string{
 	"深度": {"时间", "肉丝", "家园"},
+	// 优堡条目=checkOfficialDirectedNoTransfer 官组定向消费（§59.409 附
+	// 官种通道·优堡官种→时间拦）——限转 flag 通道不消费（§59.539 只查深度）。
 	"优堡": {"时间"},
 }
 
@@ -787,6 +794,27 @@ var HardcodedExclusionPairs = map[string]map[string]bool{
 	"优堡":   {"不可说": true},
 	"家园":   {"铂金家": true},
 	"铂金家": {"家园": true},
+}
+
+// HardcodedOneWayExclusions §59.539: 硬编码单向互斥（源→目标·禁止转载
+// 方向单侧），禁止用户修改。与 pipeline 定向名单（siteDirectedNoTransfer
+// Targets·发布门第一重）构成双重防御；为未来其它站单向禁转立参考先例。
+// 深度站全站官种非官组不能发种+未开放其目标适配——纯防御性（用户定案）。
+var HardcodedOneWayExclusions = map[string]map[string]bool{
+	"深度": {"时间": true, "肉丝": true, "家园": true},
+}
+
+// PublishHardcodedOneWayExclusions 单向互斥暴露（rules 展示消费）。
+func PublishHardcodedOneWayExclusions() map[string]map[string]bool {
+	return HardcodedOneWayExclusions
+}
+
+// IsHardcodedOneWayExclusion 单向互斥判定：source→target 方向禁止。
+func IsHardcodedOneWayExclusion(sourceSite, targetSite string) bool {
+	if targets, ok := HardcodedOneWayExclusions[sourceSite]; ok {
+		return targets[targetSite]
+	}
+	return false
 }
 
 func PublishHardcodedExclusionPairs() map[string]map[string]bool {

@@ -307,6 +307,16 @@ export const seedConfigApi = {
   declBackfillCancel() {
     return client.post<ApiResponse<{ message: string }>>('/publish/seeds/declaration-backfill-cancel')
   },
+  // §59.539: 禁转标记复检——手动触发/状态/配置
+  noTransferRecheckRun() {
+    return client.post<ApiResponse<{ started: boolean; running: boolean }>>('/publish/seeds/no-transfer-recheck/run')
+  },
+  noTransferRecheckStatus() {
+    return client.get<ApiResponse<{ running: boolean; last_run: string; last_stats: string; enabled: boolean; schedule: string }>>('/publish/seeds/no-transfer-recheck/status')
+  },
+  noTransferRecheckConfigSave(enabled: boolean, schedule: string) {
+    return client.put<ApiResponse<{ saved: boolean }>>('/publish/seeds/no-transfer-recheck/config', { enabled, schedule })
+  },
   snapshotUnconfigured(clientId: number, savePath: string) {
     return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: number; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
   },

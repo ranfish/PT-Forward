@@ -33,6 +33,16 @@
           <a-input v-model:value="form.coverageSchedule" placeholder="0 */12 * * *" />
           <span class="coverage-hint">{{ t('iyuu.coverageScheduleHint') }}</span>
         </a-form-item>
+        <!-- §59.539: 立即执行挪到调度计划正下方（用户反馈远离看不到） -->
+        <a-form-item v-if="form.coverageEnabled" :label="t('iyuu.coverageTask')">
+          <a-space wrap>
+            <a-button type="primary" :loading="covRunning" :disabled="covStatus.running" @click="handleCoverageRun">{{ t('iyuu.coverageRunNow') }}</a-button>
+            <a-tag v-if="covStatus.running" color="processing">{{ t('iyuu.coverageRunning') }}</a-tag>
+            <a-tag v-else-if="covStatus.last_run" color="default">{{ t('iyuu.coverageLastRun') }}: {{ covStatus.last_run }}</a-tag>
+          </a-space>
+          <div v-if="covStatus.last_stats" class="coverage-hint">{{ covStatus.last_stats }}</div>
+          <div v-if="covStatus.last_error" class="coverage-hint" style="color: #cf1322">{{ covStatus.last_error }}</div>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</a-button>
@@ -69,19 +79,7 @@
       <a-empty v-else :description="t('iyuu.viewAfterSave')" />
     </a-card>
 
-    <a-divider />
 
-    <a-card :title="t('iyuu.coverageTask')" style="margin-top: 16px">
-      <a-space direction="vertical" style="width: 100%">
-        <a-space>
-          <a-button type="primary" :loading="covRunning" :disabled="covStatus.running" @click="handleCoverageRun">{{ t('iyuu.coverageRunNow') }}</a-button>
-          <a-tag v-if="covStatus.running" color="processing">{{ t('iyuu.coverageRunning') }}</a-tag>
-          <a-tag v-else-if="covStatus.last_run" color="default">{{ t('iyuu.coverageLastRun') }}: {{ covStatus.last_run }}</a-tag>
-        </a-space>
-        <div v-if="covStatus.last_stats" class="coverage-hint">{{ covStatus.last_stats }}</div>
-        <div v-if="covStatus.last_error" class="coverage-hint" style="color: #cf1322">{{ covStatus.last_error }}</div>
-      </a-space>
-    </a-card>
 
     <a-divider />
 

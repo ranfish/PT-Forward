@@ -247,6 +247,9 @@ func (rt *Router) SetupCompliance(checker *compliance.Checker) {
 	}
 }
 
+// PublishTorrents §59.539: handler 暴露（main 注册禁转复检 cron 用）。
+func (rt *Router) PublishTorrents() *PublishTorrentsHandler { return rt.publishTorrentsHandler }
+
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
 	rt.publishTorrentsHandler.SetCoverageService(coverageSvc)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)

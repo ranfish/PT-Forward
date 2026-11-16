@@ -87,11 +87,11 @@ func TestDirectedNoTransferConsumption(t *testing.T) {
 		t.Fatal("非限转 flag 不应被名单拦")
 	}
 
-	// ④ 其它站"限转"（keepfrds 等——暂无名单映射）不受名单+72h 窗影响
-	//（keepfrds 的窗走"限时禁转"独立通道——窗判定限定名单映射站）
+	// ④ §59.539 语义更新：非深度站"限转"走通用拦截（标记在=拦·对齐列表
+	// forbiddenSet 口径；复检发现站方摘标记后自动放行——标记跟随）
 	seedMetaFlags(t, db, "hash5", "朋友", []string{"限转"}, &future)
-	if blocked, _ := p.checkFlagsFromMetadata(ctx, "hash5", "朋友", "时间"); blocked {
-		t.Fatal("无名单映射的站'限转'不应按深度站名单/窗拦（keepfrds 维持现状）")
+	if blocked, _ := p.checkFlagsFromMetadata(ctx, "hash5", "朋友", "时间"); !blocked {
+		t.Fatal("§59.539 非深度站'限转'应通用拦（标记在=拦·复检清除后放行）")
 	}
 
 	// ⑤ 既有禁转族回归（forbiddenFlags 通道不变）
@@ -163,12 +163,14 @@ func TestUbitsOfficialDirectedNoTransfer(t *testing.T) {
 		t.Fatal("无组名标题应放行")
 	}
 
-	// ⑦ 限转块排除优堡回归：优堡 flags 含"限转"+窗内未来——
-	// 非官种不进名单/窗拦（优堡非"限转"语义站）
+	// ⑦ §59.539 语义更新：优堡 flags 含"限转"走通用拦截（标记在=拦·
+	// 对齐列表 forbiddenSet；官组定向通道独立判不变；复检清除后放行）
 	future := time.Now().Add(48 * time.Hour)
 	seedMetaFlags(t, db, "ubhash1", "优堡", []string{"限转"}, &future)
-	if blocked, _ := p.checkFlagsFromMetadata(ctx, "ubhash1", "优堡", "时间"); blocked {
-		t.Fatal("优堡'限转'不应走深度站名单/72h 窗（官种通道独立判）")
+	if blocked, reason := p.checkFlagsFromMetadata(ctx, "ubhash1", "优堡", "时间"); !blocked {
+		t.Fatal("§59.539 优堡'限转'应通用拦（标记在=拦）")
+	} else if !strings.Contains(reason, "限转标记在效") {
+		t.Fatalf("应走通用拦截文案: %s", reason)
 	}
 }
 

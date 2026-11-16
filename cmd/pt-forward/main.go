@@ -620,6 +620,28 @@ func main() {
 	router.SetIyuuCoverageSync(syncCoverageSchedule)
 	syncCoverageSchedule()
 
+	// §59.539: 禁转标记定时复检——配置驱动（开关默认停+cron 可配·标记跟随：
+	// 消失→放行/还在→滚动续期/变化→跟随/失败→原样）。
+	syncNoTransferRecheck := func() {
+		const task = "no-transfer-recheck"
+		_ = taskRegistry.Unregister(task) // 幂等注销（配置变化重注册）
+		enabled, schedule := router.PublishTorrents().NoTransferRecheckTaskConfig(context.Background())
+		if !enabled {
+			log.Info("禁转复检任务未启用（no_transfer_recheck_enabled=false）")
+			return
+		}
+		if err := taskRegistry.Register(task, "publish", schedule, func(ctx context.Context) error {
+			router.PublishTorrents().RunNoTransferRecheck(ctx)
+			return nil
+		}); err != nil {
+			log.Warn("禁转复检任务注册失败", zap.Error(err))
+			return
+		}
+		log.Info("禁转复检任务已注册", zap.String("schedule", schedule))
+	}
+	router.PublishTorrents().SetNoTransferRecheckSync(syncNoTransferRecheck)
+	syncNoTransferRecheck()
+
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)
 

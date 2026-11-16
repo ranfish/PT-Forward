@@ -2058,6 +2058,22 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		// §59.539: 硬编码单向互斥（源→目标单侧禁转·深度站定）——只读
+		// 展示与双向硬编码区分（one_way 标记）。
+		for src, targets := range publish.PublishHardcodedOneWayExclusions() {
+			for tgt := range targets {
+				key := src + "→" + tgt
+				if dbPairs[key] {
+					continue
+				}
+				result = append(result, map[string]interface{}{
+					"target_site":  tgt,
+					"source_site":  src,
+					"is_hardcoded": true,
+					"one_way":      true,
+				})
+			}
+		}
 		Success(w, result)
 
 	case http.MethodPost:
@@ -2096,7 +2112,8 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
-		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) {
+		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) ||
+			publish.IsHardcodedOneWayExclusion(req.SourceSite, req.TargetSite) {
 			Error(w, http.StatusForbidden, 40300, "硬编码互斥规则不可删除")
 			return
 		}

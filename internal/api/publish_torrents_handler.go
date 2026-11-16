@@ -63,6 +63,8 @@ type PublishTorrentsHandler struct {
 	batchFetch          batchFetchState
 	siteBatch           siteBatchState // §59.166 一站多种批量任务
 	recompute           recomputeState // §59.514 附八 P2: 重建任务化
+	noTransferRecheck     noTransferRecheckState     // §59.539 禁转标记复检
+	noTransferRecheckSync func()                     // §59.539 配置变更即时重注册 cron（main 注入）
 	declBackfill        declBackfillState // §59.516 v0.0.1461: 简介引用清洗任务
 	strategySem         chan struct{}  // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 }
@@ -475,6 +477,13 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleAuditInfoHash(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/recompute-profiles") && r.Method == http.MethodPost:
 
+	// §59.539: 禁转标记复检——手动触发/状态/配置三端点
+	case strings.HasSuffix(path, "/publish/seeds/no-transfer-recheck/run") && r.Method == http.MethodPost:
+		h.handleNoTransferRecheckRun(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/no-transfer-recheck/status") && r.Method == http.MethodGet:
+		h.handleNoTransferRecheckStatus(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/no-transfer-recheck/config") && r.Method == http.MethodPut:
+		h.handleNoTransferRecheckConfigSave(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/recompute-profiles-task") && r.Method == http.MethodPost:
 		h.handleRecomputeProfilesTask(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/recompute-progress") && r.Method == http.MethodGet:

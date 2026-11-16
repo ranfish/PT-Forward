@@ -2193,9 +2193,9 @@ func TestSite_Exclusions_CreateAndGet(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected array, got %T", resp.Data)
 	}
-	// 硬编码 4 条 + 用户创建 1 条 = 5
-	if len(items) != 5 {
-		t.Errorf("expected 5 exclusions (4 hardcoded + 1 user), got %d", len(items))
+	// §59.539: 硬编码双向 4 条 + 单向 3 条（深度→时间/肉丝/家园）+ 用户 1 条 = 8
+	if len(items) != 8 {
+		t.Errorf("expected 8 exclusions (4 hardcoded + 3 one-way + 1 user), got %d", len(items))
 	}
 }
 

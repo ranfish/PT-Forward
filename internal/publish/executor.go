@@ -149,6 +149,11 @@ func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.T
 	if IsHardcodedExclusion(sourceSite, targetSite) {
 		return true, fmt.Sprintf("源站 %s → 目标站 %s 为互斥站点（禁止互相转载）", sourceSite, targetSite)
 	}
+	// §59.539: 硬编码单向互斥（深度→{时间,肉丝,家园}·站规定向禁转
+	// 第二重防御·用户定案）。
+	if IsHardcodedOneWayExclusion(sourceSite, targetSite) {
+		return true, fmt.Sprintf("源站 %s → 目标站 %s 为单向禁转站点（站规定向名单）", sourceSite, targetSite)
+	}
 	var exclusion model.PublishExclusion
 	if err := e.db.WithContext(ctx).
 		Where("target_site = ? AND source_site = ?", targetSite, sourceSite).

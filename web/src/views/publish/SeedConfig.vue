@@ -106,6 +106,26 @@
             <ClearOutlined /> 简介引用清洗{{ declBackfillProgressText }}
           </a-button>
         </a-tooltip>
+        <!-- §59.539: 禁转标记复检——标记跟随（消失→放行/还在→滚动续期） -->
+        <a-button style="margin-left: 8px" :loading="ntrRunning" @click="runNoTransferRecheck">
+          <SafetyCertificateOutlined /> 禁转复检
+        </a-button>
+        <a-popover v-model:open="ntrCfgOpen" trigger="click" title="禁转复检定时配置">
+          <template #content>
+            <a-space direction="vertical" style="width: 260px">
+              <a-space>
+                <a-switch v-model:checked="ntrCfg.enabled" checked-children="开" un-checked-children="关" />
+                <span>定时复检</span>
+              </a-space>
+              <a-input v-model:value="ntrCfg.schedule" placeholder="0 5 * * *（每天 05:00）" :disabled="!ntrCfg.enabled" />
+              <a-button type="primary" size="small" :loading="ntrSaving" @click="saveNtrConfig">保存</a-button>
+            </a-space>
+          </template>
+          <a-button style="margin-left: 4px">
+            <template #icon><SettingOutlined /></template>
+          </a-button>
+        </a-popover>
+        <a-tag v-if="ntrStatus.last_run" style="margin-left: 4px">{{ ntrStatus.last_stats || ntrStatus.last_run }}</a-tag>
       </div>
     </div>
 
@@ -280,9 +300,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { SyncOutlined, PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
+import { SyncOutlined, PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined, SafetyCertificateOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import MusicDetailPanel from './MusicDetailPanel.vue'
@@ -756,6 +776,67 @@ function pollRecompute() {
   }, 3000)
 }
 
+// ==================== §59.539: 禁转标记复检 ====================
+const ntrRunning = ref(false)
+const ntrCfgOpen = ref(false)
+const ntrSaving = ref(false)
+const ntrCfg = reactive({ enabled: false, schedule: '0 5 * * *' })
+const ntrStatus = ref<{ running: boolean; last_run: string; last_stats: string }>({ running: false, last_run: '', last_stats: '' })
+let ntrTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadNtrStatus() {
+  try {
+    const resp = await seedConfigApi.noTransferRecheckStatus()
+    const d = resp.data.data
+    ntrStatus.value = { running: d.running, last_run: d.last_run, last_stats: d.last_stats }
+    ntrCfg.enabled = d.enabled
+    if (d.schedule) ntrCfg.schedule = d.schedule
+    ntrRunning.value = d.running
+    if (d.running) startNtrPolling()
+  } catch { /* 静默——列表页加载失败不阻塞 */ }
+}
+
+async function runNoTransferRecheck() {
+  try {
+    await seedConfigApi.noTransferRecheckRun()
+    message.success('禁转复检已启动')
+    startNtrPolling()
+  } catch {
+    message.warning('复检启动失败')
+  }
+}
+
+function startNtrPolling() {
+  if (ntrTimer) return
+  ntrTimer = setInterval(async () => {
+    try {
+      const resp = await seedConfigApi.noTransferRecheckStatus()
+      const d = resp.data.data
+      ntrStatus.value = { running: d.running, last_run: d.last_run, last_stats: d.last_stats }
+      ntrRunning.value = d.running
+      if (!d.running && ntrTimer) {
+        clearInterval(ntrTimer)
+        ntrTimer = null
+        if (d.last_stats) message.info(d.last_stats)
+        fetchList()
+      }
+    } catch { /* 轮询失败静默重试 */ }
+  }, 3000)
+}
+
+async function saveNtrConfig() {
+  ntrSaving.value = true
+  try {
+    await seedConfigApi.noTransferRecheckConfigSave(ntrCfg.enabled, ntrCfg.schedule)
+    message.success('禁转复检配置已保存')
+    ntrCfgOpen.value = false
+  } catch {
+    message.warning('保存失败（检查 cron 表达式格式）')
+  } finally {
+    ntrSaving.value = false
+  }
+}
+
 // ==================== §59.516 v0.0.1461: 简介引用清洗 ====================
 const declBackfillActive = ref(false)
 const declBackfillProgressText = ref('')
@@ -814,6 +895,7 @@ function onBatchFetchCompleted() {
 let deeplinkSkipSearch = false
 
 onMounted(async () => {
+  loadNtrStatus()
   loadPersistedFilters()
   fetchClientPaths()
   const q = route.query
@@ -860,6 +942,10 @@ watch(searchText, () => {
   }
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => onFilterChange(), 400)
+})
+
+onBeforeUnmount(() => {
+  if (ntrTimer) clearInterval(ntrTimer)
 })
 </script>
 
