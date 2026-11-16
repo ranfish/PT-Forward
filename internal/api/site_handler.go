@@ -1524,6 +1524,34 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	if s.Framework == "mteam" || s.Framework == "cola" {
 		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
 	}
+	// §59.540: 猪猪（piggo 令牌 API）——POST /v1/api/me 探活（Bearer·
+	// 查询类 JSON 正文契约·§59.1449 hdarea 同族：通用分支 POST 根 URL
+	// 对 API 站不适配）。
+	if s.Framework == "piggo" {
+		meURL := strings.TrimRight(s.BaseURL, "/") + "/v1/api/me"
+		req, err := http.NewRequest("POST", meURL, strings.NewReader("{}"))
+		if err != nil {
+			return false, "构造请求失败: " + err.Error()
+		}
+		req.Header.Set("Authorization", "Bearer "+s.APIKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "连接失败: " + err.Error()
+		}
+		defer func() { httpclient.DrainBody(resp) }()
+		switch {
+		case resp.StatusCode == http.StatusOK:
+			return true, "存取令牌认证成功（/v1/api/me）"
+		case resp.StatusCode == http.StatusUnauthorized:
+			return false, "存取令牌无效（401）"
+		case resp.StatusCode == http.StatusForbidden:
+			return false, "令牌有效但被拦（403——可能未读必读公告，请到猪猪前台读公告）"
+		default:
+			return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+	}
 	// §59.515 刀1 生产首验：API 网关站（好大）探活走 /api/v1/status——
 	// 通用分支 POST 站点根 URL 会 302（→index/login）误报「被重定向」。
 	// status 为 GET 探活端点（任意有效 Key·返回身份与协议入口）。
