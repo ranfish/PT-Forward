@@ -142,10 +142,7 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 	if cfg.TLSPretend != "" {
 		// §59.334 附二: Chrome 指纹传输层——拆解 azuretls 分层组合
 		// （智能拨号 + Chrome TLS/H2 指纹完全叠加，替代 azuretlsTransport）
-		return &http.Client{
-			Timeout:   cfg.Timeout,
-			Transport: &chromeTransport{session: getChromeSession(cfg.Domain, cfg.ProxyURL), domain: cfg.Domain},
-		}
+		return newChromeClient(cfg.Domain, cfg.ProxyURL, cfg.Timeout)
 	}
 	return &http.Client{
 		Timeout:   cfg.Timeout,
@@ -174,4 +171,22 @@ func filterIPv6(addrs []net.IPAddr) []net.IPAddr {
 		}
 	}
 	return out
+}
+
+// NewChromeClient §59.540: Chrome TLS 指纹客户端公共构造（azuretls 基座·
+// §59.334 附二 chromeTransport 同源）——CF 指纹墙站直用入口：探针/工具/
+// 未来消费方无需经 SiteConfig 配置通道。站级配置路径（sites.tls_pretend →
+// NewSiteHTTPClient TLSPretend 分支）内部同走此单点。
+// domain 用于站点级 Session 复用（空串=独立 session）。
+func NewChromeClient(domain, proxyURL string, timeout time.Duration) *http.Client {
+	return newChromeClient(domain, proxyURL, timeout)
+}
+
+// newChromeClient 内部单点：chromeTransport 构造（TLSPretend 分支与公共
+// 方法同源——Session 复用/重试语义一致）。
+func newChromeClient(domain, proxyURL string, timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: &chromeTransport{session: getChromeSession(domain, proxyURL), domain: domain},
+	}
 }
