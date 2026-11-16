@@ -146,6 +146,8 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 			"enabled":           false,
 			"baseUrl":           "https://2025.iyuu.cn",
 			"syncIntervalHours": 24,
+			"coverageEnabled":  false, // §59.535 刀3 联合回归 P1：GET 回读缺字段→前端刷新回 off 显示假象（DB 实存 1 实证）
+			"coverageSchedule": "",
 		})
 		return
 	}
@@ -160,6 +162,8 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 		"version":           cfg.Version,
 		"requestTimeoutMs":  cfg.RequestTimeoutSec * 1000,
 		"syncIntervalHours": cfg.SyncIntervalHours,
+		"coverageEnabled":   cfg.CoverageEnabled, // §59.535 刀3 P1：PUT 已存 GET 漏读=保存不生效假象根修
+		"coverageSchedule":  cfg.CoverageSchedule,
 	})
 }
 

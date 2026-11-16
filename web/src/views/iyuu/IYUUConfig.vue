@@ -60,6 +60,10 @@
           <template v-if="column.key === 'Enabled'">
             <a-badge :status="record.Enabled ? 'success' : 'default'" :text="record.Enabled ? t('common.enabled') : t('common.disabled')" />
           </template>
+          <!-- 域名掩码防泄漏（maskDomain 公共单点·/publish/rules 同款） -->
+          <template v-else-if="column.key === 'SiteDomain'">
+            {{ maskDomain(record.SiteDomain) }}
+          </template>
         </template>
       </a-table>
       <a-empty v-else :description="t('iyuu.viewAfterSave')" />
@@ -109,6 +113,7 @@ import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { iyuuApi } from '@/api/iyuu'
+import { maskDomain } from '@/utils/format'
 
 const { t } = useI18n()
 
