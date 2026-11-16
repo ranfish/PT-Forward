@@ -2036,14 +2036,20 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		dbPairs := make(map[string]bool, len(exclusions))
 		result := make([]map[string]interface{}, 0, len(exclusions)+8)
 		for _, e := range exclusions {
+			// §59.539 附: 同键 DB 行（硬编码机制上线前的历史手动创建）按
+			// 硬编码影子展示——实际拦截语义=内置（DB 行删了代码层拦截还在，
+			// 显示用户规则+可删按钮是双重谎言：DELETE 实被 403 拒）。影子
+			// 行不参与删除（前端禁删按钮），展示与行为一致。
+			isHC := publish.IsHardcodedExclusion(e.SourceSite, e.TargetSite) ||
+				publish.IsHardcodedOneWayExclusion(e.SourceSite, e.TargetSite)
 			result = append(result, map[string]interface{}{
 				"id":           e.ID,
 				"target_site":  e.TargetSite,
 				"source_site":  e.SourceSite,
 				"created_at":   e.CreatedAt,
-				"is_hardcoded": false,
+				"is_hardcoded": isHC,
 			})
-			dbPairs[e.SourceSite+"→"+e.TargetSite] = true
+			dbPairs[e.SourceSite+"→"+e.TargetSite] = true // 全收集去重（防与硬编码行双显）
 		}
 		for src, targets := range publish.PublishHardcodedExclusionPairs() {
 			for tgt := range targets {

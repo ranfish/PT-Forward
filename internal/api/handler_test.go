@@ -9271,3 +9271,43 @@ func TestDeleteRuleCreate_ExplicitZeroDeleteNum(t *testing.T) {
 		t.Errorf("未填未保默认 1: delete_num=%d", got)
 	}
 }
+
+// §59.539 附: 互斥展示影子行——DB 历史同键行（硬编码机制上线前手动创建）
+// 按硬编码展示（is_hardcoded=true·前端禁删）——修复「显示用户规则+可删
+// 按钮，实际 DELETE 被 403 拒」的双重矛盾（用户 243 实测发现）。
+func TestSite_Exclusions_ShadowRowDisplayedAsHardcoded(t *testing.T) {
+	env := setupTestEnv(t)
+	// DB 行=硬编码互斥同键（家园→铂金家）
+	env.db.Create(&model.PublishExclusion{SourceSite: "家园", TargetSite: "铂金家"})
+	w := env.doRequest("GET", "/api/v1/publish/exclusions", nil)
+	resp := parseResponse(t, w)
+	items, ok := resp.Data.([]interface{})
+	if !ok {
+		t.Fatalf("expected array, got %T", resp.Data)
+	}
+	found := false
+	for _, it := range items {
+		m, _ := it.(map[string]interface{})
+		if m["source_site"] == "家园" && m["target_site"] == "铂金家" {
+			found = true
+			if m["is_hardcoded"] != true {
+				t.Fatalf("影子行应显示内置: %+v", m)
+			}
+		}
+		// 硬编码行不与影子行双显（同键只一条）
+	}
+	if !found {
+		t.Fatal("家园→铂金家 行未显示")
+	}
+	// 同键只显示一条（影子行显示·硬编码行去重）
+	cnt := 0
+	for _, it := range items {
+		m, _ := it.(map[string]interface{})
+		if m["source_site"] == "家园" && m["target_site"] == "铂金家" {
+			cnt++
+		}
+	}
+	if cnt != 1 {
+		t.Fatalf("同键应只显示一条（防双显）, got %d", cnt)
+	}
+}
