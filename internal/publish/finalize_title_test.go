@@ -54,39 +54,33 @@ func TestPreAuditTitleReadsColumn(t *testing.T) {
 // §59.514 附十 B: MI 证据层恒跑锚——torrentData 空（recompute 降级路径
 // ExportTorrent 失败）时 WEB-DL∧MIEncoded 仍须纠正 WEBRip（原被
 // arbitrateWithTorrent :46 门整体拦——243 全库筛查 35 行漏纠实证）。
-func TestFinalizeTitleMIEvidenceWithoutTorrent(t *testing.T) {
+func TestFinalizeTitleFollowSourceSpec(t *testing.T) {
+	// §59.536: WEB 族 MI 仲裁撤销——跟随源站标注。原 §59.514 附十 B
+	// 「降级路径恒跑纠 WEB-DL→WEBRip」锚反转：MI civilian 裁决在场
+	// （真压制形态）规格仍保真 WEB-DL（财神强制改回/优堡「与文件名
+	// 不符」拒——站方 ground truth=源站标注）。
 	e := &PublishExecutor{}
 	meta := &model.TorrentMetadata{
 		Title:    "Movie 2025 1080p WEB-DL x264 AAC-UBWEB",
 		Category: "category.movie",
 	}
-	// §59.517: MI 升级为引擎裁决消费——合成真实民压形态（x264+sc40+crf
-	// 非零小数+开源 keyint 组合·Kanjoos 同族）。裸 x264 WL 零参数形态引擎
-	// 按 B2 先验判官方不再无条件翻转（平台 x264 流语义——§59.517 交叉层）。
 	tp := titleparser.BuildTechProfile(meta.Title, "General\nVideo\nFormat : AVC\nWriting library : x264 core 148\nEncoding settings : scenecut=40 / crf=20.5 / keyint=250 / keyint-min=25\nWidth : 1 920 pixels\nHeight : 816 pixels\nAudio #1\nFormat : AAC LC\nChannel(s) : 2 channels\n", "", "", "", "")
 	if !tp.MIEncoded {
-		t.Fatalf("前置失败：MIEncoded 应为 true（Writing library x264）")
+		t.Fatalf("前置失败：MIEncoded 应为 true")
 	}
 	if tp.Specification != "WEB-DL" {
 		t.Fatalf("前置失败：Specification=%q want WEB-DL", tp.Specification)
 	}
 	if tp.MIWebVerdict != titleparser.WEBVerdictCivilian {
-		t.Fatalf("前置失败：引擎裁决=%q want civilian", tp.MIWebVerdict)
+		t.Fatalf("前置失败：引擎裁决=%q want civilian（计算保留·IsEncode 消费）", tp.MIWebVerdict)
 	}
-	title, notes := e.FinalizeTitle(context.Background(), meta, &tp, nil) // torrentData=nil——降级路径
-	if tp.Specification != "WEBRip" {
-		t.Errorf("降级路径漏纠：Specification=%q want WEBRip（MI 证据层应恒跑）", tp.Specification)
+	_, notes := e.FinalizeTitle(context.Background(), meta, &tp, nil)
+	if tp.Specification != "WEB-DL" {
+		t.Errorf("§59.536 跟随源站：Specification=%q want WEB-DL（MI 不得改写）", tp.Specification)
 	}
-	found := false
 	for _, n := range notes {
-		if strings.Contains(n, "规格仲裁(MI引擎)") {
-			found = true
+		if strings.Contains(n, "规格仲裁") && strings.Contains(n, "WEB") {
+			t.Errorf("WEB 族仲裁 note 应零出现: %v", n)
 		}
-	}
-	if !found {
-		t.Errorf("notes 缺 MI 引擎仲裁记录: %v", notes)
-	}
-	if !strings.Contains(title, "WEBRip") {
-		t.Errorf("标题未含 WEBRip: %q", title)
 	}
 }

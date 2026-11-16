@@ -93,26 +93,21 @@ func TestArbitrateTime(t *testing.T) {
 // 纠正（WEB-DL+压制痕迹→WEBRip）；反方向无铁证不干预。
 func TestArbitrateFrom(t *testing.T) {
 	e := &PublishExecutor{}
-	meta := arbTestMeta("From S04 2026 1080p WEBRip DDP5.1 x265 10bit-Yumi@FRDS", "第四季")
+	// §59.536: 跟随源站标注——标题 WEB-DL + name WEB-DL（发布组标注一致性
+	// 场景·MI 即使证压制也不改写——财神强制改回/优堡「与文件名不符」拒实证）
+	meta := arbTestMeta("From S04 2026 1080p WEB-DL DDP5.1 x265 10bit-Yumi@FRDS", "第四季")
 	tp := titleparser.BuildTechProfile(meta.Title, "", "", "", "", "")
+	tp.MIEncoded = true // MI 压制痕迹在场——§59.536 撤销后不再触发改写
 	notes := e.arbitrateNameTokens(meta, &tp, "From.S04.2026.1080p.WEB-DL.DDP5.1.x265.10bit-Yumi@FRDS")
-	if !strings.EqualFold(tp.Specification, "WEBRip") {
-		t.Errorf("From Spec=%q want WEBRip（name 的 WEB-DL 不得覆盖·notes=%v）", tp.Specification, notes)
+	if !strings.EqualFold(tp.Specification, "WEB-DL") {
+		t.Errorf("From Spec=%q want WEB-DL（跟随源站标注·MI 不改写·notes=%v）", tp.Specification, notes)
 	}
-	// MI 铁证单方向：标题误标 WEB-DL + MIEncoded → 纠正 WEBRip
-	// §59.514 附十 B: 纠正移至 arbitrateMIEvidence（MI 证据层恒跑——
-	// torrentData 门外·recompute 降级路径不再漏）·测试对齐新接缝
-	tp2 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
-	tp2.MIEncoded = true
-	notes2 := e.arbitrateMIEvidence(&tp2)
-	if !strings.EqualFold(tp2.Specification, "WEBRip") {
-		t.Errorf("MI 铁证纠正: Spec=%q want WEBRip（notes=%v）", tp2.Specification, notes2)
-	}
-	// 反方向不纠正（MIEncoded=false 无铁证不干预——§59.226 附五单方向性）
-	tp3 := titleparser.BuildTechProfile("Some Show S01 1080p WEB-DL x264-GRP", "", "", "", "", "")
-	e.arbitrateMIEvidence(&tp3)
-	if !strings.EqualFold(tp3.Specification, "WEB-DL") {
-		t.Errorf("无铁证不干预: Spec=%q want WEB-DL", tp3.Specification)
+	// 源站原生 WEBRip 同样保真（name 的 WEB-DL 不得覆盖标题 WEBRip——
+	// §59.514 附二 name 不参与 WEB 族维持）
+	tpB := titleparser.BuildTechProfile("Some Show S01 1080p WEBRip x264-GRP", "", "", "", "", "")
+	e.arbitrateNameTokens(meta, &tpB, "Some.Show.S01.1080p.WEB-DL.x264-GRP")
+	if !strings.EqualFold(tpB.Specification, "WEBRip") {
+		t.Errorf("源站 WEBRip 保真: Spec=%q want WEBRip（name 不覆盖）", tpB.Specification)
 	}
 }
 
@@ -173,41 +168,3 @@ func TestBareE01GateAndNormalize(t *testing.T) {
 }
 
 
-// TestArbitrateMIEngine §59.517: WEB 族判定引擎收编 arbitrateMIEvidence——
-// 四态：civilian 纠正 WEB-DL→WEBRip（规则名透出）/ official∧WEBRip 反向
-// 观察（单方向不改）/ 引擎缺席旧规则兜底 / official∧WEB-DL 零干预。
-func TestArbitrateMIEngine(t *testing.T) {
-	e := &PublishExecutor{}
-
-	// ① civilian 裁决 → WEB-DL 纠正为 WEBRip + 规则名透出
-	tp := &titleparser.TechProfile{Specification: "WEB-DL",
-		MIWebVerdict: titleparser.WEBVerdictCivilian, MIWebRule: "交叉:x265+sc40+crf小数"}
-	notes := e.arbitrateMIEvidence(tp)
-	if tp.Specification != "WEBRip" || len(notes) != 1 || !strings.Contains(notes[0], "x265+sc40+crf小数") {
-		t.Errorf("① civilian 纠正失效: spec=%q notes=%v", tp.Specification, notes)
-	}
-
-	// ② official ∧ WEBRip name → 反向观察（单方向不改·§59.517 十二③）
-	tp2 := &titleparser.TechProfile{Specification: "WEBRip",
-		MIWebVerdict: titleparser.WEBVerdictOfficial, MIWebRule: "铁证②DV P5"}
-	notes2 := e.arbitrateMIEvidence(tp2)
-	if tp2.Specification != "WEBRip" || len(notes2) != 1 || !strings.Contains(notes2[0], "观察") {
-		t.Errorf("② 反向观察失效: spec=%q notes=%v", tp2.Specification, notes2)
-	}
-
-	// ③ 引擎缺席（B1）+ 旧规则兜底：WEB-DL ∧ MIEncoded → WEBRip
-	tp3 := &titleparser.TechProfile{Specification: "WEB-DL", MIEncoded: true}
-	notes3 := e.arbitrateMIEvidence(tp3)
-	if tp3.Specification != "WEBRip" || len(notes3) != 1 {
-		t.Errorf("③ 旧规则兜底失效: spec=%q notes=%v", tp3.Specification, notes3)
-	}
-
-	// ④ official ∧ WEB-DL → 零干预（良性混合防御——平台 x264 形态）
-	tp4 := &titleparser.TechProfile{Specification: "WEB-DL",
-		MIEncoded: true, // 原始 WL 信号在场
-		MIWebVerdict: titleparser.WEBVerdictOfficial, MIWebRule: "交叉:x264+stitchable"}
-	notes4 := e.arbitrateMIEvidence(tp4)
-	if tp4.Specification != "WEB-DL" || len(notes4) != 0 {
-		t.Errorf("④ official 零干预失效: spec=%q notes=%v", tp4.Specification, notes4)
-	}
-}

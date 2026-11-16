@@ -1364,8 +1364,9 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, siteName
 	case "hdtv":
 		stdKey = "medium.hdtv"
 	case "bdrip", "dvdrip", "tvrip", "encode", "webrip":
-		// WEBRip=Encode（§59.166 From S04 案站方 TYPE_MISMATCH 对照——源站 WEB-DL
-		// 标错、MI 痕迹证 WEBRip，重组已归 WEBRip，媒介跟 Encode 而非 WEB-DL）
+		// WEBRip→Encode 槽（§59.166 站方 TYPE_MISMATCH 对照定案·站方媒介槽
+		// 体系无 WEBRip 独立槽的翻译映射）。§59.536: 仅源站原生 WEBRip 触发
+		// ——MI 改写已撤（源站 WEB-DL→WEB-DL 槽不再落入本分支）
 		stdKey = "medium.encode"
 	}
 	// §59.380: stdKey 推导抽单源（codec 压制形态联动复用——防双实现漂移）

@@ -66,7 +66,7 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 	// §59.151: MI 编码铁证传递（IsEncode MI 驱动）
 	p.MIEncoded = mi.Encoded
 	p.MIHasVideo = mi.Encoded || mi.Resolution != "" || mi.VideoCodec != ""
-	// §59.517: WEB 族引擎裁决传递（arbitrateMIEvidence/IsEncode 消费）
+	// §59.517 WEB 族引擎裁决传递——§59.536 起唯一消费方=IsEncode WEB 豁免（发布链改写已撤·跟随源站标注）
 	p.MIWebVerdict = mi.WEBVerdict
 	p.MIWebRule = mi.WEBRule
 }

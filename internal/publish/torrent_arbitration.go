@@ -69,35 +69,12 @@ func (e *PublishExecutor) arbitrateWithTorrent(ctx context.Context, meta *model.
 	return notes
 }
 
-// arbitrateMIEvidence §59.514 附十 B：MI 证据层仲裁——不依赖 torrentData，
-// 恒跑（原在 arbitrateNameTokens 内被 torrentData 门整体拦——recompute
-// 降级路径 ExportTorrent 失败时 WEB-DL∧MIEncoded 漏纠 35 行实证）。
-// §59.517: WEB 族判定引擎收编本仲裁——MI 五层特征 → 分层引擎二值裁决
-// （铁证层/交叉层/中性尾部·良性混合防御）。单方向纠正维持（§59.514 附二：
-// WEB 族内细分 name 不参与；§59.517 十二③：反向 WEBRip→WEB-DL 只观察不改）。
-func (e *PublishExecutor) arbitrateMIEvidence(tp *titleparser.TechProfile) []string {
-	if tp == nil {
-		return nil
-	}
-	var notes []string
-	if isWebSpec(tp.Specification) && tp.MIWebVerdict != "" {
-		if tp.MIWebVerdict == titleparser.WEBVerdictCivilian && strings.EqualFold(tp.Specification, "WEB-DL") {
-			tp.Specification = "WEBRip"
-			notes = append(notes, "规格仲裁(MI引擎): WEB-DL → WEBRip（"+tp.MIWebRule+"·§59.517）")
-		} else if tp.MIWebVerdict == titleparser.WEBVerdictOfficial && strings.EqualFold(tp.Specification, "WEBRip") {
-			// 反向观察（单方向不改——站方/发布组命名预期风险·§59.517 十二③）
-			notes = append(notes, "规格仲裁(MI引擎): WEBRip ∧ 引擎判官方（"+tp.MIWebRule+"）——单方向不改·观察")
-		}
-		return notes
-	}
-	// §59.514 附十 B 旧规则兜底：引擎缺席（MI 无 Video 段·B1）但 General
-	// 段压制器黑名单在场——降级路径保护保持原行为。
-	if strings.EqualFold(tp.Specification, "WEB-DL") && tp.MIEncoded {
-		tp.Specification = "WEBRip"
-		notes = append(notes, "规格仲裁(MI铁证): WEB-DL → WEBRip（压制痕迹 Writing library 在场）")
-	}
-	return notes
-}
+// §59.536: arbitrateMIEvidence 已撤销（四代判定推翻·跟随源站标注）——
+// WEB-DL/WEBRip 标题与媒介跟随源站标注保真流转，MI 不改写。三类站点行为
+// 实证（From 案 10 站不审/财神强制改回 WEB-DL/优堡「来源与实际文件名不符」
+// 拒后人工沟通）——站方 ground truth=源站标注/文件名，MI 技术改写制造
+// 标题≠文件名不一致（优堡拒因正是我方制造）。MIWebVerdict 计算保留供
+// IsEncode WEB 豁免（LiTV 修复）；webdl_judge 引擎代码保留作回退阀。
 
 // arbitrateNameTokens name 的 S/E/年/来源/品牌 token 与标题 tp 仲裁。
 // name 是 .torrent name（发布组命名——下载器做种目录名的数学权威版）。
