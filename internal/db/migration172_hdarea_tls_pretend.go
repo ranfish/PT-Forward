@@ -10,10 +10,8 @@ import (
 )
 
 func init() {
-	Migrations = append(Migrations, Migration{
-		ID: "migration172_hdarea_tls_pretend",
-		Run: func(db *gorm.DB) error {
-			return db.Exec("UPDATE sites SET tls_pretend = 'chrome' WHERE domain = 'hdarea.club' AND (tls_pretend IS NULL OR tls_pretend = '')").Error
-		},
+	RegisterMigration(172, "hdarea_tls_pretend", func(gormDB *gorm.DB) error {
+		return gormDB.Exec(`UPDATE sites SET tls_pretend = 'chrome', updated_at = datetime('now')
+			WHERE domain = 'hdarea.club' AND (tls_pretend IS NULL OR tls_pretend = '')`).Error
 	})
 }
