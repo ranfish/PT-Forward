@@ -554,3 +554,8 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **taxonomy 处理维度**：4 选项 SDR/HDR10/HDR10+/DV 对 standard_keys（hdr10/hdr10plus/dolby_vision）一一配对·catalog 快照核对后进 migration。
 - **H&R 系统零处理（用户定案）**：辅种不考核·RSS 下载用户自担·只消费不判断→adapter HR 恒 false；真实规则备查=HR3（480h 窗保 72h）/HR5（480h 窗保 120h）·带对应标签的种子才考核。
 - **好大偶发挂起补录**：间隔 1s 十连发 2 挂（第 2/4 发·后 6 发全过）=随机 ~20% 黑洞节点非频率惩罚·好大维持不迁移·若未来迁移重试链可兜。
+
+**§59.538 第三轮回归（2026-11-16）**：
+- **media_info 特判撤销**（用户纠正）：审核门 9 字段含 MI（§59.500 完整才推理）——MI 缺失过不了审核发不出·猪猪特判多余。
+- 新遗漏四项定处理：①执行层内置站级限流（exec 绕过 GlobalLimiter·API 各端点 30-60/min）②做种体积分页成本高——首版 total 一发做种数·体积按需③音乐种不发 piggo（音乐链收口乌托邦 §59.485·piggo 影视链 only）④small_descr 必填——审核门不含副标题·空副标题 422 字典透出。
+- 顺路确认：图片零下载（MD 直链内嵌·不触发图片白名单流程）；tags 完结 11/合集 9 入映射表·分集永不勾；exec 数组参数注入免疫。
