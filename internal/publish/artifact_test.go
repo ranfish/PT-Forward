@@ -1,6 +1,8 @@
 package publish
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -207,5 +209,46 @@ func TestFindLargestVideo_NoDir(t *testing.T) {
 	_, err := g.findLargestVideo("/nonexistent/path")
 	if err == nil {
 		t.Error("expected error for nonexistent directory")
+	}
+}
+
+// §59.540 附五: findLargestVideos 候选序——多文件剧集 fallback 的选择正确性
+func TestFindLargestVideos(t *testing.T) {
+	g := &PublishArtifactGenerator{}
+	dir := t.TempDir()
+	// E24（最大·源损坏）E01（次大·健康）E12（第三）——体积降序
+	files := map[string]int{"E24.mp4": 300, "E01.mp4": 200, "E12.mp4": 100}
+	for name, size := range files {
+		p := filepath.Join(dir, name)
+		data := make([]byte, size)
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// n=2：主选 E24 + fallback E01（E12 不入候选=短路界）
+	paths, err := g.findLargestVideos(dir, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 {
+		t.Fatalf("want 2 candidates, got %d", len(paths))
+	}
+	if filepath.Base(paths[0]) != "E24.mp4" || filepath.Base(paths[1]) != "E01.mp4" {
+		t.Errorf("candidate order wrong: %v", paths)
+	}
+	// n=1：单候选（旧行为等价）
+	one, err := g.findLargestVideos(dir, 1)
+	if err != nil || len(one) != 1 || filepath.Base(one[0]) != "E24.mp4" {
+		t.Errorf("n=1 should return largest only: %v %v", one, err)
+	}
+	// n=0：非法
+	if _, err := g.findLargestVideos(dir, 0); err == nil {
+		t.Error("n=0 should error")
+	}
+	// 非视频扩展名不入候选
+	dir2 := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir2, "note.txt"), []byte("x"), 0o644)
+	if _, err := g.findLargestVideos(dir2, 2); err == nil {
+		t.Error("no video files should error")
 	}
 }

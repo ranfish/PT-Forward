@@ -130,11 +130,11 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 
 	// 如果 torrentDir 是文件路径（非目录），直接分析该文件（精确匹配模式）
 	var videoPath string
+	var fallbackVideos []string // §59.540 附五: 截图 fallback 候选（目录模式次大文件）
 	if info, statErr := os.Stat(torrentDir); statErr == nil && !info.IsDir() {
 		videoPath = torrentDir
 	} else {
-		var err error
-		videoPath, err = g.findLargestVideo(torrentDir)
+		candidates, err := g.findLargestVideos(torrentDir, 2) // 主选+次选（短路界）
 		if err != nil {
 			g.logger.Warn("no video file found, using source artifacts",
 				zap.String("dir", torrentDir),
@@ -142,6 +142,10 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 			result.MediaInfoText = sourceMediaInfo
 			result.ScreenshotURLs = sourceScreenshots
 			return result, nil
+		}
+		videoPath = candidates[0]
+		if len(candidates) > 1 {
+			fallbackVideos = candidates[1:]
 		}
 	}
 
@@ -170,7 +174,7 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 	case "source_rehost":
 		result.ScreenshotURLs = g.rehostScreenshots(ctx, sourceScreenshots)
 	case "local_upload":
-		result.ScreenshotURLs = g.captureLocalScreenshots(ctx, videoPath, forcedSubSid)
+		result.ScreenshotURLs = g.captureLocalScreenshots(ctx, videoPath, fallbackVideos, forcedSubSid)
 		if len(result.ScreenshotURLs) == 0 {
 			result.ScreenshotURLs = sourceScreenshots
 		}
@@ -194,9 +198,9 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 			need := MinScreenshots - len(result.ScreenshotURLs)
 			var localShots []string
 			if len(result.ScreenshotURLs) == 0 {
-				localShots = g.captureLocalScreenshots(ctx, videoPath, forcedSubSid) // 全量（按 Count）
+				localShots = g.captureLocalScreenshots(ctx, videoPath, fallbackVideos, forcedSubSid) // 全量（按 Count）
 			} else {
-				localShots = g.captureLocalScreenshotsCount(ctx, videoPath, need) // 差额
+				localShots = g.captureLocalScreenshotsCount(ctx, videoPath, fallbackVideos, need) // 差额
 			}
 			result.ScreenshotURLs = append(result.ScreenshotURLs, localShots...) // 源站在前补足在后
 		}
@@ -249,15 +253,47 @@ func uploadWithRetry(parent context.Context,
 	return "", lastErr
 }
 
-func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string, forcedSid ...int) []string {
+// captureLocalScreenshots 本地截图+上传。§59.540 附五: fallbackVideos——
+// 多文件剧集主选文件解码零帧（源损坏·E24 案）时逐个换次大候选重试；候选
+// 耗尽仍失败=短路返回 nil（诚实无图→审核拦截不可发布·删种由用户决定）。
+// sid 每候选独立探测（换文件后轨号语义不延续）；forced 人工轨跨候选保持
+// （用户显式动作优先·轨缺失时 mpv 自然降级）。
+func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string, fallbackVideos []string, forcedSid ...int) []string {
 	engineProbe := g.screenshotEngineNow()
 	if engineProbe == nil || !engineProbe.Available() {
 		return nil
 	}
+	forcedSubSid := 0
+	if len(forcedSid) > 0 && forcedSid[0] > 0 {
+		forcedSubSid = forcedSid[0]
+	}
+	candidates := append([]string{videoPath}, fallbackVideos...)
+	for i, candidate := range candidates {
+		localShots, tmpDir := g.captureOneCandidate(ctx, engineProbe, candidate, forcedSubSid)
+		if localShots == nil {
+			if i+1 < len(candidates) {
+				g.logger.Warn("screenshot capture failed on video, falling back to next",
+					zap.String("video", filepath.Base(candidate)),
+					zap.String("next", filepath.Base(candidates[i+1])))
+				continue
+			}
+			g.logger.Warn("screenshot capture failed on all candidates, honest no-screenshots",
+				zap.Int("candidates", len(candidates)),
+				zap.String("last_video", filepath.Base(candidate)))
+			return nil // 候选耗尽·短路失败（现状语义）
+		}
+		return g.uploadCapturedShots(ctx, localShots, tmpDir)
+	}
+	return nil
+}
+
+// captureOneCandidate 单候选截图尝试（sid 探测+可观测日志+Capture）。
+// 失败返回 (nil, "")（tmpDir 已清理）；成功返回 (本地截图路径, tmpDir)。
+func (g *PublishArtifactGenerator) captureOneCandidate(ctx context.Context, engine *ScreenshotEngine, videoPath string, forcedSubSid int) ([]string, string) {
 	subtitleSID := 0
 	subtitleSource := "none"
-	if len(forcedSid) > 0 && forcedSid[0] > 0 {
-		subtitleSID = forcedSid[0] // §59.298 C: 人工指定轨（tab3 下拉）——跳过自动选择
+	if forcedSubSid > 0 {
+		subtitleSID = forcedSubSid // §59.298 C: 人工指定轨（tab3 下拉）——跳过自动选择
 		subtitleSource = "forced"
 	} else if g.subtitleDetector.Available() {
 		if sid, err := g.subtitleDetector.FindSubtitleStreamID(ctx, videoPath); err == nil && sid > 0 {
@@ -271,15 +307,20 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		zap.Int("sid", subtitleSID),
 		zap.String("source", subtitleSource),
 		zap.String("video", filepath.Base(videoPath)))
-	localShots, tmpDir, err := engineProbe.Capture(ctx, videoPath, subtitleSID)
+	localShots, tmpDir, err := engine.Capture(ctx, videoPath, subtitleSID)
 	if err != nil || len(localShots) == 0 {
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)
 		}
 		g.logger.Warn("local screenshot capture failed", zap.Int("shots", len(localShots)), zap.Error(err))
-		return nil
+		return nil, ""
 	}
 	g.logger.Info("local screenshots captured", zap.Int("count", len(localShots)), zap.String("tmpDir", tmpDir))
+	return localShots, tmpDir
+}
+
+// uploadCapturedShots 截图上传（原 captureLocalScreenshots 上传段·行为零变化）。
+func (g *PublishArtifactGenerator) uploadCapturedShots(ctx context.Context, localShots []string, tmpDir string) []string {
 	if g.imageHostMgr == nil {
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)
@@ -397,7 +438,22 @@ func (g *PublishArtifactGenerator) rehostScreenshots(ctx context.Context, urls [
 	return rehosted
 }
 
+// findLargestVideo 体积最大单候选（单文件形态语义保留）。
 func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) {
+	paths, err := g.findLargestVideos(dir, 1)
+	if err != nil {
+		return "", err
+	}
+	return paths[0], nil
+}
+
+// findLargestVideos §59.540 附五: 体积降序前 n 个视频候选——多文件剧集
+// 截图 fallback 用（最大文件源损坏（E24 案·h264 码流层坏但容器/BT 校验层
+// 完好）→ 次大文件重试）。n 上界即短路界：候选耗尽=诚实无图。
+func (g *PublishArtifactGenerator) findLargestVideos(dir string, n int) ([]string, error) {
+	if n <= 0 {
+		return nil, fmt.Errorf("invalid candidate count %d", n)
+	}
 	videoExts := map[string]bool{
 		".mkv": true, ".mp4": true, ".avi": true, ".ts": true,
 		".m2ts": true, ".wmv": true, ".flv": true, ".mov": true,
@@ -420,11 +476,11 @@ func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) 
 		return nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("walk directory: %w", err)
+		return nil, fmt.Errorf("walk directory: %w", err)
 	}
 
 	if len(candidates) == 0 {
-		return "", fmt.Errorf("no video files found in %s", dir)
+		return nil, fmt.Errorf("no video files found in %s", dir)
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
@@ -436,7 +492,10 @@ func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) 
 		return si.Size() > sj.Size()
 	})
 
-	return candidates[0], nil
+	if len(candidates) > n {
+		candidates = candidates[:n]
+	}
+	return candidates, nil
 }
 
 // processScreenshotsAuto §59.53: 源站截图逐张处置——白名单（pixhost 家族/
@@ -469,11 +528,12 @@ func (g *PublishArtifactGenerator) processScreenshotsAuto(ctx context.Context, u
 
 // captureLocalScreenshotsCount §59.53: mpv 截指定张数（差额补足）。
 // 内部复用全量截图后取前 n 张（时间点均布，前 n 张即为按序补足）。
-func (g *PublishArtifactGenerator) captureLocalScreenshotsCount(ctx context.Context, videoPath string, n int) []string {
+// §59.540 附五: fallback 候选透传（主文件坏时差额补拍同样换次大文件）。
+func (g *PublishArtifactGenerator) captureLocalScreenshotsCount(ctx context.Context, videoPath string, fallbackVideos []string, n int) []string {
 	if n <= 0 {
 		return nil
 	}
-	all := g.captureLocalScreenshots(ctx, videoPath)
+	all := g.captureLocalScreenshots(ctx, videoPath, fallbackVideos)
 	if len(all) <= n {
 		return all
 	}
