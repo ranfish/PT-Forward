@@ -586,10 +586,15 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 	// 只要有一个挂了 metadata 就算已配置（与列表页 name→hash 桥口径一致，
 	// 修复 §59.28 H1 在弹窗的体现：按去重保留行 hash 判定会误报已获取资源）。
 	var rawItems []unconfiguredItem
+	// §59.537: 完成度 100% 边界——未完成种不进弹窗条目清单（数据不完整
+	// 不是可获取素材·与列表页 handleListSeeds/弹窗树 handleSeedUniquePaths
+	// 三面同滤）。注意 NOT IN 子查询（资源级已配置判定 §59.29）不加此滤：
+	// 已配置资源不因完成度回退误现身为未配置。
 	h.db.WithContext(r.Context()).
 		Table("torrent_snapshots AS s").
 		Select("s.hash, s.name, s.size, s.client_uid, s.save_path").
 		Where("s.client_uid = ? AND s.save_path = ? AND s.is_hidden = ?", clientUID, savePath, false).
+		Where("s.progress >= ?", 1.0).
 		Where("s.name NOT IN (?)",
 			h.db.Table("torrent_snapshots AS s2").
 				Joins("INNER JOIN torrent_metadata m ON s2.hash = m.info_hash").
