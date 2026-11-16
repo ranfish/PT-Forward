@@ -523,3 +523,24 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **猪猪复验**：POST 3 连发全 200（4.7~9s 偏慢·生产超时配 15s+）；**下载链端到端通**（签发→主域 GET→真 torrent 25.6KB bencode）；api 子域 GET 403 无生产影响（API 全 POST·下载走主域 piggo.me/v1/web/）。
 - **好大结论修正：不迁移**——243 复验 3 连发 200/200/25s 超时——CF 判罚=「指纹+频率」组合，curl-impersonate 单发改善但**连发仍触发静默挂起**；好大维持既有「全局代理+批量预查+熔断」体系（§59.1487 工作正常）。**curl-impersonate=猪猪专属**。
 - **兼容性定案（用户拍板）**：x86_64 only（ARM 不支持）；glibc 最高引用 2.17（CentOS 7 级·2013 后所有 x86 兼容·J1900 老机覆盖）；动态库仅 zlib/pthread/libc（BoringSSL 静态编入近乎自包含）；CA 路径自适应（Debian /etc/ssl/certs/ca-certificates.crt vs RH 系 /etc/pki/tls/certs/ca-bundle.crt——243 Rocky 实证）；Docker 镜像预装零感知·systemd 版随发行二进制分发·缺工具环境猪猪功能 fail-fast 不拖垮主程序。
+
+**§59.538 规则文档吸收（2026-11-16 晚·用户供 /tmp/piggo-rules.txt·发布+RSS+H&R 三章）**：
+
+**发布规则关键**：
+- **审核制**：发完先进审核队·过审前他人不可下（发布终态=已提交待审·非即时可见）
+- **info_hash 重写**：站方清外站 tracker→改本站 tracker+private+来源标记→**info_hash 与本机不同**——发布链推种必须用**站方下载的 .torrent**（download-link 拉取）做种；同 hash 已有种 422（=API dedup 同源）
+- **Markdown only 禁 BBCode**：简介组装需 Markdown 翻译层（现有 assembleDescription 是 BBCode 体系）·**截图必不可少**（简介内嵌）
+- 分类自动纠正：站方按 MI 识别**盖住手填**（来源/媒介/编码/音频/分辨率/处理以 MI 为准·制作组优先标题·地区按元数据）——识别规则=去标点最长命中（2160P/4K·H265/HEVC 同档）——我们 taxonomy 映射照做·站方兜底纠正
+- 种子文件：v1 only（v2/混合拒）·4MB·文件≤4096
+- 发布资格：上传开关+分区等级+**拒绝态 2 颗冻结**（文案透出即可·API 无资格端点）
+- 收费/促销/置顶/H&R 挡位=权限限定·普通人促销抽奖——**发布恒不预设**
+
+**RSS 章**：
+- **订阅制**：RSS 管理建订阅·每条独立 rss_key（≤10 条）·可按分区/分类/标签/体积/促销等过滤·条数≤100——**验证时 1 条=用户该订阅的过滤配置**·适配时建议用户建「全量 100 条」订阅
+- 限额：XML 60/h·enclosure 50/h·**单 IP 120/h**·停用倍数 5——RSS 引擎调度对齐
+- 条目链接=24h HMAC 短链·收费种默认无 enclosure·轮换 key 即失效
+
+**H&R**：
+- 考核 enabled·挡位制（一档 72h 做种/480h 窗/0.2·二档 120h/480h/0.2）·各分区现均未设挡位→回退窗口 72h+完成率 1
+- **发布者不记**（发种无 H&R ✓）·下载他人种（辅种场景）会记——长期做种天然满足
+- 停下载阈值 10 条·饲料消一条 100000
