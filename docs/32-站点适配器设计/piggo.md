@@ -499,3 +499,21 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **CF 破解=TLS 指纹**：curl-impersonate chrome116 POST→200（同 IP 同秒裸 curl→403 铁证）；**无需 cf_clearance**；主域 /v1/api/* 仍 nginx 静态 405（未代理）——生产走 api.piggo.me。
 - **实测链**：ping ✓ / me ✓（Bearer+IPv6 出口 2408:...）/ torrents 搜索 ✓（q=Dune→60 条真实结果全字段：name/small_descr/cover/size/section/category/taxonomy/media{douban,imdb}/seeders/times_completed/added_at/page_url/tag_ids·分页 total_capped）。
 - **生产架构方向**：Go 客户端需浏览器 TLS 指纹（bogdanfinn/tls-client 或 utls 方案）——CF 指纹墙唯一障碍已破；Bearer+POST JSON+统一信封+九端点全契约在手。
+
+**九端点全量实测（2026-11-16 晚·chrome116 指纹+cURL 官方形态）**：
+
+| 端点 | 实测 |
+|------|------|
+| /ping | ✓ {"ok":true} |
+| /me | ✓ <作者> id=22479·can_upload=true·has_passkey=false |
+| /me/torrents | ✓ kind=seeding 真实做种（57178 金鱼公主 FRDS·uploaded/seed_seconds/ratio 个人统计字段） |
+| /catalog | ✓ 12 分区（电影1/电视剧2/综艺3/少儿5/纪录6/动漫7/音乐8/图文9/有声10/体育11/其他12）+81 分类+7 taxonomies（地区17/来源5/媒介5/编码8/音频编码11/分辨率4/处理4/**制作组5**）+**22 tags（id=2 禁转**/1 官方/15 独占/9 合集/11 完结/3 国语/4 中字/5 HDR10/6 3D/17 零魔/18 自购/21 未审） |
+| /torrents 搜索 | ✓ q+section_id+分页（Dune 60 条·字段全） |
+| /torrents/{id} 详情 | ✓ 57277/57178 完整（慢响应 3.2s 偶现·管道截断假象教训） |
+| /torrents/{id}/download-link | ✓ 24h 签发真 URL（piggo.me/v1/web/.../dl/base64·不含 passkey·announce 后作废） |
+| /torrents/pieces-hash | ✓ **243 真指纹精确命中** id=56292（L0 辅种通道验证） |
+| /torrents/publish | 不真发（铁律）——契约=cURL form 权威形态（category_ids=[3,5] JSON 字符串数组·非 NP 重复字段）+422 dedup 带 torrent_id |
+
+- **禁转体系在 API 面**：tags id=2=禁转——tag_ids 含 2 即禁转种（§59.539 复检通用路径天然覆盖：catalog 翻译 tag_ids→名称「禁转」→extractFlags 命中）。
+- 官方请求头三元组：Accept+Content-Type application/json+Bearer。
+- 文档用户版 v3=625 行（含每端点 cURL 权威形态）。
