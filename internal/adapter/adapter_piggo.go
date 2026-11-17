@@ -586,11 +586,16 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	// TNode 聚合先例）→ JSON 数组串；兜底 FormFields 单值。
 	// §59.541 回归审核 P1: taglist applier 硬编码 Key="tagList"（系统约定·
 	// TNode/好学/朱雀同款 §59.1331/§59.1481）——聚合条件双 key 收（站方
-	// 字段名 tag_ids 由本层翻译）
+	// 字段名 tag_ids 由本层翻译）。
+	// §59.540 附六·二轮回归 P2: 非数值项蒸发——applier 无映射标准键直出
+	// （write("tagList", tag) else 分支）会混入数字数组致 422；好学先例
+	// ParseInt 过滤（§59.1481 蒸发路径——第三站接入漏继承）。
 	tagVals := make([]string, 0, 4)
 	for _, kv := range req.TagArrayFields {
 		if (kv.Key == "tag_ids" || kv.Key == "tagList") && kv.Value != "" {
-			tagVals = append(tagVals, kv.Value)
+			if n, perr := strconv.ParseInt(strings.TrimSpace(kv.Value), 10, 64); perr == nil && n > 0 {
+				tagVals = append(tagVals, strconv.FormatInt(n, 10))
+			}
 		}
 	}
 	if len(tagVals) > 0 {

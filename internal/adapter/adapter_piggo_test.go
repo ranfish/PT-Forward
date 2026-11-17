@@ -220,6 +220,8 @@ func TestPiggoPublishTaglistKey(t *testing.T) {
 		TagArrayFields: []model.TagKV{
 			{Key: "tagList", Value: "4"}, // 中字
 			{Key: "tagList", Value: "9"}, // 合集
+			// §59.540 附六·二轮回归 P2: 无映射标准键直出（值集 miss 蒸发）
+			{Key: "tagList", Value: "hdr10_plus"},
 		},
 	})
 	if err != nil {
@@ -229,7 +231,10 @@ func TestPiggoPublishTaglistKey(t *testing.T) {
 		t.Errorf("multipart 应含 tag_ids 字段: %.200s", body)
 	}
 	if !strings.Contains(body, "[4,9]") {
-		t.Errorf("tag_ids 应为 JSON 数字数组串 [4,9]: %.200s", body)
+		t.Errorf("tag_ids 应为数字数组串 [4,9]（非数字蒸发）: %.200s", body)
+	}
+	if strings.Contains(body, "hdr10_plus") {
+		t.Errorf("无映射标准键应蒸发不进 tag_ids: %.200s", body)
 	}
 	// taxonomy 八维合并（全兜底形态在场）
 	if !strings.Contains(body, "[36,31,26,19,10,6,5,53]") {
