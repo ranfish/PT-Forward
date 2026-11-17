@@ -28,7 +28,7 @@ func TestSiteIsTargetGate(t *testing.T) {
 		}
 		return s
 	}
-	unsupported := mk("未适配站", "piggo.me", "")                                      // 真未适配站（二师兄——longpt.org 已适配 §59.444 原占位失效）
+	unsupported := mk("未适配站", "unadapted.example.com", "")                          // supported 外假域名（§59.444 原占位 piggo.me·§59.541 值集刀开闸后 105 站全适配无真未适配站——miss 路径同走 403 分支）
 	unconfigured := mk("幸运", "pt.luckpt.de", "")                                      // 适配但未配置
 	configured := mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配已配置(暂停)
 
@@ -98,7 +98,10 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 		}
 		return s
 	}
-	mk("未适配站", "piggo.me", "")                                      // 真未适配站（§59.444 原占位 longpt.org 已适配失效）
+	// §59.541: 值集刀开闸后 105 站全 publish_supported——「未适配导入降级」
+	// 无现实数据面（死路径·未来新站 false 时恢复）。语义迁移：piggo 开闸站
+	// 导入 is_target=true 不降级（反向锁死 §59.541 开闸）+passkey 加密载体保留。
+	mk("二师兄", "piggo.me", "")                                  // 已适配开闸（§59.444 曾为未适配占位）
 	mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配
 
 	const plainPasskey = "0123456789abcdef0123456789abcdef"
@@ -116,19 +119,19 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 		t.Errorf("应更新 2 站, got %v", rd["updated"])
 	}
 	warns, _ := rd["warnings"].([]interface{})
-	if len(warns) != 1 {
-		t.Errorf("应恰 1 条降级警告, got %v", warns)
+	if len(warns) != 0 {
+		t.Errorf("开闸站导入不应降级警告, got %v", warns)
 	}
 	errs, _ := rd["errors"].([]interface{})
 	if len(errs) != 0 {
-		t.Errorf("降级不应计入 errors, got %v", errs)
+		t.Errorf("导入不应计入 errors, got %v", errs)
 	}
-	var unsupported2, configured2 model.Site
-	if err := env.db.Where("domain = ?", "piggo.me").First(&unsupported2).Error; err != nil {
+	var adapted2, configured2 model.Site
+	if err := env.db.Where("domain = ?", "piggo.me").First(&adapted2).Error; err != nil {
 		t.Fatal(err)
 	}
-	if unsupported2.IsTarget {
-		t.Error("未适配站导入后 is_target 应降级为 false")
+	if !adapted2.IsTarget {
+		t.Error("开闸站导入后 is_target 应保持 true（§59.541 不降级）")
 	}
 	if err := env.db.Where("domain = ?", "xdypt.vip").First(&configured2).Error; err != nil {
 		t.Fatal(err)
