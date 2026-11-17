@@ -109,7 +109,7 @@ func TestFreshInstallChain(t *testing.T) {
 		if pcfg == nil || pcfg.FormFields == nil {
 			t.Fatalf("piggo form_config 解析失败")
 		}
-		for _, domain := range []string{"small_descr", "description"} {
+		for _, domain := range []string{"small_descr", "description", "technical_info"} {
 			if v, ok := pcfg.FormFields[domain]; !ok || v == "" {
 				t.Errorf("piggo form_fields 缺 %s 域——契约必填文本域断链（422/空键同族·检查 174/177 配置链）", domain)
 			}
