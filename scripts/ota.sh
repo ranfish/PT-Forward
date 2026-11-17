@@ -8,15 +8,19 @@
 #   bash scripts/ota.sh -v v0.0.1120       # 指定版本（默认最新）
 #   bash scripts/ota.sh -c                 # 仅检查版本不执行 OTA
 #
-# 环境变量:
-#   PTF_PASS   默认 [REDACTED-password]
-#   PTF_USER   默认 admin
+# 环境变量（必须设 .env·无硬编码默认值）:
+#   cp .env.example .env && 填入真实值
 
 set -euo pipefail
 
-ALL_HOSTS="10.0.0.243 10.0.0.12 10.0.0.99 10.0.0.249 10.0.0.22 10.0.0.65 10.0.0.245 10.0.0.28 10.0.0.242"
-USER="${PTF_USER:-admin}"
-PASS="${PTF_PASS:-[REDACTED-password]}"
+# §仓库安全-1: 从仓库根加载 .env（严格模式·未配置报错退出）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+[ -f "$REPO_ROOT/.env" ] && source "$REPO_ROOT/.env"
+
+ALL_HOSTS="${PROD_HOSTS:?Error: PROD_HOSTS not set in .env}"
+USER="${PTF_USER:?Error: PTF_USER not set in .env}"
+PASS="${PTF_PASS:?Error: PTF_PASS not set in .env}"
 PORT=8765
 TARGET_VER=""
 CHECK_ONLY=false

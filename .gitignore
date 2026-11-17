@@ -76,3 +76,6 @@ env-PT-Forward.md
 sqlcheck
 xdy-codec-fix
 pt-forward.b*
+
+# .env 豁免：模板文件入库（真实 .env 不入库）
+!.env.example

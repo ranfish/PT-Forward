@@ -126,7 +126,10 @@ def pre_audit(body, cookie):
 
 def main():
     cookie = open('/tmp/lk.ck').read().strip()
-    token = api('/auth/login', '', 'POST', {'username': 'admin', 'password': '[REDACTED-password]'})['data']['accessToken']
+    token = api('/auth/login', '', 'POST', {
+        'username': os.environ.get('PTF_USER', ''),
+        'password': os.environ.get('PTF_PASS', '')
+    })['data']['accessToken']
     lst = api('/publish/seeds?ready=true&page_size=300', token)['data']['items']
     print(f"ready 簇: {len(lst)}", flush=True)
     results, errors = [], []

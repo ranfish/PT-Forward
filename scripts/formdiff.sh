@@ -14,16 +14,21 @@
 #   本脚本报差异 + 适配期 python 裸对说一致  → Diff 工具问题(解析器假阳性)
 #   本脚本报差异 + python 裸对也报           → 适配问题(配置错)或站方改版(重抓)
 #
-# 环境变量: PTF_HOST(默认 localhost) PTF_USER/PTF_PASS(默认 admin/[REDACTED-password])
+# 环境变量（必须设 .env）: PTF_HOST / PTF_USER / PTF_PASS
 
 set -euo pipefail
+
+# §仓库安全-1: 从仓库根加载 .env（严格模式）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+[ -f "$REPO_ROOT/.env" ] && source "$REPO_ROOT/.env"
 
 SITE="${1:?用法: formdiff.sh <站名> <发布页HTML文件> [host]}"
 HTML_FILE="${2:?缺少 HTML 文件参数}"
 HOST="${3:-${PTF_HOST:-localhost}}"
 PORT=8765
-USER="${PTF_USER:-admin}"
-PASS="${PTF_PASS:-[REDACTED-password]}"
+USER="${PTF_USER:?Error: PTF_USER not set in .env}"
+PASS="${PTF_PASS:?Error: PTF_PASS not set in .env}"
 
 [ -f "$HTML_FILE" ] || { echo "❌ HTML 文件不存在: $HTML_FILE"; exit 2; }
 

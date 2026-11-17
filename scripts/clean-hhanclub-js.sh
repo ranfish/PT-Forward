@@ -4,7 +4,7 @@
 # 用法：bash scripts/clean-hhanclub-js.sh <IP或域名> [用户名] [认证方式]
 #   认证方式：key（默认·root+私钥 ~/[REDACTED-ssh_path]）| pass（<作者>+密码）
 #   密码经环境变量 PTF_PASS 传入（禁止硬编码入库）：
-#     export PTF_PASS='...'   # SSH 密码 + sudo 密码 + API admin 密码（同源）
+#     export PTF_PASS='...'   # 面板密码（从 .env 读取·三个密码不应同源）
 # 示例：
 #   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh pt31.<作者>.uk              # 私钥组
 #   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh pt29.<作者>.uk <作者> pass # 密码组

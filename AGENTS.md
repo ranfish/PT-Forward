@@ -118,20 +118,17 @@
 
 ## 环境信息
 
+> **§仓库安全-1**：基础设施信息不入库——实际值见本地 `.env`（不入库）·模板见 `.env.example`
+
 - **Go**：`/home/<user>/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）
 - **Node**：`/home/<user>/.local/bin/node`（v22，系统 Node 18 不兼容，必须用此路径）
 - **CGO**：后端编译必须 `CGO_ENABLED=1`
 - **DB**：`data/pt-forward.db`（SQLite）
 - **服务**：`systemctl --user restart pt-forward`（用户级 systemd 服务，端口 8765）
-- **开发环境 29**：10.0.0.29，Agent 唯一可操作的机器（编译/测试/部署/DB）
-- **生产环境 249**：10.0.0.249 Docker（docker compose），端口 8765，**禁止 Agent 直接操作**
-- **pt30 环境**：pt30.<作者>.uk（192.168.100.30）Docker，**禁止 Agent 直接操作**
-- **65 环境**：10.0.0.65 Docker，**禁止 Agent 直接操作**
-- **243 环境**：10.0.0.243 Docker，SSH root/~/[REDACTED-ssh_path]，**禁止 Agent 直接操作**
-- **12 环境**：10.0.0.12 Docker，**禁止 Agent 直接操作**
-- **PT8 环境 242**：10.0.0.242 Docker，**禁止 Agent 直接操作**
-- **22 环境 22**：10.0.0.22 Docker，**禁止 Agent 直接操作**
-- **代理**：`http://10.0.2.5:7897`（curl/docker pull 等访问外部网络时可用）
+- **开发环境**：`$DEV_HOST`（见 .env），Agent 唯一可操作的机器（编译/测试/部署/DB）
+- **生产环境**：各主机 IP 见 .env 的 `PROD_HOST_*` 变量，**禁止 Agent 直接操作**
+- **243 环境**：`$PROD_HOST_243`（见 .env），SSH 密钥路径 `$SSH_KEY`，**禁止 Agent 直接操作**·只读诊断+scp 二进制
+- **代理**：`$PROXY`（见 .env·curl/docker pull 等访问外部网络时可用）
 - **Docker**：`sg docker -c "docker ..."`（当前用户不在 docker 组，需 sg 切换组）
 
 ## 通用规则
