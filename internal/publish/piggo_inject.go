@@ -254,3 +254,24 @@ func atoiSafe(s string) (int, bool) {
 	}
 	return n, true
 }
+
+// piggoDescrPtgen §59.541 附四: piggo {{ptgen}} 模板机制——站方校验「已填
+// 豆瓣/TMDB/IMDb 时，简介须包含 {{ptgen}}」：站方用自营 PTGen 服务
+// （ptgen.piggo.me）在占位符处服务端渲染简介块。
+//
+// 转换：组装 descr 中自制 PTGen 正文（assembleDescription 以
+// meta.Description 原样嵌入）整体替换为 {{ptgen}}——站方渲染替代自制，
+// 防内容双份；无正文时前置占位符保校验通过；无链接字段时零变化。
+func piggoDescrPtgen(descr string, meta *model.TorrentMetadata) string {
+	const marker = "{{ptgen}}"
+	if meta == nil || (meta.DoubanURL == "" && meta.IMDbURL == "") {
+		return descr
+	}
+	if body := strings.TrimSpace(meta.Description); body != "" {
+		return strings.Replace(descr, body, marker, 1)
+	}
+	if strings.Contains(descr, marker) {
+		return descr
+	}
+	return marker + "\n\n" + descr
+}

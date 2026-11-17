@@ -556,6 +556,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return failRec("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
 	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta, cfg)
+	// §59.541 附四: piggo {{ptgen}} 模板——已填豆瓣/IMDb 时站方要求简介含
+	// {{ptgen}} 占位符（站方自营 PTGen 服务端渲染）；自制 PTGen 正文换占位符
+	if cfg.Framework == "piggo" {
+		form[cfg.FormFields[model.FieldDomainDescription]] = piggoDescrPtgen(form[cfg.FormFields[model.FieldDomainDescription]], meta)
+	}
 
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
 	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）

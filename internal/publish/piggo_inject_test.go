@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -153,5 +154,37 @@ func TestPiggoSourceProcessingInject(t *testing.T) {
 	}
 	if form2["processing_id"] != "6" {
 		t.Errorf("SDR 死键激活: tp.HDR 空→hdr.sdr→6, got %s", form2["processing_id"])
+	}
+}
+
+// §59.541 附四: piggo {{ptgen}} 模板机制——站方校验「已填豆瓣/TMDB/IMDb 时
+// 简介须包含 {{ptgen}}」（连发 5 颗 422 实证）。
+func TestPiggoDescrPtgen(t *testing.T) {
+	meta := &model.TorrentMetadata{
+		DoubanURL:   "https://movie.douban.com/subject/123/",
+		Description: "◎片名 痴迷\n◎年代 2025",
+	}
+	descr := "[quote]声明[/quote]\n\n" + meta.Description + "\n\n[img]https://x/s.jpg[/img]"
+	got := piggoDescrPtgen(descr, meta)
+	if !strings.Contains(got, "{{ptgen}}") {
+		t.Errorf("缺 {{ptgen}} 占位符: %q", got)
+	}
+	if strings.Contains(got, "◎片名") {
+		t.Errorf("自制 PTGen 正文未替换（内容双份）: %q", got)
+	}
+	if !strings.Contains(got, "[quote]声明") || !strings.Contains(got, "s.jpg") {
+		t.Errorf("声明/截图段丢失: %q", got)
+	}
+
+	// 无正文·有链接：前置占位符保校验
+	got2 := piggoDescrPtgen("纯截图简介", &model.TorrentMetadata{DoubanURL: "https://d/1"})
+	if !strings.HasPrefix(got2, "{{ptgen}}") {
+		t.Errorf("无正文应前置占位符: %q", got2)
+	}
+
+	// 无链接字段：零变化
+	got3 := piggoDescrPtgen(descr, &model.TorrentMetadata{Description: "正文"})
+	if got3 != descr {
+		t.Errorf("无链接字段应零变化: %q", got3)
 	}
 }
