@@ -433,7 +433,7 @@
     "auth_type": "apikey",
     "cookiecloud_domain": "piggo.me",
     "verification_status": "verified",
-    "publish_supported": false,
+    "publish_supported": true,
     "api_key_label": "存取令牌（个人中心→存取令牌）",
     "special_notes": "§59.538 改版后 Vite SPA+令牌 API（api.piggo.me/v1/api·Bearer）；CF 按 TLS 指纹判罚→tls_pretend=chrome（azuretls）"
   },

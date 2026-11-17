@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -479,6 +480,61 @@ func (a *PiggoAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteC
 // ── 发布 ──
 
 // UploadTorrent multipart publish。
+// piggoTaxonomyFallback §59.541: taxonomy 八维空位兜底（「八维全填」定案——
+// 素材 miss 时填 Other/SDR，站方 MI 纠正盖住手填·Ronin 八维全填站方实态）。
+var piggoTaxonomyFallback = map[string]string{
+	"source_id":     "36", // Other（来源）
+	"medium_id":     "31", // Other（媒介）
+	"codec_id":      "26", // Other（编码）
+	"audio_id":      "19", // Other（音频）
+	"resolution_id": "10", // other（分辨率）
+	"processing_id": "6",  // SDR（处理）
+	"team_id":       "5",  // Other（制作组）
+	"region_id":     "53", // 其他（地区）
+}
+
+// piggoTaxonomyIDs §59.541: 八维虚拟字段（form_config 值映射产物）合并为
+// taxonomy_ids 扁平 JSON 数组（站方契约——id 段区分维度归属·每维一项）。
+// ExtraFields 优先于 FormFields（与 get() 同序）。
+func piggoTaxonomyIDs(req *model.PublishRequest) string {
+	order := []string{
+		"source_id", "medium_id", "codec_id", "audio_id",
+		"resolution_id", "processing_id", "team_id", "region_id",
+	}
+	seen := map[string]bool{}
+	var ids []string
+	for _, k := range order {
+		v := ""
+		if vv, ok := req.ExtraFields[k]; ok && vv != "" {
+			v = vv
+		} else if vv, ok := req.FormFields[k]; ok {
+			v = vv
+		}
+		if v == "" {
+			v = piggoTaxonomyFallback[k]
+		}
+		if v == "" || seen[v] {
+			continue // 维度 id 空间互斥——去重纯防御
+		}
+		seen[v] = true
+		ids = append(ids, v)
+	}
+	if len(ids) == 0 {
+		return ""
+	}
+	// 站方契约数字数组（detail 实测 [35,28,...] 无引号）——手工拼形
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, id := range ids {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(id)
+	}
+	b.WriteByte(']')
+	return b.String()
+}
+
 // 契约：file/name/small_descr/descr/media_info/section_id/category_ids 必填；
 // 数组字段 JSON 串形态（category_ids=[3,5]）；成功 201；422 errors 字典
 // 透出（dedup「种子已存在 #tid」→ data.torrent_id → duplicate 语义）。
@@ -514,14 +570,31 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	w := newPiggoMultipartWriter(&buf)
 	w.addField("name", name)
 	w.addField("small_descr", smallDescr)
-	w.addField("descr", descr)
+	// §59.541: Markdown 翻译层（§59.538 定案 MD only 禁 BBCode——
+	// BBCodeToMarkdown 复用·截图内嵌保留 [img]→![]()）
+	w.addField("descr", description.BBCodeToMarkdown(descr))
 	w.addField("media_info", mediaInfo)
 	w.addField("section_id", sectionID)
 	w.addField("category_ids", categoryIDs)
-	if v := get("taxonomy_ids"); v != "" {
-		w.addField("taxonomy_ids", v)
+	// §59.541: taxonomy 八维合并——8 个虚拟字段（form_config 值映射各维 id）
+	// 合并扁平 taxonomy_ids JSON 数组；空维兜 Other/SDR（「八维全填」定案——
+	// Ronin 站方实态·站方 MI 纠正盖住手填）
+	if tx := piggoTaxonomyIDs(req); tx != "" {
+		w.addField("taxonomy_ids", tx)
 	}
-	if v := get("tag_ids"); v != "" {
+	// §59.541: tag_ids 聚合——TagArrayFields 同名 KV（executor 通用链真相源·
+	// TNode 聚合先例）→ JSON 数组串；兜底 FormFields 单值
+	tagVals := make([]string, 0, 4)
+	for _, kv := range req.TagArrayFields {
+		if kv.Key == "tag_ids" && kv.Value != "" {
+			tagVals = append(tagVals, kv.Value)
+		}
+	}
+	if len(tagVals) > 0 {
+		if b, err := json.Marshal(tagVals); err == nil {
+			w.addField("tag_ids", string(b))
+		}
+	} else if v := get("tag_ids"); v != "" {
 		w.addField("tag_ids", v)
 	}
 	if req.DoubanLink != "" {

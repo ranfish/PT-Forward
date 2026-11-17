@@ -165,3 +165,36 @@ func TestPiggoHRFalse(t *testing.T) {
 		t.Fatalf("HR 应恒 false: %+v %v", hr, err)
 	}
 }
+
+// §59.541: taxonomy 八维合并锚——全维/部分维兜底/ExtraFields 优先序。
+func TestPiggoTaxonomyIDs(t *testing.T) {
+	// 全维显式（Ronin 形态：Blu-ray+Remux+H.265+DTS-HD MA+4K+DV+Other组+美国）
+	req := &model.PublishRequest{
+		FormFields: map[string]string{
+			"source_id": "35", "medium_id": "28", "codec_id": "25",
+			"audio_id": "21", "resolution_id": "11", "processing_id": "9",
+			"team_id": "5", "region_id": "40",
+		},
+	}
+	if got := piggoTaxonomyIDs(req); got != "[35,28,25,21,11,9,5,40]" {
+		t.Errorf("全维: got %s", got)
+	}
+	// 空维兜底（全空→八兜底值）
+	req2 := &model.PublishRequest{FormFields: map[string]string{}}
+	if got := piggoTaxonomyIDs(req2); got != "[36,31,26,19,10,6,5,53]" {
+		t.Errorf("全兜底: got %s", got)
+	}
+	// 部分维（source 显式·其余兜底）+ExtraFields 优先
+	req3 := &model.PublishRequest{
+		FormFields:  map[string]string{"codec_id": "24"},
+		ExtraFields: map[string]string{"codec_id": "25"}, // Extra 优先
+	}
+	got := piggoTaxonomyIDs(req3)
+	if got != "[36,31,25,19,10,6,5,53]" {
+		t.Errorf("部分维+Extra优先: got %s", got)
+	}
+	// nil FormFields（防御）
+	if got := piggoTaxonomyIDs(&model.PublishRequest{}); got != "[36,31,26,19,10,6,5,53]" {
+		t.Errorf("nil 防御: got %s", got)
+	}
+}

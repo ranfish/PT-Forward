@@ -564,3 +564,63 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - **猪猪 tls 通道=azuretls chromeTransport**（§59.334 附二既有基建·RoundTripper·Session 复用·重试内置）——实测全绿：ping/搜索+Bearer/RSS feed GET（29KB）/稳定 3 连发 0.1s 级。**curl-impersonate 执行层方案整体撤销**（零新包零二进制零打包）。差异原因：azuretls 自研 HTTP/2 实现未踩中 CF 检测特征（tls-client 的 fhttp 已被识破）。备胎记录：若未来 azuretls 被识破切回 curl-impersonate（验证数据在本档）。
 - **猪猪接入形态**：adapter client 走 TLSPretend="chrome"（§59.333 既有配置通道·sites.tls_pretend 列）；RSS 同列配置——纯配置级。
 - **好大迁移定案（用户 b）**：243 现场实证 azuretls 3 连发 200（§59.1487 挂起现场根治）→ migration172 hdarea tls_pretend='chrome'（消费面零改动·adapter+RSS 全链自动生效·现状 proxy_url 空 use_global_proxy=0 即无代理直连·迁移后指纹直连根治）。
+
+**§59.541 值集刀定案（2026-11-17·用户逐项拍板·catalog 实测明细快照 /tmp/opencode/piggo-catalog.json 2026-11-16 版）**：
+
+**发布四层结构（站方种实测定锚）**：
+- `section_id` 单值分区：1 电影/2 电视剧/3 综艺/5 少儿/6 纪录片/7 动漫/8 音乐/9 图文/10 有声/11 体育/12 其他
+- `category_ids` 纯体裁多选数组（无分区前缀·id 跨区复用）：实测 Ronin=[3,7] 动作+惊悚·Fiksik=[5,6,11,14,15] 奇幻科幻+动画+其他+益智启蒙+冒险·Rocky III=[11] 单项兜底合法
+- `taxonomy_ids` 八维扁平数组各一项（id 段区分归属）：Ronin=[35,28,25,21,11,9,5,40]=Blu-ray+Remux+H.265+DTS-HD MA+4K+DV+Other组+美国
+- `tag_ids` 多选数组：Ronin=[4,5,7,19] 中字+HDR10+DV+中英双语
+
+**A. 动画分区组合判据（方案二·样本 4/4 实证）**：
+```
+产地=日本 ∧ animation          → 7 动漫
+PTGen genre 含 Family/Kids     → 5 少儿
+其余 animation                 → 7 动漫（默认）
+```
+摸站实证：千与千寻/你的名字（日漫剧场）→7·蜘蛛侠平行宇宙（西方青少年向）→7·玩具总动员/小黄人（合家欢低幼）→5·诡秘之主/黑色四叶草/工作细胞（泛年龄剧集）→7。分界本质=受众年龄感人工判断·判据纯度<100% 容忍（站方审核制人工可挪）。
+
+**B. 体裁 category_ids（b1 全映射）**：PTGen genre 词全映射（命中几个挂几个·分区感知有效集）+零命中兜底「11=其他」（电影/剧集/综艺/纪录/少儿/体育区通用）。
+
+**C. tags 22 项接线（12 接+8 不接+2 挂账）**：
+| 接（键） | 不接（理由） |
+|---------|-------------|
+| 3 国语←tag.chinese_audio | 1 官方（转存铁律） |
+| 4 中字←tag.chinese_subtitle | 2 禁转（铁律） |
+| 5 HDR10←tag.hdr10 | 15 独占（站方权限） |
+| 7 DV←tag.dolby_vision | 17 零魔（运营） |
+| 10 Atmos←tag.dolby_atmos | 18 自购（转存语义） |
+| 6 3D←tag.three_d | 21 未审（站方内部） |
+| 8 特效←tag.effects_subtitle | 13 怀旧计划（运营） |
+| 9 合集←tag.collection | 14 应求（运营） |
+| 11 完结←tag.complete | **20 备胎（挂账——组映射补全轮再议）** |
+| 12 追更←tag.ongoing | **22 丐帮（挂账——同上）** |
+| 16 分集←键不配（§59.424 禁发永不触发） | |
+| 19 中英双语←tag.bilingual_subtitle_chs_eng | |
+
+**HDR 双通道定案（Ronin 实证对齐）**：taxonomy 处理单选（SDR/HDR10/HDR10+/DV）+tags 多选（5+7 可同勾）**两边都写**——DoVi 盘 taxonomy=DV+tags=[5,7]·HDR10 盘 taxonomy=HDR10+tags=[5]·SDR 盘 taxonomy=SDR+无 HDR tags。非财神式同值误投（站方实务即此·taxonomy 单选 vs tags 多选语义分层）。Atmos 走 tags（10）·DDP 走 taxonomy 音频（62）——分域不重叠。
+
+**D. 副标题 small_descr**：直传源站副标题（保真哲学·Fiksik「螺丝钉1-4季全集 1080P 国语中字」实态已可用）。
+
+**E. Markdown 层**：BBCode→MD 纯函数转换（[img]→![]()·[url]→[]()·[b]/[i]·[quote]→>·[size]/[color] 剥壳留内容）——转换层非重写模板·未来其它 MD 站复用。
+
+**taxonomy 8 维值集表（catalog 权威）**：
+- 来源(1)：DVD=32/TV=33/WEB-DL=34/Blu-ray=35/Other=36
+- 媒介(2)：Untouched=27/Remux=28/Encode=29/DIY=30/Other=31（与 medium canonical 完美对齐）
+- 编码(3)：H.264/X.264=24/H.265/X.265=25/H.266/VVC=63/MPEG-2=64/VC-1=65/VP9=66/AV1=67/Other=26
+- 音频编码(4)：FLAC=14/APE=15/DTS=16/MP3=17/AAC=18/Other=19/AC-3=20/DTS-HD MA=21/TrueHD=22/LPCM=23/DDP=62
+- 分辨率(5)：other=10/4K=11/1080p·i=12/720p=13
+- 处理(6)：SDR=6/HDR10=7/HDR10+=8/DV=9（§59.538 已定案键配对）
+- 制作组(7)：PigoWeb=1/PigoHD=2/PigoNF=3/PigoAD=4/Other=5
+- 地区(8)：内地=37/香港=38/台湾=39/美国=40/英国=41/韩国=42/日本=43/法国=44/德国=45/意大利=46/西班牙=47/加拿大=48/澳大利亚=49/印度=50/泰国=51/俄罗斯=52/其他=53
+
+**miss 兜底哲学**：taxonomy 八维全填（素材缺→Other/SDR 兜底）——站方 MI 纠正盖住手填（Ronin 八维全填实证·站方识别规则=去标点最长命中）；体裁分类站方不纠正（填错就错·审核人工兜底）。
+
+**实施分解**：
+1. Markdown 转换层（internal/description·纯函数+锚矩阵）
+2. executor 猪猪特化：piggoSectionOf（A 判据·animation 覆写）+piggoCategoryIds（B·genre 词→分区感知分类表）——PublishRequest 无 genre·组装段 meta 上下文生成
+3. migration174：form_config（type→section_id+8 taxonomy 虚拟字段+tags 12 项）+is_target/publish_supported 开闸
+4. PiggoAdapter 组装：8 虚拟字段合并 taxonomy_ids JSON 串+tag_ids 数组串+descr MD 转换挂载
+5. 测试锚：A 判据三态+B 映射+MD 矩阵
+6. DryRun 借壳（243 Fiksik 素材现成）→首颗实测（待用户）

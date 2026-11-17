@@ -8450,7 +8450,7 @@
       "auth_type": "apikey",
       "download_mode": "",
       "is_source": true,
-      "is_target": false,
+      "is_target": true,
       "cookiecloud_domain": "piggo.me",
       "alternative_domains": "",
       "form": {},

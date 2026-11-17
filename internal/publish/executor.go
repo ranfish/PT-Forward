@@ -517,6 +517,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if in.TargetSite == "肉丝" {
 		rousiPublishInject(form, meta)
 	}
+	// §59.541: 二师兄特化注入（section_id 动画组合判据覆写+category_ids
+	// 体裁数组+source/processing 域特化组装——form_config 单值映射覆盖
+	// 不了的组装逻辑）
+	if in.TargetSite == "二师兄" {
+		piggoPublishInject(form, cfg, meta, tp)
+	}
 	// §59.459: 野马特化注入（regionList 产区数组≤3/中文译名/封面 URL）
 	if in.TargetSite == "野马" {
 		yemaPublishInject(form, meta)
