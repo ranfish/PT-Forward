@@ -100,7 +100,7 @@ func init() {
 		{"label": "SDR", "value": "6", "standard_keys": ["hdr.sdr"]},
 		{"label": "HDR10", "value": "7", "standard_keys": ["hdr.hdr10", "hdr.hdr"]},
 		{"label": "HDR10+", "value": "8", "standard_keys": ["hdr.hdr10plus"]},
-		{"label": "DV", "value": "9", "standard_keys": ["hdr.dv", "hdr.dv_hdr", "hdr.dv_hdr10plus"]}
+		{"label": "DV（杜比视界)", "value": "9", "standard_keys": ["hdr.dv", "hdr.dv_hdr", "hdr.dv_hdr10plus"]}
 	],
 	"team": [
 		{"label": "PigoWeb", "value": "1"},
