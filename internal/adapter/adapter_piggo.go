@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -326,7 +327,16 @@ func (a *PiggoAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, networkError("构造下载请求失败: "+err.Error(), err)
 	}
-	resp, err := a.doer.Client.Do(req)
+	// §59.541 附九: 下载用普通 GET（站方文档「拿到 url 后用普通 GET 下载」）——
+	// 签名 URL 自含鉴权·无需 Bearer/chrome TLS·chrome 传输栈在 piggo.me Web 面
+	// 碰 CF JS 挑战挂死（tid=57298 三次重推 30s 超时实证）。API 调用保持 chrome。
+	plainClient := &http.Client{Timeout: 60 * time.Second}
+	if config != nil && config.ProxyURL != "" {
+		plainClient.Transport = &http.Transport{Proxy: func(*http.Request) (*url.URL, error) {
+			return url.Parse(config.ProxyURL)
+		}}
+	}
+	resp, err := plainClient.Do(req)
 	if err != nil {
 		return nil, networkError("下载种子失败: "+err.Error(), err)
 	}
