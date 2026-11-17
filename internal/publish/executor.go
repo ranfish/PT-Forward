@@ -638,7 +638,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		ExtraArtists: gpwArtists,
 		SubtitleLangs: gpwSubs,
 		Title:       publishTitle,
-		Subtitle:    form[model.FieldDomainSmallDescr],
+		Subtitle:    meta.Subtitle, // §59.541 附二: 直读素材——原 form 字面量读在缺域/非恒等映射站断流（好学/朱雀缺域·馒头smallDescr/肉丝subtitle/野马shortDesc 非恒等·五站实锤）
 		Description: form[cfg.FormFields[model.FieldDomainDescription]],
 		MediaInfo:   meta.MediaInfo,
 		BDInfo:      meta.BDInfo,
@@ -1710,7 +1710,7 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 	}
 	body := auditBody{
 		Name:          auditName,
-		SmallDescr:    form[model.FieldDomainSmallDescr],
+		SmallDescr:    meta.Subtitle, // §59.541 附二: 同 Execute :641——audit 展示面同源直读（form 字面量读五站恒空）
 		IMDBURL:       meta.IMDbURL,
 		Description:   form[cfg.FormFields[model.FieldDomainDescription]],
 		TechnicalInfo: TechTextOf(meta),
