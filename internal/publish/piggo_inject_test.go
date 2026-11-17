@@ -114,3 +114,39 @@ func TestPiggoPublishInject_CategoryJSON(t *testing.T) {
 		t.Errorf("category_ids JSON: got %s", form["category_ids"])
 	}
 }
+
+// §59.541 回归审核补锚: source/processing 域特化组装（jobs 通用段不消费
+// 这两域——海豹同款特化先例·首版锚 cfg=nil 跳过未覆盖）。
+func TestPiggoSourceProcessingInject(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		FormFields: map[string]string{
+			"source": "source_id", "processing": "processing_id",
+		},
+		ValueMappings: map[string][]model.FormValueMapping{
+			"source": {
+				{Label: "WEB-DL", Value: "34", StandardKeys: []string{"medium.webdl", "medium.webrip"}},
+			},
+			"processing": {
+				{Label: "SDR", Value: "6", StandardKeys: []string{"hdr.sdr"}},
+				{Label: "DV", Value: "9", StandardKeys: []string{"hdr.dv"}},
+			},
+		},
+	}
+	meta := &model.TorrentMetadata{Category: "category.movie"}
+	tp := titleparser.TechProfile{Specification: "WEB-DL", HDR: "DoVi"}
+	form := map[string]string{"section_id": "1"}
+	piggoPublishInject(form, cfg, meta, tp)
+	if form["source_id"] != "34" {
+		t.Errorf("source 特化: got %s", form["source_id"])
+	}
+	if form["processing_id"] != "9" {
+		t.Errorf("processing 特化 (DoVi→hdr.dv→9): got %s", form["processing_id"])
+	}
+	// 素材 miss：两域留空（adapter 空维兜 Other/SDR——分层兜底不在本函数）
+	tp2 := titleparser.TechProfile{}
+	form2 := map[string]string{"section_id": "1"}
+	piggoPublishInject(form2, cfg, meta, tp2)
+	if form2["source_id"] != "" || form2["processing_id"] != "" {
+		t.Errorf("miss 应留空交 adapter 兜底: %v", form2)
+	}
+}

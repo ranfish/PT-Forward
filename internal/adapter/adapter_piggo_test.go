@@ -7,6 +7,7 @@ package adapter
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -196,5 +197,42 @@ func TestPiggoTaxonomyIDs(t *testing.T) {
 	// nil FormFields（防御）
 	if got := piggoTaxonomyIDs(&model.PublishRequest{}); got != "[36,31,26,19,10,6,5,53]" {
 		t.Errorf("nil 防御: got %s", got)
+	}
+}
+
+// §59.541 回归审核 P1 锚: taglist applier 硬编码 Key="tagList"（系统约定）
+// ——adapter 聚合双 key 收后 multipart tag_ids JSON 数组串必须在场。
+// （好学 §59.1481 同型第三站·锚增标准键蒸发路径先例）
+func TestPiggoPublishTaglistKey(t *testing.T) {
+	var body string
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1}}`))
+	})
+	defer srv.Close()
+	_, err := a.UploadTorrent(context.Background(), piggoCfg(srv.URL), &model.PublishRequest{
+		Title: "t", Subtitle: "s", Description: "d", MediaInfo: "mi",
+		TorrentData: []byte("xx"),
+		FormFields: map[string]string{"section_id": "1", "category_ids": "[3]"},
+		// taglist 模式 applier 产出形态（executor 真相源——key="tagList"）
+		TagArrayFields: []model.TagKV{
+			{Key: "tagList", Value: "4"}, // 中字
+			{Key: "tagList", Value: "9"}, // 合集
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, `"tag_ids"`+"\r\n") && !strings.Contains(body, `"tag_ids"`+"\n") {
+		t.Errorf("multipart 应含 tag_ids 字段: %.200s", body)
+	}
+	if !strings.Contains(body, "[4,9]") {
+		t.Errorf("tag_ids 应为 JSON 数字数组串 [4,9]: %.200s", body)
+	}
+	// taxonomy 八维合并（全兜底形态在场）
+	if !strings.Contains(body, "[36,31,26,19,10,6,5,53]") {
+		t.Errorf("taxonomy_ids 空维兜底串缺失: %.300s", body)
 	}
 }

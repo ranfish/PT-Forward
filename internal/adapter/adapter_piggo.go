@@ -583,17 +583,29 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		w.addField("taxonomy_ids", tx)
 	}
 	// §59.541: tag_ids 聚合——TagArrayFields 同名 KV（executor 通用链真相源·
-	// TNode 聚合先例）→ JSON 数组串；兜底 FormFields 单值
+	// TNode 聚合先例）→ JSON 数组串；兜底 FormFields 单值。
+	// §59.541 回归审核 P1: taglist applier 硬编码 Key="tagList"（系统约定·
+	// TNode/好学/朱雀同款 §59.1331/§59.1481）——聚合条件双 key 收（站方
+	// 字段名 tag_ids 由本层翻译）
 	tagVals := make([]string, 0, 4)
 	for _, kv := range req.TagArrayFields {
-		if kv.Key == "tag_ids" && kv.Value != "" {
+		if (kv.Key == "tag_ids" || kv.Key == "tagList") && kv.Value != "" {
 			tagVals = append(tagVals, kv.Value)
 		}
 	}
 	if len(tagVals) > 0 {
-		if b, err := json.Marshal(tagVals); err == nil {
-			w.addField("tag_ids", string(b))
+		// 站方契约数字数组（与 piggoTaxonomyIDs 同款——json.Marshal 字符串
+		// 数组首版错被锚抓出·§59.1328 修一处 grep 另一处纪律）
+		var tb strings.Builder
+		tb.WriteByte('[')
+		for i, v := range tagVals {
+			if i > 0 {
+				tb.WriteByte(',')
+			}
+			tb.WriteString(v)
 		}
+		tb.WriteByte(']')
+		w.addField("tag_ids", tb.String())
 	} else if v := get("tag_ids"); v != "" {
 		w.addField("tag_ids", v)
 	}

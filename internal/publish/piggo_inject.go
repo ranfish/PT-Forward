@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/metadata"
-	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 )
@@ -105,7 +104,7 @@ func piggoPublishInject(form map[string]string, cfg *model.PublishFormConfig, me
 	if cfg != nil {
 		if fn, ok := cfg.FormFields["source"]; ok && fn != "" {
 			if _, filled := form[fn]; !filled {
-				if key := mediumStdKeyOf(tp, ""); key != "" {
+				if key := piggoSourceStdKey(tp); key != "" {
 					for _, m := range cfg.ValueMappings["source"] {
 						for _, k := range m.StandardKeys {
 							if k == key {
@@ -120,7 +119,10 @@ func piggoPublishInject(form map[string]string, cfg *model.PublishFormConfig, me
 		// processing 域（HDR 处理 taxonomy——同款特化）
 		if fn, ok := cfg.FormFields["processing"]; ok && fn != "" {
 			if _, filled := form[fn]; !filled {
-				if key := extract.LookupStandardKey("hdr", tp.HDR); key != "" {
+				// §59.541 回归审核修正: LookupDictKey（StandardizeTechProfile
+				// 同款——variants/pattern 匹配·"DoVi"→hdr.dv）；首版误用
+				// extract.LookupStandardKey 对 "Dolby Vision" 原词恒空
+				if key := titleparser.LookupDictKey("hdr", tp.HDR); key != "" {
 					for _, m := range cfg.ValueMappings["processing"] {
 						for _, k := range m.StandardKeys {
 							if k == key {
@@ -133,6 +135,23 @@ func piggoPublishInject(form map[string]string, cfg *model.PublishFormConfig, me
 			}
 		}
 	}
+}
+
+// piggoSourceStdKey 来源域素材键（mediumMappingOf 推导同构——Specification
+// 规格先行 + SourceType fallback；首版直接 mediumStdKeyOf 在 Specification-
+// only 素材（SourceType 空）下恒空——回归审核抓出）。
+func piggoSourceStdKey(tp titleparser.TechProfile) string {
+	switch strings.ToLower(tp.Specification) {
+	case "remux":
+		return "medium.remux"
+	case "web-dl", "webdl", "webrip":
+		return "medium.webdl"
+	case "hdtv":
+		return "medium.hdtv"
+	case "bdrip", "dvdrip", "tvrip", "encode":
+		return "medium.encode"
+	}
+	return mediumStdKeyOf(tp, "")
 }
 
 // needsPiggoSectionOverride animation 类型才需要判据覆写（meta.Category
