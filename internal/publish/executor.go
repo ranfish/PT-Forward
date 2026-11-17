@@ -560,6 +560,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// {{ptgen}} 占位符（站方自营 PTGen 服务端渲染）；自制 PTGen 正文换占位符
 	if cfg.Framework == "piggo" {
 		form[cfg.FormFields[model.FieldDomainDescription]] = piggoDescrPtgen(form[cfg.FormFields[model.FieldDomainDescription]], meta)
+		// §59.541 附八: screenshots[] 独立字段——piggo 专有截图 URL 输入行
+		// （站方页面展示走独立字段·descr 内嵌可能不渲染）
+		if shots := parseScreenshotsCol(meta.Screenshots); len(shots) > 0 {
+			form["__piggo_screenshots"] = strings.Join(shots, "\n")
+		}
 	}
 
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；

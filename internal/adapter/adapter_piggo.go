@@ -625,6 +625,16 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		anon = "1"
 	}
 	w.addField("anonymous", anon)
+	// §59.541 附八: screenshots[] 独立截图字段（URL 列表——站方页面展示
+	// 走独立输入行·descr 内嵌不渲染）。executor 经 __piggo_screenshots
+	// 传递（newline 分隔 URL 列表）。
+	if ss := get("__piggo_screenshots"); ss != "" {
+		for _, line := range strings.Split(ss, "\n") {
+			if u := strings.TrimSpace(line); u != "" {
+				w.addField("screenshots[]", u)
+			}
+		}
+	}
 	w.addFile("file", "a.torrent", req.TorrentData)
 	w.close()
 
