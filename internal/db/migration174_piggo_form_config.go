@@ -43,7 +43,8 @@ func init() {
 	"processing": "processing_id",
 	"team": "team_id",
 	"region": "region_id",
-	"tags": "tag_ids"
+	"tags": "tag_ids",
+	"description": "descr"
 },
 "value_mappings": {
 	"type": [

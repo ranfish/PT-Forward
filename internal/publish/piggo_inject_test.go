@@ -143,10 +143,15 @@ func TestPiggoSourceProcessingInject(t *testing.T) {
 		t.Errorf("processing 特化 (DoVi→hdr.dv→9): got %s", form["processing_id"])
 	}
 	// 素材 miss：两域留空（adapter 空维兜 Other/SDR——分层兜底不在本函数）
+	// §59.541 b1 修正：SDR 死键激活——tp.HDR 空→key=hdr.sdr→processing_id=6
+	// （DryRun form 十键完整可预览·值集 hdr.sdr 键从死键变活键）
 	tp2 := titleparser.TechProfile{}
 	form2 := map[string]string{"section_id": "1"}
 	piggoPublishInject(form2, cfg, meta, tp2)
-	if form2["source_id"] != "" || form2["processing_id"] != "" {
-		t.Errorf("miss 应留空交 adapter 兜底: %v", form2)
+	if form2["source_id"] != "" {
+		t.Errorf("source miss 应留空交 adapter 兜底: %v", form2)
+	}
+	if form2["processing_id"] != "6" {
+		t.Errorf("SDR 死键激活: tp.HDR 空→hdr.sdr→6, got %s", form2["processing_id"])
 	}
 }

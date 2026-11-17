@@ -122,13 +122,19 @@ func piggoPublishInject(form map[string]string, cfg *model.PublishFormConfig, me
 				// §59.541 回归审核修正: LookupDictKey（StandardizeTechProfile
 				// 同款——variants/pattern 匹配·"DoVi"→hdr.dv）；首版误用
 				// extract.LookupStandardKey 对 "Dolby Vision" 原词恒空
-				if key := titleparser.LookupDictKey("hdr", tp.HDR); key != "" {
-					for _, m := range cfg.ValueMappings["processing"] {
-						for _, k := range m.StandardKeys {
-							if k == key {
-								form[fn] = m.Value
-								break
-							}
+				key := titleparser.LookupDictKey("hdr", tp.HDR)
+				if key == "" {
+					// §59.541 b1: SDR=无 HDR 词的推断默认态（用户定案）——
+					// 值集 hdr.sdr 键由死键激活（tp.HDR 永不含 SDR·标题/MI
+					// 不写 SDR·唯一来源就是"没有"）——前移 executor 层使
+					// DryRun form 十键完整可预览；adapter 兜底降级纯防御
+					key = "hdr.sdr"
+				}
+				for _, m := range cfg.ValueMappings["processing"] {
+					for _, k := range m.StandardKeys {
+						if k == key {
+							form[fn] = m.Value
+							break
 						}
 					}
 				}
