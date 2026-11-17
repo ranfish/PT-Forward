@@ -633,3 +633,7 @@ PTGen genre 含 Family/Kids     → 5 少儿
 - **修**：migration174 源码补 `"small_descr":"small_descr"` + migration177 json_set 刷存量 + FreshInstallChain ④-b 锚（piggo 契约必填文本域 small_descr/description 缺域即 CI 红——防同族第三例）。
 - **残留边缘**：源副标题为空的素材仍走站方 422 透出（摸站已知行为·piggo.md §新遗漏④——不拦不合成，保真哲学）。
 - **方法论**：契约必填文本域≠「adapter 读了 req.Subtitle 就行」——**executor→form→pubReq 的域映射是唯一通道**，新站接入 checklist 补一条「grep adapter 契约必填文本域 ↔ form_fields 配域对照」。
+
+### §59.541 附三·MD 转换层实战 422 根修（2026-11-17·v0.0.1514）
+
+- 首发二阶段（网络恢复后）：连发 5 颗全 422「简介含有 BBCode，本站仅支持 Markdown」——转换器双漏点：Quote 模式无 (?s)（多行引用块整个漏过）+嵌套 [quote] 单遍非贪婪残留。修=18 模式补 (?is)+quote 内层优先循环+残骸清扫（详见 docs/31 §59.541 附三）。**站方 MD 检测器是严格白名单**——任何残留 BBCode token 即 422。

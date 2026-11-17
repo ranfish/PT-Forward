@@ -42,31 +42,31 @@ var bbcodePatterns = struct {
 	URLWithText:   regexp.MustCompile(`(?i)\[url=([^\]]+)\]([^\[]*?)\[/url\]`),
 	URLPlain:      regexp.MustCompile(`(?i)\[url\]([^\[]*?)\[/url\]`),
 	Img:           regexp.MustCompile(`(?i)\[img\]([^\[]*?)\[/img\]`),
-	Bold:          regexp.MustCompile(`(?i)\[b\](.*?)\[/b\]`),
-	Italic:        regexp.MustCompile(`(?i)\[i\](.*?)\[/i\]`),
-	Underline:     regexp.MustCompile(`(?i)\[u\](.*?)\[/u\]`),
-	Strike:        regexp.MustCompile(`(?i)\[s\](.*?)\[/s\]`),
-	Code:          regexp.MustCompile(`(?i)\[code\](.*?)\[/code\]`),
-	Color:         regexp.MustCompile(`(?i)\[color=[^\]]*\](.*?)\[/color\]`),
-	Size:          regexp.MustCompile(`(?i)\[size=[^\]]*\](.*?)\[/size\]`),
-	Font:          regexp.MustCompile(`(?i)\[font=[^\]]*\](.*?)\[/font\]`),
-	Align:         regexp.MustCompile(`(?i)\[align=[^\]]*\](.*?)\[/align\]`),
-	Center:        regexp.MustCompile(`(?i)\[center\](.*?)\[/center\]`),
-	Left:          regexp.MustCompile(`(?i)\[left\](.*?)\[/left\]`),
-	Right:         regexp.MustCompile(`(?i)\[right\](.*?)\[/right\]`),
+	Bold:          regexp.MustCompile(`(?is)\[b\](.*?)\[/b\]`),
+	Italic:        regexp.MustCompile(`(?is)\[i\](.*?)\[/i\]`),
+	Underline:     regexp.MustCompile(`(?is)\[u\](.*?)\[/u\]`),
+	Strike:        regexp.MustCompile(`(?is)\[s\](.*?)\[/s\]`),
+	Code:          regexp.MustCompile(`(?is)\[code\](.*?)\[/code\]`),
+	Color:         regexp.MustCompile(`(?is)\[color=[^\]]*\](.*?)\[/color\]`),
+	Size:          regexp.MustCompile(`(?is)\[size=[^\]]*\](.*?)\[/size\]`),
+	Font:          regexp.MustCompile(`(?is)\[font=[^\]]*\](.*?)\[/font\]`),
+	Align:         regexp.MustCompile(`(?is)\[align=[^\]]*\](.*?)\[/align\]`),
+	Center:        regexp.MustCompile(`(?is)\[center\](.*?)\[/center\]`),
+	Left:          regexp.MustCompile(`(?is)\[left\](.*?)\[/left\]`),
+	Right:         regexp.MustCompile(`(?is)\[right\](.*?)\[/right\]`),
 	HR:            regexp.MustCompile(`(?i)\[hr\]`),
-	Table:         regexp.MustCompile(`(?i)\[table\](.*?)\[/table\]`),
-	TR:            regexp.MustCompile(`(?i)\[tr\](.*?)\[/tr\]`),
-	TD:            regexp.MustCompile(`(?i)\[td\](.*?)\[/td\]`),
-	TH:            regexp.MustCompile(`(?i)\[th\](.*?)\[/th\]`),
+	Table:         regexp.MustCompile(`(?is)\[table\](.*?)\[/table\]`),
+	TR:            regexp.MustCompile(`(?is)\[tr\](.*?)\[/tr\]`),
+	TD:            regexp.MustCompile(`(?is)\[td\](.*?)\[/td\]`),
+	TH:            regexp.MustCompile(`(?is)\[th\](.*?)\[/th\]`),
 	Email:         regexp.MustCompile(`(?i)\[email\]([^\[]*?)\[/email\]`),
 	AsteriskClose: regexp.MustCompile(`(?i)\[\*/?\]`),
 	StyleClose:    regexp.MustCompile(`(?i)\[/(?:color|size|font|align|center|left|right)\]`),
-	Spoiler:       regexp.MustCompile(`(?i)\[spoiler(?:=[^\]]*)?\](.*?)\[/spoiler\]`),
+	Spoiler:       regexp.MustCompile(`(?is)\[spoiler(?:=[^\]]*)?\](.*?)\[/spoiler\]`),
 	Quote:         regexp.MustCompile(`(?i)\[quote\](.*?)\[/quote\]`),
 	QuoteInner:    regexp.MustCompile(`(?is)\[quote\](.*?)\[/quote\]`),
 	Newline:       regexp.MustCompile(`\n`),
-	List:          regexp.MustCompile(`(?i)\[list\](.*?)\[/list\]`),
+	List:          regexp.MustCompile(`(?is)\[list\](.*?)\[/list\]`),
 	ListInner:     regexp.MustCompile(`(?is)\[list\](.*?)\[/list\]`),
 	ListItem:      regexp.MustCompile(`\[\*\]([^\[]*)`),
 }
@@ -77,6 +77,15 @@ func init() {
 		bbcodePatterns.Heading[level-1] = regexp.MustCompile(`(?i)\[` + tag + `\](.*?)\[/` + tag + `\]`)
 	}
 }
+
+// quoteInnermostRe §59.541 附三: 最内层 quote 匹配（RE2 无前瞻——内容形态
+// =不含 '[' 后随 q/Q，即不含嵌套 [quote] 开标签）；配合外层循环实现由内
+// 向外逐层转换（statement 嵌套引用实战形态）。
+var quoteInnermostRe = regexp.MustCompile(`(?is)\[quote\]((?:[^[]|\[[^qQ])*)\[/quote\]`)
+
+// residualQuoteTokenRe §59.541 附三: 落单/畸形 quote token 清扫兜底——
+// MD 站任何残留 BBCode=422（Obsession 首发实战）。
+var residualQuoteTokenRe = regexp.MustCompile(`(?i)\[/?quote(?:=[^\]]*)?\]`)
 
 func BBCodeToMarkdown(input string) string {
 	if input == "" {
@@ -94,18 +103,30 @@ func BBCodeToMarkdown(input string) string {
 	s = p.Underline.ReplaceAllString(s, "<u>$1</u>")
 	s = p.Strike.ReplaceAllString(s, "~~$1~~")
 	s = p.Code.ReplaceAllString(s, "```\n$1\n```")
-	s = p.Quote.ReplaceAllStringFunc(s, func(m string) string {
-		inner := p.QuoteInner.FindStringSubmatch(m)
-		if len(inner) < 2 {
-			return m
+	// §59.541 附三: 嵌套 quote 内层优先循环——单遍非贪婪在嵌套形态下必残留
+	// 内层 [quote]+落单 [/quote]（Obsession 首发实战 422 实证）；且原 Quote
+	// 模式无 (?s)，statement 多行引用块整个不转换是第二漏点。由内向外逐层
+	// 转换，无进展即停（16 层上限防御）。
+	for pass := 0; pass < 16; pass++ {
+		next := quoteInnermostRe.ReplaceAllStringFunc(s, func(m string) string {
+			g := quoteInnermostRe.FindStringSubmatch(m)
+			if len(g) < 2 {
+				return m
+			}
+			lines := p.Newline.Split(g[1], -1)
+			result := ""
+			for _, line := range lines {
+				result += "> " + line + "\n"
+			}
+			return result
+		})
+		if next == s {
+			break
 		}
-		lines := p.Newline.Split(inner[1], -1)
-		result := ""
-		for _, line := range lines {
-			result += "> " + line + "\n"
-		}
-		return result
-	})
+		s = next
+	}
+	// 残骸清扫: 落单/畸形 quote token 兜底剥除。
+	s = residualQuoteTokenRe.ReplaceAllString(s, "")
 	s = p.Color.ReplaceAllString(s, "$1")
 	s = p.Size.ReplaceAllString(s, "$1")
 	s = p.Font.ReplaceAllString(s, "$1")
