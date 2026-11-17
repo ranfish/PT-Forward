@@ -44,6 +44,7 @@ func init() {
 	"team": "team_id",
 	"region": "region_id",
 	"tags": "tag_ids",
+	"small_descr": "small_descr",
 	"description": "descr"
 },
 "value_mappings": {

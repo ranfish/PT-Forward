@@ -96,6 +96,26 @@ func TestFreshInstallChain(t *testing.T) {
 		}
 	}
 
+	// ④-b 断言一b：piggo 契约必填文本域在场（§59.541 首颗实战 422 案）。
+	// form_fields 缺域=文本域断链同族第二例（176 description 空键 →
+	// 177 small_descr 422）：setForm 守卫按域跳过 → pubReq 文本恒空 →
+	// 站方必填校验拒收。契约必填文本域必须在 form_fields 配域——缺即红。
+	{
+		var piggo model.Site
+		if err := gdb.Where("domain = ?", "piggo.me").First(&piggo).Error; err != nil {
+			t.Fatalf("piggo 站行缺失: %v", err)
+		}
+		pcfg := model.ParseFormConfig(piggo.PublishFormConfig)
+		if pcfg == nil || pcfg.FormFields == nil {
+			t.Fatalf("piggo form_config 解析失败")
+		}
+		for _, domain := range []string{"small_descr", "description"} {
+			if v, ok := pcfg.FormFields[domain]; !ok || v == "" {
+				t.Errorf("piggo form_fields 缺 %s 域——契约必填文本域断链（422/空键同族·检查 174/177 配置链）", domain)
+			}
+		}
+	}
+
 	// ⑤ 断言二：采集侧资产（site_field_mappings）非空
 	var fmCount int64
 	gdb.Model(&model.SiteFieldMapping{}).Count(&fmCount)

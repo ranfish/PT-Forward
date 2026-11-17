@@ -624,3 +624,12 @@ PTGen genre 含 Family/Kids     → 5 少儿
 4. PiggoAdapter 组装：8 虚拟字段合并 taxonomy_ids JSON 串+tag_ids 数组串+descr MD 转换挂载
 5. 测试锚：A 判据三态+B 映射+MD 矩阵
 6. DryRun 借壳（243 Fiksik 素材现成）→首颗实测（待用户）
+
+### §59.541 附·首颗实战 422 根修（2026-11-17·v0.0.1512）
+
+- **首颗**：Obsession 2025 UHD BluRay（簇代表 1d6392d1·源 朋友）→ 二师兄，10:33 执行。
+- **现象**：`failed · 上传失败: piggo 发布 422: 请填写副标题`（publish_result_records id=4847）。
+- **根因**：素材副标题**在场**（`【痴迷/爱你致死不渝(港/台)/痴爱成魔】mUHD作品 4k 杜比视界版本 英语 评论音轨 简繁英双语字幕`）但 form_fields 未配 `small_descr` 域 → setForm 守卫跳过 → executor :641 `pubReq.Subtitle = form[small_descr]` 恒空 → adapter `addField("small_descr","")` → 站方必填校验拒收。**与 description 空键（migration176）同族第二例：form_fields 缺域=文本域断链**。
+- **修**：migration174 源码补 `"small_descr":"small_descr"` + migration177 json_set 刷存量 + FreshInstallChain ④-b 锚（piggo 契约必填文本域 small_descr/description 缺域即 CI 红——防同族第三例）。
+- **残留边缘**：源副标题为空的素材仍走站方 422 透出（摸站已知行为·piggo.md §新遗漏④——不拦不合成，保真哲学）。
+- **方法论**：契约必填文本域≠「adapter 读了 req.Subtitle 就行」——**executor→form→pubReq 的域映射是唯一通道**，新站接入 checklist 补一条「grep adapter 契约必填文本域 ↔ form_fields 配域对照」。
