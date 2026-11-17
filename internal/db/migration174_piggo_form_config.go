@@ -45,7 +45,8 @@ func init() {
 	"region": "region_id",
 	"tags": "tag_ids",
 	"small_descr": "small_descr",
-	"description": "descr"
+	"description": "descr",
+	"technical_info": "media_info"
 },
 "value_mappings": {
 	"type": [

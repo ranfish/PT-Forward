@@ -659,7 +659,11 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		if err := json.Unmarshal(env.Data, &it); err == nil && it.ID > 0 {
 			return &model.PublishResponse{
 				Success: true, TorrentID: strconv.FormatInt(it.ID, 10),
-				DetailURL: it.PageURL, IDSource: "api_201", TorrentData: req.TorrentData,
+				DetailURL: it.PageURL, IDSource: "api_201",
+				// §59.541 附七: 不回填 TorrentData——piggo 上传后会重新生成
+				// .torrent（加 source 字段·hash 变化），本地数据≠站方终版。
+				// 回填会触发 pusher §59.515 D2 直推通道跳过站方下载→TR 同
+				// hash 去重→站方 tracker 永远挂不上（首战五连发实证）。
 			}, nil
 		}
 		return nil, parseError("piggo 201 响应解析失败: "+truncate(string(rb), 200), nil)

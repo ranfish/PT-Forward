@@ -643,3 +643,10 @@ PTGen genre 含 Family/Kids     → 5 少儿
 - **站方校验**：已填豆瓣/TMDB/IMDb 任一字段时，简介**必须**包含 `{{ptgen}}` 占位符——站方用自营 PTGen 服务（ptgen.piggo.me）在该处服务端渲染简介块。
 - **实现**：piggoDescrPtgen（executor :558 后·Framework==piggo）——自制 PTGen 正文整体替换为占位符（防双份）；无正文前置占位符；无链接零变化。
 - **首次 422 记录**：4865-4869 五颗（v0.0.1514 重发批）。
+
+### §59.541 附七·推种断链根修+API 差异记录（2026-11-17·v0.0.1516）
+
+- **piggo 上传响应不包含 .torrent 数据**——与好大（return_torrent_base64）不同。adapter 不得回填 `TorrentData = req.TorrentData`（本地数据≠站方终版）。
+- **piggo 上传后重新生成 .torrent**：加 `source: "[piggo.me] 猪猪"` 字段 → info_hash 变化。实证 tid=57289：本地 hash fa2de723ce → piggo hash aa21ecbd。
+- **announce 使用 token 认证**（停 passkey·只接受下载令牌——piggo.md :422 记载）。
+- **新 API 站接入三问**：①上传响应是否含 .torrent？②站方是否重写（source 字段）？③info_hash 是否与上传时一致？

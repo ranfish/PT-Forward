@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -185,6 +186,27 @@ func (c *TRClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		}
 		if _, err := c.rpcCall(ctx, "torrent-set", setArgs); err != nil {
 			c.logger.Warn("post-add torrent-set limits failed", zap.String("hash", hash), zap.Error(err))
+		}
+	}
+
+	// §59.541 附七: 私有种子同 info_hash 去重——TR torrent-add 对同 hash
+	// 返回 torrent-duplicate（成功但不加 tracker）→ 站方 announce 永远挂
+	// 不上。piggo 首战五连发实证：站方 .torrent 与源站同 piece 布局=同
+	// info_hash → TR 静默去重 → 站方 0 seeder。
+	// 修：isDup 时从 .torrent 提取 announce → torrent-set trackerAdd 补挂。
+	if isDup {
+		if announces := extractAnnounces(data); len(announces) > 0 {
+			trackerArgs := map[string]interface{}{
+				"ids":        []string{hash},
+				"trackerAdd": announces,
+			}
+			if _, err := c.rpcCall(ctx, "torrent-set", trackerArgs); err != nil {
+				c.logger.Warn("dup-add trackerAdd failed（站方 announce 未挂上·种子可能不做种）",
+					zap.String("hash", hash), zap.Strings("announces", announces), zap.Error(err))
+			} else {
+				c.logger.Info("dup-add tracker added（同 hash 去重后补挂站方 tracker）",
+					zap.String("hash", hash), zap.Strings("announces", announces))
+			}
 		}
 	}
 
@@ -452,4 +474,41 @@ func (c *TRClient) GetTrackers(ctx context.Context, hash string) ([]string, erro
 		}
 	}
 	return urls, nil
+}
+
+// extractAnnounces §59.541 附七: 从 .torrent bencode 提取 announce URL 列表
+// （根字典 announce-list 多 tracker 全量 + announce 单 tracker 兜底·去重）。
+// 空列表=无 announce 跳过补挂。
+func extractAnnounces(data []byte) []string {
+	root, err := fingerprint.DecodeBencode(data)
+	if err != nil {
+		return nil
+	}
+	m, ok := root.(map[string]any)
+	if !ok {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var urls []string
+	// announce-list 优先（多 tracker 全量）
+	if al, ok := m["announce-list"]; ok {
+		if tiers, ok := al.([]any); ok {
+			for _, tier := range tiers {
+				if list, ok := tier.([]any); ok {
+					for _, u := range list {
+						if s, ok := u.(string); ok && s != "" && !seen[s] {
+							seen[s] = true
+							urls = append(urls, s)
+						}
+					}
+				}
+			}
+		}
+	}
+	// 单 announce 兜底
+	if a, ok := m["announce"].(string); ok && a != "" && !seen[a] {
+		seen[a] = true
+		urls = append(urls, a)
+	}
+	return urls
 }

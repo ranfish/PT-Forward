@@ -6,6 +6,12 @@ import (
 	"sort"
 )
 
+// DecodeBencode §59.541 附七: 导出 bencode 解码（TR AddFromFile 去重补挂
+// tracker 需提取 announce——原私有函数收编公共）。
+func DecodeBencode(data []byte) (any, error) {
+	return decodeBencode(data)
+}
+
 func decodeBencode(data []byte) (any, error) {
 	v, _, err := decodeValue(data, 0)
 	return v, err
