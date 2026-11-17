@@ -650,3 +650,16 @@ PTGen genre 含 Family/Kids     → 5 少儿
 - **piggo 上传后重新生成 .torrent**：加 `source: "[piggo.me] 猪猪"` 字段 → info_hash 变化。实证 tid=57289：本地 hash fa2de723ce → piggo hash aa21ecbd。
 - **announce 使用 token 认证**（停 passkey·只接受下载令牌——piggo.md :422 记载）。
 - **新 API 站接入三问**：①上传响应是否含 .torrent？②站方是否重写（source 字段）？③info_hash 是否与上传时一致？
+
+### §59.541 附九·download-link 端点完整行为指令（文档漏读补录）
+
+> **站方文档原文（用户供 API 文档 v3·625 行）**：
+> "签发约 24 小时的种子文件 URL（不含 passkey）。无权 403，看不见 404。成功 announce 后作废。收费种签发时检查余额，真正拉文件时才计次、扣费。**拿到 url 后用普通 GET 下载，不要把令牌带到 Tracker。**"
+
+**关键行为指令**：
+1. 返回的 URL 用**普通 GET** 下载——不需要 Bearer/chrome TLS（签名 URL 自含鉴权）
+2. **不要把令牌带到 Tracker**——API 令牌不能出现在 announce URL 中
+3. 签发 24h 有效·成功 announce 后作废
+4. 收费种：签发时查余额·拉文件时扣费
+
+**教训**：API 文档摘要只记端点清单（「有什么」）不够——**行为指令（「怎么用」）同等重要**。今后新 API 站接入，每个端点的完整描述段必须通读，不能只看路由表。
