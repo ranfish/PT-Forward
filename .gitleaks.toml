@@ -1,0 +1,66 @@
+# PT-Forward gitleaks 配置（§仓库安全-1 第三刀·2026-11-18）
+#
+# 职责：机械防线——commit/push 内容级泄漏扫描
+# 原则：值级精确豁免优先·文件级豁免仅限「文档示例」与「构建标志」
+# 禁止：--no-verify 绕过；新增豁免必须在 PR/commit 说明理由
+# 联动：第八刀（filter-repo）后删除 baseline 重新生成（应为空）
+
+[extend]
+useDefault = true
+
+# ── 自定义规则（本次事件的核心泄漏形态·默认规则集不覆盖）──
+
+[[rules]]
+id = "pt-passkey"
+description = "PT site passkey in URL"
+regex = '''(?i)passkey=[a-f0-9]{16,64}'''
+tags = ["pt", "passkey"]
+keywords = ["passkey"]
+
+[[rules]]
+id = "nexusphp-session-cookie"
+description = "NexusPHP login cookie (c_secure_*)"
+regex = '''c_secure_(?:uid|pass)=[A-Za-z0-9+/=]{20,}'''
+tags = ["pt", "session"]
+
+[[rules]]
+id = "encryption-key-hex64"
+description = "64-hex encryption key"
+regex = '''(?i)encryption[_-]?key\s*[:=]\s*["']?[a-f0-9]{64}'''
+tags = ["key"]
+keywords = ["encryption_key", "encryption-key", "encryptionKey"]
+
+[allowlist]
+description = "测试占位值 / 站点级公开 token / 文档示例 / 已清理占位符"
+regexTarget = "match"
+regexes = [
+  # ── 清理后的占位符（§仓库安全-4/第三刀摸底处置）──
+  "SANITIZEDSIGNATURE",            # 假 JWT 签名段（testdata 61 文件）
+  "passkey=SANITIZED",             # R-07 passkey 清理形态
+  "SANITIZEDAUTHKEY",              # mua.xloli authKey
+  "SANITIZEDLOGOUTTOKEN",
+  "SANITIZEDLOGOUTKEY",
+  "SANITIZEDDLKEY",
+  "SANITIZEDLOGOUTAUTH",
+  "SANITIZEDTOKEN",
+  # ── 测试构造值（httptest 本地服务器配套·非真实站点）──
+  "0123456789abcdef0123456789abcdef",
+  "0123456789abcdef0123456789abcdef",
+  "0123456789abcdef",
+  "testkey1234567890",
+  # ── sanitizer 自测用例（故意形态·测净化器本身）──
+  "passkey=abc123secret",
+  "encryption_key=enc_abc",
+  # ── 站点级公开 token（CF 分析 beacon·所有访客相同）──
+  "0e1e43a8396d446991a245164515eb29",
+  "30c7ae2f31d4455885d13c8160a396ef",
+  "72de07ff2b8143bfa2fc2394d048dbcb",
+]
+paths = [
+  # 构建标志误报（CGO_ENABLED 等）
+  '''Makefile''',
+  # M-Team API 文档示例（your-api-key-here 占位形态）
+  '''docs/25-M-Team-API完整指南\.md''',
+  # 词库键名（standard_key 值被泛化规则误报）
+  '''internal/titleparser/dict/medium\.json''',
+]

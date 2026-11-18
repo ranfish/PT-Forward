@@ -120,6 +120,8 @@
 
 > **§仓库安全-1**：基础设施信息不入库——实际值见本地 `.env`（不入库）·模板见 `.env.example`
 
+- **gitleaks**：`~/.local/bin/gitleaks`（v8.24.3·第三刀防线）——pre-commit 自动调用·缺失时 warning 放行（CI 硬门兜底）。误报处理：`.gitleaks.toml` allowlist 值级精确豁免+commit 说明理由·**禁止 `--no-verify` 绕过**。CI 三流（ci/release/docker-publish）均有 secrets job（baseline 模式）·第八刀历史重写后删 `.gitleaks-baseline.json` 重新生成（应为空）。
+
 - **Go**：`/home/<user>/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）
 - **Node**：`/home/<user>/.local/bin/node`（v22，系统 Node 18 不兼容，必须用此路径）
 - **CGO**：后端编译必须 `CGO_ENABLED=1`

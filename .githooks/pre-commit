@@ -2,6 +2,7 @@
 # §59.154: pre-commit 硬拦截——防 .gitignore 覆盖不到的形态再犯
 # (a) 文件名含 .db（数据库族——历史上 16GB 备份曾被 add -A 带入）
 # (b) 暂存文件 >50MB（仓库最大合法文件 bin/pt-forward ~34MB）
+# §仓库安全-1 第三刀: gitleaks 内容级扫描（passkey/密钥/会话 cookie 形态）
 set -e
 LIST=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$LIST" ] && exit 0
@@ -21,4 +22,22 @@ for f in $LIST; do
         exit 1
     fi
 done
+
+# ── gitleaks 内容级扫描（第三刀）──
+# gitleaks 缺失时 warning 放行（不卡重装环境）·CI 硬门兜底
+GITLEAKS="$(command -v gitleaks || true)"
+[ -x "$HOME/.local/bin/gitleaks" ] && GITLEAKS="$HOME/.local/bin/gitleaks"
+if [ -n "$GITLEAKS" ]; then
+    if ! "$GITLEAKS" protect --staged --config "$(git rev-parse --show-toplevel)/.gitleaks.toml"; then
+        echo ""
+        echo "✗ gitleaks 检出疑似敏感信息——禁止提交"
+        echo "  · 确为泄漏：清除内容后重新 add"
+        echo "  · 确为误报：在 .gitleaks.toml allowlist 精确豁免（值级优先）并在 commit 说明理由"
+        echo "  · 禁止 --no-verify 绕过（§仓库安全-1 纪律）"
+        exit 1
+    fi
+else
+    echo "⚠ gitleaks 未安装——本次跳过内容扫描（CI 将兜底）"
+    echo "  建议安装: ~/.local/bin/gitleaks 8.24.3（见 AGENTS.md 环境信息）"
+fi
 exit 0
