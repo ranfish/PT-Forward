@@ -819,7 +819,7 @@ FGT, RARBG, Mp4Ba, xiaomi, huawei, BlackTV, BitsTV, DreamHD, Hao4K
 
 ## 九、发布页验证（2026-04-22 Playwright 实际采集）
 
-> 用户 <作者> 已登录，页面标题 `OKPT :: 发布 - Powered by NexusPHP`。
+> 用户已登录，页面标题 `OKPT :: 发布 - Powered by NexusPHP`。
 
 ### 9.1 关键发现：双分类模式
 

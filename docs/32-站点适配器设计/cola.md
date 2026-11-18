@@ -42,7 +42,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 
 | 端点 | 用途 | 权限 | 实测（2026-11-03） |
 |---|---|---|---|
-| POST /api/member/profile | 用户资料 | Key 有效 | ✓ uid=907 <作者> |
+| POST /api/member/profile | 用户资料 | Key 有效 | ✓ uid=907 <用户名> |
 | POST /api/torrent/search | 关键词搜索 | catalog.read | ✓（响应字段 id/name/smallDescr/size/category/imdb/status.discount） |
 | POST /api/torrent/genDlToken?id=N | 换下载票 | torrent.download | ✓（首试超时=节流，冷却后通） |
 | GET /downloads/<凭据>/<id> | 下载 .torrent | 凭票访问 | ✓ 7997B bencode |
@@ -113,7 +113,7 @@ tracker.colapt.com = Tracker（passkey 嵌入 announce）
 
 ## 摸底时间线（2026-11-03）
 
-- profile → 200（uid=907 <作者>，2026-10-20 注册，上传 86MB）
+- profile → 200（uid=907 <用户名>，2026-10-20 注册，上传 86MB）
 - search → 200（FREE 促销在 status.discount）
 - genDlToken → 首试超时（节流）→ 冷却 30s 后 200（签名 URL exp+sig）
 - 下载 → 200 7997B bencode（announce=tracker.colapt.com+passkey）

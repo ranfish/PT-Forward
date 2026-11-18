@@ -456,7 +456,7 @@ PTFans mode=5 包含 11 个成人内容分类：
 
 ## 五、发布页验证（2026-04-22 Playwright 实际采集）
 
-> 用户 <作者> 已登录，页面标题 `PTFans :: 发布 - Powered by NexusPHP`。
+> 用户已登录，页面标题 `PTFans :: 发布 - Powered by NexusPHP`。
 
 与现有文档对比：
 

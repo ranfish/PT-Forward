@@ -354,7 +354,7 @@ HDVideo 无专用 `technical_info` 字段，MediaInfo 需嵌入 `descr` 简介�
 
 ## 五、发布页字段验证（2026-04-22 Playwright 实际采集）
 
-> 用户 <作者> 已登录，页面标题 `HDVideo :: 发布 - Powered by NexusPHP`。
+> 用户已登录，页面标题 `HDVideo :: 发布 - Powered by NexusPHP`。
 
 与现有文档逐一对比，采集结果完全一致：
 

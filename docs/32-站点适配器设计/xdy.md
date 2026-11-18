@@ -13,7 +13,7 @@
 | 直连性 | 243 Docker 直连可达（302 login.php → 登录态 200） |
 | 上传端点 | `takeupload.php`（POST multipart/form-data，form name="upload"） |
 | Tracker | `https://xdypt.vip/announce.php`（**同域 announce**，与幸运分域 tracker 不同） |
-| 用户 | <作者>（user_id=10318，c_secure_pass 单 cookie 登录态有效） |
+| 用户 | <用户名>（user_id=<uid>，c_secure_pass 单 cookie 登录态有效） |
 | 候选制 | 无强制（rules："任何人都能发布资源"；游戏类需候选或上传员等级） |
 | 全站活动 | 2X Free 至 2026-09-30；转种/发种大赛（500 种=6 个月 VIP；站点种子总量目标 10000——**发展期站点，欢迎转存**） |
 

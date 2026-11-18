@@ -2,7 +2,7 @@
 
 > 站点：瓷器 HDWinG · hdwing.org · tracker.hdwing.org
 > 状态：**全功能收官**（§59.510-511·2026-11-10——源站+目标站+首颗实战 pushed tid=838594 seeded=1 五链全绿）
-> 摸底账号：<作者>_hdc（UID 268618 · UltimateUser 等级 · CC cookie 有效）
+> 摸底账号：<用户名>（UID <uid> · UltimateUser 等级 · CC cookie 有效）
 
 ## 1. 站点实态档案
 

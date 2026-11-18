@@ -560,7 +560,7 @@ AnimeBytes (AB), DEEPBASSNiNE (DB9), HDBits (HDB), Passthepopcorn (PTP), Redacte
 
 | 链 | 端点 | 实测 |
 |---|---|---|
-| 用户态 | `ajax.php?action=index` | ✓ <作者>/ratio 123/**seedingCount 2195**/authkey/passkey（download 构造原料） |
+| 用户态 | `ajax.php?action=index` | ✓ <用户名>/ratio 123/**seedingCount 2195**/authkey/passkey（download 构造原料） |
 | **detail** | `ajax.php?action=torrent&hash=<info_hash>` | ✓ **hash 直查**（恢复/辅种重大利好）——响应双层：group（name/year/releaseType/**imdbId/doubanId**/imdbRating/tags/description/conver[封面 typo]）+torrent（infoHash/remasterTitle/scene/size/seeders/**freeTorrent/freeType**/**mediainfos 数组**/fileName） |
 | discount | detail 响应 freeTorrent/freeType 字段 | ✓（数据源实证——这颗 False） |
 | download | `torrents.php?action=download&id=&authkey=&torrent_pass=` | ✓ 179KB bencode（announce=tracker.greatposterwall.com） |

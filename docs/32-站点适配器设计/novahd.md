@@ -364,7 +364,7 @@ NovaHD 有 17 个制作组，含自家组 NHDWeb(15) 和 NDJWEB(16)。转种时�
 
 ## 五、发布页字段验证（2026-04-22 Playwright 实际采集）
 
-> 用户 <作者> 已登录，页面标题 `NovaHD :: 发布 - Powered by NexusPHP`。
+> 用户已登录，页面标题 `NovaHD :: 发布 - Powered by NexusPHP`。
 
 与现有文档逐一对比，**所有字段完全一致**，无差异：
 

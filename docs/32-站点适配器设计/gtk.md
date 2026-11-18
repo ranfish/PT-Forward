@@ -135,7 +135,7 @@
 
 ## 二、发布页面表单字段分析（2026-04-22 Playwright 实际采集验证）
 
-> 用户 <作者> 已登录，页面标题 `PT GTK :: 发布 BT|电影|... - Powered by NexusPHP`，表单共 37 个元素。以下数据已与实际页面逐一验证一致。
+> 用户已登录，页面标题 `PT GTK :: 发布 BT|电影|... - Powered by NexusPHP`，表单共 37 个元素。以下数据已与实际页面逐一验证一致。
 
 **提交地址**: `takeupload.php`（POST multipart/form-data）
 
