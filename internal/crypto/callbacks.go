@@ -298,3 +298,17 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 	}
 	return nil
 }
+
+// EncryptedColumnIndex 返回表名→加密列集合的拷贝（§仓库安全-3 第四刀：
+// 应急轮换 CLI 的遍历单源——与 GORM 回调共用 getEncryptedModels，永不漂移）。
+func EncryptedColumnIndex() map[string]map[string]bool {
+	out := make(map[string]map[string]bool, len(encryptedColumnIndex))
+	for t, cols := range encryptedColumnIndex {
+		c2 := make(map[string]bool, len(cols))
+		for c := range cols {
+			c2[c] = true
+		}
+		out[t] = c2
+	}
+	return out
+}

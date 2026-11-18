@@ -82,6 +82,7 @@ func main() {
 	configPath := flag.String("config", "", "path to config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	resetPassword := flag.String("reset-password", "", "reset admin password to the given value")
+	rotateKey := flag.Bool("rotate-key", false, "rotate encryption key (emergency, \u00a7\u4ed3\u5e93\u5b89\u5168-3)")
 	flag.Parse()
 
 	if *showVersion {
@@ -150,6 +151,17 @@ func main() {
 	// 全部 miss 却被记录已执行（永不重跑）→ 新装环境 publish_form_config
 	// 永远空（用户只能 Diff 工具松查次优接入）。挪至 seed 后：新装链站行
 	// 先建→migration 命中精配；老环境已执行全跳过（幂等无感）。
+
+	// §仓库安全-3 第四刀：应急密钥轮换——在 initEncryption 之前执行
+	// （不注册 GORM 加密回调，全程 raw 读写防旧密钥回调二次加密）
+	if *rotateKey {
+		if err := runRotateKey(cfg, *configPath, db, log); err != nil {
+			log.Error("rotate-key failed", zap.Error(err))
+			_ = log.Sync()
+			os.Exit(1) //nolint:gocritic
+		}
+		return
+	}
 
 	if err := initEncryption(cfg, *configPath, db, log); err != nil {
 		log.Error("failed to init encryption", zap.Error(err))
@@ -1090,12 +1102,14 @@ func initDB(cfg *config.Config, log *zap.Logger, ctx context.Context) (*gorm.DB,
 
 func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap.Logger) error {
 	key := cfg.Security.EncryptionKey
+	keyFromDB := false
 	if key == "" {
 		settingsRepo := setting.NewRepository(db)
 		ctx := context.Background()
 		stored, err := settingsRepo.Get(ctx, "encryption_key")
 		if err == nil && stored != "" {
 			key = stored
+			keyFromDB = true
 		}
 	}
 	if key == "" {
@@ -1127,9 +1141,22 @@ func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap
 			log.Info("encryption_key auto-generated and stored in database")
 		}
 	}
+	// §仓库安全-3（R-02 定案）：密钥永不进 DB——自动迁移与残留清理
+	// a) key 来自 config：DB 若有旧版同步的残留行（stored==key）→ 清理
+	// b) key 来自 DB fallback：config 可写则迁移（写 config 成功后删 DB 行）
 	syncRepo := setting.NewRepository(db)
-	if stored, _ := syncRepo.Get(context.Background(), "encryption_key"); stored != key {
-		_ = syncRepo.Set(context.Background(), "encryption_key", key)
+	if stored, _ := syncRepo.Get(context.Background(), "encryption_key"); stored != "" {
+		if stored == key && keyFromDB && configPath != "" {
+			if err := writeEncryptionKeyToConfig(configPath, key); err == nil {
+				_ = syncRepo.Delete(context.Background(), "encryption_key")
+				log.Info("encryption_key migrated from DB to config file (\u00a7\u4ed3\u5e93\u5b89\u5168-3)", zap.String("path", configPath))
+			} else {
+				log.Warn("config not writable, key temporarily stays in DB", zap.Error(err))
+			}
+		} else {
+			_ = syncRepo.Delete(context.Background(), "encryption_key")
+			log.Info("cleared legacy encryption_key row in DB (\u00a7\u4ed3\u5e93\u5b89\u5168-3: key never in DB)")
+		}
 	}
 	enc, err := crypto.NewCredentialEncryptor(key)
 	if err != nil {
