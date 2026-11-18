@@ -29,10 +29,14 @@ done
 FIXTURES=$(echo "$LIST" | grep -E '^internal/adapter/testdata/.*\.html$' || true)
 if [ -n "$FIXTURES" ]; then
     OUT=$(python3 "$(git rev-parse --show-toplevel)/scripts/sanitize-fixture.py" $FIXTURES 2>&1)
-    if [ -n "$OUT" ]; then
-        echo "$OUT" | sed 's/^/  [fixture] /'
+    RC=$?
+    echo "$OUT" | grep -v '^$' | sed 's/^/  [fixture] /'
+    if [ $RC -eq 0 ] && [ -n "$OUT" ]; then
         echo "$FIXTURES" | xargs -r git add
         echo "  [fixture] 已自动消毒并重新暂存（§仓库安全-1 管道）"
+    elif [ $RC -ne 0 ]; then
+        echo "✗ 消毒管道执行失败（exit $RC）——中止提交"
+        exit 1
     fi
 fi
 # ── gitleaks 内容级扫描（第三刀）──
