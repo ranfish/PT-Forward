@@ -42,7 +42,7 @@
 
 ## 当前任务焦点（新会话必读）
 
-> **分支任务·仓库安全专项（2026-11-17 起·docs/31 §仓库安全-1~10）**：第三刀已完成（gitleaks 双门+自建比对层·§仓库安全-11）、第四刀已完成（R-02 轮换 CLI+密钥出 DB·e03a4e43·现役环境下次 OTA 首启自动迁移密钥——数据级验证点）。刀序（§仓库安全-9）：①②③④⑤✅（⑤大二进制三留五出·77d79607·CI+Docker 双绿）→ ⑥✅（docs 敏感审查 34 处改写·含第八刀替换清单）→ ⑦✅（脱敏管道 pre-commit 自动消毒·§仓库安全-17）→ ⑧✅（filter-repo 七轮重写：①36值②68值③身份词→<作者>（1510处uid关联·三段式洗牌保护import路径）④IYUU token⑤<user> 路径+域名⑥<user> 独立词（§仓库安全-22·联合回归 P1 定案·工具环境变量化 PTF_DB/LUCK_USERNAME）⑦message 层清洗（--message-callback：commit message 的 <user>×6+PT站用户名×2+自托管域名×2·blob 层洗法补全）·CI 首验修复（16处=3真+13误报→allowlist）·gitleaks 全历史 0 findings——剩 Support 工单（用户提交·草稿 /tmp/opencode/r08/）+IYUU token 重置（用户）+备份 mirror 专项关闭后删）→ ⑨✅（发布物审计四项全绿·§仓库安全-20·aedaba1b——strings 10类零·ldflags 纯版本·embed 18 文件零·Docker 层干净）→ **转 public 前置条件全部满足**
+> **分支任务·仓库安全专项（2026-11-17 起·docs/31 §仓库安全-1~10）**：第三刀已完成（gitleaks 双门+自建比对层·§仓库安全-11）、第四刀已完成（R-02 轮换 CLI+密钥出 DB·e03a4e43·现役环境下次 OTA 首启自动迁移密钥——数据级验证点）。刀序（§仓库安全-9）：①②③④⑤✅（⑤大二进制三留五出·77d79607·CI+Docker 双绿）→ ⑥✅（docs 敏感审查 34 处改写·含第八刀替换清单）→ ⑦✅（脱敏管道 pre-commit 自动消毒·§仓库安全-17）→ ⑧✅（filter-repo 七轮重写：①36值②68值③身份词→<作者>（1510处uid关联·三段式洗牌保护import路径）④IYUU token⑤系统用户名路径+域名⑥系统用户名独立词（§仓库安全-22·联合回归 P1 定案·工具环境变量化 PTF_DB/LUCK_USERNAME）⑦message 层清洗（--message-callback：commit message 的 <user>×6+PT站用户名×2+自托管域名×2·blob 层洗法补全）·CI 首验修复（16处=3真+13误报→allowlist）·gitleaks 全历史 0 findings——剩 Support 工单（用户提交·草稿 /tmp/opencode/r08/）+IYUU token 重置（用户）+备份 mirror 专项关闭后删）→ ⑨✅（发布物审计四项全绿·§仓库安全-20·aedaba1b——strings 10类零·ldflags 纯版本·embed 18 文件零·Docker 层干净）→ **转 public 前置条件全部满足**
 
 **九刀全清单（§仓库安全-9 刀序·2026-11-18 收官）**：
 ①✅ 删敏感文件+口令清除 ②✅ .env 体系+变量化 ③✅ gitleaks 双门+自建比对层 ④✅ R-02 轮换 CLI+密钥出 DB ⑤✅ 大二进制三留五出 ⑥✅ docs+skills+scripts 敏感审查 ⑦✅ 夹具脱敏管道 ⑧✅ filter-repo 七轮重写（blob 六轮+message 一轮·历史敏感值清零·含 <user> 身份关联）⑨✅ 发布物审计
