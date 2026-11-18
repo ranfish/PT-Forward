@@ -5,7 +5,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../../.."
 
-SSH_HOST=root@10.0.0.243
+# §仓库安全-1：基础设施信息不入库——实际值见 .env（PROD_HOST_243）
+REPO_ROOT="$(pwd)"
+[ -f "$REPO_ROOT/.env" ] && source "$REPO_ROOT/.env"
+SSH_HOST="root@${PROD_HOST_243:?Error: PROD_HOST_243 not set in .env}"
 CONTAINER=pt-forward
 
 if [ ! -f pt-forward ]; then

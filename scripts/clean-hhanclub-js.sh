@@ -2,13 +2,13 @@
 # 憨憨 JS 残留清洗脚本（§59.516 v0.0.1462/1463·2026-11-14 修正版）
 #
 # 用法：bash scripts/clean-hhanclub-js.sh <IP或域名> [用户名] [认证方式]
-#   认证方式：key（默认·root+私钥 ~/[REDACTED-ssh_path]）| pass（<作者>+密码）
+#   认证方式：key（默认·root+私钥 $SSH_KEY）| pass（<SSH用户>+密码）
 #   密码经环境变量 PTF_PASS 传入（禁止硬编码入库）：
 #     export PTF_PASS='...'   # 面板密码（从 .env 读取·三个密码不应同源）
 # 示例：
-#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh pt31.<作者>.uk              # 私钥组
-#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh pt29.<作者>.uk <作者> pass # 密码组
-#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh pt4.<作者>.uk <user> key    # 私钥组+API兜底
+#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh <host别名>                   # 私钥组
+#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh <host别名> <SSH用户> pass    # 密码组
+#   PTF_PASS='...' bash scripts/clean-hhanclub-js.sh <host别名> <SSH用户> key     # 私钥组+API兜底
 #
 # 清洗语义（幂等·可重复执行）：
 #   对 source_description 含 JS 标记（jQuery/function/viewpeerlist）的行清空
@@ -17,16 +17,22 @@
 #
 # 策略（2026-11-14 修正·8 环境实测适配）：
 #   ① SQLite 直写（root 可写·秒级）
-#   ② sudo -S 直写（<作者>@fnOS 组：DB 属主 root·<作者> sudo 可用）
+#   ② sudo -S 直写（fnOS 系统用户组：DB 属主 root·sudo 可用）
 #   ③ API 兜底（找不到 DB / sudo 不通·需目标环境 ≥ v0.0.1463）
 #   修正点：API 端点路径（原多 /publish/torrents 段必 404）；DB 搜索加 /vol*
 #   （fnOS 挂载）；PTF_PASS 经 env 注入远端（原 API 兜底断链）
 #
 # 2026-11-14 实测分组：
-#   key  组：pt31/pt35（root+xsy）·pt4（<user>+xsy）
-#   pass 组：pt29/pt30/pt32/pt33/fnos（<作者>+密码）
+#   key  组：pt31/pt35/pt4（root 或系统用户+私钥 $SSH_KEY）
+#   pass 组：pt29/pt30/pt32/pt33/fnos（系统用户+密码）
 
 set -euo pipefail
+
+# §仓库安全-1：基础设施信息不入库——SSH 私钥路径见 .env（SSH_KEY）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+[ -f "$REPO_ROOT/.env" ] && source "$REPO_ROOT/.env"
+: "${SSH_KEY:?Error: SSH_KEY not set in .env}"
 
 IP="${1:?用法: $0 <IP> [用户名] [认证方式]}"
 USER="${2:-root}"
@@ -43,7 +49,7 @@ run_remote() {
   fi
   if [ "$AUTH" = "key" ]; then
     # envprefix 为空时 " bash -s" 前导空格无害；非空时 env 与 bash 必须同命令（分离则 PTF_PASS 丢失）
-    ssh -i ~/[REDACTED-ssh_path] -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o BatchMode=yes \
+    ssh -i "$SSH_KEY" -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o BatchMode=yes \
       "$USER@$IP" "${envprefix} bash -s" < "$script" 2>&1 | grep -v "password for"
   else
     if [ -z "${PTF_PASS:-}" ]; then

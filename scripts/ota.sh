@@ -3,8 +3,8 @@
 #
 # 用法:
 #   bash scripts/ota.sh                    # 全部 9 个环境
-#   bash scripts/ota.sh 10.0.0.28          # 指定单个环境
-#   bash scripts/ota.sh 10.0.0.28 10.0.0.12  # 指定多个环境
+#   bash scripts/ota.sh <host1>             # 指定单个环境（值见 .env 的 PROD_HOST_*）
+#   bash scripts/ota.sh <host1> <host2>      # 指定多个环境
 #   bash scripts/ota.sh -v v0.0.1120       # 指定版本（默认最新）
 #   bash scripts/ota.sh -c                 # 仅检查版本不执行 OTA
 #

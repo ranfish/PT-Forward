@@ -7,7 +7,7 @@ Playwright 容器化 UI 验证（§59.319 附十三基建）——登录/导航/
 
 ```bash
 # 环境变量（默认 localhost:8765/admin；PTF_PASS 必填）
-export PTF_BASE=http://10.0.0.243:8765   # 可选
+export PTF_BASE=http://$PROD_HOST_243:8765   # 可选（值见 .env）
 export PTF_PASS='目标环境密码'
 
 sg docker -c "docker run --rm --network host \
