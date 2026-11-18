@@ -345,7 +345,7 @@ func TestGazelle_GetTorrentInfoHash_OK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hash != "[REDACTED-passkey]8899aabbccdd" {
+	if hash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("hash: %s", hash)
 	}
 }

@@ -148,7 +148,7 @@ func TestUnit3D_GetTorrentDetail_API(t *testing.T) {
 func TestUnit3D_GetTorrentDetail_Web(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`<html><title>Web Title :: Site</title>
-		info_hash: [REDACTED-passkey]8899aabbccdd
+		info_hash: aabbccddeeff00112233445566778899aabbccdd
 		<td>Size<td>2 GB</td></td>
 		</html>`))
 	}))
@@ -380,7 +380,7 @@ func TestUnit3D_GetTorrentInfoHash_API(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hash != "[REDACTED-passkey]8899aabbccdd" {
+	if hash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("hash: %s", hash)
 	}
 }

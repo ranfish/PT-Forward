@@ -24,7 +24,7 @@ func debugSite() {
 	}
 
 	db, _ := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db"), &gorm.Config{})
-	enc, _ := crypto.NewCredentialEncryptor("[REDACTED-enc_key]")
+	enc, _ := crypto.NewCredentialEncryptor(os.Getenv("ENCRYPTION_KEY"))
 	crypto.RegisterCallbacks(db, enc, zap.NewNop())
 
 	logger, _ := zap.NewProduction()

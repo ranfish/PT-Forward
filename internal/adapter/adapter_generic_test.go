@@ -285,7 +285,7 @@ func TestGenericAdapter_GetTorrentInfoHash_OK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hash != "[REDACTED-passkey]8899aabbccdd" {
+	if hash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("unexpected hash: %s", hash)
 	}
 }
@@ -518,7 +518,7 @@ func TestGenericAdapter_GetTorrentDetail_DTDD(t *testing.T) {
 		<dt>基本信息</dt>
 		<dd>大小：3.2 GB&nbsp;&nbsp;类型：电视剧&nbsp;&nbsp;编码：H.265&nbsp;&nbsp;分辨率：1080p</dd>
 		<dt>种子文件</dt>
-		<dd>info_hash: [REDACTED-passkey]8899aabbccdd</dd>
+		<dd>info_hash: aabbccddeeff00112233445566778899aabbccdd</dd>
 		</html>`))
 	}))
 	defer srv.Close()
@@ -536,7 +536,7 @@ func TestGenericAdapter_GetTorrentDetail_DTDD(t *testing.T) {
 	if detail.Title != "DD Torrent" {
 		t.Errorf("unexpected title: %s", detail.Title)
 	}
-	if detail.InfoHash != "[REDACTED-passkey]8899aabbccdd" {
+	if detail.InfoHash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("unexpected infohash: %s", detail.InfoHash)
 	}
 	if detail.Size == 0 {

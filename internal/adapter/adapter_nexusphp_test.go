@@ -122,7 +122,7 @@ func TestNexusPHP_GetTorrentDetail_OK(t *testing.T) {
 		<tr><td class="rowhead">类别与标签</td><td class="rowfollow"><a href="torrents.php?cat=401"><img class="c_movie" src="pic/cattrans.gif" alt="电影 (Movie)" /></a></td></tr>
 		<tr><td class="rowhead">副标题</td><td class="rowfollow">好东西/爱情神话2 | 导演: 邵艺辉</td></tr>
 		<tr><td class="rowhead">基本信息</td><td class="rowfollow"><b><b>大小：</b></b>2.5 GB&nbsp;&nbsp;&nbsp;<b>类型:</b>&nbsp;电影&nbsp;&nbsp;&nbsp;<b>编码:</b>&nbsp;H.265&nbsp;&nbsp;&nbsp;<b>分辨率:</b>&nbsp;1080p&nbsp;&nbsp;&nbsp;<b>媒介:</b>&nbsp;WEB-DL&nbsp;&nbsp;&nbsp;<b>音频编码:</b>&nbsp;DDP&nbsp;&nbsp;&nbsp;<b>制作组:</b>&nbsp;CMCT&nbsp;&nbsp;&nbsp;<b>地区:</b>&nbsp;大陆</td></tr>
-		<tr><td class="rowhead">种子文件</td><td class="rowfollow"><b>文件数：</b>3个文件 &nbsp; &nbsp; 种子Hash：[REDACTED-passkey]8899aabbccdd<br /></td></tr>
+		<tr><td class="rowhead">种子文件</td><td class="rowfollow"><b>文件数：</b>3个文件 &nbsp; &nbsp; 种子Hash：aabbccddeeff00112233445566778899aabbccdd<br /></td></tr>
 		<div id='kdescr'>[img]poster[/img] some description</div>
 		<span class="tag tag-free">Free</span>
 		</html>`)
@@ -140,7 +140,7 @@ func TestNexusPHP_GetTorrentDetail_OK(t *testing.T) {
 	if detail.Title != "Movie 2024 1080p" {
 		t.Errorf("title: %s", detail.Title)
 	}
-	if detail.InfoHash != "[REDACTED-passkey]8899aabbccdd" {
+	if detail.InfoHash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("hash: %s", detail.InfoHash)
 	}
 	if detail.Size == 0 {
@@ -184,7 +184,7 @@ func TestNexusPHP_GetTorrentDetail_CSSNoise(t *testing.T) {
 		<link rel="stylesheet" href="styles/curtain_imageresizer.css?20241021" type="text/css" />
 		<style>body { font-size: 14px; }</style>
 		<title>CSS Noise Test</title>
-		<td>info_hash</td><td>[REDACTED-passkey]8899aabbccdd</td>
+		<td>info_hash</td><td>aabbccddeeff00112233445566778899aabbccdd</td>
 		<tr><td class="rowhead">基本信息</td><td><b><b>大小：</b></b>1.01 GB</td></tr>
 		<tr><td class="rowhead">类别与标签</td><td class="rowfollow"><a href="torrents.php?cat=404"><img class="c_tv" src="pic/cattrans.gif" alt="电视剧 (TV Series)" /></a></td></tr>
 		<div>File Size: 510 MiB</div>
@@ -476,7 +476,7 @@ func TestNexusPHP_GetTorrentInfoHash_OK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hash != "[REDACTED-passkey]8899aabbccdd" {
+	if hash != "aabbccddeeff00112233445566778899aabbccdd" {
 		t.Errorf("hash: %s", hash)
 	}
 }
