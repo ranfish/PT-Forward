@@ -16,8 +16,10 @@ jobs:
         run: |
           curl -sL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar xz -C /usr/local/bin gitleaks
           gitleaks version
-      - name: Secrets scan (baseline mode)
-        run: gitleaks git . --config .gitleaks.toml --baseline-path .gitleaks-baseline.json -v
+      - name: Secrets scan (baseline diff)
+        run: |
+          gitleaks git . --config .gitleaks.toml --report-format json --report-path /tmp/scan.json --exit-code 0
+          python3 scripts/gitleaks-baseline-diff.py /tmp/scan.json .gitleaks-baseline.json
 
   build-and-push:
     needs: [secrets]
