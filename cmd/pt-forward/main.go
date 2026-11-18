@@ -82,7 +82,7 @@ func main() {
 	configPath := flag.String("config", "", "path to config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	resetPassword := flag.String("reset-password", "", "reset admin password to the given value")
-	rotateKey := flag.Bool("rotate-key", false, "rotate encryption key (emergency, \u00a7\u4ed3\u5e93\u5b89\u5168-3)")
+	rotateKey := flag.Bool("rotate-key", false, "rotate encryption key (emergency; STOP the service first \u2014 running instance keeps writing with the old key)")
 	flag.Parse()
 
 	if *showVersion {
@@ -1147,7 +1147,8 @@ func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap
 	syncRepo := setting.NewRepository(db)
 	if stored, _ := syncRepo.Get(context.Background(), "encryption_key"); stored != "" {
 		if stored == key && keyFromDB && configPath != "" {
-			if err := writeEncryptionKeyToConfig(configPath, key); err == nil {
+			// §仓库安全-12 回归审核修：替换式（追加式在 config 已有 security 段时产生双段）
+			if err := replaceEncryptionKeyInConfig(configPath, key); err == nil {
 				_ = syncRepo.Delete(context.Background(), "encryption_key")
 				log.Info("encryption_key migrated from DB to config file (\u00a7\u4ed3\u5e93\u5b89\u5168-3)", zap.String("path", configPath))
 			} else {

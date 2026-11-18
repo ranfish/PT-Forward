@@ -226,3 +226,25 @@ func afterColon(s string) string {
 	}
 	return s
 }
+
+// TestInitEncryptionMigrateExistingSection：config 已有 security 段（key 缺失）
+// → 迁移后单段单键（§仓库安全-12 回归审核修③的锚）
+func TestInitEncryptionMigrateExistingSection(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+	key, _ := crypto.GenerateRandomKey()
+	setting.NewRepository(db).Set(context.Background(), "encryption_key", key)
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte("log:\n  level: info\n\nsecurity:\n  # placeholder\n"), 0640)
+	if err := initEncryption(&config.Config{}, cfgPath, db, zap.NewNop()); err != nil {
+		t.Fatalf("initEncryption: %v", err)
+	}
+	content, _ := os.ReadFile(cfgPath)
+	s := string(content)
+	if !containsOnce(s, "security:") || !containsOnce(s, "encryption_key:") {
+		t.Fatalf("迁移产生双段/双键:\n%s", s)
+	}
+	if k := extractKey(s); k != key {
+		t.Fatalf("密钥未正确迁移: %q", k)
+	}
+}

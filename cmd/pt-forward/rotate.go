@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -196,7 +195,8 @@ func copyFile(src, dst string) error {
 }
 
 // replaceEncryptionKeyInConfig 替换式写入（writeEncryptionKeyToConfig 是追加式——
-// 轮换场景 config 已有 security 段，追加会产生两个 encryption_key）。
+// 轮换/迁移场景 config 可能已有 security 段，追加会产生重复键）。
+// 形态矩阵：段在+键在→替换 · 段在+键缺→段内插入 · 段缺→追加新段。
 func replaceEncryptionKeyInConfig(path, newKey string) error {
 	content, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -206,29 +206,40 @@ func replaceEncryptionKeyInConfig(path, newKey string) error {
 		return err
 	}
 	lines := strings.Split(string(content), "\n")
-	replaced := false
-	inSecurity := false
+	keyLine := "  encryption_key: " + newKey
+
+	secStart := -1
 	for i, l := range lines {
-		t := strings.TrimSpace(l)
-		if t == "security:" {
-			inSecurity = true
+		if strings.TrimSpace(l) == "security:" {
+			secStart = i
+			break
+		}
+	}
+	if secStart < 0 {
+		out := strings.TrimRight(string(content), "\n") + "\n\nsecurity:\n  encryption_key: " + newKey + "\n"
+		return os.WriteFile(path, []byte(out), 0640)
+	}
+	// 段范围 = secStart+1 .. secEnd（下一个顶级键行或文件尾；顶级=非空非缩进非注释）
+	secEnd := len(lines)
+	for i := secStart + 1; i < len(lines); i++ {
+		l := lines[i]
+		if l == "" || strings.HasPrefix(l, " ") || strings.HasPrefix(l, "\t") || strings.HasPrefix(strings.TrimSpace(l), "#") {
 			continue
 		}
-		if inSecurity {
-			if strings.HasPrefix(t, "encryption_key:") {
-				indent := l[:len(l)-len(strings.TrimLeft(l, " \t"))]
-				lines[i] = indent + "encryption_key: " + newKey
-				replaced = true
-			} else if t != "" {
-				inSecurity = false
-			}
+		secEnd = i
+		break
+	}
+	for i := secStart + 1; i < secEnd; i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "encryption_key:") {
+			indent := lines[i][:len(lines[i])-len(strings.TrimLeft(lines[i], " \t"))]
+			lines[i] = indent + "encryption_key: " + newKey
+			return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0640)
 		}
 	}
-	out := strings.Join(lines, "\n")
-	if !replaced {
-		out = strings.TrimRight(out, "\n") + "\n\nsecurity:\n  encryption_key: " + newKey + "\n"
-	}
-	return os.WriteFile(path, []byte(out), 0640)
+	// 段内无键：插入段首之后
+	out := make([]string, 0, len(lines)+1)
+	out = append(out, lines[:secStart+1]...)
+	out = append(out, keyLine)
+	out = append(out, lines[secStart+1:]...)
+	return os.WriteFile(path, []byte(strings.Join(out, "\n")), 0640)
 }
-
-var _ = filepath.Join // 保持 import 集稳定（backup 使用相对路径形态时不再依赖）
