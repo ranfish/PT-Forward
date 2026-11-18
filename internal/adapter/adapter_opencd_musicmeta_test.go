@@ -113,7 +113,7 @@ Felice Giardini (1716 - 1796): 6 Sonatas for Violin &amp; Continuo, Op. 1:<br />
 </tr>
 <tr style="display:;">
 <td class="rowtitle" msg="链接地址">下载链接</td>
-<td colspan="4"><b>此链接包含您的个人密钥信息，请勿提供给他人使用。</b><br/><a href="https://open.cd/download.php?id=189504&passkey=[REDACTED-passkey]">https`
+<td colspan="4"><b>此链接包含您的个人密钥信息，请勿提供给他人使用。</b><br/><a href="https://open.cd/download.php?id=189504&passkey=SANITIZED">https`
 	// 曲目区
 	trackSeg := `id="divtracklist" style="overflow-x:auto;">
 <b>曲目列表：</b><br />
@@ -135,7 +135,7 @@ Felice Giardini (1716 - 1796): 6 Sonatas for Violin &amp; Continuo, Op. 1:<br />
 </tr>
 <tr style="display:;">
 <td class="rowtitle" msg="链接地址">下载链接</td>
-<td colspan="4"><b>此链接包含您的个人密钥信息，请勿提供给他人使用。</b><br/><a href="https://open.cd/download.php?id=189504&passkey=[REDACTED-passkey]">https://open.cd/downloa`
+<td colspan="4"><b>此链接包含您的个人密钥信息，请勿提供给他人使用。</b><br/><a href="https://open.cd/download.php?id=189504&passkey=SANITIZED">https://open.cd/downloa`
 	html := fieldSeg + trackSeg
 
 	detail := extractOpenCDDetail(html)
