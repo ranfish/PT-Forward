@@ -79,3 +79,11 @@ pt-forward.b*
 
 # .env 豁免：模板文件入库（真实 .env 不入库）
 !.env.example
+
+# §仓库安全-9 第五刀：编译产物/死资产出库（~93MB·历史 blob 归第八刀 filter-repo）
+# 三留自编译资产（无外部下载源）：bin/amd64/{mpv-new,ffmpeg,ffprobe}
+/bin/pt-forward
+/bin/amd64/mpv
+/tools/cookiecloud/cookiecloud
+/tools/decrypt-cookie/decrypt-cookie
+/filter.test
