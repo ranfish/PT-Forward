@@ -23,6 +23,18 @@ for f in $LIST; do
     fi
 done
 
+# ── 夹具自动消毒（§仓库安全-1 第七刀）──
+# testdata 变更时自动剥离账号关联痕迹（passkey/JWT/绑定 token）·
+# 有修改则重新暂存（开发者无感·原始 HTML 直接 add 即可）
+FIXTURES=$(echo "$LIST" | grep -E '^internal/adapter/testdata/.*\.html$' || true)
+if [ -n "$FIXTURES" ]; then
+    OUT=$(python3 "$(git rev-parse --show-toplevel)/scripts/sanitize-fixture.py" $FIXTURES 2>&1)
+    if [ -n "$OUT" ]; then
+        echo "$OUT" | sed 's/^/  [fixture] /'
+        echo "$FIXTURES" | xargs -r git add
+        echo "  [fixture] 已自动消毒并重新暂存（§仓库安全-1 管道）"
+    fi
+fi
 # ── gitleaks 内容级扫描（第三刀）──
 # gitleaks 缺失时 warning 放行（不卡重装环境）·CI 硬门兜底
 GITLEAKS="$(command -v gitleaks || true)"
@@ -40,4 +52,5 @@ else
     echo "⚠ gitleaks 未安装——本次跳过内容扫描（CI 将兜底）"
     echo "  建议安装: ~/.local/bin/gitleaks 8.24.3（见 AGENTS.md 环境信息）"
 fi
+
 exit 0
