@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"go.uber.org/zap"
@@ -23,7 +24,11 @@ func main() {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
-	db, err := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db"), &gorm.Config{})
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

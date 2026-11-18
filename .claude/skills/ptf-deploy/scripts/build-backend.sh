@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../../.."
 
-GO=/home/<user>/.local/go/bin/go
+GO="${GO:-$HOME/.local/go/bin/go}"
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "⚠️  工作区有未提交改动（铁律：先提交后部署）：" >&2

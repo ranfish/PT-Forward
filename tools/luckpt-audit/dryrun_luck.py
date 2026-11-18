@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """§59.151 幸运专线全量端到端推演：243 ready 种子 → 组装幸运表单 → 官方 pre-audit 批量验证"""
-import json, time, urllib.request, sys
+import json, time, urllib.request, sys, os
 
 API = "http://127.0.0.1:8765/api/v1"
 LUCK_API = "https://pt.luckpt.de/api/auto-audit/pre-audit"
@@ -114,7 +114,7 @@ def api(path, token, method='GET', data=None):
 
 def pre_audit(body, cookie):
     data = dict(body)
-    data['user_info'] = {'id': 10136, 'username': '<作者>', 'class': 10}
+    data['user_info'] = {'id': 10136, 'username': os.environ.get('LUCK_USERNAME', ''), 'class': 10}
     data['export_time'] = '2026-08-30T00:00:00.000Z'
     req = urllib.request.Request(LUCK_API, data=json.dumps(data).encode(), method='POST',
         headers={'Content-Type': 'application/json', 'Accept': 'application/json',

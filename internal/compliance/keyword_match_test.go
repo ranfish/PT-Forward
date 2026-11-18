@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -61,7 +62,11 @@ func TestChineseFalsePositiveExclusion(t *testing.T) {
 
 // §56.2x: 端到端锚定——真实 DB 规则（含 builtin "Porn"）下的判定
 func TestPornographersEndToEnd(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db?mode=ro"), &gorm.Config{})
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
+	db, err := gorm.Open(sqlite.Open(dbPath+"?mode=ro"), &gorm.Config{})
 	if err != nil {
 		t.Skipf("无 29 环境 DB: %v", err)
 	}

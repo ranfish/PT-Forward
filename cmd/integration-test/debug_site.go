@@ -23,7 +23,11 @@ func debugSite() {
 		siteName = os.Args[1]
 	}
 
-	db, _ := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db"), &gorm.Config{})
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
+	db, _ := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	enc, _ := crypto.NewCredentialEncryptor(os.Getenv("ENCRYPTION_KEY"))
 	crypto.RegisterCallbacks(db, enc, zap.NewNop())
 

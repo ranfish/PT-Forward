@@ -5,8 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../../.."
 
-GO=/home/<user>/.local/go/bin/go
-export PATH="/home/<user>/.local/bin:$PATH"  # Node v22（系统 Node 18 不兼容）
+GO="${GO:-$HOME/.local/go/bin/go}"
+export PATH="$HOME/.local/bin:$PATH"  # Node v22（系统 Node 18 不兼容）
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "⚠️  工作区有未提交改动（铁律：先提交后部署）：" >&2

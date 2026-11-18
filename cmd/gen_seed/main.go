@@ -145,7 +145,11 @@ var frameworkDownloadDefaults = map[string]string{
 func boolPtr(b bool) *bool { return &b }
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db"), &gorm.Config{})
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -311,7 +315,7 @@ func main() {
 		panic(err)
 	}
 
-	outputPath := "/home/<user>/PT-Forward/internal/site/supported_sites.json"
+outputPath := "internal/site/supported_sites.json"
 	if err := os.WriteFile(outputPath, data, 0644); err != nil {
 		panic(err)
 	}

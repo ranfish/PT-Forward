@@ -129,7 +129,10 @@ func main() {
 }
 
 func openDB() *gorm.DB {
-	dbPath := "/home/<user>/PT-Forward/data/pt-forward.db"
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open db: %v\n", err)

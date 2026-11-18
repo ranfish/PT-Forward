@@ -48,7 +48,7 @@ docker-multiarch:
 	docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$(VERSION) -t pt-forward:$(VERSION) -t pt-forward:latest .
 
 # §59.35 P3: 前端字典 codegen（生成物进 git，CI drift 检查）
-GO ?= $(shell command -v go 2>/dev/null || echo /home/<user>/.local/go/bin/go)
+GO ?= $(shell command -v go 2>/dev/null || echo $(HOME)/.local/go/bin/go)
 
 dict:
 	$(GO) run ./cmd/gen-dict

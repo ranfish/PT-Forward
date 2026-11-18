@@ -44,10 +44,14 @@ func newRealFetcher(t *testing.T) (*Fetcher, *gorm.DB) {
 	if os.Getenv("PTF_E2E_REAL_SITE") == "" {
 		t.Skip("真实站 E2E：设置 PTF_E2E_REAL_SITE=1 开启")
 	}
-	if _, err := os.Stat("/home/<user>/PT-Forward/data/pt-forward.db"); err != nil {
+	dbPath := os.Getenv("PTF_DB")
+	if dbPath == "" {
+		dbPath = "data/pt-forward.db"
+	}
+	if _, err := os.Stat(dbPath); err != nil {
 		t.Skip("非 29 环境")
 	}
-	db, err := gorm.Open(sqlite.Open("/home/<user>/PT-Forward/data/pt-forward.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		t.Skipf("无 29 DB: %v", err)
 	}
