@@ -87,3 +87,6 @@ pt-forward.b*
 /tools/cookiecloud/cookiecloud
 /tools/decrypt-cookie/decrypt-cookie
 /filter.test
+
+# §仓库安全-24 G-2: Cookie 转储类文件防复发（v1 事故形态——工具再生成不被手滑 add）
+**/cookies.json

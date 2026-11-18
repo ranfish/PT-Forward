@@ -45,7 +45,6 @@ regexes = [
   "SANITIZEDTOKEN",
   # ── 测试构造值（httptest 本地服务器配套·非真实站点）──
   "0123456789abcdef0123456789abcdef",
-  "0123456789abcdef0123456789abcdef",
   "0123456789abcdef",
   "testkey1234567890",
   # ── sanitizer 自测用例（故意形态·测净化器本身）──
