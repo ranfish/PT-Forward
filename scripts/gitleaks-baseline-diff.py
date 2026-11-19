@@ -37,10 +37,9 @@ def main():
             (r.get("File", "?"), r.get("RuleID", "?")) for r in extra
         ).most_common(25):
             print(f"  {file} [{rule}] ×{n}")
-        # 诊断摘要：Secret 前 12 字符（定位形态用——处置后应移除此段）
+        # 定位明细：File:Line + RuleID（不含任何 Secret 片段——§仓库安全-25 F-1 整改）
         for r in extra[:10]:
-            s = str(r.get("Secret", ""))
-            print(f"    · {r.get('File','?')}:{r.get('StartLine','?')} secret[:12]={s[:12]!r} len={len(s)}")
+            print(f"    · {r.get('File','?')}:{r.get('StartLine','?')} [{r.get('RuleID','?')}]")
         print("处置：清除泄漏内容·或 .gitleaks.toml allowlist 值级豁免（commit 说明理由）")
         return 1
     print(f"✓ 扫描 {len(findings)} findings 全部在基线内（基线指纹 {len(baseline)}）")
