@@ -3139,7 +3139,9 @@ fetched:
 			// 第二段禁转PTT 是用户指定的固定引言（v0.0.597）。
 			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
 				thanksLine := description.GenerateThanksQuote(meta.SiteName, profile.ReleaseGroup, false, nil)
-				noTransferLine := "[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
+				// §59.542 刀1: 引用词单源——此前此处与剥离侧 thanksNoTransferTail 各维护
+				// 一份字面量（两套词），本次 Pope 案证实两侧形态假设漂移是累积根因。
+				noTransferLine := thanksNoTransferTail
 				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
 
 				// 幂等：先剥离历史追加的致谢块（v0.0.607 修复重获累积）
@@ -3175,44 +3177,61 @@ fetched:
 	return nil
 }
 
-// thanksAppendMarker §59.28 致谢追加分隔标记：statement 中该标记之后的内容
-// 是我们追加的致谢块（重获时剥离，保证幂等）。
+// thanksAppendMarker §59.28 致谢追加分隔标记（历史形态）：老组名「FRDS」
+// 时代（组映射后改名「FRDS torrent」）追加的致谢块文本·243 存量 5551 行依赖
+// 此兜底剥离——保留（§59.542 刀1 扫描定案：新形态不命中此标记·零误伤）。
 const thanksAppendMarker = "FRDS官组作品"
 
-// thanksNoTransferTail §59.260: 追加块固定尾引言（用户定案不变文案）——
-// 任意组名/中英模板的结构锚（幂等剥离通用判据）。
-const thanksNoTransferTail = "[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
+// thanksCoreText §59.542 刀1: 单源引用（本体在 internal/description——
+// 声明过滤词表同样引用·三处消费一源）。
+const thanksCoreText = description.ThanksCoreText
 
-// stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等 + §59.260 通用化）。
-// 追加格式固定双 quote 结尾：
+// thanksNoTransferTail §59.260: 追加块固定尾引言（用户定案不变文案）——
+// 任意组名/中英模板的结构锚（幂等剥离通用判据）。§59.542 刀1: 从 thanksCoreText
+// 合成（消灭第二份字面量）。
+const thanksNoTransferTail = "[quote][b][color=red][size=5]" + thanksCoreText + "[/size][/color][/b][/quote]"
+
+// §59.542 刀2: 派生锚+形态宽容——站方 BBCode 规范化实证三重改写
+// （blue→#0000ff / red→#ff0000 / [quote]后插换行·Pope 案 2026-11-19），
+// 字面锚全部失配致旧对剥不掉→重获累积（13 颗双份实证）。正则化：
+// 色值枚举+标签间 \s* 宽容换行；head 锚按「蓝色致谢块形态」内容无关
+// （源站无此文本——thanksCoreText 系统独有·任意蓝色致谢块必为
+// 我方追加或回流·剥除安全）；tail 锚内容锁 thanksCoreText 单源。
+var (
+	thanksHeadBlockRe = regexp.MustCompile(`(?s)\[quote\]\s*\[b\]\s*\[color=(?:blue|#0000ff)\]\s*\[size=5\]\s*[^\[]{1,400}?\[/size\]\s*\[/color\]\s*\[/b\]\s*\[/quote\]`)
+	thanksTailBlockRe = regexp.MustCompile(`(?s)\[quote\]\s*\[b\]\s*\[color=(?:red|#ff0000)\]\s*\[size=5\]\s*` + regexp.QuoteMeta(thanksCoreText) + `\s*\[/size\]\s*\[/color\]\s*\[/b\]\s*\[/quote\]`)
+)
+
+// stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等 + §59.260 通用化 +
+// §59.542 刀2 形态宽容）。追加格式固定双 quote 结尾：
 //
 //	[quote][b][color=blue][size=5]{组名}官组作品...[/quote]\n[quote][b][color=red][size=5]互珍互重，禁转PTT...[/quote]
 //
-// §59.260：以固定尾引言 thanksNoTransferTail 为锚（任意组名/中英模板通用），
-// 从最后一个尾引言回溯相邻前一 [quote] 起点整块剥离；旧 FRDS 标记兜底兼容。
+// §59.542 刀2: 正则锚（色值枚举+换行宽容）——站方规范化形态（#0000ff/#ff0000/
+// quote 后换行）与原生形态（blue/red/无换行）一律可剥；head 按蓝色致谢块形态
+// 内容无关匹配（源站无此文本·任意蓝色致谢块必为我方产物）。
 func stripAppendedThanks(statement string) string {
-	// 循环剥离（累积多轮的历史数据一次清净）：每轮以最后一个尾引言为锚，
-	// 向前找配对的致谢前缀 quote（固定蓝色[size=5]形态）——中间可能隔着其它
-	// quote（多轮累积时上一对的尾引言），必须匹配致谢自身特征而非任意 quote。
+	// 循环剥离（累积多轮的历史数据一次清净）：先剥尾引言块（内容锁
+	// thanksCoreText），再剥 head 中最后一个蓝色致谢块（配对优先·无配对
+	// 时尾块单独剥——不误伤源站真声明块）。
 	for {
-		idx := strings.LastIndex(statement, thanksNoTransferTail)
-		if idx < 0 {
+		tail := thanksTailBlockRe.FindStringIndex(statement)
+		if tail == nil {
 			break
 		}
-		head := statement[:idx]
-		// 配对致谢 = head 中最后一个蓝色 size=5 quote（追加块固定形态）
-		prevStart := strings.LastIndex(head, "[quote][b][color=blue][size=5]")
-		if prevStart < 0 {
-			// 无配对致谢（异常形态）——仅剥尾引言自身
-			tailStart := strings.LastIndex(head, "[quote]")
-			if tailStart < 0 {
-				statement = strings.TrimSpace(head)
-				continue
-			}
-			statement = strings.TrimSpace(head[:tailStart])
+		head := statement[:tail[0]]
+		if hs := thanksHeadBlockRe.FindAllStringIndex(head, -1); len(hs) > 0 {
+			last := hs[len(hs)-1]
+			statement = strings.TrimSpace(head[:last[0]])
 			continue
 		}
-		statement = strings.TrimSpace(head[:prevStart])
+		// 无配对致谢（头块被站方超预期改写？）——仅剥尾块自身·不动其它 quote
+		statement = strings.TrimSpace(head)
+	}
+	// 孤立致谢头块清扫（尾块已不在/被超预期改写的残留——蓝色致谢块必为
+	// 我方产物·剩余多少剥多少）
+	for thanksHeadBlockRe.MatchString(statement) {
+		statement = strings.TrimSpace(thanksHeadBlockRe.ReplaceAllString(statement, ""))
 	}
 	// 旧 FRDS 标记兜底（历史数据兼容——同循环）
 	for strings.Contains(statement, thanksAppendMarker) {

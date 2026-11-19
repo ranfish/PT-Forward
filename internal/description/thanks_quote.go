@@ -27,6 +27,11 @@ const (
 
 	// GroupNamePlaceholder §59.20: 制作组名占位符。
 	GroupNamePlaceholder = "{group_name}"
+
+	// ThanksCoreText §59.542 刀1: 禁转引言文本单源——追加锚/剥离锚/
+	// 声明过滤词表全部派生于此（改措辞只动这一处·生成与剥离永不漂移）。
+	// 系统独有措辞（用户确认未见于其它发布者）。
+	ThanksCoreText = "互珍互重，禁转PTT"
 )
 
 // GenerateThanksQuote 生成感谢引言。

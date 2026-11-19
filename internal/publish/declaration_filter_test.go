@@ -32,14 +32,16 @@ func TestDeclarationFilter_SiteDisclaimers(t *testing.T) {
 	if !strings.Contains(got.CleanedText, "正文描述保留") {
 		t.Error("正文误伤")
 	}
-	if !strings.Contains(got.CleanedText, "QHstudIo官组作品，感谢原制作者发布。") {
-		t.Error("我方追加致谢块被误剥")
+	// §59.542 刀3 新语义：我方致谢/禁转PTT 模板文本改为剥除（回流治）——
+	// 旧锚（保留断言）随定案更新
+	if strings.Contains(got.CleanedText, "QHstudIo官组作品") {
+		t.Error("我方致谢模板应剥除（§59.542 回流治）")
 	}
-	if !strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
-		t.Error("禁转PTT块被误剥")
+	if strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
+		t.Error("禁转PTT模板应剥除（§59.542 回流治）")
 	}
-	if len(got.RemovedDecls) != 2 {
-		t.Errorf("应剥除恰好 2 块，实际 %d", len(got.RemovedDecls))
+	if len(got.RemovedDecls) != 4 {
+		t.Errorf("应剥除恰好 4 块，实际 %d", len(got.RemovedDecls))
 	}
 }
 
@@ -63,8 +65,9 @@ func TestDeclarationFilter_MusicAndPTBA(t *testing.T) {
 			t.Errorf("声明块未剥净（残留 %q）", kw)
 		}
 	}
-	if !strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
-		t.Error("我方禁转PTT声明被误剥（新词 禁转PTTime 不得误伤前缀 PTT）")
+	// §59.542 刀3 新语义：我方禁转PTT 模板改为剥除（回流治）
+	if strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
+		t.Error("我方禁转PTT模板应剥除（§59.542 回流治）")
 	}
 	if !strings.Contains(got.CleanedText, "正文内容保留") || !strings.Contains(got.CleanedText, "测试影片") {
 		t.Error("正文误伤")
@@ -78,8 +81,9 @@ func TestDeclarationFilter_PTTimeVsPTT(t *testing.T) {
 	if strings.Contains(got.CleanedText, "PTTime") {
 		t.Error("站方禁转PTTime 未剥除")
 	}
-	if !strings.Contains(got.CleanedText, "禁转PTT") {
-		t.Error("我方禁转PTT 误剥")
+	// §59.542 刀3：我方禁转PTT 同剥（回流治——发布场景由 append 重加·行为无损）
+	if strings.Contains(got.CleanedText, "互珍互重，禁转PTT") {
+		t.Error("我方禁转PTT 模板应剥除（§59.542 回流治）")
 	}
 }
 

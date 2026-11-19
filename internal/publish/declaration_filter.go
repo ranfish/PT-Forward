@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 )
@@ -36,6 +37,13 @@ var defaultDeclarationPatterns = []string{
 	// v0.0.1456（2026-11-12 用户定案·9 环境全库扫描）：
 	// ① 防自身「禁转PTT」声明与站方「禁转PTTime」重复。
 	"禁转PTTime",
+	// §59.542 刀3（2026-11-19 用户定案·Pope 案）：我方声明模板回流剥除——
+	// 从我们发布的站重获取时 descr 头部声明段被提取回流（243 实证 295 颗
+	// #0000ff 站方规范化形态+13 颗双份累积）。两条均为转种致谢模板文本·
+	// 语义上不属于「源站官组声明」；ThanksCoreText 系统独有措辞（用户确认
+	// 未见于其它发布者）零误伤——单源引用 description.ThanksCoreText。
+	description.ThanksCoreText,
+	"官组作品，感谢原制作者发布",
 	// ② 音乐站「试听/免责」声明族（皇后/乌托邦/我堡/红豆饭模板变体群——
 	//   短锚按内容子串整块删·299+226+203+93+53+40… 颗 4 环境实证）。
 	"仅用于试听",

@@ -46,3 +46,38 @@ func TestStripAppendedThanks_AnyGroup(t *testing.T) {
 		t.Errorf("[含禁转字样的源站文] 不应误剥源站文: got=%q", got)
 	}
 }
+
+// §59.542 刀2: 站方规范化形态宽容——Pope 案实拉形态（三重改写：
+// blue→#0000ff / red→#ff0000 / [quote] 后插换行）·字面锚全失配致累积。
+func TestStripAppendedThanks_SiteNormalized(t *testing.T) {
+	// Pope 案 243 实拉形态（站方渲染后回流的原始字节）
+	siteTail := "[quote]\n[b][color=#ff0000][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
+	siteHead := "[quote]\n[b][color=#0000ff][size=5]FRDS torrent官组作品，感谢原制作者发布。[/size][/color][/b][/quote]"
+	base := "源站原始声明内容"
+
+	// ① 纯回流形态（295 颗存量形态）→ 全剥净回源站原文
+	got := stripAppendedThanks(base + "\n\n" + siteHead + "\n\n" + siteTail)
+	if got != base {
+		t.Errorf("[回流形态] 应剥净: got=%q", got)
+	}
+
+	// ② 原生+回流双份（13 颗累积形态：旧对站方改写剥不掉+新对 append）→ 全剥净
+	nativeTail := "[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
+	nativeHead := "[quote][b][color=blue][size=5]FRDS torrent官组作品，感谢原制作者发布。[/size][/color][/b][/quote]"
+	doubled := base + "\n\n" + siteHead + "\n\n" + siteTail + "\n\n" + nativeHead + "\n\n" + nativeTail
+	if got = stripAppendedThanks(doubled); got != base {
+		t.Errorf("[双份累积] 应全剥: got=%q", got)
+	}
+
+	// ③ 孤立回流头块（尾块缺失/被超预期改写）→ 清扫剥净
+	lone := base + "\n\n" + siteHead
+	if got = stripAppendedThanks(lone); got != base {
+		t.Errorf("[孤立头块] 应清扫: got=%q", got)
+	}
+
+	// ④ 源站真声明（红色 quote 但内容不同）不误伤
+	realDecl := "[quote]\n[b][color=#ff0000][size=5]本站资源仅供学习交流[/size][/color][/b][/quote]"
+	if got = stripAppendedThanks(realDecl + "\n\n" + siteHead + "\n\n" + siteTail); got != realDecl {
+		t.Errorf("[源站真声明] 不应误伤: got=%q", got)
+	}
+}
