@@ -23,7 +23,10 @@ import (
 )
 
 // var 而非 const：测试注入 httptest 假 GitHub（§59.386 fresh 缓存锚）。
-var githubAPI = "https://api.github.com/repos/<作者>/PT-Forward/releases/latest"
+// 注意 owner=ranfish 是运行时必需的真实 GitHub 身份（§仓库安全-19 公开
+// 身份定案可保留）——历史重写 KEEP 规则只覆盖 github.com/ranfish 前缀，
+// api.github.com 域漏保护致此 URL 曾被误洗为占位符（§仓库安全-26 教训）。
+var githubAPI = "https://api.github.com/repos/ranfish/PT-Forward/releases/latest"
 
 func (h *SystemHandler) getProxyFromSettings() string {
 	repo := setting.NewRepository(h.db)
