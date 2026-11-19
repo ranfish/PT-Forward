@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
+
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -167,7 +170,31 @@ func (h *PublishTorrentsHandler) declBackfillRow(ctx context.Context, row model.
 	}
 	if row.Statement != "" {
 		if fs := h.declFilter.Filter(row.Statement, patterns); fs.CleanedText != row.Statement {
-			updates["statement"] = fs.CleanedText
+			// §59.542 追记二 bug 修复：backfill 不能只 Filter 全剥——
+			// 官组种的 statement=源站声明+我方追加的 thanks（tab2 显示体）。
+			// 全剥后官组种 statement 变空（源站无声明·全靠 thanks 充当显示）。
+			// 对齐发布 handler :3147 语义：Filter 净化 → 官组 re-append。
+			cleaned := fs.CleanedText
+			// §59.542 追记二: ReleaseGroup 从 detail_source JSON 提取（不在 metadata 直列）
+			var rg string
+			if row.DetailSourceJSON != "" {
+				var ds struct {
+					ReleaseGroup string `json:"release_group"`
+				}
+				_ = json.Unmarshal([]byte(row.DetailSourceJSON), &ds)
+				rg = ds.ReleaseGroup
+			}
+			if rg != "" && rg != "NOGROUP" {
+				base := stripAppendedThanks(cleaned)
+				thanksLine := description.GenerateThanksQuote(row.SiteName, rg, false, nil)
+				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + thanksNoTransferTail
+				if base == "" {
+					cleaned = thanks
+				} else {
+					cleaned = base + "\n\n" + thanks
+				}
+			}
+			updates["statement"] = cleaned
 		}
 	}
 	if len(updates) > 0 {
