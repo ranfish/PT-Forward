@@ -42,6 +42,12 @@ type Fetcher struct {
 	// nil 时不过滤（未装配）。
 	PTGenViable func(ctx context.Context, meta *model.TorrentMetadata) bool
 
+	// §59.542 刀3 补: 声明过滤回调——获取链（FetchAndStore 直落库路径·
+	// 批量/簇自动获取）的 statement 回流剥除挂点。此链不经发布 handler
+	// （3105 的 Filter）·Pope 案实证回流声明从该路径落库（#0000ff 原文
+	// 295 颗）。nil 时不过滤（未装配——测试/离线驱动场景）。
+	DeclFilter func(ctx context.Context, statement string) string
+
 	// §59.485: 音乐封面转存图床（唯一白名单 pixhost·其余全转存——
 	// 系统资产单一化；nil=未注入跳过）
 	imageHostMgr *imagehost.Manager
@@ -49,6 +55,15 @@ type Fetcher struct {
 
 // SetImageHostManager §59.485: 音乐封面转存图床注入（pipeline 同款
 // Setter 模式——main 组装处调用）。
+// filterDecl §59.542 刀3 补: 获取链声明过滤（DeclFilter 回调包装——
+// nil 未装配时原样返回·测试/离线驱动场景零行为）。
+func (f *Fetcher) filterDecl(ctx context.Context, statement string) string {
+	if f.DeclFilter == nil || statement == "" {
+		return statement
+	}
+	return f.DeclFilter(ctx, statement)
+}
+
 func (f *Fetcher) SetImageHostManager(mgr *imagehost.Manager) {
 	f.imageHostMgr = mgr
 }
@@ -517,7 +532,7 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 	// §59.485: 音乐封面转存单点（三站统一——detail 完成后落库前；
 	// 仅音乐种∧封面非空∧非 pixhost 域触发·失败降级保留原 URL）
 	f.rehostMusicCover(ctx, detail, siteCfg)
-	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta, buildLocalMI)
+	meta := f.buildMetadata(ctx, infoHash, siteName, torrentID, detail, engineMeta, buildLocalMI)
 	meta.FetchSource = fetchSource
 	return meta, nil
 }
@@ -733,7 +748,7 @@ func (f *Fetcher) persistCoverageHits(ctx context.Context, infoHash string, hits
 }
 
 // localMI §59.348 C 互斥门：非空=本地已判定非原盘——detail.BDInfo 拒收。
-func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta, localMI string) *model.TorrentMetadata {
+func (f *Fetcher) buildMetadata(ctx context.Context, infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta, localMI string) *model.TorrentMetadata {
 	now := time.Now()
 	meta := &model.TorrentMetadata{
 		InfoHash:          infoHash,
@@ -746,7 +761,9 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		// §59.236 ③: desc 站方原文不保存——Description 只由主链
 		// runMainlinePTGen 写 RawBBCode（我们的查询结果或空）
 		Description: "",
-		Statement:         detail.Statement,
+		// §59.542 刀3 补: 获取链声明过滤——回流声明（我方发布产物被
+		// 采集回来）在此剥除·与发布 handler 3105 同源词表。
+		Statement:       f.filterDecl(ctx, detail.Statement),
 		NoTransferUntil:   detail.NoTransferUntil, // §59.162 限时禁转让渡截止
 		Poster:            detail.PosterURL,
 		IMDbURL:           detail.IMDbURL,

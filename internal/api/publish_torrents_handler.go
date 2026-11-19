@@ -6227,6 +6227,17 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 // 获取成功但发布者未填豆瓣链接 → incomplete 陷阱）。PTGen 有缓存——同
 // 键重复判定近零成本（同资源不同站键高度趋同）。
 // h.ptgen == nil（组件未装配）时恒 true（不过滤）。
+// filterStatementForFetch §59.542 刀3 补: 获取链声明过滤（DeclFilter 回调
+// 的 handler 侧实现——词表与发布链 3105 同源 GetPatterns·declFilter 未装配
+// 时原样返回）。
+func (h *PublishTorrentsHandler) filterStatementForFetch(ctx context.Context, statement string) string {
+	if h.declFilter == nil || statement == "" {
+		return statement
+	}
+	patterns := h.declFilter.GetPatterns(ctx)
+	return h.declFilter.Filter(statement, patterns).CleanedText
+}
+
 func (h *PublishTorrentsHandler) ptgenViable(ctx context.Context, meta *model.TorrentMetadata) bool {
 	if h.ptgen == nil || meta == nil {
 		return true

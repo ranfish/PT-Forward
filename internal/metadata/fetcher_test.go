@@ -89,12 +89,12 @@ func TestBuildMetadata_BDInfoLocalDiscGate(t *testing.T) {
 		BDInfo:  "DISC INFO:\n\nDisc Title: MOVIE_BD\nDisc Label: MOVIE.2020.COMPLETE.BLURAY-GRP\nDisc Size: 25,000,000,000 bytes\nProtection: AACS\n\nPLAYLIST REPORT:\n\nName: 00000.MPLS\nLength: 1:26:21.217\n\nVIDEO:\n\nCodec: AVC\n\nAUDIO:\n\nCodec: DTS-HD\n\nFILES:\n01: M2TS 12345",
 	}
 	// localMI 空 → 照收
-	m := f.buildMetadata("hash", "site", "123", detail, extract.Meta{}, "")
+	m := f.buildMetadata(context.Background(), "hash", "site", "123", detail, extract.Meta{}, "")
 	if m.BDInfo == "" {
 		t.Error("localMI 空（远程场景）应照收 detail.BDInfo")
 	}
 	// localMI 非空 → 拒收
-	m2 := f.buildMetadata("hash", "site", "123", detail, extract.Meta{}, "General\nComplete name : movie.mkv")
+	m2 := f.buildMetadata(context.Background(), "hash", "site", "123", detail, extract.Meta{}, "General\nComplete name : movie.mkv")
 	if m2.BDInfo != "" {
 		t.Errorf("localMI 非空（本地已判非原盘）应拒收 detail.BDInfo，got %d bytes", len(m2.BDInfo))
 	}

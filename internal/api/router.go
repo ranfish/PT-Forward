@@ -207,6 +207,9 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 		// §59.341 ②（方案 a）: Fetcher 的 IYUU 候选循环接入 PTGen 可行性
 		// 判定（与 handler 簇循环同函数——装配点单点注入）。
 		metadataFetcher.PTGenViable = rt.publishTorrentsHandler.ptgenViable
+		// §59.542 刀3 补: 获取链声明过滤装配——FetchAndStore 直落库路径的
+		// statement 回流剥除（与发布 handler 3105 同源词表·单点注入）。
+		metadataFetcher.DeclFilter = rt.publishTorrentsHandler.filterStatementForFetch
 	}
 	if complianceChecker != nil {
 		rt.publishTorrentsHandler.SetComplianceChecker(complianceChecker)
