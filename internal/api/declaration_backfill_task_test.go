@@ -135,7 +135,9 @@ func TestDeclBackfillSelectRows(t *testing.T) {
 }
 
 // §59.542 追记五锚：空 statement + 官组 → 行级直接 re-append——原实现被
-// `row.Statement != ""` 守卫整体跳过（即使预筛选中也不处理）。
+// `row.Statement != ""` 守卫整体跳过（即使预选中也不处理）。
+// 追记六锚升级：组名从 title 提取（发布链 :3053 同源）——detail_source_json
+// 的 release_group 是槽位键（team.other）·误用致「team.other官组作品」错形态。
 func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -147,10 +149,11 @@ func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
 	f := publish.NewDeclarationFilter(setting.NewRepository(db), nil)
 	h := &PublishTorrentsHandler{db: db, declFilter: f}
 	rows := []model.TorrentMetadata{
-		// ① 空 statement + 官组 → 补回两句致谢
-		{InfoHash: "ee", SiteName: "朋友", DetailSourceJSON: `{"site_name":"朋友","release_group":"FRDS"}`},
-		// ② 空 statement + NOGROUP → 保持空（无致谢语义）
-		{InfoHash: "ff", SiteName: "朋友", DetailSourceJSON: `{"site_name":"朋友","release_group":"NOGROUP"}`},
+		// ① 空 statement + title 含真实组名（Pope 案形态：detail_source
+		// 是槽位键 team.other·title 里才是 FRDS 真身）→ 致谢用 FRDS
+		{InfoHash: "ee", SiteName: "柠檬不甜", Title: "The Pope's Exorcist 2023 2160p UHD BluRay DoVi HDR x265 TrueHD 7.1 Atmos-mUHD-FRDS", DetailSourceJSON: `{"site_name":"柠檬不甜","release_group":"team.other"}`},
+		// ② 空 statement + title 无组名 + 槽位键 → 不 append（组名提取空）
+		{InfoHash: "ff", SiteName: "朋友", Title: "Some Movie 2023 1080p BluRay", DetailSourceJSON: `{"site_name":"朋友","release_group":"NOGROUP"}`},
 	}
 	for i := range rows {
 		if err := db.Create(&rows[i]).Error; err != nil {
@@ -168,7 +171,10 @@ func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
 		t.Fatal("ee statement 仍为空（空 statement+官组未 re-append）")
 	}
 	if !strings.Contains(ee.Statement, "FRDS") || !strings.Contains(ee.Statement, "互珍互重，禁转PTT") {
-		t.Errorf("ee statement=%q（应含官组名+禁转PTT 两句致谢）", ee.Statement)
+		t.Errorf("ee statement=%q（应含真实组名 FRDS+禁转PTT 两句致谢）", ee.Statement)
+	}
+	if strings.Contains(ee.Statement, "team.other") {
+		t.Errorf("ee statement=%q（致谢组名误用槽位键 team.other——应从 title 提取真实组名）", ee.Statement)
 	}
 	if !strings.Contains(ee.Statement, "color=blue") {
 		t.Errorf("ee statement=%q（应为 blue 原生形态）", ee.Statement)
@@ -176,13 +182,13 @@ func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
 	var ff model.TorrentMetadata
 	db.Where("info_hash = ?", "ff").First(&ff)
 	if ff.Statement != "" {
-		t.Errorf("ff statement=%q（NOGROUP 应保持空）", ff.Statement)
+		t.Errorf("ff statement=%q（无组名应保持空）", ff.Statement)
 	}
 	// 计数：changed=1（ee）·done=2·failed=0
 	if h.declBackfill.changed != 1 || h.declBackfill.done != 2 || h.declBackfill.failed != 0 {
 		t.Errorf("计数 changed=%d done=%d failed=%d（应 1/2/0）", h.declBackfill.changed, h.declBackfill.done, h.declBackfill.failed)
 	}
-	// 幂等：二轮零变化
+	// 幂等：二轮零变化（Filter 剥掉再加回 final==原值不 UPDATE）
 	var fresh []model.TorrentMetadata
 	db.Where("info_hash IN ?", []string{"ee", "ff"}).Find(&fresh)
 	h.declBackfill.changed = 0

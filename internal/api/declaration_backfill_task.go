@@ -7,10 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"encoding/json"
-
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -134,12 +133,13 @@ func (h *PublishTorrentsHandler) declBackfillSelectRows(ctx context.Context, pat
 	var rows []model.TorrentMetadata
 	if err := h.db.WithContext(ctx).
 		Where(strings.Join(conds, " OR "), args...).
-		Select("info_hash", "description", "statement", "detail_source_json", "site_name").
+		Select("info_hash", "description", "statement", "detail_source_json", "site_name", "title").
 		Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	return rows, nil
 }
+
 
 // runDeclBackfillTask 逐行清洗（graceful 检查点每行前）。
 func (h *PublishTorrentsHandler) runDeclBackfillTask(rows []model.TorrentMetadata, patterns []string) {
@@ -189,15 +189,13 @@ func (h *PublishTorrentsHandler) declBackfillRow(ctx context.Context, row model.
 			updates["description"] = fr.CleanedText
 		}
 	}
-	// §59.542 追记二: ReleaseGroup 从 detail_source JSON 提取（不在 metadata 直列）
-	var rg string
-	if row.DetailSourceJSON != "" {
-		var ds struct {
-			ReleaseGroup string `json:"release_group"`
-		}
-		_ = json.Unmarshal([]byte(row.DetailSourceJSON), &ds)
-		rg = ds.ReleaseGroup
-	}
+	// §59.542 追记六: 组名提取对齐发布链 :2487 同源——util.ExtractGroupName
+	// （§59.342/64 多轮修复的权威单点·dash 后缀站方标题主流通路全命中）。
+	// detail_source_json.release_group 是目标站值集槽位键（team.other/
+	// team.ubweb/数字 id）非真实组名——v0.0.1523 首版误用致 16625 行致谢
+	// 组名错形态（「team.other官组作品」·Pope 案实抓）。提取 miss 的行
+	// （中缀形态少数）保持原状不 append（诚实缺省好过错误组名）。
+	rg := util.ExtractGroupName(row.Title)
 	// buildThanks 官组行补回标准致谢（对齐发布 handler :3147 语义）。
 	buildThanks := func(base string) string {
 		if rg == "" || rg == "NOGROUP" {
