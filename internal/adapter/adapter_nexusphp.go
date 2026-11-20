@@ -324,15 +324,14 @@ func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *m
 var reHhanTagSection = regexp.MustCompile(`(?s)>标签</div>(.*?)>基本信息</div>`)
 
 // enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
-// 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
-// 文本（种子名后标记区 [禁转] 永久 / [ 限时禁转 ] 24h——用户站点经验权威）。
-// 非侵入：塞 detail 附加字段，两态判定收口在 fetcher（extract_flags 消费）。
-// enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
-// 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
-// 文本（种子名后标记区 [禁转] 永久 / [ 限时禁转 ] 24h——用户站点经验权威）。
+// 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 标记区
+// [禁转] 永久 / [限时禁转] 24h（用户站点经验权威）。
 // 非侵入：塞 detail 附加字段，两态判定收口在 fetcher（extract_flags 消费）。
 // §59.340 A: mainHTML 变参——复用主链 HTML（原二次抓同 URL 纯浪费）；空则
 // 兜底自抓（独立调用方兼容）。
+// §59.542 追记十三（用户定案·详情页优先）：h1 标题区 badge 为主判定——
+// 详情页主链必达零额外请求，老种翻页后列表锚定 miss 不影响判定；h1 无
+// badge 再走列表行兜底（形态演变第二通道——宁可多拦不可错放）。
 func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
 	html := ""
 	if len(mainHTML) > 0 {
@@ -348,9 +347,39 @@ func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, confi
 	if m := reKeepfrdsAddedAt.FindStringSubmatch(html); len(m) > 1 {
 		detail.AddedAtText = strings.TrimSpace(m[1])
 	}
+	// §59.542 追记十三: h1 badge 优先——命中即判定，不再抓列表页。
+	if badge := keepfrdsH1Badge(html); badge != "" {
+		detail.RawListRow = badge
+		return
+	}
 	if row := a.fetchKeepfrdsListRow(ctx, config, torrentID); row != "" {
 		detail.RawListRow = row
 	}
+}
+
+// reKeepfrdsH1Zone h1 标题区间（badge 限定域——页面其它区域可能复用
+// recommended class，仅标题区标记是权威信号）。锚定 NP 详情页标题标准
+// id="top"（实拉单 h1；锚定后页头潜在 h1 干扰不影响——miss 则走列表兜底）。
+var reKeepfrdsH1Zone = regexp.MustCompile(`(?s)<h1[^>]*id=["']top["'][^>]*>.*?</h1>`)
+
+// reKeepfrdsH1Badge h1 标题区禁转 badge（§59.542 追记十三·朋友站 tid 2782403
+// 实测）：`<b>[<font class='recommended'>禁转</font>]</b>`——与列表页行同
+// badge 形态（限时禁转同 class·列表页实拉佐证）。折扣类用其它 class
+// （halfdown 等）不命中；引号单双兼容；(?s) 防 h1 内嵌图标跨行。
+var reKeepfrdsH1Badge = regexp.MustCompile(`<b>\s*\[\s*<font\s+class\s*=\s*['"]recommended['"]\s*>([^<]+)</font>\s*\]\s*</b>`)
+
+// keepfrdsH1Badge 提取 h1 禁转 badge 段——仅 badge 文本进分类器（标题
+// 文本不进：种子名含"禁转"字样不误判），词形两态判定收口 ClassifyNoTransfer。
+func keepfrdsH1Badge(html string) string {
+	zone := reKeepfrdsH1Zone.FindString(html)
+	if zone == "" {
+		return ""
+	}
+	m := reKeepfrdsH1Badge.FindStringSubmatch(zone)
+	if len(m) > 1 {
+		return "<b>[" + strings.TrimSpace(m[1]) + "]</b>"
+	}
+	return ""
 }
 
 var reKeepfrdsAddedAt = regexp.MustCompile(`由[^<]{0,30}发布于([^<]{2,25})`)
