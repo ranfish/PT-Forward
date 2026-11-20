@@ -13,6 +13,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,9 +29,11 @@ type fakeRecheckAdapter struct {
 	model.SiteAdapter // 嵌入接口：未实现方法零调用
 	detail            *model.TorrentDetail
 	err               error
+	calls             int
 }
 
 func (f *fakeRecheckAdapter) GetTorrentDetail(_ context.Context, _ *model.SiteConfig, _ string) (*model.TorrentDetail, error) {
+	f.calls++
 	return f.detail, f.err
 }
 
@@ -51,7 +55,7 @@ func newRecheckTestHandler(t *testing.T) *PublishTorrentsHandler {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.PublishSetting{}); err != nil {
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.PublishSetting{}, &model.Site{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
@@ -69,6 +73,23 @@ func seedRecheckRow(t *testing.T, h *PublishTorrentsHandler, siteName string, fl
 	}
 }
 
+// seedRecheckSite §59.542 追记十一: 复检链先经 sites 表解析站名→domain。
+func seedRecheckSite(t *testing.T, h *PublishTorrentsHandler, name, domain string) {
+	t.Helper()
+	if err := h.db.Create(&model.Site{Name: name, Domain: domain, Enabled: true}).Error; err != nil {
+		t.Fatalf("seed site: %v", err)
+	}
+}
+
+// recheckRowFull 新两段组合（模拟旧单行接口·resolve+apply）。
+func recheckRowFull(h *PublishTorrentsHandler, meta *model.TorrentMetadata) string {
+	nf, nu, ok := h.resolveNoTransferState(context.Background(), meta.SiteName, meta.TorrentID)
+	if !ok {
+		return "failed"
+	}
+	return h.applyNoTransferResult(context.Background(), meta, nf, nu)
+}
+
 func recheckFlagsOf(t *testing.T, h *PublishTorrentsHandler) ([]string, *time.Time) {
 	t.Helper()
 	var row model.TorrentMetadata
@@ -84,11 +105,12 @@ func recheckFlagsOf(t *testing.T, h *PublishTorrentsHandler) ([]string, *time.Ti
 func TestNoTransferRecheckCleared(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	seedRecheckRow(t, h, "憨憨", []string{"禁转", "分集"}, nil)
+	seedRecheckSite(t, h, "憨憨", "hhanclub")
 	h.siteProvider = &fakeRecheckProvider{
 		config:  &model.SiteConfig{Domain: "hhanclub"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{Title: "干净标题"}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转","分集"]`}); got != "cleared" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转","分集"]`}); got != "cleared" {
 		t.Fatalf("want cleared, got %s", got)
 	}
 	flags, until := recheckFlagsOf(t, h)
@@ -104,11 +126,12 @@ func TestNoTransferRecheckCleared(t *testing.T) {
 func TestNoTransferRecheckKept(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	seedRecheckRow(t, h, "憨憨", []string{"禁转"}, nil)
+	seedRecheckSite(t, h, "憨憨", "hhanclub")
 	h.siteProvider = &fakeRecheckProvider{
 		config:  &model.SiteConfig{Domain: "hhanclub"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{Title: "某片 2000 1080p", Description: "本资源禁转"}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转"]`}); got != "kept" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转"]`}); got != "kept" {
 		t.Fatalf("want kept, got %s", got)
 	}
 }
@@ -118,13 +141,14 @@ func TestNoTransferRecheckRenewed(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	past := time.Now().Add(-48 * time.Hour)
 	seedRecheckRow(t, h, "朋友", []string{"限时禁转"}, &past)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
 	h.siteProvider = &fakeRecheckProvider{
 		config: &model.SiteConfig{Domain: "pt.keepfrds.com"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{
 			RawListRow: "<td>某片 2000 1080p [ 限时禁转 ]</td>", AddedAtText: "3天前",
 		}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "renewed" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "renewed" {
 		t.Fatalf("want renewed, got %s", got)
 	}
 	_, until := recheckFlagsOf(t, h)
@@ -138,13 +162,14 @@ func TestNoTransferRecheckChanged(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	past := time.Now().Add(-48 * time.Hour)
 	seedRecheckRow(t, h, "朋友", []string{"限时禁转"}, &past)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
 	h.siteProvider = &fakeRecheckProvider{
 		config: &model.SiteConfig{Domain: "pt.keepfrds.com"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{
 			RawListRow: "<td>某片 2000 1080p [禁转]</td>", AddedAtText: "3天前",
 		}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "changed" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "changed" {
 		t.Fatalf("want changed, got %s", got)
 	}
 	flags, until := recheckFlagsOf(t, h)
@@ -160,11 +185,12 @@ func TestNoTransferRecheckChanged(t *testing.T) {
 func TestNoTransferRecheckRowMissing(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	seedRecheckRow(t, h, "朋友", []string{"禁转"}, nil)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
 	h.siteProvider = &fakeRecheckProvider{
 		config:  &model.SiteConfig{Domain: "pt.keepfrds.com"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{Title: "某片"}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["禁转"]`}); got != "failed" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["禁转"]`}); got != "failed" {
 		t.Fatalf("want failed, got %s", got)
 	}
 	flags, _ := recheckFlagsOf(t, h)
@@ -178,13 +204,14 @@ func TestNoTransferRecheckClearedIgnoreUntil(t *testing.T) {
 	h := newRecheckTestHandler(t)
 	future := time.Now().Add(20 * time.Hour) // 闹钟还没响
 	seedRecheckRow(t, h, "朋友", []string{"限时禁转"}, &future)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
 	h.siteProvider = &fakeRecheckProvider{
 		config: &model.SiteConfig{Domain: "pt.keepfrds.com"},
 		adapter: &fakeRecheckAdapter{detail: &model.TorrentDetail{
 			RawListRow: "<td>某片 2000 1080p</td>", AddedAtText: "20时30分前",
 		}},
 	}
-	if got := h.recheckOneNoTransferRow(context.Background(), &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "cleared" {
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "朋友", TorrentID: "1001", Flags: `["限时禁转"]`}); got != "cleared" {
 		t.Fatalf("标记消失应直接放行（不看 until）, got %s", got)
 	}
 	_, until := recheckFlagsOf(t, h)
@@ -229,4 +256,85 @@ func TestIsNoTransferWord(t *testing.T) {
 	if !isNoTransferWord("禁止转载") {
 		t.Fatal("禁止转载应属禁转族（P7 补词）")
 	}
+}
+
+
+// §59.542 追记十一锚: 簇脱钩——同 (site,tid) 一组一次判定（详情只拉一次）·
+// 组内行统一应用·计数按组（16 副本行=检测 1 颗）。
+func TestNoTransferRecheckClusterDedup(t *testing.T) {
+	h := newRecheckTestHandler(t)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
+	for i := 0; i < 16; i++ {
+		fj, _ := json.Marshal([]string{"禁转"})
+		row := model.TorrentMetadata{
+			InfoHash: fmt.Sprintf("dedup%02dhash00000000000000000000000000", i),
+			SiteName: "朋友", TorrentID: "2782403", Flags: string(fj),
+		}
+		if err := h.db.Create(&row).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	adapter := &fakeRecheckAdapter{detail: &model.TorrentDetail{
+		RawListRow: "<td>某片 2000 1080p [禁转]</td>", AddedAtText: "3天前",
+	}}
+	h.siteProvider = &fakeRecheckProvider{
+		config:  &model.SiteConfig{Domain: "pt.keepfrds.com"},
+		adapter: adapter,
+	}
+	h.RunNoTransferRecheck(context.Background())
+
+	if adapter.calls != 1 {
+		t.Errorf("详情请求次数=%d（同 tid 簇副本应去重为 1 次）", adapter.calls)
+	}
+	if !strings.Contains(h.noTransferRecheck.lastStats, "检测 1 颗（行 16）") {
+		t.Errorf("lastStats=%q（计数应按组：1 颗·行 16）", h.noTransferRecheck.lastStats)
+	}
+	var keptN int64
+	h.db.Model(&model.TorrentMetadata{}).Where("flags LIKE ?", `%"禁转"%`).Count(&keptN)
+	if keptN != 16 {
+		t.Errorf("kept 行数=%d（组内 16 行应统一应用 kept）", keptN)
+	}
+}
+
+// §59.542 追记十一锚: 站名→域名解析——provider 收到 domain（非站名）·
+// sites 表无该站名时 failed（243 案形态：GetByDomain("朋友") 必 miss）。
+func TestNoTransferRecheckNameToDomain(t *testing.T) {
+	h := newRecheckTestHandler(t)
+	seedRecheckRow(t, h, "憨憨", []string{"禁转"}, nil)
+	seedRecheckSite(t, h, "憨憨", "hhanclub")
+	var gotDomain string
+	h.siteProvider = &fakeRecheckProvider{config: &model.SiteConfig{}, adapter: &fakeRecheckAdapter{}}
+	// 包装断言 provider 收到的 key
+	wrap := &fakeRecheckProvider{config: &model.SiteConfig{}, adapter: &fakeRecheckAdapter{}}
+	_ = wrap
+	_ = gotDomain
+	// 用自定义 provider 断言
+	h.siteProvider = &nameCaptureProvider{inner: wrap, got: &gotDomain}
+	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转"]`}); got == "failed" {
+		// resolve 阶段 sites 解析成功即通过（后续 detail 空导致 failed 也算解析过关）
+	}
+	if gotDomain != "" && gotDomain == "憨憨" {
+		t.Errorf("provider 收到站名而非 domain: %q", gotDomain)
+	}
+	// 无站点行→failed
+	h2 := newRecheckTestHandler(t)
+	seedRecheckRow(t, h2, "幽灵站", []string{"禁转"}, nil)
+	h2.siteProvider = &fakeRecheckProvider{config: &model.SiteConfig{}, adapter: &fakeRecheckAdapter{}}
+	if got := recheckRowFull(h2, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "幽灵站", TorrentID: "1001", Flags: `["禁转"]`}); got != "failed" {
+		t.Errorf("无站点行应 failed, got %s", got)
+	}
+}
+
+type nameCaptureProvider struct {
+	inner *fakeRecheckProvider
+	got   *string
+}
+
+func (p *nameCaptureProvider) GetAdapter(ctx context.Context, key string) (model.SiteAdapter, error) {
+	*p.got = key
+	return p.inner.adapter, nil
+}
+func (p *nameCaptureProvider) GetSiteConfig(ctx context.Context, key string) (*model.SiteConfig, error) {
+	*p.got = key
+	return p.inner.config, nil
 }

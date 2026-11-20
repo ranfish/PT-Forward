@@ -108,6 +108,16 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 		Find(&metas)
 
 	cleared, kept, renewed, changed, failed := 0, 0, 0, 0, 0
+	// §59.542 追记十一: (site,tid) 去重——同簇多行常共享同一站方 tid
+	//（243 实证：16 hash 行同 tid 2782403）·逐行独立请求=重复拉详情+
+	// 限流风险。同组只判定一次·结果逐行应用。
+	type groupKey struct{ site, tid string }
+	type resolveResult struct {
+		forbidden []string
+		until     *time.Time
+		ok        bool
+	}
+	resolved := make(map[groupKey]*resolveResult)
 	for i := range metas {
 		select {
 		case <-ctx.Done():
@@ -115,7 +125,18 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 			goto done
 		default:
 		}
-		switch h.recheckOneNoTransferRow(ctx, &metas[i]) {
+		key := groupKey{metas[i].SiteName, metas[i].TorrentID}
+		rr, seen := resolved[key]
+		if !seen {
+			nf, nu, ok := h.resolveNoTransferState(ctx, metas[i].SiteName, metas[i].TorrentID)
+			rr = &resolveResult{forbidden: nf, until: nu, ok: ok}
+			resolved[key] = rr
+		}
+		if !rr.ok {
+			failed++
+			continue
+		}
+		switch h.applyNoTransferResult(ctx, &metas[i], rr.forbidden, rr.until) {
 		case "cleared":
 			cleared++
 		case "kept":
@@ -129,8 +150,11 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 		}
 	}
 done:
-	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + itoa(len(metas)) +
-		" 颗：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +
+	// §59.542 追记十一（用户定案：复检与簇脱钩）: 复检对象=源站+该种子
+	//（站方对某 tid 的标记）·簇副本行不是独立复检对象——同 (site,tid)
+	// 一组一次判定·组内行统一应用；计数按组（16 副本行=「检测 1 颗」）。
+	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + itoa(len(resolved)) +
+		" 颗（行 " + itoa(len(metas)) + "）：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +
 		" · 续期 " + itoa(renewed) + " · 变化 " + itoa(changed) + " · 失败 " + itoa(failed)
 	h.noTransferRecheck.mu.Lock()
 	h.noTransferRecheck.lastRun = time.Now().Format("2006-01-02 15:04:05")
@@ -142,44 +166,51 @@ done:
 		zap.Int("renewed", renewed), zap.Int("changed", changed), zap.Int("failed", failed))
 }
 
-// recheckOneNoTransferRow 单颗复检：返回 cleared/kept/renewed/changed/failed。
-func (h *PublishTorrentsHandler) recheckOneNoTransferRow(ctx context.Context, meta *model.TorrentMetadata) string {
-	var oldFlags []string
-	if meta.Flags != "" {
-		_ = json.Unmarshal([]byte(meta.Flags), &oldFlags)
-	}
-	// 保留集=非禁转族（分集/adult 等·子集替换保护）
-	keep := make([]string, 0, len(oldFlags))
-	for _, f := range oldFlags {
-		if !isNoTransferWord(f) {
-			keep = append(keep, f)
-		}
-	}
-
-	// 站方当前禁转集判定
-	var newForbidden []string
-	var newUntil *time.Time
+// resolveNoTransferState 网络判定段（一组一次）：站名→域名解析 + 拉详情 +
+// 站方当前禁转集提取。返回 (禁转集, until, ok)。
+// §59.542 追记十一根因修复：meta.SiteName 是站名（「朋友」）而
+// GetSiteConfig/GetAdapter 按 domain 查——原实现直接传站名必然
+// GetByDomain miss（243 实证：16/16 全 failed·「站点不存在: 朋友」·
+// 15 秒快速失败零请求）。此处先经 sites 表解析站名→domain。
+func (h *PublishTorrentsHandler) resolveNoTransferState(ctx context.Context, siteName, torrentID string) ([]string, *time.Time, bool) {
 	if h.siteProvider == nil {
-		return "failed"
+		h.logger.Debug("no-transfer recheck skip: site provider nil")
+		return nil, nil, false
 	}
-	config, err := h.siteProvider.GetSiteConfig(ctx, meta.SiteName)
+	var site model.Site
+	if err := h.db.WithContext(ctx).Where("name = ?", siteName).First(&site).Error; err != nil {
+		h.logger.Debug("no-transfer recheck: site name not found",
+			zap.String("site", siteName), zap.Error(err))
+		return nil, nil, false
+	}
+	config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
 	if err != nil || config == nil {
-		return "failed"
+		h.logger.Debug("no-transfer recheck: get site config failed",
+			zap.String("site", siteName), zap.String("domain", site.Domain), zap.Error(err))
+		return nil, nil, false
 	}
-	adapter, err := h.siteProvider.GetAdapter(ctx, meta.SiteName)
+	adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
 	if err != nil || adapter == nil {
-		return "failed"
+		h.logger.Debug("no-transfer recheck: get adapter failed",
+			zap.String("site", siteName), zap.String("domain", site.Domain), zap.Error(err))
+		return nil, nil, false
 	}
-	detail, err := adapter.GetTorrentDetail(ctx, config, meta.TorrentID)
+	detail, err := adapter.GetTorrentDetail(ctx, config, torrentID)
 	if err != nil || detail == nil {
-		return "failed"
+		h.logger.Debug("no-transfer recheck: get detail failed",
+			zap.String("site", siteName), zap.String("tid", torrentID), zap.Error(err))
+		return nil, nil, false
 	}
 	now := time.Now()
+	var newForbidden []string
+	var newUntil *time.Time
 	if strings.Contains(config.Domain, "keepfrds") {
 		// 列表行路径：RawListRow 空=数据不足（列表抓取失败）→ fail 保持
 		// （防详情页无标记误判消失——§59.539 站点分层定案）
 		if detail.RawListRow == "" {
-			return "failed"
+			h.logger.Debug("no-transfer recheck: keepfrds raw list row empty",
+				zap.String("site", siteName), zap.String("tid", torrentID))
+			return nil, nil, false
 		}
 		limited, permanent, until := metadata.ClassifyNoTransfer(detail.RawListRow, detail.AddedAtText, now)
 		switch {
@@ -199,6 +230,23 @@ func (h *PublishTorrentsHandler) recheckOneNoTransferRow(ctx context.Context, me
 			}
 		}
 	}
+	return newForbidden, newUntil, true
+}
+
+// applyNoTransferResult 本地对比回写段（一行一次）：滚动续期 + 动作判定 +
+// 子集替换回写。返回 cleared/kept/renewed/changed/failed。
+func (h *PublishTorrentsHandler) applyNoTransferResult(ctx context.Context, meta *model.TorrentMetadata, newForbidden []string, newUntil *time.Time) string {
+	var oldFlags []string
+	if meta.Flags != "" {
+		_ = json.Unmarshal([]byte(meta.Flags), &oldFlags)
+	}
+	// 保留集=非禁转族（分集/adult 等·子集替换保护）
+	keep := make([]string, 0, len(oldFlags))
+	for _, f := range oldFlags {
+		if !isNoTransferWord(f) {
+			keep = append(keep, f)
+		}
+	}
 
 	// 滚动续期：限时禁转在 + until 缺失/已过（站方延长窗）→ now+24h
 	// （ClassifyNoTransfer 公式重算不出延长窗——发布时间不变重算恒过去；
@@ -212,8 +260,8 @@ func (h *PublishTorrentsHandler) recheckOneNoTransferRow(ctx context.Context, me
 	}
 	action := "kept"
 	if hasLimited {
-		if newUntil == nil || newUntil.Before(now) {
-			u := now.Add(24 * time.Hour)
+		if newUntil == nil || newUntil.Before(time.Now()) {
+			u := time.Now().Add(24 * time.Hour)
 			newUntil = &u
 			action = "renewed"
 		}
