@@ -63,22 +63,8 @@ func (h *PublishTorrentsHandler) handleDeclBackfillTask(w http.ResponseWriter, r
 		Error(w, http.StatusBadRequest, 40001, "无生效过滤规则")
 		return
 	}
-	conds := make([]string, 0, len(patterns)+1)
-	args := make([]interface{}, 0, len(patterns)*2)
-	for _, p := range patterns {
-		esc := "%" + likeEscape(p) + "%"
-		conds = append(conds, "(description LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')")
-		args = append(args, esc, esc)
-	}
-	// §59.542 追记四: 空 statement + 有官组的行也纳入——上轮清洗
-	// 全剥后官组种 statement 变空（16626 行）·预筛按关键词 LIKE
-	// 找不到它们→re-append 无法触达。追加 OR 条件覆盖此形态。
-	conds = append(conds, `((statement = '' OR statement IS NULL) AND detail_source_json LIKE '%\"release_group\":\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"NOGROUP\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"other\"%')`)
-	var rows []model.TorrentMetadata
-	if err := h.db.WithContext(r.Context()).
-		Where(strings.Join(conds, " OR "), args...).
-		Select("info_hash", "description", "statement", "detail_source_json", "site_name").
-		Find(&rows).Error; err != nil {
+	rows, err := h.declBackfillSelectRows(r.Context(), patterns)
+	if err != nil {
 		h.declBackfill.mu.Unlock()
 		Error(w, http.StatusInternalServerError, 50000, "查询失败: "+err.Error())
 		return
@@ -122,6 +108,37 @@ func (h *PublishTorrentsHandler) handleDeclBackfillCancel(w http.ResponseWriter,
 	h.declBackfill.stopRequested = true
 	h.declBackfill.mu.Unlock()
 	Success(w, map[string]interface{}{"message": "停止请求已接受——当前行完成后终止"})
+}
+
+// declBackfillSelectRows 预筛（§59.542 追记五提取为方法——预筛 SQL 必须有
+// 真实 JSON 形态的端到端锚：v0.0.1522 反引号字符串里写了字面 \"（反斜杠+
+// 引号）→ LIKE 匹配带反斜杠文本 → 生产 total=0·测试若只复制查询语句则与
+// 实现共享误解抓不到（§59.1481 假绿同族）。
+// 范围=两类行的并集：
+//  1. 生效词任一 LIKE 命中 description/statement（超集——Filter 引用块
+//     感知为仲裁者·命中但不匹配的行零变化）
+//  2. statement 空/NULL + detail_source_json 有非空非 NOGROUP 非 other 的
+//     release_group（§59.542 追记四：上轮清洗全剥后官组种 statement 变空
+//     ·关键词 LIKE 找不到它们→re-append 无法触达）
+func (h *PublishTorrentsHandler) declBackfillSelectRows(ctx context.Context, patterns []string) ([]model.TorrentMetadata, error) {
+	conds := make([]string, 0, len(patterns)+1)
+	args := make([]interface{}, 0, len(patterns)*2)
+	for _, p := range patterns {
+		esc := "%" + likeEscape(p) + "%"
+		conds = append(conds, "(description LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')")
+		args = append(args, esc, esc)
+	}
+	// 注意：Go 反引号原始字符串里 " 不需要转义——写 \" 会成为字面反斜杠
+	// 导致 LIKE 永不命中（v0.0.1523 生产事故形态）。
+	conds = append(conds, `((statement = '' OR statement IS NULL) AND detail_source_json LIKE '%"release_group":"%' AND detail_source_json NOT LIKE '%"release_group":""%' AND detail_source_json NOT LIKE '%"release_group":"NOGROUP"%' AND detail_source_json NOT LIKE '%"release_group":"other"%')`)
+	var rows []model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where(strings.Join(conds, " OR "), args...).
+		Select("info_hash", "description", "statement", "detail_source_json", "site_name").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 // runDeclBackfillTask 逐行清洗（graceful 检查点每行前）。
@@ -172,34 +189,45 @@ func (h *PublishTorrentsHandler) declBackfillRow(ctx context.Context, row model.
 			updates["description"] = fr.CleanedText
 		}
 	}
+	// §59.542 追记二: ReleaseGroup 从 detail_source JSON 提取（不在 metadata 直列）
+	var rg string
+	if row.DetailSourceJSON != "" {
+		var ds struct {
+			ReleaseGroup string `json:"release_group"`
+		}
+		_ = json.Unmarshal([]byte(row.DetailSourceJSON), &ds)
+		rg = ds.ReleaseGroup
+	}
+	// buildThanks 官组行补回标准致谢（对齐发布 handler :3147 语义）。
+	buildThanks := func(base string) string {
+		if rg == "" || rg == "NOGROUP" {
+			return base
+		}
+		thanksLine := description.GenerateThanksQuote(row.SiteName, rg, false, nil)
+		thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + thanksNoTransferTail
+		if base == "" {
+			return thanks
+		}
+		return base + "\n\n" + thanks
+	}
 	if row.Statement != "" {
 		if fs := h.declFilter.Filter(row.Statement, patterns); fs.CleanedText != row.Statement {
 			// §59.542 追记二 bug 修复：backfill 不能只 Filter 全剥——
 			// 官组种的 statement=源站声明+我方追加的 thanks（tab2 显示体）。
 			// 全剥后官组种 statement 变空（源站无声明·全靠 thanks 充当显示）。
 			// 对齐发布 handler :3147 语义：Filter 净化 → 官组 re-append。
-			cleaned := fs.CleanedText
-			// §59.542 追记二: ReleaseGroup 从 detail_source JSON 提取（不在 metadata 直列）
-			var rg string
-			if row.DetailSourceJSON != "" {
-				var ds struct {
-					ReleaseGroup string `json:"release_group"`
-				}
-				_ = json.Unmarshal([]byte(row.DetailSourceJSON), &ds)
-				rg = ds.ReleaseGroup
+			// 追记五: final 与原值相同则不算 changed——官组种 statement 恒含
+			// 水印词（我们的 thanks）·每轮「剥掉再加回」落库值不变·changed
+			// 虚计会误导（changed 语义=真实落库变化）。
+			if final := buildThanks(stripAppendedThanks(fs.CleanedText)); final != row.Statement {
+				updates["statement"] = final
 			}
-			if rg != "" && rg != "NOGROUP" {
-				base := stripAppendedThanks(cleaned)
-				thanksLine := description.GenerateThanksQuote(row.SiteName, rg, false, nil)
-				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + thanksNoTransferTail
-				if base == "" {
-					cleaned = thanks
-				} else {
-					cleaned = base + "\n\n" + thanks
-				}
-			}
-			updates["statement"] = cleaned
 		}
+	} else if rg != "" && rg != "NOGROUP" {
+		// §59.542 追记五 bug 修复：空 statement + 官组 → 直接 append——
+		// 原实现被 `row.Statement != ""` 守卫整体跳过·上轮清洗清空的
+		// 官组种（16625 行）即使被预筛选中也永不 re-append。
+		updates["statement"] = buildThanks("")
 	}
 	if len(updates) > 0 {
 		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -73,5 +74,124 @@ func TestDeclBackfillTask(t *testing.T) {
 	h.runDeclBackfillTask(fresh, patterns)
 	if h.declBackfill.changed != 0 || h.declBackfill.done != 3 {
 		t.Errorf("幂等失败：changed=%d done=%d（应 0/3）", h.declBackfill.changed, h.declBackfill.done)
+	}
+}
+
+// §59.542 追记五锚：预筛 SQL 端到端——v0.0.1523 生产事故（反引号字符串里
+// 字面 \" 致 LIKE 永不命中·total=0）。必须用真实 JSON 形态的行直接调生产
+// 预筛方法验证（提取 declBackfillSelectRows 的原因——测试里复制查询=与
+// 实现共享误解·抓不到转义错）。
+func TestDeclBackfillSelectRows(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &setting.Setting{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	f := publish.NewDeclarationFilter(setting.NewRepository(db), nil)
+	h := &PublishTorrentsHandler{db: db, declFilter: f}
+	seed := []model.TorrentMetadata{
+		// ① 空 statement + 官组（正常组名）→ 必须选中（16625 行目标形态）
+		{InfoHash: "sel1", DetailSourceJSON: `{"site_name":"朋友","release_group":"FRDS"}`},
+		// ② 空 statement + NOGROUP → 不选（无致谢语义）
+		{InfoHash: "skip1", DetailSourceJSON: `{"site_name":"朋友","release_group":"NOGROUP"}`},
+		// ③ 空 statement + 空组名 → 不选
+		{InfoHash: "skip2", DetailSourceJSON: `{"site_name":"朋友","release_group":""}`},
+		// ④ 空 statement + other → 不选
+		{InfoHash: "skip3", DetailSourceJSON: `{"site_name":"朋友","release_group":"other"}`},
+		// ⑤ 空 statement + 无 release_group 键 → 不选
+		{InfoHash: "skip4", DetailSourceJSON: `{"site_name":"朋友"}`},
+		// ⑥ 含水印词 statement → 选中（LIKE 通道）
+		{InfoHash: "sel2", Statement: "含互珍互重，禁转PTT的声明"},
+		// ⑦ 干净且非空 statement + 无官组 → 不选
+		{InfoHash: "skip5", Statement: "干净声明", DetailSourceJSON: `{"site_name":"朋友"}`},
+	}
+	for i := range seed {
+		if err := db.Create(&seed[i]).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	ctx := context.Background()
+	patterns := f.GetPatterns(ctx)
+	rows, err := h.declBackfillSelectRows(ctx, patterns)
+	if err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	got := map[string]bool{}
+	for _, r := range rows {
+		got[r.InfoHash] = true
+	}
+	for _, want := range []string{"sel1", "sel2"} {
+		if !got[want] {
+			t.Errorf("预筛漏选 %s（目标形态未被选中=re-append 无法触达）", want)
+		}
+	}
+	for _, skip := range []string{"skip1", "skip2", "skip3", "skip4", "skip5"} {
+		if got[skip] {
+			t.Errorf("预筛误选 %s（应跳过）", skip)
+		}
+	}
+}
+
+// §59.542 追记五锚：空 statement + 官组 → 行级直接 re-append——原实现被
+// `row.Statement != ""` 守卫整体跳过（即使预筛选中也不处理）。
+func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &setting.Setting{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	f := publish.NewDeclarationFilter(setting.NewRepository(db), nil)
+	h := &PublishTorrentsHandler{db: db, declFilter: f}
+	rows := []model.TorrentMetadata{
+		// ① 空 statement + 官组 → 补回两句致谢
+		{InfoHash: "ee", SiteName: "朋友", DetailSourceJSON: `{"site_name":"朋友","release_group":"FRDS"}`},
+		// ② 空 statement + NOGROUP → 保持空（无致谢语义）
+		{InfoHash: "ff", SiteName: "朋友", DetailSourceJSON: `{"site_name":"朋友","release_group":"NOGROUP"}`},
+	}
+	for i := range rows {
+		if err := db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	ctx := context.Background()
+	patterns := f.GetPatterns(ctx)
+	h.declBackfill.total = len(rows)
+	h.runDeclBackfillTask(rows, patterns)
+
+	var ee model.TorrentMetadata
+	db.Where("info_hash = ?", "ee").First(&ee)
+	if ee.Statement == "" {
+		t.Fatal("ee statement 仍为空（空 statement+官组未 re-append）")
+	}
+	if !strings.Contains(ee.Statement, "FRDS") || !strings.Contains(ee.Statement, "互珍互重，禁转PTT") {
+		t.Errorf("ee statement=%q（应含官组名+禁转PTT 两句致谢）", ee.Statement)
+	}
+	if !strings.Contains(ee.Statement, "color=blue") {
+		t.Errorf("ee statement=%q（应为 blue 原生形态）", ee.Statement)
+	}
+	var ff model.TorrentMetadata
+	db.Where("info_hash = ?", "ff").First(&ff)
+	if ff.Statement != "" {
+		t.Errorf("ff statement=%q（NOGROUP 应保持空）", ff.Statement)
+	}
+	// 计数：changed=1（ee）·done=2·failed=0
+	if h.declBackfill.changed != 1 || h.declBackfill.done != 2 || h.declBackfill.failed != 0 {
+		t.Errorf("计数 changed=%d done=%d failed=%d（应 1/2/0）", h.declBackfill.changed, h.declBackfill.done, h.declBackfill.failed)
+	}
+	// 幂等：二轮零变化
+	var fresh []model.TorrentMetadata
+	db.Where("info_hash IN ?", []string{"ee", "ff"}).Find(&fresh)
+	h.declBackfill.changed = 0
+	h.declBackfill.done = 0
+	h.declBackfill.active = true
+	h.declBackfill.finished = false
+	h.declBackfill.total = len(fresh)
+	h.runDeclBackfillTask(fresh, patterns)
+	if h.declBackfill.changed != 0 {
+		t.Errorf("幂等失败：changed=%d（应 0）", h.declBackfill.changed)
 	}
 }
