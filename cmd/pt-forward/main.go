@@ -210,6 +210,14 @@ func main() {
 	}
 	defer authManager.Stop()
 
+	// §59.542 追记八: 运维 API token（可选·空=禁用）——Agent 调 API 的专用
+	// 凭证·与登录密码分离（历史：复用密码导致 Agent reset 与用户改密互相
+	// 覆盖）。吊销=清空/修改变量重启。恒定时间比对·不落 DB 不落日志。
+	if opsToken := os.Getenv("PTF_OPS_TOKEN"); opsToken != "" {
+		authManager.SetOpsToken(opsToken)
+		log.Info("ops token auth enabled (PTF_OPS_TOKEN)")
+	}
+
 	if err := auth.EnsureAdminUser(ctx, authRepo, log); err != nil {
 		log.Error("failed to ensure admin user", zap.Error(err))
 		os.Exit(1) //nolint:gocritic

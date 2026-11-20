@@ -3,10 +3,12 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -150,6 +152,27 @@ type AuthManager struct {
 	persistWg sync.WaitGroup
 	stopOnce  sync.Once
 	stopCh    chan struct{}
+
+	// opsToken §59.542 追记八: 运维 API token（PTF_OPS_TOKEN 环境变量）——
+	// 与登录密码彻底分离的认证通道。历史教训：Agent 调 API 复用 admin 密码
+	// → Agent reset 与用户改密互相覆盖（243 案·双方密码轮番作废）。ops token
+	// 不经过 DB 哈希·不受密码变更影响·吊销=改环境变量重启。原子读写（启动
+	// 设置一次后只读·测试中可能重复设置）。
+	opsToken atomic.Value // string
+}
+
+// SetOpsToken 设置运维 token（空=禁用）。main 启动时从 PTF_OPS_TOKEN 读入。
+func (m *AuthManager) SetOpsToken(token string) {
+	m.opsToken.Store(token)
+}
+
+// MatchOpsToken 恒定时间比对（防时序侧信道）。未配置或空 token 恒 false。
+func (m *AuthManager) MatchOpsToken(token string) bool {
+	ot, _ := m.opsToken.Load().(string)
+	if ot == "" || token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(ot), []byte(token)) == 1
 }
 
 type SettingStore interface {

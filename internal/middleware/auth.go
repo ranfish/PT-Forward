@@ -34,6 +34,14 @@ func JWTAuth(authManager *auth.AuthManager) func(http.Handler) http.Handler {
 
 			claims, err := authManager.ValidateAccessToken(tokenStr)
 			if err != nil {
+				// §59.542 追记八: ops token 通道（JWT 失败后尝试）——运维 API
+				// 认证与用户登录密码分离（Agent 用 .env 的 token·用户改密码
+				// 互不干扰）。未配置（PTF_OPS_TOKEN 空）时恒不命中零影响。
+				if authManager.MatchOpsToken(tokenStr) {
+					ctx := context.WithValue(r.Context(), auth.CtxKeyUserID, "admin")
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
 				writeAuthError(w, http.StatusUnauthorized, 40101, "Token 无效或已过期")
 				return
 			}
