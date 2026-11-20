@@ -454,7 +454,40 @@ func parseHumanSize(s string) (uint64, error) {
 }
 
 // SupportsSearchByPiecesHash piggo L0 通道可用（§59.538 pieces-hash 实测命中）。
+// §59.543: SearchByPiecesHash 方法已实现（此前声明 true 却缺方法=断言失败
+// 被特征批量通道排除——二师兄辅种零结果根因之一）。
 func (a *PiggoAdapter) SupportsSearchByPiecesHash() bool { return true }
+
+// SearchByPiecesHash §59.543: 特征辅种主通道——POST /torrents/pieces-hash
+// 传真 pieces-hash（真指纹·piggo.md :514 实证精确命中）·返回
+// map[piecesHash]tid。与 NP 站同管线（引擎 piecesHashSearcher 接口·
+// 批 ≤100 与站方限流 30/min 匹配——825 源=9 批/轮远低于限流）。
+func (a *PiggoAdapter) SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error) {
+	out := make(map[string]int)
+	if len(piecesHashes) == 0 {
+		return out, nil
+	}
+	const max = 100
+	for start := 0; start < len(piecesHashes); start += max {
+		end := start + max
+		if end > len(piecesHashes) {
+			end = len(piecesHashes)
+		}
+		var resp struct {
+			Items []struct {
+				Hash string `json:"hash"`
+				ID   int64  `json:"id"`
+			} `json:"items"`
+		}
+		if err := a.apiJSON(ctx, config, "/v1/api/torrents/pieces-hash", map[string]any{"hashes": piecesHashes[start:end]}, &resp); err != nil {
+			return out, err
+		}
+		for _, it := range resp.Items {
+			out[it.Hash] = int(it.ID)
+		}
+	}
+	return out, nil
+}
 
 // BatchMatchHashes POST /torrents/pieces-hash（≤100/批·同 hash 取 id 最大）。
 func (a *PiggoAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*model.HashMatchResult, error) {

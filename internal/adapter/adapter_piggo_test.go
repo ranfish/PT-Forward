@@ -5,6 +5,7 @@ package adapter
 // （§59.1339 教训：验证样例必须真实数据源）。
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"io"
@@ -239,5 +240,64 @@ func TestPiggoPublishTaglistKey(t *testing.T) {
 	// taxonomy 八维合并（全兜底形态在场）
 	if !strings.Contains(body, "[36,31,26,19,10,6,5,53]") {
 		t.Errorf("taxonomy_ids 空维兜底串缺失: %.300s", body)
+	}
+}
+
+// §59.543: 特征辅种主通道锚——SearchByPiecesHash 传真指纹批量→map[tid]。
+func TestPiggoSearchByPiecesHash(t *testing.T) {
+	var batches [][]string
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Hashes []string `json:"hashes"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		batches = append(batches, body.Hashes)
+		// 只命中其中一个 hash（tid=56292——piggo.md 真指纹实证 id）
+		items := []map[string]any{}
+		for _, h := range body.Hashes {
+			if strings.HasPrefix(h, "aaaa") {
+				items = append(items, map[string]any{"hash": h, "id": 56292, "page_url": "https://piggo.me/detail/56292"})
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"data": map[string]any{"items": items},
+			"msg":  "ok",
+		})
+	})
+	defer srv.Close()
+
+	hashes := make([]string, 0, 101)
+	for i := 0; i < 101; i++ {
+		hashes = append(hashes, fmt.Sprintf("aaaa%02d%038d", i, i))
+	}
+	res, err := a.SearchByPiecesHash(context.Background(), piggoCfg(srv.URL), hashes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 批边界：101 个 → 2 批（100+1）
+	if len(batches) != 2 || len(batches[0]) != 100 || len(batches[1]) != 1 {
+		t.Fatalf("分批错: %d 批 %v", len(batches), []int{len(batches[0]), len(batches[1])})
+	}
+	// mock 对所有 aaaa 前缀都回 → 101 全命中
+	if len(res) != 101 {
+		t.Fatalf("命中数错: %d", len(res))
+	}
+	for h, id := range res {
+		if id != 56292 {
+			t.Fatalf("tid 映射错: %s→%d", h, id)
+		}
+	}
+}
+
+// 空入参零请求。
+func TestPiggoSearchByPiecesHash_Empty(t *testing.T) {
+	a, srv := newPiggoTestAdapter(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("空入参不应发请求")
+	})
+	defer srv.Close()
+	res, err := a.SearchByPiecesHash(context.Background(), piggoCfg(srv.URL), nil)
+	if err != nil || len(res) != 0 {
+		t.Fatalf("空入参: res=%v err=%v", res, err)
 	}
 }
