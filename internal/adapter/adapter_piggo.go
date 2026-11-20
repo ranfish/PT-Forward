@@ -489,36 +489,14 @@ func (a *PiggoAdapter) SearchByPiecesHash(ctx context.Context, config *model.Sit
 	return out, nil
 }
 
-// BatchMatchHashes POST /torrents/pieces-hash（≤100/批·同 hash 取 id 最大）。
-func (a *PiggoAdapter) BatchMatchHashes(ctx context.Context, config *model.SiteConfig, hashes []string) ([]*model.HashMatchResult, error) {
-	if len(hashes) == 0 {
-		return nil, nil
-	}
-	const max = 100
-	var out []*model.HashMatchResult
-	for start := 0; start < len(hashes); start += max {
-		end := start + max
-		if end > len(hashes) {
-			end = len(hashes)
-		}
-		var resp struct {
-			Items []struct {
-				Hash    string `json:"hash"`
-				ID      int64  `json:"id"`
-				PageURL string `json:"page_url"`
-			} `json:"items"`
-		}
-		if err := a.apiJSON(ctx, config, "/v1/api/torrents/pieces-hash", map[string]any{"hashes": hashes[start:end]}, &resp); err != nil {
-			return out, err
-		}
-		for _, it := range resp.Items {
-			out = append(out, &model.HashMatchResult{
-				InfoHash: it.Hash, TorrentID: strconv.FormatInt(it.ID, 10), DownloadURL: it.PageURL,
-			})
-		}
-	}
-	return out, nil
-}
+// §59.543 项 2（用户定案·2026-11-20）：BatchMatchHashes 已删除——
+// piggo 站方唯一的 hash 查询端点 /torrents/pieces-hash 收【真 pieces-hash
+// （内容指纹）】（piggo.md :514 实证·当时验证即拿真指纹命中）·无 info-hash
+// 反查端点——L0（info_hash 数学身份）通道对 piggo 物理不适用。此前该方法
+// 把真指纹端点包装成 L0 接口：调用方传 info_hash 进收内容指纹的窗口→
+// 必然零命中白跑（每轮 9 批·占 30/min 配额·243 实证 825 查询 0 命中）。
+// 端点现由 SearchByPiecesHash（特征通道·传真指纹）独占正确使用。
+// 引擎侧 model.HashBatchMatcher 断言不过→L0 预查对 piggo 静默跳过（零请求）。
 
 // ── 发布 ──
 

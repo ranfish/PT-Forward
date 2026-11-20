@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/adapter"
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 // §59.543 编译期防线：声明 SupportsSearchByPiecesHash()=true 的 adapter
@@ -15,4 +16,14 @@ func TestPiecesHashSearcherContract(t *testing.T) {
 	var _ piecesHashSearcher = (&adapter.PiggoAdapter{})
 	var _ piecesHashSearcher = (&adapter.NexusPHPAdapter{})
 	var _ piecesHashSearcher = (&adapter.YemaptAdapter{})
+}
+
+// §59.543 项 2 锚：piggo 的 pieces-hash 端点=真指纹语义——
+// PiggoAdapter 满足特征通道（piecesHashSearcher）且【不】满足 L0 通道
+// （HashBatchMatcher·info_hash 反查——piggo 无此端点·v0.0.1535 删除错位包装）。
+func TestPiggoNotHashBatchMatcher(t *testing.T) {
+	var _ piecesHashSearcher = (&adapter.PiggoAdapter{})
+	if _, ok := any(&adapter.PiggoAdapter{}).(model.HashBatchMatcher); ok {
+		t.Error("PiggoAdapter 不应满足 HashBatchMatcher（info_hash 语义——piggo 站方无此端点·§59.543 项 2）")
+	}
 }
