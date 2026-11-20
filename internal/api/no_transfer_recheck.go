@@ -109,7 +109,7 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 
 	cleared, kept, renewed, changed, failed := 0, 0, 0, 0, 0
 	// §59.542 追记十一: (site,tid) 去重——同簇多行常共享同一站方 tid
-	//（243 实证：16 hash 行同 tid 2782403）·逐行独立请求=重复拉详情+
+	// （243 实证：16 hash 行同 tid 2782403）·逐行独立请求=重复拉详情+
 	// 限流风险。同组只判定一次·结果逐行应用。
 	type groupKey struct{ site, tid string }
 	type resolveResult struct {
@@ -151,7 +151,7 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 	}
 done:
 	// §59.542 追记十一（用户定案：复检与簇脱钩）: 复检对象=源站+该种子
-	//（站方对某 tid 的标记）·簇副本行不是独立复检对象——同 (site,tid)
+	// （站方对某 tid 的标记）·簇副本行不是独立复检对象——同 (site,tid)
 	// 一组一次判定·组内行统一应用；计数按组（16 副本行=「检测 1 颗」）。
 	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + itoa(len(resolved)) +
 		" 颗（行 " + itoa(len(metas)) + "）：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +

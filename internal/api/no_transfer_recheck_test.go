@@ -303,17 +303,15 @@ func TestNoTransferRecheckNameToDomain(t *testing.T) {
 	seedRecheckRow(t, h, "憨憨", []string{"禁转"}, nil)
 	seedRecheckSite(t, h, "憨憨", "hhanclub")
 	var gotDomain string
-	h.siteProvider = &fakeRecheckProvider{config: &model.SiteConfig{}, adapter: &fakeRecheckAdapter{}}
-	// 包装断言 provider 收到的 key
 	wrap := &fakeRecheckProvider{config: &model.SiteConfig{}, adapter: &fakeRecheckAdapter{}}
-	_ = wrap
-	_ = gotDomain
-	// 用自定义 provider 断言
 	h.siteProvider = &nameCaptureProvider{inner: wrap, got: &gotDomain}
-	if got := recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转"]`}); got == "failed" {
-		// resolve 阶段 sites 解析成功即通过（后续 detail 空导致 failed 也算解析过关）
+	// resolve 阶段：sites 解析成功即收到 domain（后续 detail 空导致 failed
+	// 也算解析过关——断言点在 gotDomain 收到的值）。
+	_ = recheckRowFull(h, &model.TorrentMetadata{InfoHash: "ntrhash00000000000000000000000000000000", SiteName: "憨憨", TorrentID: "1001", Flags: `["禁转"]`})
+	if gotDomain == "" {
+		t.Fatal("provider 未收到任何 key——sites 解析未发生")
 	}
-	if gotDomain != "" && gotDomain == "憨憨" {
+	if gotDomain == "憨憨" {
 		t.Errorf("provider 收到站名而非 domain: %q", gotDomain)
 	}
 	// 无站点行→failed
