@@ -179,7 +179,8 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 	}
 
 	if req.SyncEnabled != nil && *req.SyncEnabled && !wasEnabled {
-		h.db.Model(&model.CookieCloudConfig{}).Where("1 = 1").Update("last_sync_at", nil)
+		// §59.542 追记十: 精确更新（替代 Where("1 = 1")·同类收敛第三处）
+		h.db.Model(&cfg).Update("last_sync_at", nil)
 	}
 
 	h.logger.Info("cookiecloud config updated", zap.String("component", "cookiecloud"))
@@ -234,6 +235,30 @@ func (h *CookieCloudHandler) handleTest(w http.ResponseWriter, r *http.Request) 
 	var cfg model.CookieCloudConfig
 	if err := h.db.First(&cfg).Error; err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请先配置 CookieCloud")
+		return
+	}
+
+	// §59.542 追记十: 按模式分流——builtin 模式无 ServerURL·原实现无条件
+	// FetchAndDecrypt 必然 400 误导运维。builtin 下用本地持久化密文验证
+	// 配置凭据可解密性（uuid+password 与密文成对匹配的本地验证）。
+	if cfg.Mode == "builtin" {
+		if cfg.UUID == "" || cfg.Password == "" {
+			Error(w, http.StatusBadRequest, 40001, "配置不完整（需要 uuid/password）")
+			return
+		}
+		if cfg.LastEncrypted == "" {
+			Error(w, http.StatusBadRequest, 40001, "尚无内置服务端推送数据——请先用浏览器插件推送一次再测试")
+			return
+		}
+		if _, err := cookiecloud.DecryptFromEncrypted(cfg.LastEncrypted, cfg.UUID, cfg.Password); err != nil {
+			h.logger.Error("cookiecloud builtin decrypt test failed", zap.Error(err))
+			Error(w, http.StatusBadGateway, 50001, "本地密文解密失败——请检查插件端 uuid/密码与配置是否一致")
+			return
+		}
+		Success(w, map[string]interface{}{
+			"ok":      true,
+			"message": "本地密文解密测试成功（uuid/密码与插件端一致）",
+		})
 		return
 	}
 

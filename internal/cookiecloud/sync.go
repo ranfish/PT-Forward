@@ -334,9 +334,13 @@ func (s *SyncService) getConfig(ctx context.Context) (*model.CookieCloudConfig, 
 
 func (s *SyncService) updateConfigSyncTime(ctx context.Context) {
 	now := time.Now()
-	s.db.Model(&model.CookieCloudConfig{}).
-		Where("1 = 1").
-		Update("last_sync_at", &now)
+	// §59.542 追记十: 精确更新配置行（替代 Where("1 = 1") 全表写·
+	// 单配置模型下等效但语义收敛——同类收敛清单第二处）
+	var cfg model.CookieCloudConfig
+	if err := s.db.WithContext(ctx).First(&cfg).Error; err != nil {
+		return
+	}
+	s.db.WithContext(ctx).Model(&cfg).Update("last_sync_at", &now)
 }
 
 func extractDomain(baseURL string) string {
