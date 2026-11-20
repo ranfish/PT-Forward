@@ -34,6 +34,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -323,20 +324,47 @@ func (a *PiggoAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if dl.URL == "" {
 		return nil, parseError("download-link 签发为空", nil)
 	}
+	// §59.543 追记四（2026-11-20 辅种送种链 403 实证修复）：下载 GET 改
+	// chrome 栈优先（a.doer.Client·azuretls——主域 piggo.me 的 CF 按 TLS
+	// 指纹拦截 Go 原生栈〔matches 10605-10607 HTTP 403+CF HTML·普通栈
+	// 三连 403 两连超时〕·API 域同 CF 边缘对 azuretls 放行实证）。普通栈
+	// 保留 fallback（§59.541 附九旧定案的栈·当时 curl-impersonate 时代
+	// chrome 挂死的结论不适用 azuretls——架构反转后未在主域实测过）。
+	// 无 Bearer/chrome 请求头——签名 URL 自含鉴权（§59.1323 好大签名 URL
+	// 无头 GET 先例：带头反而触发 Web 面路由 scope 校验）。
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dl.URL, nil)
 	if err != nil {
 		return nil, networkError("构造下载请求失败: "+err.Error(), err)
 	}
-	// §59.541 附九: 下载用普通 GET（站方文档「拿到 url 后用普通 GET 下载」）——
-	// 签名 URL 自含鉴权·无需 Bearer/chrome TLS·chrome 传输栈在 piggo.me Web 面
-	// 碰 CF JS 挑战挂死（tid=57298 三次重推 30s 超时实证）。API 调用保持 chrome。
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
+	resp, err := a.doer.Client.Do(req)
+	if err == nil {
+		defer func() { drainBody(resp) }()
+		if resp.StatusCode == http.StatusOK {
+			return io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+		}
+		rb, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		a.logger.Warn("piggo download chrome 栈非 200·回退普通栈",
+			zap.Int("status", resp.StatusCode),
+			zap.String("body", truncate(string(rb), 100)))
+		resp.Body.Close()
+	} else {
+		a.logger.Warn("piggo download chrome 栈失败·回退普通栈", zap.Error(err))
+	}
+
+	// fallback：§59.541 附九普通 GET 栈（Go 原生+代理）。
+	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dl.URL, nil)
+	if err != nil {
+		return nil, networkError("构造下载请求失败: "+err.Error(), err)
+	}
+	req2.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	plainClient := &http.Client{Timeout: 60 * time.Second}
 	if config != nil && config.ProxyURL != "" {
 		plainClient.Transport = &http.Transport{Proxy: func(*http.Request) (*url.URL, error) {
 			return url.Parse(config.ProxyURL)
 		}}
 	}
-	resp, err := plainClient.Do(req)
+	resp, err = plainClient.Do(req2)
 	if err != nil {
 		return nil, networkError("下载种子失败: "+err.Error(), err)
 	}
