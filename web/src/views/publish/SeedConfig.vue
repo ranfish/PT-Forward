@@ -125,7 +125,14 @@
             <template #icon><SettingOutlined /></template>
           </a-button>
         </a-popover>
-        <a-tag v-if="ntrStatus.last_run" style="margin-left: 4px">{{ ntrStatus.last_stats || ntrStatus.last_run }}</a-tag>
+        <!-- §59.542 追记十四：颗数≠行数时「行 N」红色粗体（字号不变）——
+             簇内多副本=该资源跨站存在的视觉信号（禁转发报警线索）。 -->
+        <a-tag v-if="ntrStatus.last_run" style="margin-left: 4px">
+          <template v-for="(p, i) in ntrStatsParts" :key="i">
+            <span v-if="p.hot" style="color: #e02020; font-weight: 700">{{ p.text }}</span>
+            <span v-else>{{ p.text }}</span>
+          </template>
+        </a-tag>
       </div>
     </div>
 
@@ -783,6 +790,23 @@ const ntrSaving = ref(false)
 const ntrCfg = reactive({ enabled: false, schedule: '0 5 * * *' })
 const ntrStatus = ref<{ running: boolean; last_run: string; last_stats: string }>({ running: false, last_run: '', last_stats: '' })
 let ntrTimer: ReturnType<typeof setInterval> | null = null
+
+// §59.542 追记十四：stats 拆段渲染——「检测 X 颗（行 Y）」X≠Y 时
+// 「行 Y」段标 hot（红色粗体·字号不变）。行>颗=簇内副本存在=资源
+// 跨站存在信号（不同站 .torrent 因 source 字段 hash 不同）。
+const ntrStatsParts = computed<{ text: string; hot: boolean }[]>(() => {
+  const s = ntrStatus.value.last_stats || ntrStatus.value.last_run || ''
+  const m = s.match(/检测 (\d+) 颗（行 (\d+)）/)
+  if (!m || m[1] === m[2]) return [{ text: s, hot: false }]
+  const seg = `行 ${m[2]}）`
+  const i = s.indexOf(seg)
+  if (i < 0) return [{ text: s, hot: false }]
+  return [
+    { text: s.slice(0, i), hot: false },
+    { text: `行 ${m[2]}`, hot: true },
+    { text: s.slice(i + seg.length), hot: false },
+  ]
+})
 
 async function loadNtrStatus() {
   try {
