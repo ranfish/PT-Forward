@@ -63,17 +63,21 @@ func (h *PublishTorrentsHandler) handleDeclBackfillTask(w http.ResponseWriter, r
 		Error(w, http.StatusBadRequest, 40001, "无生效过滤规则")
 		return
 	}
-	conds := make([]string, 0, len(patterns))
+	conds := make([]string, 0, len(patterns)+1)
 	args := make([]interface{}, 0, len(patterns)*2)
 	for _, p := range patterns {
 		esc := "%" + likeEscape(p) + "%"
 		conds = append(conds, "(description LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')")
 		args = append(args, esc, esc)
 	}
+	// §59.542 追记四: 空 statement + 有官组的行也纳入——上轮清洗
+	// 全剥后官组种 statement 变空（16626 行）·预筛按关键词 LIKE
+	// 找不到它们→re-append 无法触达。追加 OR 条件覆盖此形态。
+	conds = append(conds, `((statement = '' OR statement IS NULL) AND detail_source_json LIKE '%\"release_group\":\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"NOGROUP\"%' AND detail_source_json NOT LIKE '%\"release_group\":\"other\"%')`)
 	var rows []model.TorrentMetadata
 	if err := h.db.WithContext(r.Context()).
 		Where(strings.Join(conds, " OR "), args...).
-		Select("info_hash", "description", "statement").
+		Select("info_hash", "description", "statement", "detail_source_json", "site_name").
 		Find(&rows).Error; err != nil {
 		h.declBackfill.mu.Unlock()
 		Error(w, http.StatusInternalServerError, 50000, "查询失败: "+err.Error())
