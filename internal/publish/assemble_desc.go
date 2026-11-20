@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
+
+	"github.com/ranfish/pt-forward/internal/description"
 )
 
 // miColonRe 幸运 MI 误判防御（§59.163 探针四发实证：description 含
@@ -45,7 +47,9 @@ func FullwidthMIColons(s string) string {
 // meta 各资产来自种子配置页六 Tab（获取-审核阶段产物）。
 func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConfig) string {
 	var b strings.Builder
-	if q := strings.TrimSpace(meta.Statement); q != "" {
+	// §59.542 追记十二: 消费时合成——发布组装与 tab2 展示同一单点
+	// （description.ComposeStatement·官组行无致谢动态追加·有则原样）。
+	if q := strings.TrimSpace(description.ComposeStatement(meta.Statement, meta.SiteName, meta.Title)); q != "" {
 		// §59.178: 剥外层 [quote] 壳后 Trim 换行——NP 站 HTML fieldset/legend
 		// 后的换行被 BBCode 转换保留（[quote]⏎正文⏎[/quote]），渲染后引用块
 		// 内首行前出现空行。剥壳 → Trim → 重包单层，消除双 quote 嵌套与空行。

@@ -3134,25 +3134,12 @@ fetched:
 				updates["flags"] = string(newFlags)
 			}
 
-			// §59.26 §59.28: 声明末尾追加转载致谢（幂等——重获不累积）
-			// 第一段用 GenerateThanksQuote（含"转自{source_site}"权威模板），
-			// 第二段禁转PTT 是用户指定的固定引言（v0.0.597）。
-			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
-				thanksLine := description.GenerateThanksQuote(meta.SiteName, profile.ReleaseGroup, false, nil)
-				// §59.542 刀1: 引用词单源——此前此处与剥离侧 thanksNoTransferTail 各维护
-				// 一份字面量（两套词），本次 Pope 案证实两侧形态假设漂移是累积根因。
-				noTransferLine := thanksNoTransferTail
-				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
-
-				// 幂等：先剥离历史追加的致谢块（v0.0.607 修复重获累积）
-				base := stripAppendedThanks(finalMeta.Statement)
-				// §59.80: 空 base 不接 \n\n 前缀（米仔睡着了实锤前导空行）
-				if base == "" {
-					updates["statement"] = thanks
-				} else {
-					updates["statement"] = base + "\n\n" + thanks
-				}
-			}
+			// §59.542 追记十二（用户定案·回归原始设计）：获取链不再入库
+			// append 致谢——DB statement 保持净化态（站方原始声明·数据与
+			// 水印彻底分离）。tab2 展示与发布组装由 description.ComposeStatement
+			// 消费时动态合成（单点）。历史 append 时灵时不灵（11-12 起
+			// 实证失效·title 形态时序依赖）与回流污染两个问题一次根治。
+			_ = profile
 
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
@@ -4720,7 +4707,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"mediainfo":       miForProfile,
 		"bdinfo":          meta.BDInfo,
 		"is_disc":         meta.BDInfo != "", // §59.319 附四：前端单框化/文案分流
-		"statement":       meta.Statement,
+		// §59.542 追记十二: 消费时合成——tab2 初见即完整形态（站方声明+
+		// 官组致谢）·DB 保持净化态（数据与水印分离终态设计）。
+		"statement":       description.ComposeStatement(meta.Statement, meta.SiteName, meta.Title),
 		"imdb_url":        meta.IMDbURL,
 		"douban_url":      meta.DoubanURL,
 		"tmdb_url":        meta.TMDbURL,

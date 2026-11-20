@@ -5,7 +5,11 @@
 // 默认英文站: "Torrent from [b]{source_site}[/b]. All thanks to the original uploader!"
 package description
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/ranfish/pt-forward/internal/util"
+)
 
 // ThanksQuoteConfig 感谢引言配置。
 type ThanksQuoteConfig struct {
@@ -70,4 +74,42 @@ func selectTemplate(isEnglishSite bool, config *ThanksQuoteConfig) string {
 		return config.ChineseTemplate
 	}
 	return DefaultChineseThanksQuote
+}
+
+// BuildOfficialThanks 生成完整两句官方致谢块（§59.542 追记十二：
+// 消费时合成单点——水印从「入库资产」变「消费时合成」）。
+// 形态与历史获取链 append（v0.0.597-1530）完全一致。
+func BuildOfficialThanks(siteName, group string) string {
+	thanksLine := GenerateThanksQuote(siteName, group, false, nil)
+	head := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]"
+	tail := "[quote][b][color=red][size=5]" + ThanksCoreText + "[/size][/color][/b][/quote]"
+	return head + "\n" + tail
+}
+
+// HasOfficialThanks statement 是否已含我方致谢（消费合成判别——历史
+// backfill 行与回流形态均含「官组作品」锚词·两态兼容判别）。
+func HasOfficialThanks(statement string) bool {
+	return strings.Contains(statement, "官组作品")
+}
+
+// ComposeStatement §59.542 追记十二（用户定案·回归 v0.0.597 原始设计）：
+// 消费时合成——tab2 展示与发布组装共用单点。DB statement 保持净化态
+// （站方原始声明·数据与水印分离·获取链不再入库 append）；消费层动态
+// 合成：官组行（title 组名提取·发布链 :2487 同源 util.ExtractGroupName）
+// 且无致谢 → base + 致谢；已有致谢（历史 backfill 行）原样返回（两态
+// 兼容·无需存量再清洗）；非官组/无组名 → 原样。
+func ComposeStatement(statement, siteName, title string) string {
+	group := util.ExtractGroupName(title)
+	// Other=站方兜底槽语义（无真实组名）——同 NOGROUP 不合成致谢。
+	if group == "" || group == "NOGROUP" || group == "Other" {
+		return statement
+	}
+	if HasOfficialThanks(statement) {
+		return statement
+	}
+	thanks := BuildOfficialThanks(siteName, group)
+	if strings.TrimSpace(statement) == "" {
+		return thanks
+	}
+	return statement + "\n\n" + thanks
 }
