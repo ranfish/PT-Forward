@@ -518,6 +518,11 @@ func canPublishToPiggo(req *PublishRequest) bool {
 - 官方请求头三元组：Accept+Content-Type application/json+Bearer。
 - 文档用户版 v3=625 行（含每端点 cURL 权威形态）。
 
+**域防护特征实态更新（2026-11-20·§59.543 追记五实证）**：
+- **api.piggo.me（API 域）无 CF**——裸 curl 直连/代理均 200（签发 POST 返真 JSON）；11-16 记载的「裸 curl 403·需 chrome 指纹」已过时（站方已摘除）。直连 2.4s/代理 1.5s——生产走代理（快+稳）。
+- **piggo.me（主域/下载域）有 CF·按 UA 判罚**——浏览器 UA 过（下载 URL→200 真 bencode）/默认 UA（Go-http-client 等）403。TLS 指纹非判罚变量（Go 原生栈+浏览器 UA 实证 200）。
+- 下载正解=**普通 GET+浏览器 UA**（站方文档「普通 GET」与 CF 现实的兼容点）·零令牌头（「不要把令牌带到 Tracker」）。
+
 **curl-impersonate 方案复验（2026-11-16·定案版）**：
 - **tls-client 库全灭**：Go 内嵌指纹伪装全 Chrome profile（120/124/131/133/PSK 族）对猪猪 CF 皆 403——CF 检测已深入 Go 程序化 TLS 全族（H2 帧序层），只有真 BoringSSL 二进制（curl-impersonate）能过。
 - **猪猪复验**：POST 3 连发全 200（4.7~9s 偏慢·生产超时配 15s+）；**下载链端到端通**（签发→主域 GET→真 torrent 25.6KB bencode）；api 子域 GET 403 无生产影响（API 全 POST·下载走主域 piggo.me/v1/web/）。
