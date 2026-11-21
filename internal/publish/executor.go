@@ -744,7 +744,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		var rec model.PublishResultRecord
 		if err := e.db.WithContext(ctx).
 			Where("target_site = ? AND pieces_hash = ? AND status IN ?", in.TargetSite, piecesHash,
-				[]string{"pushed", "pushed_existing", "uploaded", "duplicate"}).
+				model.PublishSkipStatuses).
 			Order("id DESC").First(&rec).Error; err == nil {
 			// 本地记忆 tid 补充：站方 API 查一次取真实 tid（失败不阻塞——记忆拦截已成立）
 			tidShown := rec.TorrentID

@@ -1,8 +1,9 @@
 // §59.535 刀5/刀6: 簇已有站三面并集判据单点——选站置灰（单簇过滤）与批量
 // 发布执行层逐对跳过（3b）共用。三面：
-//   面1 tracker 快照实测——簇内副本 tracker_domain→站名（正在做种·最实时）
-//   面2 覆盖表——info_hash×site（has/probably_has·站上有但没在做种）
-//   面3 发布记录——我们自己的发布成功史（站上必有）
+//
+//	面1 tracker 快照实测——簇内副本 tracker_domain→站名（正在做种·最实时）
+//	面2 覆盖表——info_hash×site（has/probably_has·站上有但没在做种）
+//	面3 发布记录——我们自己的发布成功史（站上必有）
 //
 // 方向=宁可多置灰（站方 dedup 兜底重复发布无害）不漏放（漏置灰仅多一次
 // 注定失败请求·two-way 安全）。
@@ -16,14 +17,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// coveredPublishStatuses 面3 发布记录成功终态集（站上已有语义）。
-var coveredPublishStatuses = map[string]bool{
-	"pushed":           true,
-	"pushed_existing":  true,
-	"uploaded":         true,
-	"uploaded_existing": true,
-	"duplicate":        true,
-}
+// coveredPublishStatuses 面3 发布记录成功终态集——单点引用
+// model.PublishSkipStatuses（§59.546 终态登记处·发布事实口径不含 existing：
+// 保留用户重试/推种选择权·用户定案 2026-11-22）。
+var coveredPublishStatuses = func() map[string]bool {
+	m := make(map[string]bool, len(model.PublishSkipStatuses))
+	for _, s := range model.PublishSkipStatuses {
+		m[s] = true
+	}
+	return m
+}()
 
 // CoveredSitesOfCluster 返回簇已有站集合（站名→true）。
 // infoHash 定位快照行→(client_uid,save_path,name) 同簇聚合；快照 miss（非

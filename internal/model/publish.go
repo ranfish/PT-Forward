@@ -2,6 +2,32 @@ package model
 
 import "time"
 
+// 发布终态清单·全库唯一登记处（§59.546 单点定案）。
+//
+// 两清单语义分叉是用户定案（2026-11-22 Hatfields 案）·禁止误统一：
+//
+//	「跳过=替用户做决定」——跳过判据只能用『我们确实把种发上去了』的
+//	证据（发布事实·持 tid），不能用『站上有』的证据（文案信任）。
+//	existing=上传响应文案说已有（无 tid·未推种）——用户还没行使过
+//	推种权·系统无权预先替用户放弃（补推是用户可选操作）。
+//
+// 新增发布终态的流程铁律：先在此登记（判断语义归属）→ 改锚测试
+// （publish_status_sets_test.go 内容锁定）→ 再 grep 消费面接线。
+// 禁止在任何查询点手写裸终态清单（源码扫描锚会拦）。
+//
+// PublishedListStatuses 列表层「已发布」口径（§59.166 一站多种）：该站
+// 有我们的终态记录（含 existing——记录在案即出清可发布·防整体重传）。
+var PublishedListStatuses = []string{
+	"pushed", "pushed_existing", "uploaded", "uploaded_existing", "duplicate", "existing",
+}
+
+// PublishSkipStatuses 跳过/拦截口径（§59.535 刀6 覆盖过滤面3 + §59.515
+// dedup 本地记忆）：我们确实发上去了（持 tid 的发布事实）。**不含
+// existing**——保留用户重试/推种的选择权（见上哲学定案）。
+var PublishSkipStatuses = []string{
+	"pushed", "pushed_existing", "uploaded", "uploaded_existing", "duplicate",
+}
+
 // §33.1.14 — PublishCandidate: 待发布候选（决策 #214）
 type PublishCandidate struct {
 	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
@@ -13,8 +39,8 @@ type PublishCandidate struct {
 	InfoHash        string    `json:"info_hash" gorm:"index;size:40"`
 	TorrentName     string    `json:"torrent_name" gorm:"size:500"`
 	Size            int64     `json:"size"`
-	ClientUID       uint       `json:"client_uid"`
-	SourceClientUID uint       `json:"source_client_uid"`
+	ClientUID       uint      `json:"client_uid"`
+	SourceClientUID uint      `json:"source_client_uid"`
 
 	LocalSavePath string `json:"local_save_path" gorm:"size:500"`
 	LocalFilePath string `json:"local_file_path" gorm:"size:500"`
@@ -67,7 +93,7 @@ type PublishGroupMember struct {
 	SiteName  string `json:"site_name" gorm:"uniqueIndex:idx_group_site;size:100"`
 	TorrentID string `json:"torrent_id" gorm:"size:50"`
 	Role      string `json:"role" gorm:"size:20"`
-	ClientUID uint  `json:"client_uid"`
+	ClientUID uint   `json:"client_uid"`
 	Size      int64  `json:"size" gorm:"default:0"`
 	SavePath  string `json:"save_path" gorm:"size:500"`
 
@@ -130,20 +156,20 @@ type PublishResultRecord struct {
 	CrossSiteExcluded bool   `json:"cross_site_excluded"`
 	TeamDetected      string `json:"team_detected" gorm:"size:50"`
 
-	Status       PublishResultStatus `json:"status" gorm:"size:20"`
-	SkipReason   string              `json:"skip_reason" gorm:"size:200"`
+	Status     PublishResultStatus `json:"status" gorm:"size:20"`
+	SkipReason string              `json:"skip_reason" gorm:"size:200"`
 	// §59.166 dedup 本地记忆（站方 pieces-hash API 瞬时空返回实战打穿——18:49 批
 	// 4 种重传；发布成功/拦截均落，dedup 先查本地零依赖站方）
 	PiecesHash string `json:"pieces_hash" gorm:"size:40;index"`
 	// §59.159: 源种 hash（记录溯源）
-	SourceInfoHash string            `json:"source_info_hash" gorm:"size:40;index"`
+	SourceInfoHash string `json:"source_info_hash" gorm:"size:40;index"`
 	// §59.159: 加种目标路径（发布时落库——补推纯记录回放，不依赖快照行存活）
-	SavePath       string            `json:"save_path" gorm:"size:500"`
-	PublishURL   string              `json:"publish_url" gorm:"size:500"`
-	ErrorMessage string              `json:"error_message" gorm:"size:500"`
-	CompletedAt  *time.Time          `json:"completed_at"`
+	SavePath     string     `json:"save_path" gorm:"size:500"`
+	PublishURL   string     `json:"publish_url" gorm:"size:500"`
+	ErrorMessage string     `json:"error_message" gorm:"size:500"`
+	CompletedAt  *time.Time `json:"completed_at"`
 
-	Trigger      string `json:"trigger" gorm:"size:20"`       // manual/batch/reseed/wizard
+	Trigger      string `json:"trigger" gorm:"size:20"`              // manual/batch/reseed/wizard
 	BatchGroupID string `json:"batch_group_id" gorm:"size:36;index"` // 批量发布 UUID
 	Title        string `json:"title" gorm:"size:500"`
 	Subtitle     string `json:"subtitle" gorm:"size:500"`
@@ -152,9 +178,9 @@ type PublishResultRecord struct {
 	Logs         string `json:"logs" gorm:"type:text"`
 
 	// §56.30: 加种回下载器
-	Seeded    bool       `json:"seeded" gorm:"default:false"`      // 是否已加种
-	SeededAt  *time.Time `json:"seeded_at"`                         // 加种时间
-	SeedError string     `json:"seed_error" gorm:"size:500"`        // 加种失败原因
+	Seeded    bool       `json:"seeded" gorm:"default:false"` // 是否已加种
+	SeededAt  *time.Time `json:"seeded_at"`                   // 加种时间
+	SeedError string     `json:"seed_error" gorm:"size:500"`  // 加种失败原因
 }
 
 func (PublishResultRecord) TableName() string { return "publish_result_records" }
@@ -185,35 +211,35 @@ type PublishArtist struct {
 }
 
 type PublishRequest struct {
-	TorrentData     []byte            `json:"-"`
-	FormFields      map[string]string `json:"form_fields"`
-	TagFields       map[string]string `json:"tag_fields"`
+	TorrentData []byte            `json:"-"`
+	FormFields  map[string]string `json:"form_fields"`
+	TagFields   map[string]string `json:"tag_fields"`
 	// §59.156: checkbox 数组标签（tags[4][] 同名字段多次重复——multipart 数组语义；
 	// map 无法承载重复键，NUL 拼接 adapter 不可拆）
-	TagArrayFields []TagKV           `json:"tag_array_fields,omitempty"`
-	TagConfig       string            `json:"tag_config,omitempty"` // §56.22: 站点 tag 配置 JSON（SiteTagConfig）
-	Title           string            `json:"title"`
-	Subtitle        string            `json:"subtitle"`
-	Description     string            `json:"description"`
-	MediaInfo       string            `json:"media_info"`
-	BDInfo          string            `json:"bd_info"`
-	Screenshots     []string          `json:"screenshots"`
-	ScreenshotInDesc bool             `json:"screenshot_in_desc"`
-	IMDbLink        string            `json:"imdb_link"`
-	DoubanLink      string            `json:"douban_link"`
-	Anonymous       bool              `json:"anonymous"`
-	ExtraFields     map[string]string `json:"extra_fields"`
+	TagArrayFields   []TagKV           `json:"tag_array_fields,omitempty"`
+	TagConfig        string            `json:"tag_config,omitempty"` // §56.22: 站点 tag 配置 JSON（SiteTagConfig）
+	Title            string            `json:"title"`
+	Subtitle         string            `json:"subtitle"`
+	Description      string            `json:"description"`
+	MediaInfo        string            `json:"media_info"`
+	BDInfo           string            `json:"bd_info"`
+	Screenshots      []string          `json:"screenshots"`
+	ScreenshotInDesc bool              `json:"screenshot_in_desc"`
+	IMDbLink         string            `json:"imdb_link"`
+	DoubanLink       string            `json:"douban_link"`
+	Anonymous        bool              `json:"anonymous"`
+	ExtraFields      map[string]string `json:"extra_fields"`
 	// §59.462: 剧组四件套（GazellePW 建组平行数组——Name/ID/SubName+
 	// Role=importance 数字；Name=英文名 SubName=中文名 公共层拆分产物）
 	ExtraArtists []PublishArtist `json:"extra_artists,omitempty"`
 	// §59.462: 字幕语言码数组（GazellePW subtitles[]——chinese_simplified 等）
-	SubtitleLangs []string `json:"subtitle_langs,omitempty"`
-	SourceSite    string   `json:"source_site"`
-	SourceInfoHash  string            `json:"source_info_hash"`
-	SourceTorrentID string            `json:"source_torrent_id"`
-	ClientUID       uint             `json:"client_uid"`
-	GroupID         uint              `json:"group_group_id"`
-	TargetSite      string            `json:"target_site"`
+	SubtitleLangs   []string `json:"subtitle_langs,omitempty"`
+	SourceSite      string   `json:"source_site"`
+	SourceInfoHash  string   `json:"source_info_hash"`
+	SourceTorrentID string   `json:"source_torrent_id"`
+	ClientUID       uint     `json:"client_uid"`
+	GroupID         uint     `json:"group_group_id"`
+	TargetSite      string   `json:"target_site"`
 }
 
 // TagKV 有序表单键值对（同名字段重复语义）。
@@ -224,11 +250,11 @@ type TagKV struct {
 
 // §33.1.10 — PublishResponse: 站点上传响应
 type PublishResponse struct {
-	Success      bool   `json:"success"`
-	TorrentID    string `json:"torrent_id"`
-	DetailURL    string `json:"detail_url"`
-	IsExisting   bool   `json:"is_existing"`
-	ExistingID   string `json:"existing_id"`
+	Success    bool   `json:"success"`
+	TorrentID  string `json:"torrent_id"`
+	DetailURL  string `json:"detail_url"`
+	IsExisting bool   `json:"is_existing"`
+	ExistingID string `json:"existing_id"`
 	// §59.159 IDSource: TorrentID 来源——"redirect"=成功页 302 最终 URL（权威，
 	// 加种免检）/"body"=响应文本提取（推荐位风险，name 校验兜底）。用户定案：
 	// 主防线是下载源正确（成功页下载必然正确），校验仅 body 来源兜底。
@@ -244,11 +270,11 @@ type PublishResponse struct {
 
 // §46 — SitePublishLimit: 站点发布限制配置
 type SitePublishLimit struct {
-	ID          uint   `json:"id" gorm:"primaryKey;autoIncrement"`
-	SiteName    string `json:"site_name" gorm:"uniqueIndex;size:100"`
-	Enabled     bool   `json:"enabled" gorm:"default:false"`
-	MaxCount    int    `json:"max_count" gorm:"default:20"`
-	WindowHours int    `json:"window_hours" gorm:"default:24"`
+	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	SiteName    string    `json:"site_name" gorm:"uniqueIndex;size:100"`
+	Enabled     bool      `json:"enabled" gorm:"default:false"`
+	MaxCount    int       `json:"max_count" gorm:"default:20"`
+	WindowHours int       `json:"window_hours" gorm:"default:24"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

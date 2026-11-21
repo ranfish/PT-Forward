@@ -151,7 +151,7 @@ func (e *PublishExecutor) executeMusicPublish(ctx context.Context, in ExecuteInp
 		var rec model.PublishResultRecord
 		if err := e.db.WithContext(ctx).
 			Where("target_site = ? AND pieces_hash = ? AND status IN ?", in.TargetSite, piecesHash,
-				[]string{"pushed", "pushed_existing", "uploaded", "duplicate"}).
+				model.PublishSkipStatuses).
 			Order("id DESC").First(&rec).Error; err == nil {
 			msg := "本地记忆命中（站上已有同内容种）: " + piecesHash
 			e.recordResult(ctx, in, meta, rv, "duplicate", msg, rec.TorrentID, detailURLOf(siteConfig, rec.TorrentID), piecesHash)

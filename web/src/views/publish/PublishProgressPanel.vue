@@ -22,13 +22,16 @@
       <a-alert :type="alertType" show-icon style="margin-bottom: 12px">
         <template #message>
           <span style="font-size: 15px; font-weight: 600">
-            发布成功 {{ okCount }}<span v-if="rowMode === 'site'"> 站</span><span v-else> 种</span><span v-if="existCount"> · 已存在 {{ existCount }}</span><span v-if="failCount"> · 失败 {{ failCount }}</span>
+            发布成功 {{ okCount }}<span v-if="rowMode === 'site'"> 站</span><span v-else> 种</span><span v-if="existCount"> · 已存在 {{ existCount }}</span><span v-if="skipCount"> · 跳过 {{ skipCount }}<span v-if="rowMode === 'site'"> 站</span><span v-else> 种</span></span><span v-if="failCount"> · 失败 {{ failCount }}</span>
           </span>
         </template>
         <template #description>
           <!-- §59.505: 弹窗只列失败行（成功项汇总计数+发布日志页查看——
                全列成功行是噪声·用户定案）；全成功时零明细最干净 -->
+          <!-- §59.546: skipped 可见性修复——Hatfields 案：skipped 曾是幽灵终态
+               （三个汇总数字+明细+日志全不可见）→ 弹窗误显「全部成功」 -->
           <template v-if="attentionRows.length">失败明细（{{ attentionRows.length }}）——成功项详情见发布日志</template>
+          <template v-else-if="skipCount">全部成功 · 跳过 {{ skipCount }}<span v-if="rowMode === 'site'"> 站</span><span v-else> 种</span>=站上已有（覆盖判据）——无需重发</template>
           <template v-else>全部成功——详情见发布日志</template>
         </template>
       </a-alert>
@@ -87,6 +90,8 @@ const existStatuses = ['duplicate', 'existing']
 // 非失败（首版误入 attentionRows 失败明细区+alertType 警告色双错）。
 const skipStatuses = ['skipped']
 const okCount = computed(() => props.results.filter(r => okStatuses.includes(r.status)).length)
+// §59.546: skipped 计数可见性（Hatfields 案——幽灵终态修复）
+const skipCount = computed(() => props.results.filter(r => skipStatuses.includes(r.status)).length)
 const existCount = computed(() => props.results.filter(r => existStatuses.includes(r.status)).length)
 const failCount = computed(() => props.results.filter(r => r.status === 'failed').length)
 // §59.505: 明细只列需关注行=failed+未知状态（ok/exist 之外的防御集合）——

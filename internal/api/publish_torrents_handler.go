@@ -1,13 +1,13 @@
 package api
 
 import (
-	"reflect"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ranfish/pt-forward/internal/comment"
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/description"
@@ -25,7 +26,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
-	"github.com/ranfish/pt-forward/internal/comment"
 	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
@@ -39,34 +39,34 @@ type SiteProviderGetter interface {
 }
 
 type PublishTorrentsHandler struct {
-	executor            *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
-	db                  *gorm.DB
-	coverage            *coverage.Service
-	clientMgr           MFClientProvider
-	siteProvider        SiteProviderGetter
-	sourceDetector      *publish.SourceSiteDetector
-	declFilter          *publish.DeclarationFilter
-	reseedEngine        *reseed.Engine
-	metadataFetcher     MetadataFetcherProvider
-	complianceChecker   *compliance.Checker
-	seedPipeline        SeedArtifactAnalyzer
-	bdinfoQueue         *publish.BDInfoScanQueue // §59.319 P1: 原盘扫描队列
-	bdinfoScanner       *publish.BDInfoScanner   // §59.319 P1: 识别门磁盘侧
-	shotStrategy        ScreenshotStrategyRunner
-	screenshotCacheDays int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
-	ptgen               PTGenAnalyzer
-	resourceResolver    *publish.ResourceResolver
-	preflightCache      map[string]preflightEntry // §59.176: 站点发布前置检查缓存（5 分钟）
-	preflightMu         sync.Mutex
-	logger              *zap.Logger
-	bgState             backgroundQueryState
-	batchFetch          batchFetchState
-	siteBatch           siteBatchState // §59.166 一站多种批量任务
-	recompute           recomputeState // §59.514 附八 P2: 重建任务化
-	noTransferRecheck     noTransferRecheckState     // §59.539 禁转标记复检
-	noTransferRecheckSync func()                     // §59.539 配置变更即时重注册 cron（main 注入）
-	declBackfill        declBackfillState // §59.516 v0.0.1461: 简介引用清洗任务
-	strategySem         chan struct{}  // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
+	executor              *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
+	db                    *gorm.DB
+	coverage              *coverage.Service
+	clientMgr             MFClientProvider
+	siteProvider          SiteProviderGetter
+	sourceDetector        *publish.SourceSiteDetector
+	declFilter            *publish.DeclarationFilter
+	reseedEngine          *reseed.Engine
+	metadataFetcher       MetadataFetcherProvider
+	complianceChecker     *compliance.Checker
+	seedPipeline          SeedArtifactAnalyzer
+	bdinfoQueue           *publish.BDInfoScanQueue // §59.319 P1: 原盘扫描队列
+	bdinfoScanner         *publish.BDInfoScanner   // §59.319 P1: 识别门磁盘侧
+	shotStrategy          ScreenshotStrategyRunner
+	screenshotCacheDays   int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
+	ptgen                 PTGenAnalyzer
+	resourceResolver      *publish.ResourceResolver
+	preflightCache        map[string]preflightEntry // §59.176: 站点发布前置检查缓存（5 分钟）
+	preflightMu           sync.Mutex
+	logger                *zap.Logger
+	bgState               backgroundQueryState
+	batchFetch            batchFetchState
+	siteBatch             siteBatchState         // §59.166 一站多种批量任务
+	recompute             recomputeState         // §59.514 附八 P2: 重建任务化
+	noTransferRecheck     noTransferRecheckState // §59.539 禁转标记复检
+	noTransferRecheckSync func()                 // §59.539 配置变更即时重注册 cron（main 注入）
+	declBackfill          declBackfillState      // §59.516 v0.0.1461: 简介引用清洗任务
+	strategySem           chan struct{}          // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 }
 
 type backgroundQueryState struct {
@@ -87,12 +87,12 @@ type batchFetchState struct {
 }
 
 type batchFetchItem struct {
-	Hash   string `json:"hash"`
-	Name   string `json:"name"`
-	Size   int64  `json:"size"`
+	Hash     string `json:"hash"`
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
 	SavePath string `json:"savePath"`
-	Status string `json:"status"` // pending / done / failed
-	Error  string `json:"error,omitempty"`
+	Status   string `json:"status"` // pending / done / failed
+	Error    string `json:"error,omitempty"`
 }
 
 // ═══ §59.166 一站多种批量发布任务（N 种×1 站——串行+间隔，轮询进度）═══
@@ -1094,7 +1094,6 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 		"queried": len(req.InfoHashes),
 	})
 }
-
 
 func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *http.Request) {
 	clientIDStr := r.URL.Query().Get("client_id")
@@ -2315,7 +2314,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 		// + forcePTGen 强刷（§59.173）。来源：禁转/无映射筛选视图「批量重获」
 		// 按钮（该视图行多为已获取簇·常规批量获取会被簇跳过全部 no-op）。
 		Force bool `json:"force"`
-		Items     []struct {
+		Items []struct {
 			Hash     string `json:"hash"`
 			Name     string `json:"name"`
 			Size     int64  `json:"size"`
@@ -2799,13 +2798,13 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	var meta *model.TorrentMetadata
 	var err error
 	if result.TorrentID != "" {
-	// §59.338: 直达预算 25s→90s——覆盖主 fallback 45s + enrich fallback 45s
-	// 的物理时长（fallback 独立预算不烧本 ctx，但返回后 enrich/store 继续
-	// 用本 ctx——243 实证 90s 真实工作被 25s ctx 绞杀在最后一步 store：
-	// "store metadata: context deadline exceeded"，browser fetch success
-	// 9 次零落库）。HTTP 尝试的快速失败由 fetchDetailsHTML 内 readBody
-	// 15s 停滞保护承担（不再依赖短 directCtx）。
-	directCtx, directCancel := context.WithTimeout(fetchCtx, 90*time.Second)
+		// §59.338: 直达预算 25s→90s——覆盖主 fallback 45s + enrich fallback 45s
+		// 的物理时长（fallback 独立预算不烧本 ctx，但返回后 enrich/store 继续
+		// 用本 ctx——243 实证 90s 真实工作被 25s ctx 绞杀在最后一步 store：
+		// "store metadata: context deadline exceeded"，browser fetch success
+		// 9 次零落库）。HTTP 尝试的快速失败由 fetchDetailsHTML 内 readBody
+		// 15s 停滞保护承担（不再依赖短 directCtx）。
+		directCtx, directCancel := context.WithTimeout(fetchCtx, 90*time.Second)
 		// §59.61: tid 来源含 coverage_tid/comment_tid——统一走 D3 轻校验入口
 		// （coverage_tid 历史也校验：错缓存宁可降级搜索，符合审计精神）
 		meta, err = h.metadataFetcher.FetchAndStoreDirect(directCtx, hash, result.SourceSite, result.TorrentID, name)
@@ -3083,20 +3082,20 @@ fetched:
 			updates := map[string]interface{}{
 				"reassembled_title": reassembledTitle,
 				"reassembled_notes": strings.Join(reassembledNotes, "；"),
-				"category":        category,
-				"resolution":      profile.Resolution,
-				"video_codec":     profile.VideoCodec,
-				"audio_codec":     profile.AudioCodec,
-				"audio_channels":  profile.AudioChannels,
-				"audio_tech":      profile.AudioTechnology,
-				"audio_tracks":    profile.AudioTracks, // §59.76: v1.05 #16
-				"hdr":             profile.HDR,
-				"bit_depth":       profile.BitDepth,
-				"source_type":     profile.SourceType,
-				"specification":   profile.Specification,
-				"source_platform": profile.SourcePlatform,
-				"edition_info":    profile.EditionInfo,
-				"region_code":     profile.RegionCode,
+				"category":          category,
+				"resolution":        profile.Resolution,
+				"video_codec":       profile.VideoCodec,
+				"audio_codec":       profile.AudioCodec,
+				"audio_channels":    profile.AudioChannels,
+				"audio_tech":        profile.AudioTechnology,
+				"audio_tracks":      profile.AudioTracks, // §59.76: v1.05 #16
+				"hdr":               profile.HDR,
+				"bit_depth":         profile.BitDepth,
+				"source_type":       profile.SourceType,
+				"specification":     profile.Specification,
+				"source_platform":   profile.SourcePlatform,
+				"edition_info":      profile.EditionInfo,
+				"region_code":       profile.RegionCode,
 			}
 
 			// §59.265 附: statement 列同步过滤——站点固定资源声明在声明列（Tab2
@@ -3522,7 +3521,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		h.db.WithContext(r.Context()).
 			Table("publish_result_records").
 			Where("target_site = ? AND source_info_hash != '' AND status IN ?",
-				publishTargetSite, []string{"pushed", "pushed_existing", "uploaded", "duplicate", "existing"}).
+				publishTargetSite, model.PublishedListStatuses).
 			Distinct("source_info_hash").
 			Pluck("source_info_hash", &pubHashes)
 		publishedClusters = make(map[string]bool)
@@ -4104,20 +4103,20 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 		updates := map[string]interface{}{
 			"reassembled_title": reassembledTitle,
 			"reassembled_notes": strings.Join(reassembledNotes, "；"),
-			"category":        category,
-			"resolution":      profile.Resolution,
-			"video_codec":     profile.VideoCodec,
-			"audio_codec":     profile.AudioCodec,
-			"audio_channels":  profile.AudioChannels,
-			"audio_tech":      profile.AudioTechnology,
-			"audio_tracks":    profile.AudioTracks,
-			"hdr":             profile.HDR,
-			"bit_depth":       profile.BitDepth,
-			"source_type":     profile.SourceType,
-			"specification":   profile.Specification,
-			"source_platform": profile.SourcePlatform,
-			"edition_info":    profile.EditionInfo,
-			"region_code":     profile.RegionCode,
+			"category":          category,
+			"resolution":        profile.Resolution,
+			"video_codec":       profile.VideoCodec,
+			"audio_codec":       profile.AudioCodec,
+			"audio_channels":    profile.AudioChannels,
+			"audio_tech":        profile.AudioTechnology,
+			"audio_tracks":      profile.AudioTracks,
+			"hdr":               profile.HDR,
+			"bit_depth":         profile.BitDepth,
+			"source_type":       profile.SourceType,
+			"specification":     profile.Specification,
+			"source_platform":   profile.SourcePlatform,
+			"edition_info":      profile.EditionInfo,
+			"region_code":       profile.RegionCode,
 		}
 		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 			Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
@@ -4351,8 +4350,6 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 		"info_hash_no_source": noSrc,
 	})
 }
-
-
 
 // musicFetchArgs §59.474: 音乐链 FetchAndStoreBySearch 变参构造——
 // 影视：[localMI, suffix]；音乐：[localMI, suffix, "music"]（isMusicSeed
@@ -4696,19 +4693,19 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	}
 
 	result := map[string]interface{}{
-		"info_hash":       meta.InfoHash,
-		"site_name":       meta.SiteName,
-		"title":           meta.Title,
-		"subtitle":        meta.Subtitle,
+		"info_hash": meta.InfoHash,
+		"site_name": meta.SiteName,
+		"title":     meta.Title,
+		"subtitle":  meta.Subtitle,
 		// §59.514 附八: 重组标题资产列透出（Tab1 ①区展示核对+tooltip notes）
 		"reassembled_title": meta.ReassembledTitle,
 		"reassembled_notes": meta.ReassembledNotes,
-		"poster":          meta.Poster,
-		"description":     descriptionOut,
-		"screenshots":     screenshots,
-		"mediainfo":       miForProfile,
-		"bdinfo":          meta.BDInfo,
-		"is_disc":         meta.BDInfo != "", // §59.319 附四：前端单框化/文案分流
+		"poster":            meta.Poster,
+		"description":       descriptionOut,
+		"screenshots":       screenshots,
+		"mediainfo":         miForProfile,
+		"bdinfo":            meta.BDInfo,
+		"is_disc":           meta.BDInfo != "", // §59.319 附四：前端单框化/文案分流
 		// §59.542 追记十二: 消费时合成——tab2 初见即完整形态（站方声明+
 		// 官组致谢）·DB 保持净化态（数据与水印分离终态设计）。
 		"statement":       description.ComposeStatement(meta.Statement, meta.SiteName, meta.Title),
@@ -5211,11 +5208,11 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	}
 	hasCluster := true
 	if err := h.db.WithContext(r.Context()). //nolint:gosec // Row().Scan 容错——无行 → 走直删分支
-						Table("torrent_snapshots").
-		Select("client_uid, save_path, name").
-		Where("hash = ? AND name != ''", infoHash).
-		Limit(1).
-		Row().Scan(&ck.ClientUID, &ck.SavePath, &ck.Name); err != nil { //nolint:errcheck // 同上
+							Table("torrent_snapshots").
+							Select("client_uid, save_path, name").
+							Where("hash = ? AND name != ''", infoHash).
+							Limit(1).
+							Row().Scan(&ck.ClientUID, &ck.SavePath, &ck.Name); err != nil { //nolint:errcheck // 同上
 		hasCluster = false
 	}
 
@@ -5382,7 +5379,6 @@ func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID u
 		}
 	}
 }
-
 
 // purgeDeadScreenshots §59.49: 截图获取时探活——HEAD（含 1 次重试）逐张检查，
 // 清死留活；全死全清（screenshots=[]）。只反映获取时点存活状态。
@@ -5584,7 +5580,6 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	// §59.63: 成功落库写穿缓存（final 非空才到达此处——same 早退/失败路径不写）
 	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientUID, savePath, name, final)
 }
-
 
 // handleExecutePublish §59.156 切片 2: 新发布执行器入口（DB 供给——切读 publish_form_config）。
 // body: {info_hash, target_site, anonymous, tag_overrides: [], dry_run}
@@ -6316,12 +6311,12 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 			}()
 			out := repushOutcome{ID: rec.ID, Status: "failed"}
 			res := h.executor.Execute(bgCtx, publish.ExecuteInput{
-				InfoHash:      rec.SourceInfoHash,
-				TargetSite:    rec.TargetSite,
-				TorrentID:     rec.TorrentID,
-				PushOnly:      true,
-				PushClientID:  rec.DownloaderID,
-				PushSavePath:  rec.SavePath,
+				InfoHash:     rec.SourceInfoHash,
+				TargetSite:   rec.TargetSite,
+				TorrentID:    rec.TorrentID,
+				PushOnly:     true,
+				PushClientID: rec.DownloaderID,
+				PushSavePath: rec.SavePath,
 			})
 			if res != nil && res.Status == "pushed" {
 				out.Status = "pushed"
@@ -6357,8 +6352,10 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 // isMusicSeedForRouting §59.469+§59.476 音乐种分流判定：
 // S1 = coverage 含音乐源站（纯音乐站无影视内容——逻辑必然）
 // S2+ = 标题含音乐官组词（词表=release_group_mappings 音乐源站行推导·
-//       §59.476 扩表 {OpenCD,LLM,TSxD,KHQ,Musopia}·见到即判·否决闸见
-//       musicTitleMatch）。
+//
+//	§59.476 扩表 {OpenCD,LLM,TSxD,KHQ,Musopia}·见到即判·否决闸见
+//	musicTitleMatch）。
+//
 // 宁漏勿误：漏判走影视链（music 空可接受）；误判影视种锁进音乐链不可
 // 接受（误判成本=音乐链搜索无果·干净失败可重试）。
 func (h *PublishTorrentsHandler) isMusicSeedForRouting(ctx context.Context, title string, coverageSites []model.SiteCoverageCache) bool {
@@ -6595,12 +6592,14 @@ func (h *PublishTorrentsHandler) resolveMusicReplicaHash(ctx context.Context, cl
 // 标题词·数据仍从音乐源站取——龙PT 给词·皇后给数据）。
 // 通道① coverage tid 行（需 coverage 已丰富·按需触发非自动）
 // 通道② 簇 comment 解析（零网络成本·快照同步即生效——School Rumble
-//        转发案：新副本 coverage tid 未丰富但 comment 立即可用）
+//
+//	转发案：新副本 coverage tid 未丰富但 comment 立即可用）
+//
 // 合并去重·限 4 候选（成本上界：≤4 兄弟详情+≤4 音乐源站搜索）。
 // 输出轻量 struct（统一两通道类型——桥循环只消费 SiteName/TorrentID）。
 type siblingCandidate struct {
-	SiteName   string
-	TorrentID  string
+	SiteName  string
+	TorrentID string
 }
 
 func (h *PublishTorrentsHandler) siblingTitleCandidates(ctx context.Context, clientUID uint, savePath, name, selfHash string, excludeSites []string) []siblingCandidate {
@@ -6715,7 +6714,6 @@ func (h *PublishTorrentsHandler) musicSiblingTitleBridge(ctx context.Context, cl
 	}
 	return nil
 }
-
 
 // handleCoveredSites §59.535 刀5: 簇已有站三面并集（GET /publish/seeds/covered-sites?hash=）
 // ——选站发布弹窗置灰判据（单簇过滤·宁可多置灰：站方 dedup 兜底·不漏放）。
