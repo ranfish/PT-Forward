@@ -44,7 +44,16 @@ func (h *PublishTorrentsHandler) handleFixStaleDolbyTags(w http.ResponseWriter, 
 		if err := json.Unmarshal([]byte(m.Tags), &tags); err != nil {
 			continue // 非法 JSON 保持原状（不扩大处置面）
 		}
-		mi := strings.ToLower(m.MediaInfo)
+		// §59.541 附十 修正：证据列对齐推理输入语义（§59.500 刀3）——
+		// local MI 优先·空时 source MI 兜底。首版只查 media_info 列，
+		// 把 source MI 有 Dolby 证据的真键行（馒头 1141959 实证：local 空
+		// +source 含 Dolby TrueHD with Dolby Atmos+dvhe.08）误判矛盾删键
+		// ——重推立即正确加回（幂等救场）。判定必须与推理输入同源。
+		miText := m.MediaInfo
+		if strings.TrimSpace(miText) == "" {
+			miText = m.SourceMediaInfo
+		}
+		mi := strings.ToLower(miText)
 		hasAtmos := strings.Contains(mi, "atmos")
 		hasVision := strings.Contains(mi, "dolby vision") ||
 			strings.Contains(mi, "dvhe") || strings.Contains(mi, "dovi")

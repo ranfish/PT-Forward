@@ -31,15 +31,18 @@ func TestHandleFixStaleDolbyTags(t *testing.T) {
 	db := setupDolbyFixDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 
-	mk := func(hash, site, tid, tags, mi string) {
+	mk := func(hash, site, tid, tags, mi, srcMI string) {
 		db.Create(&model.TorrentMetadata{
-			InfoHash: hash, SiteName: site, TorrentID: tid, Title: tid, Tags: tags, MediaInfo: mi,
+			InfoHash: hash, SiteName: site, TorrentID: tid, Title: tid, Tags: tags, MediaInfo: mi, SourceMediaInfo: srcMI,
 		})
 	}
-	mk("hash-a", "站A", "1", `["chinese_subtitle","dolby_atmos"]`, "General\nFormat : Matroska\n")
-	mk("hash-b", "站B", "2", `["dolby_vision"]`, "HDR format : dvhe.07\n")
-	mk("hash-c", "站C", "3", `["dolby_atmos"]`, "Commercial name : Dolby Digital Atmos\n")
-	mk("hash-d", "站D", "4", `["dolby_atmos","dolby_vision","high_rating"]`, "")
+	// 行E（§59.541 附十 修正锚）：local MI 空 + source MI 有 Dolby 证据
+	// → 真键行不清洗（首版误删实证：馒头 1141959 形态）
+	mk("hash-a", "站A", "1", `["chinese_subtitle","dolby_atmos"]`, "General\nFormat : Matroska\n", "")
+	mk("hash-b", "站B", "2", `["dolby_vision"]`, "HDR format : dvhe.07\n", "")
+	mk("hash-c", "站C", "3", `["dolby_atmos"]`, "Commercial name : Dolby Digital Atmos\n", "")
+	mk("hash-d", "站D", "4", `["dolby_atmos","dolby_vision","high_rating"]`, "", "")
+	mk("hash-e", "站E", "5", `["dolby_atmos","dolby_vision"]`, "", "Commercial name : Dolby TrueHD with Dolby Atmos\nHDR format : Dolby Vision, dvhe.08\n")
 
 	// ① 首次清洗
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/publish/seeds/fix-stale-dolby", nil)
@@ -55,11 +58,11 @@ func TestHandleFixStaleDolbyTags(t *testing.T) {
 		} `json:"data"`
 	}
 	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp.Data.Scanned != 4 {
-		t.Fatalf("① scanned 应 4，got %d", resp.Data.Scanned)
+	if resp.Data.Scanned != 5 {
+		t.Fatalf("① scanned 应 5，got %d", resp.Data.Scanned)
 	}
-	if resp.Data.Cleaned != 2 { // A+D 两行清洗
-		t.Fatalf("① cleaned 应 2（A+D），got %d", resp.Data.Cleaned)
+	if resp.Data.Cleaned != 2 { // A+D 两行清洗（E=source MI 真键不清洗）
+		t.Fatalf("① cleaned 应 2（A+D·E 保留），got %d", resp.Data.Cleaned)
 	}
 
 	// 行断言
@@ -83,6 +86,10 @@ func TestHandleFixStaleDolbyTags(t *testing.T) {
 	json.Unmarshal([]byte(get("hash-d").Tags), &tagsD)
 	if len(tagsD) != 1 || tagsD[0] != "high_rating" {
 		t.Fatalf("D 行应只留 high_rating，got %v", tagsD)
+	}
+	// E 行（source MI 真键）不应被动
+	if get("hash-e").Tags != `["dolby_atmos","dolby_vision"]` {
+		t.Fatalf("E 行 source MI 真键不应动，got %s", get("hash-e").Tags)
 	}
 
 	// ② 幂等：二次调用 cleaned=0
