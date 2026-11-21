@@ -31,6 +31,11 @@ type PublishFormConfig struct {
 	// 家园 Crazy User 等级为站方后端强制路由层与此独立）
 	Offer bool `json:"offer,omitempty"`
 
+	// DescrQuoteOnly §59.541 附十二: 其它信息仅投引用块（劳改所形态——
+	// 站方详情页有独立「豆瓣信息」渲染区：根据 pt_gen 链接自动解析简介，
+	// descr 里的 PTGen 正文是重复冗余。勾选=descr 仅引用块+来源声明）
+	DescrQuoteOnly bool `json:"descr_quote_only,omitempty"`
+
 	// FormFields 逻辑域 → 表单字段名（站方 HTML 真名，如幸运 medium_sel[4] data-mode 后缀）
 	FormFields map[string]string `json:"form_fields,omitempty"`
 

@@ -65,7 +65,39 @@ func TestAssembleDescription_CoverFieldPosterStrip(t *testing.T) {
 	}
 }
 
-// TestStripLeadingPosterImage 剥壳函数单点锚（五态）。
+// TestAssembleDescription_DescrQuoteOnly §59.541 附十二 回归锚：
+// DescrQuoteOnly=true（劳改所）→ descr 仅引用块·跳过 PTGen 正文
+// （站方独立「豆瓣信息」渲染区自动解析·descr 里重复冗余）；
+// 未开启 → 简介正文保留（默认行为零变化）。
+func TestAssembleDescription_DescrQuoteOnly(t *testing.T) {
+	meta := func() *model.TorrentMetadata {
+		return &model.TorrentMetadata{
+			Statement:   "Remux来自 Test 1999 BluRay REMUX AVC-FLS\n感谢以上所有素材提供者！",
+			Description: "◎片　　名　Test\n◎译　　名　测试\n◎简　　介　剧情正文很长很长",
+		}
+	}
+
+	// ① 默认（未开启）：引用块+正文
+	cfgPlain := &model.PublishFormConfig{FormFields: map[string]string{"description": "descr"}}
+	out := assembleDescription(meta(), cfgPlain)
+	if !strings.Contains(out, "[quote]") || !strings.Contains(out, "◎片　　名") {
+		t.Fatalf("① 默认应含引用块+正文，got: %q", out[:min(100, len(out))])
+	}
+
+	// ② DescrQuoteOnly=true：仅引用块·无正文
+	cfgQuote := &model.PublishFormConfig{
+		DescrQuoteOnly: true,
+		FormFields:     map[string]string{"description": "descr", "pt_gen": "pt_gen"},
+	}
+	out = assembleDescription(meta(), cfgQuote)
+	if !strings.Contains(out, "[quote]") {
+		t.Fatalf("② 引用块应在场，got: %q", out)
+	}
+	if strings.Contains(out, "◎片　　名") || strings.Contains(out, "剧情正文") {
+		t.Fatalf("② PTGen 正文不应在场（DescrQuoteOnly），got: %q", out)
+	}
+}
+
 func TestStripLeadingPosterImage(t *testing.T) {
 	cases := []struct {
 		in, want string

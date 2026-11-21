@@ -798,3 +798,7 @@ migration121 适配期注释写明「+cover+screenshots+technical_info（必填�
 - hr[4]（H&R NO/YES radio）：两 radio 均无 checked 默认·我们不提交（站方默认接受——11-20 三颗 pushed 实证）
 - pos_state/pos_state_until（挑选/置顶）：权限字段·不提交=普通
 - 值集对账：七域（type/medium/codec/audiocodec/standard/team/tags）与 DB form_config 零漂移
+
+### §59.541 附十二：descr 仅引用块（2026-11-21·v0.0.1543）
+
+站方详情页有独立「豆瓣信息」渲染区（根据 pt_gen 链接自动解析简介）——descr 里的 PTGen 正文是重复冗余。生产形态：descr = 引用块（Remux 来源声明+致谢）·配置 `descr_quote_only: true`。

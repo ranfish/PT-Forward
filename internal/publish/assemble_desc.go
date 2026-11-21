@@ -67,7 +67,12 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 		if cfg != nil && cfg.FormFields[model.FieldDomainCover] != "" {
 			d = stripLeadingPosterImage(d)
 		}
-		b.WriteString(d)
+		// §59.541 附十二: DescrQuoteOnly（劳改所形态）——站方详情页有
+		// 独立「豆瓣信息」渲染区（根据 pt_gen 链接自动解析简介），descr
+		// 里的 PTGen 正文是重复冗余：仅投引用块+来源声明·跳过简介正文。
+		if cfg == nil || !cfg.DescrQuoteOnly {
+			b.WriteString(d)
+		}
 	}
 	// §59.166 修道院规范：无 techinfo 表单域 → MI 引用格式入简介（半角原文——
 	// 无自动审核站，标准形态；全角化只服务幸运声明 quote）
