@@ -179,6 +179,15 @@ func (c *fpCache) get(infoHash, siteName string) *model.ContentFingerprint {
 	return c.byKey[infoHash+"|"+siteName]
 }
 
+// taskControl §59.544 修1：任务取消控制柄。原 map[uint]context.CancelFunc
+// 无法比较「注册者身份」（Go 的 func 不可 ==），RunTask 收尾无法区分 map
+// 里的 cancel 是否仍是自己注册的（误删后来者注册=cancel 断链复发）。
+// 存结构体指针即可精确比较。ctx 字段供 stopAll 等场景未来扩展。
+type taskControl struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
 type Engine struct {
 	db                    *gorm.DB
 	logger                *zap.Logger
@@ -190,7 +199,7 @@ type Engine struct {
 	scheduler             *scheduler.Registry
 	limiter               *siteLimiter
 	mu                    sync.RWMutex
-	tasks                 map[uint]context.CancelFunc
+	tasks                 map[uint]*taskControl
 	cloudFPService        model.CloudFPService
 	deleteReporter        *deleteReporter
 	contributeReporter    *contributeReporter
@@ -205,7 +214,7 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		db:      db,
 		logger:  logger,
 		limiter: newSiteLimiter(),
-		tasks:   make(map[uint]context.CancelFunc),
+		tasks:   make(map[uint]*taskControl),
 	}
 }
 
@@ -1163,8 +1172,8 @@ func (e *Engine) Stop() {
 	e.mu.Lock()
 
 	stopped := len(e.tasks)
-	for id, cancel := range e.tasks {
-		cancel()
+	for id, tc := range e.tasks {
+		tc.cancel()
 		delete(e.tasks, id)
 	}
 	e.mu.Unlock()
@@ -1183,10 +1192,10 @@ func (e *Engine) startTask(parentCtx context.Context, task *model.ReseedTask) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if old, ok := e.tasks[task.ID]; ok {
-		old()
+		old.cancel()
 	}
 	ctx, cancel := context.WithCancel(parentCtx) //nolint:gosec // cancel stored in e.tasks for later invocation
-	e.tasks[task.ID] = cancel
+	e.tasks[task.ID] = &taskControl{ctx: ctx, cancel: cancel}
 	if err := e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskIdle,
 		"updated_at": time.Now(),
@@ -1201,8 +1210,8 @@ func (e *Engine) CancelTask(taskID uint) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if cancel, ok := e.tasks[taskID]; ok {
-		cancel()
+	if tc, ok := e.tasks[taskID]; ok {
+		tc.cancel()
 		delete(e.tasks, taskID)
 	}
 }
@@ -1247,13 +1256,33 @@ func MatchDecision(input MatchInput, sizeTolerance float64) model.DecisionType {
 }
 
 func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *model.ReseedExecutionResult, retErr error) {
+	// §59.544 修1：无条件覆盖注册——原 `if !exists` 会被 startTask 引擎启动时
+	// 预注册的残留 cancel 占位：本任务的 ctx 与 tasks[id] 里的 cancel 断链，
+	// CancelTask cancel 的是无人在用的旧链（任务失控无法停止·status 永久
+	// running——2026-11-21 两次 dump+cancel 行为实验实锤）。无条件覆盖使
+	// CancelTask 永远指向「当前在跑的任务」；old.cancel() 幂等（正常路径
+	// handleTrigger 有 running 检查·不会有并发旧任务）。
 	e.mu.Lock()
-	if _, exists := e.tasks[task.ID]; !exists {
-		ctx2, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.tasks for later invocation
-		e.tasks[task.ID] = cancel
-		ctx = ctx2
+	if old, ok := e.tasks[task.ID]; ok {
+		old.cancel()
 	}
+	taskCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.tasks for later invocation
+	tc := &taskControl{ctx: taskCtx, cancel: cancel}
+	e.tasks[task.ID] = tc
 	e.mu.Unlock()
+	ctx = taskCtx
+
+	// §59.544 修1 附：defer 自清理（防残留累积——本次病灶的形成机制）。
+	// 最先注册=最后执行（晚于下方 status 回写 defer）：cancel 幂等不影响
+	// 已判定的 status；指针比较确保只删自己的注册（后来者覆盖时不误删）。
+	defer func() {
+		tc.cancel()
+		e.mu.Lock()
+		if cur, ok := e.tasks[task.ID]; ok && cur == tc {
+			delete(e.tasks, task.ID)
+		}
+		e.mu.Unlock()
+	}()
 
 	start := time.Now()
 	if err := e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
@@ -2589,6 +2618,17 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 
 	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
 	if err != nil {
+		// §59.544 修3：任务取消路径不打噪声（CancelTask 后每颗都 err·
+		// 正常收尾不需要 825 条 Warn）。
+		if ctx.Err() == nil {
+			// §59.544 修3：L2 搜索失败单条日志——原只进 l2s 内存统计
+			// （任务结束汇总才可见），站方 hang 期 30s/颗静默爬行完全
+			// 不可见（本案 79 分钟零日志=排查黑洞·§59.1529 同款）。
+			e.logger.Warn("L2 search failed",
+				zap.String("site", siteName),
+				zap.String("keyword", keyword),
+				zap.Error(err))
+		}
 		if l2s != nil {
 			l2s.record(siteName, "搜索失败")
 			l2s.mu.Lock()

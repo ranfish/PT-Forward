@@ -122,12 +122,29 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 	// 失败案），且 429 被判定 retryable 形成对抗循环。对调后：
 	// breaker 最外（数逻辑失败——与原语义一致）→ retry → limiter
 	// （每物理请求 Acquire + detector 首响应即冻结）→ 原始 transport。
+	//
+	// §59.544 修2：传输层 base 参数化——TLSPretend=chrome 时 base 用
+	// chromeTransport，但**仍走完整层序**（limiter/retry/breaker）。
+	// 原实现 `if TLSPretend != "" { return newChromeClient(...) }` 裸返回，
+	// chrome 站点全部流量绕过站点限流/熔断/重试/WAF 检测防线（好大 L2
+	// 辅种 825 颗全速轰炸触发站方 hang·30s/颗静默爬行 79 分钟案·根因②）。
+	// session 复用语义不变（getChromeSession 站点级单例·与 newChromeClient
+	// 同源）。limiter 的 domain 为空时由 transport 层 extractDomain(req.URL)
+	// 兜底=真实域名；站点 RPS 已由 provider.GetAdapter 的
+	// RegisterSiteRateLimit 幂等注册（fetch_rps 配置生效闭环）。
+	baseTransport := http.RoundTripper(transport)
+	if cfg.TLSPretend != "" {
+		baseTransport = &chromeTransport{
+			session: getChromeSession(cfg.Domain, cfg.ProxyURL),
+			domain:  cfg.Domain,
+		}
+	}
 	var inner http.RoundTripper = &domainLimiterTransport{
 		limiter:  GlobalLimiter,
 		detector: detector,
 		emitter:  GlobalEmitter,
 		domain:   cfg.Domain,
-		base:     transport,
+		base:     baseTransport,
 	}
 	inner = NewRetryTransport(inner, DefaultRetryConfig(), nil)
 	if cb := GlobalCircuitBreaker; cb != nil {
@@ -139,11 +156,9 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 			circuits: cb.circuits,
 		}
 	}
-	if cfg.TLSPretend != "" {
-		// §59.334 附二: Chrome 指纹传输层——拆解 azuretls 分层组合
-		// （智能拨号 + Chrome TLS/H2 指纹完全叠加，替代 azuretlsTransport）
-		return newChromeClient(cfg.Domain, cfg.ProxyURL, cfg.Timeout)
-	}
+	// §59.544 修2 收口：TLSPretend 的裸 return 已删除（chromeTransport 在
+	// 上方作为 baseTransport 并入层序）——chrome 站与普通站同享
+	// breaker{retry{limiter{base}}} 完整防线。
 	return &http.Client{
 		Timeout:   cfg.Timeout,
 		Transport: inner,
@@ -173,20 +188,7 @@ func filterIPv6(addrs []net.IPAddr) []net.IPAddr {
 	return out
 }
 
-// NewChromeClient §59.540: Chrome TLS 指纹客户端公共构造（azuretls 基座·
-// §59.334 附二 chromeTransport 同源）——CF 指纹墙站直用入口：探针/工具/
-// 未来消费方无需经 SiteConfig 配置通道。站级配置路径（sites.tls_pretend →
-// NewSiteHTTPClient TLSPretend 分支）内部同走此单点。
-// domain 用于站点级 Session 复用（空串=独立 session）。
-func NewChromeClient(domain, proxyURL string, timeout time.Duration) *http.Client {
-	return newChromeClient(domain, proxyURL, timeout)
-}
-
-// newChromeClient 内部单点：chromeTransport 构造（TLSPretend 分支与公共
-// 方法同源——Session 复用/重试语义一致）。
-func newChromeClient(domain, proxyURL string, timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: &chromeTransport{session: getChromeSession(domain, proxyURL), domain: domain},
-	}
-}
+// §59.544 修2 附：NewChromeClient/newChromeClient 已删除——原公共入口是
+// 「绕过 limiter/retry/breaker 层序的裸构造」，全库零消费且正是好大 L2
+// 轰炸案根因②的同型陷阱（未来消费方一律走 NewSiteHTTPClient 的
+// TLSPretend 分支——chromeTransport 作为层序 base·getChromeSession 单例）。
