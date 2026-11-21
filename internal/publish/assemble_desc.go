@@ -1,17 +1,19 @@
 // Package publish 发布描述组装——纯本地（§59.159 资产消费白名单）。
 //
 // 发布链网络动作白名单（三允许，其余禁止——AGENTS.md 铁律）：
-//   ① 目标站交互（pre-audit/dedup/上传/下载新种）——发布动作组成
-//   ② 下载器 RPC（导出/加种）——本地资源引用
-//   ③ 无了。PTGen/图床转存/豆瓣/一切外部 API 禁止——必须消费 torrent_metadata
-//      落库资产（历史违规两例：queryPTGen/rehostPoster——renderDescription
-//      采集时代组件的旧习惯，本函数即其发布专用替代）。
+//
+//	① 目标站交互（pre-audit/dedup/上传/下载新种）——发布动作组成
+//	② 下载器 RPC（导出/加种）——本地资源引用
+//	③ 无了。PTGen/图床转存/豆瓣/一切外部 API 禁止——必须消费 torrent_metadata
+//	   落库资产（历史违规两例：queryPTGen/rehostPoster——renderDescription
+//	   采集时代组件的旧习惯，本函数即其发布专用替代）。
 //
 // 组装形态（§59.159 用户定案）：
-//   [quote]Tab2 声明完整 BBCode[/quote]  ← 置顶
-//   Tab4 简介（自带海报——§59.166 不再插 Tab2 海报防双份）
-//   [quote]MediaInfo[/quote]（无 techinfo 域站——修道院规范）
-//   [img]截图 ×N[/img]（≤8 张，无引号）    ← 简介下方
+//
+//	[quote]Tab2 声明完整 BBCode[/quote]  ← 置顶
+//	Tab4 简介（自带海报——§59.166 不再插 Tab2 海报防双份）
+//	[quote]MediaInfo[/quote]（无 techinfo 域站——修道院规范）
+//	[img]截图 ×N[/img]（≤8 张，无引号）    ← 简介下方
 package publish
 
 import (
@@ -59,6 +61,12 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 		b.WriteString("[/quote]\n\n")
 	}
 	if d := strings.TrimSpace(meta.Description); d != "" {
+		// §59.541 附十一: 配置了 cover 域 → 剥简介首行海报 [img]（海报走
+		// 独立框·descr 重复多余——劳改所站方审核「其它信息不能带图」；
+		// 首行非 [img] 形态或未配 cover 域原样保留·未配域站零变化）
+		if cfg != nil && cfg.FormFields[model.FieldDomainCover] != "" {
+			d = stripLeadingPosterImage(d)
+		}
 		b.WriteString(d)
 	}
 	// §59.166 修道院规范：无 techinfo 表单域 → MI 引用格式入简介（半角原文——
@@ -71,21 +79,42 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 			b.WriteString("[/quote]")
 		}
 	}
-	shots := parseScreenshotsCol(meta.Screenshots)
-	if len(shots) > 8 { // §59.84 上限
-		shots = shots[:8]
-	}
-	if len(shots) > 0 {
-		lines := make([]string, 0, len(shots))
-		for _, u := range shots {
-			lines = append(lines, "[img]"+u+"[/img]")
+	// §59.541 附十一: 配置了 screenshots 域 → 截图走独立框（URL 一行
+	// 一张）·descr 不再内嵌 [img]（劳改所站方审核「其它信息不能带图」；
+	// 未配域的站保持内嵌行为零变化——NP 主流形态）
+	hasScreenshotField := cfg != nil && cfg.FormFields[model.FieldDomainScreenshot] != ""
+	if !hasScreenshotField {
+		shots := parseScreenshotsCol(meta.Screenshots)
+		if len(shots) > 8 { // §59.84 上限
+			shots = shots[:8]
 		}
-		b.WriteString("\n\n")
-		b.WriteString(strings.Join(lines, "\n"))
+		if len(shots) > 0 {
+			lines := make([]string, 0, len(shots))
+			for _, u := range shots {
+				lines = append(lines, "[img]"+u+"[/img]")
+			}
+			b.WriteString("\n\n")
+			b.WriteString(strings.Join(lines, "\n"))
+		}
 	}
 	return b.String()
 }
 
+// stripLeadingPosterImage §59.541 附十一: 剥简介首行海报 [img] 行
+// （cover 独立框配置下 descr 的海报重复）。首行形态 "[img]URL[/img]"
+// （允许前后空白）→ 剥除后 Trim 换行；非此形态原样返回。
+func stripLeadingPosterImage(desc string) string {
+	d := strings.TrimLeft(desc, "\r\n \t")
+	if !strings.HasPrefix(d, "[img]") {
+		return desc
+	}
+	end := strings.Index(d, "[/img]")
+	if end < 0 {
+		return desc
+	}
+	rest := d[end+len("[/img]"):]
+	return strings.TrimLeft(rest, "\r\n \t")
+}
 
 // trimQuoteWrapper §59.178: 剥外层 [quote] 壳 + Trim 换行。
 // Statement 列可能存带壳格式（附八合并产物/fetch 管线 q.Full 原文切片），

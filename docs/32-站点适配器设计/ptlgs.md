@@ -778,3 +778,23 @@
   完结=副标题词形——站方检测在审核侧非提交侧+发布预览对齐）+
   非官组禁选官方组+H&R+标题规范。
 - 遗留：首颗真实发布（候选通道）。
+
+## §59.541 附十一：截图/海报独立框投递（2026-11-21·用户实发 114977 案驱动）
+
+### 缺陷
+migration121 适配期注释写明「+cover+screenshots+technical_info（必填三件）」但 SQL 的 form_fields 实际只写了 technical_info——**实施遗漏**（§59.1512 空键族：form_fields 缺域=文本域断链）。生产形态：
+- 截图 5 张全部内嵌 descr（其它信息框）——站方审核「其它信息不能带图片链接」——用户手工逐颗补救
+- cover 框靠站方 pt_gen 联动自动填（站方服务端调 PTGen·与我们的 PTGen 资产同源同链——用户观察到「豆影的截图/PTGen 封面同链」的来源）
+
+### 修复（v0.0.1542）
+- migration179：form_fields 补 `"screenshots": "screenshots"` + `"cover": "cover"`
+- executor：`setForm(FieldDomainScreenshot, URL 一行一张)`（新常量·通用·未配域自然跳过）
+- assembleDescription 双分流（配置驱动·劳改所特化=配置了这两域）：
+  - 配 screenshots 域 → descr 不再内嵌截图 [img]（走独立框）
+  - 配 cover 域 → descr 剥简介首行海报 [img]（stripLeadingPosterImage·走独立框）
+  - 未配域的站零变化（NP 主流内嵌行为保持）
+
+### 发布页特色字段（实拉 2026-11-21·不阻塞）
+- hr[4]（H&R NO/YES radio）：两 radio 均无 checked 默认·我们不提交（站方默认接受——11-20 三颗 pushed 实证）
+- pos_state/pos_state_until（挑选/置顶）：权限字段·不提交=普通
+- 值集对账：七域（type/medium/codec/audiocodec/standard/team/tags）与 DB form_config 零漂移

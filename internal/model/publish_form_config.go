@@ -5,9 +5,10 @@ import "encoding/json"
 // §59.147 站点发布配置中心 — PublishFormConfig: 每站一份发布表单完整配置文档。
 //
 // 存于 sites.publish_form_config（单列 JSON），三层消费流：
-//   种子流: sites_source_keys JSON → 新站接入初始值（出厂模板）
-//   更新流: 配置 UI（HTML 上传 diff 确认）改 DB 即时生效——站方改版零发版响应
-//   消费流: 发布链 DB 优先（切片 2 执行器切读；切片 1 先落库）
+//
+//	种子流: sites_source_keys JSON → 新站接入初始值（出厂模板）
+//	更新流: 配置 UI（HTML 上传 diff 确认）改 DB 即时生效——站方改版零发版响应
+//	消费流: 发布链 DB 优先（切片 2 执行器切读；切片 1 先落库）
 //
 // C1 双开关: Enabled=配置启停（处方）；发布时选站勾选=动作开关（开药）。
 type PublishFormConfig struct {
@@ -52,20 +53,23 @@ const (
 	FieldDomainSmallDescr  = "small_descr"
 	FieldDomainIMDBURL     = "imdb_url"
 	FieldDomainIMDbID      = "imdb_id"   // §59.399: IMDb 编号形态（学校站 imdbid=tt4154756——URL 尾部编号提取）
-	FieldDomainPTGen       = "pt_gen"   // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
-	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
+	FieldDomainPTGen       = "pt_gen"    // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
+	FieldDomainDoubanURL   = "dburl"     // §59.159: 豆瓣链接（PTNexus 同款）
 	FieldDomainDoubanID    = "douban_id" // §59.399: 豆瓣编号形态（学校站 doubanid=24773958——subject/ 尾部编号提取）
-	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
-	FieldDomainOffer       = "offer"    // §59.421: 候选发布（checkbox value=yes——语义由 Offer 承载，域记录存在性；站方字段名两形态优堡 asoffer/家园 offers——form_fields 映射承载）
-	FieldDomainRegion      = "region"   // §59.471: 地区单选（HDVideo region_sel[4] 必填——适配遗漏补）
-	FieldDomainStyle       = "style"    // §59.471: 风格多选（HDVideo style_sel[4][] 必填——适配遗漏补）
-	FieldDomainSeason      = "season"   // §59.472: 季数（海胆 text——剧集类必填·0=不区分季）
-	FieldDomainEpisode     = "episode"  // §59.472: 集数（海胆 text——0=全季）
-	FieldDomainCollages    = "collages" // §59.472: 合集 checkbox（海胆·多季/多部电影勾选·value=1）
-	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
+	FieldDomainUplver      = "uplver"    // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
+	FieldDomainOffer       = "offer"     // §59.421: 候选发布（checkbox value=yes——语义由 Offer 承载，域记录存在性；站方字段名两形态优堡 asoffer/家园 offers——form_fields 映射承载）
+	FieldDomainRegion      = "region"    // §59.471: 地区单选（HDVideo region_sel[4] 必填——适配遗漏补）
+	FieldDomainStyle       = "style"     // §59.471: 风格多选（HDVideo style_sel[4][] 必填——适配遗漏补）
+	FieldDomainSeason      = "season"    // §59.472: 季数（海胆 text——剧集类必填·0=不区分季）
+	FieldDomainEpisode     = "episode"   // §59.472: 集数（海胆 text——0=全季）
+	FieldDomainCollages    = "collages"  // §59.472: 合集 checkbox（海胆·多季/多部电影勾选·value=1）
+	FieldDomainCNName      = "cnname"    // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
-	FieldDomainCover       = "cover"    // §59.510: 海报外链 URL 直填（瓷器——PTGen 简介首行剥壳）
+	FieldDomainCover       = "cover" // §59.510: 海报外链 URL 直填（瓷器——PTGen 简介首行剥壳）
+	// §59.541 附十一: 截图独立框（劳改所——URL 一行一张·配置此域的站
+	// assembleDescription 不再内嵌截图 [img]·descr 保持无图形态）
+	FieldDomainScreenshot = "screenshots"
 )
 
 // FormValueMapping 单个下拉/checkbox 选项的三方绑定。

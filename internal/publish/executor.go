@@ -29,6 +29,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -36,7 +37,6 @@ import (
 	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
-	"github.com/ranfish/pt-forward/internal/fingerprint"
 )
 
 // ExecuteInput 执行入参（API 层构造）。
@@ -63,10 +63,10 @@ type ExecuteInput struct {
 
 // PreAuditDetail 预检明细（幸运官方结构 §59.150）。
 type PreAuditDetail struct {
-	RuleType string `json:"ruleType"`
+	RuleType  string `json:"ruleType"`
 	ErrorCode string `json:"errorCode"`
-	Message  string `json:"message"`
-	Level    string `json:"level"`
+	Message   string `json:"message"`
+	Level     string `json:"level"`
 }
 
 // PreAuditResult 预检结果。
@@ -78,8 +78,8 @@ type PreAuditResult struct {
 
 // ExecuteResult 执行结果（状态机：每个短路点一个 Status）。
 type ExecuteResult struct {
-	Status   string `json:"status"` // disabled/ ineligible/ duplicate/ existing/ uploaded/ uploaded_existing/ pushed/ pushed_existing/ failed/ dry_run_ok
-	Message  string `json:"message"`
+	Status   string            `json:"status"` // disabled/ ineligible/ duplicate/ existing/ uploaded/ uploaded_existing/ pushed/ pushed_existing/ failed/ dry_run_ok
+	Message  string            `json:"message"`
 	PreAudit *PreAuditResult   `json:"pre_audit,omitempty"`
 	Form     map[string]string `json:"form,omitempty"` // 组装产物（DryRun 供人工核对）
 	// §59.310: 字段名→友好展示（"域名 · 值label"）——audiocodec_sel[4]=12 →
@@ -90,11 +90,11 @@ type ExecuteResult struct {
 	TagAssets []string `json:"tag_assets,omitempty"`
 	// §59.312: 标签投递可读化——tags 枚举值 → 站方 label（与 tags 索引对齐；
 	// 投递 6/10 → 完结/英语——预检人工查看语义）
-	TagsLabels []string `json:"tags_labels,omitempty"`
-	Tags     []string          `json:"tags,omitempty"`
-	Upload   *model.PublishResponse `json:"upload,omitempty"`
-	LocalAudit []LocalAuditFinding  `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
-	TargetTorrentURL string     `json:"target_torrent_url,omitempty"`
+	TagsLabels       []string               `json:"tags_labels,omitempty"`
+	Tags             []string               `json:"tags,omitempty"`
+	Upload           *model.PublishResponse `json:"upload,omitempty"`
+	LocalAudit       []LocalAuditFinding    `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
+	TargetTorrentURL string                 `json:"target_torrent_url,omitempty"`
 }
 
 // PublishExecutor 新发布执行器。
@@ -126,12 +126,13 @@ func NewPublishExecutor(pipe *Pipeline) *PublishExecutor {
 // 生效；用户"一站多种官种混选是否被阻塞"问出系统性缺口，本次搬家激活。
 // 粒度=单颗×单目标（批量逐颗独立 Execute 不连坐——官种颗拦名单站，
 // 同批非官种颗/官种颗发其它站均正常）：
-//  ① 种子禁转标记（获取链落库 flags）：绝对禁转族拦全部目标站；限时
-//     禁转窗内拦全部、窗外放行；深度站限转名单站永久拦+窗内全站拦
-//     （checkFlagsFromMetadata 单点）
-//  ② 定向禁转名单（优堡官种→PTTime 等——checkOfficialDirectedNoTransfer 单点）
-//  ③ 互斥转载站点对（HardcodedExclusionPairs）
-//  ④ 用户自定义排除规则（双保险——candidate 创建层已查，单发/重放路径）
+//
+//	① 种子禁转标记（获取链落库 flags）：绝对禁转族拦全部目标站；限时
+//	   禁转窗内拦全部、窗外放行；深度站限转名单站永久拦+窗内全站拦
+//	   （checkFlagsFromMetadata 单点）
+//	② 定向禁转名单（优堡官种→PTTime 等——checkOfficialDirectedNoTransfer 单点）
+//	③ 互斥转载站点对（HardcodedExclusionPairs）
+//	④ 用户自定义排除规则（双保险——candidate 创建层已查，单发/重放路径）
 func (e *PublishExecutor) preflightNoTransfer(ctx context.Context, meta *model.TorrentMetadata, targetSite string) (bool, string) {
 	if targetSite == "" || meta == nil {
 		return false, ""
@@ -263,9 +264,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			case pr.Success:
 				res.Status = "pushed"
 				var s2 model.Site
-			if err := e.db.WithContext(ctx).Where("name = ?", in.TargetSite).First(&s2).Error; err == nil {
-				res.TargetTorrentURL = strings.TrimRight(s2.BaseURL, "/") + "/details.php?id=" + in.TorrentID
-			}
+				if err := e.db.WithContext(ctx).Where("name = ?", in.TargetSite).First(&s2).Error; err == nil {
+					res.TargetTorrentURL = strings.TrimRight(s2.BaseURL, "/") + "/details.php?id=" + in.TorrentID
+				}
 			case pr.AlreadyExist:
 				res.Status = "pushed_existing"
 				res.Message = "下载器已有该种子（已做种）"
@@ -347,6 +348,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// [img]URL[/img] 剥壳得裸地址·hdwing.md 站方文档「海报外链 URL 直填
 	// （非 BBCode）」·未配 cover 域的站自然跳过零影响）
 	setForm(model.FieldDomainCover, coverURLOfDescription(meta.Description))
+	// §59.541 附十一: 截图独立框（劳改所——URL 一行一张；配置此域的站
+	// assembleDescription 不再内嵌截图·descr 保持无图形态；未配域自然跳过）
+	setForm(model.FieldDomainScreenshot, strings.Join(parseScreenshotsCol(meta.Screenshots), "\n"))
 	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
 	// §59.319 P2: 原盘 tech 文本源 BDInfo 优先（表单 techinfo 域/推断/审计同源）
 	setForm(model.FieldDomainTechInfo, TechTextOf(meta))
@@ -596,7 +600,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if in.DryRun {
 		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings,
 			FormLabels: buildFormLabels(cfg, form),
-			TagAssets: parseTagsAssets(meta.Tags),
+			TagAssets:  parseTagsAssets(meta.Tags),
 			TagsLabels: buildTagsLabels(cfg, applied)}
 		// §59.515 刀2 E4：check 预查重结果透出（发布前核对闭环核心价值——
 		// read scope 零副作用·网络失败降级为提示不阻断）
@@ -645,21 +649,21 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		TorrentData: torrentData,
 		FormFields:  form,
 		// §59.462 刀⑤: 海豹翻译层产物注入（jobs 段局部变量→此处消费）
-		ExtraArtists: gpwArtists,
-		SubtitleLangs: gpwSubs,
-		Title:       publishTitle,
-		Subtitle:    meta.Subtitle, // §59.541 附二: 直读素材——原 form 字面量读在缺域/非恒等映射站断流（好学/朱雀缺域·馒头smallDescr/肉丝subtitle/野马shortDesc 非恒等·五站实锤）
-		Description: form[cfg.FormFields[model.FieldDomainDescription]],
-		MediaInfo:   meta.MediaInfo,
-		BDInfo:      meta.BDInfo,
-		Screenshots: parseScreenshotsCol(meta.Screenshots),
-		IMDbLink:    meta.IMDbURL,
-		DoubanLink:  meta.DoubanURL,
-		Anonymous:   in.Anonymous,
-		SourceSite:  meta.SiteName,
+		ExtraArtists:   gpwArtists,
+		SubtitleLangs:  gpwSubs,
+		Title:          publishTitle,
+		Subtitle:       meta.Subtitle, // §59.541 附二: 直读素材——原 form 字面量读在缺域/非恒等映射站断流（好学/朱雀缺域·馒头smallDescr/肉丝subtitle/野马shortDesc 非恒等·五站实锤）
+		Description:    form[cfg.FormFields[model.FieldDomainDescription]],
+		MediaInfo:      meta.MediaInfo,
+		BDInfo:         meta.BDInfo,
+		Screenshots:    parseScreenshotsCol(meta.Screenshots),
+		IMDbLink:       meta.IMDbURL,
+		DoubanLink:     meta.DoubanURL,
+		Anonymous:      in.Anonymous,
+		SourceSite:     meta.SiteName,
 		SourceInfoHash: in.InfoHash,
-		TargetSite:  in.TargetSite,
-		ClientUID: rv.ClientUID,
+		TargetSite:     in.TargetSite,
+		ClientUID:      rv.ClientUID,
 	}
 	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
 	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
@@ -868,8 +872,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// ⑨ 加种（pusher 复用——SavePath 资源目录）
 	result := &ExecuteResult{
-		Status: uploadedStatus,
-		Upload: resp,
+		Status:           uploadedStatus,
+		Upload:           resp,
 		TargetTorrentURL: resp.DetailURL,
 	}
 	// §59.470: 超时复查命中场景的消息注入（uploaded_existing 语义正常路径无 message）
@@ -976,8 +980,13 @@ func (e *PublishExecutor) recordResultFullWithLogs(ctx context.Context, in Execu
 		DownloaderID:   rv.ClientUID,
 		Seeded:         seeded,
 		SeedError:      seedErr,
-		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),
-		CompletedAt:    &now,
+		SeededAt: func() *time.Time {
+			if seeded {
+				return &now
+			}
+			return nil
+		}(),
+		CompletedAt: &now,
 	})
 }
 
@@ -1008,8 +1017,13 @@ func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput,
 		DownloaderID:   rv.ClientUID,
 		Seeded:         seeded,
 		SeedError:      seedErr,
-		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),
-		CompletedAt:    &now,
+		SeededAt: func() *time.Time {
+			if seeded {
+				return &now
+			}
+			return nil
+		}(),
+		CompletedAt: &now,
 	})
 }
 
@@ -1697,17 +1711,17 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		Name string `json:"name"`
 	}
 	type auditBody struct {
-		Name          string   `json:"name"`
-		SmallDescr    string   `json:"small_descr"`
-		IMDBURL       string   `json:"imdb_url"`
-		Description   string   `json:"description"`
-		TechnicalInfo string   `json:"technical_info"`
-		Type          *idNameWithMode `json:"type,omitempty"`
+		Name          string            `json:"name"`
+		SmallDescr    string            `json:"small_descr"`
+		IMDBURL       string            `json:"imdb_url"`
+		Description   string            `json:"description"`
+		TechnicalInfo string            `json:"technical_info"`
+		Type          *idNameWithMode   `json:"type,omitempty"`
 		Quality       map[string]idName `json:"quality,omitempty"`
-		Tags          []idName `json:"tags"`
-		UserInfo      map[string]any `json:"user_info,omitempty"`
-		ExportTime    string   `json:"export_time,omitempty"`
-		PageURL       string   `json:"page_url,omitempty"`
+		Tags          []idName          `json:"tags"`
+		UserInfo      map[string]any    `json:"user_info,omitempty"`
+		ExportTime    string            `json:"export_time,omitempty"`
+		PageURL       string            `json:"page_url,omitempty"`
 	}
 	// §59.309: 预检 name 消费主管线产物（publishTitle 直传——按构造同源）；
 	// 空串=主管线重组失败的兜底场景（真实路径已在上游 fail，此处防御降级）
@@ -2070,6 +2084,7 @@ var haidanCrossSeasonRe = regexp.MustCompile(`^S\d{1,2}-S?\d{1,2}$`)
 //     标签①）∨ 主标题中英词形② ∨ 副标题中英词形直查③（P2 定案：
 //     直查不依赖 fetch 推断产物——历史种/推断 miss 兜底）
 //   - 全集一集：单集 E01 ∧ PTGen episodes=1（BBC 单剧形态——定案不禁）
+//
 // 拦截：单 E / 归一后仍是区间（非 E01 起或无完结信号的 E01 起区间）且
 // 无任何完结信号。
 // 边界（漏判放行·定案）：S01 标题权威（内容半季不判读文件清单）/
@@ -2120,8 +2135,8 @@ func episodeReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProf
 // 「完结剧集请添加合集标签」实锤）。
 var crossSeasonCollectionSites = map[string]bool{
 	"藏宝阁": true,
-	"优堡":   true,
-	"野马":   true,
+	"优堡":  true,
+	"野马":  true,
 }
 
 // adjustTagsForSite §59.177: 发布时标签按目标站调整（两层架构的站点扩展层）。
@@ -2286,13 +2301,16 @@ func (e *PublishExecutor) typeMappingOf(cfg *model.PublishFormConfig, siteName s
 //   - 动画 405+453 BluRay（原盘特化——discCategoryRoute 单类形态）
 //   - 其余 13 类标准键直配（通用链：404 纪录/406 演唱/407 运动/434 无损/
 //     409 其他/422 软件/427 电子书/442 有声书/451 教育/423 PC 游戏）。
+//
 // 媒介判定源=mediumMappingOf 结果的 StandardKeys（§59.380 单源同判定链
 // ——首版误用 mediumStdKeyOf 弱判定：SourceType 归一损失致 REMUX 标题判
 // bluray→421 误路由（龙PT 归一损失同款），DryRun 形态三/四抓出即修）：
-//   原盘族（bluray/uhd_bluray/hddvd 键）→电影 421/影剧 438；dvd/dvdr→
-//   420/435；remux/uhd_remux→439/402（影剧无 Remux 叶归 HD）；
-//   分发形态（encode/webdl/webrip/hdtv/其它/miss）→分辨率 sd→401/403，
-//   ≥720p→419/402（default 兜底）。
+//
+//	原盘族（bluray/uhd_bluray/hddvd 键）→电影 421/影剧 438；dvd/dvdr→
+//	420/435；remux/uhd_remux→439/402（影剧无 Remux 叶归 HD）；
+//	分发形态（encode/webdl/webrip/hdtv/其它/miss）→分辨率 sd→401/403，
+//	≥720p→419/402（default 兜底）。
+//
 // 影视族 9 叶+453 全 label-only（路由独占——通用链永不命中影视叶）；成人
 // 15 叶不录（发布层成人拦截在前 §59.222 不可达）。
 func (e *PublishExecutor) mteamCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
@@ -2801,14 +2819,18 @@ func discfanCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *m
 
 // discfanReleaseBlocked §59.425: 碟粉站点级发布前置双检查（用户定案）。
 // ①五年规则（站规硬规则——仅允许五年以前的资源）：
-//   year ≤ 当前年-5 放行；year > 当前年-5 拦；无年份放行（宁放——
-//   29 库实证占比 0+审核门无 year 字段按需生长）。
-//   年份信号=tp.Year（标题+PTGen §59.254 校正终态——Tab1 同源）。
+//
+//	year ≤ 当前年-5 放行；year > 当前年-5 拦；无年份放行（宁放——
+//	29 库实证占比 0+审核门无 year 字段按需生长）。
+//	年份信号=tp.Year（标题+PTGen §59.254 校正终态——Tab1 同源）。
+//
 // ②禁欧美（用户策略性定案——欧美资源一颗不发连候选流程都不走；
-//   站规原文"欧美需候选"升级为我方直接禁）：
-//   classifyRegionWords 复用——Western 拦/亚洲四类（大陆/港台/日韩/
-//   亚洲其它）放/无产区防御性放行（29 库 315/315 Region 全覆盖实证
-//   ——实际不触发）。
+//
+//	站规原文"欧美需候选"升级为我方直接禁）：
+//	classifyRegionWords 复用——Western 拦/亚洲四类（大陆/港台/日韩/
+//	亚洲其它）放/无产区防御性放行（29 库 315/315 Region 全覆盖实证
+//	——实际不触发）。
+//
 // 挂载：Execute PushOnly 分支后（恒定检查同 §59.424 P1——补推豁免）。
 func discfanReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProfile) (bool, string) {
 	if meta == nil || tp == nil {
@@ -2844,8 +2866,10 @@ func discfanReleaseBlocked(meta *model.TorrentMetadata, tp *titleparser.TechProf
 // 双维路由（typeMappingOf 第五站——用户定案：恒合集+产区路由）。站规
 // 明文"剧集分集仅官方发布员可发"+我方发布恒整季合集（v1.05）——
 // 402/412/414 分集项 label-only 防撞；本特化只服务合集侧产区路由：
-//   剧集 tv_series：陆港澳台→411 国产合集 ｜ 其余/无产区→413 海外合集
-//   综艺 tv_shows：陆港澳台→403 国产综艺 ｜ 其余/无产区→415 海外合集
+//
+//	剧集 tv_series：陆港澳台→411 国产合集 ｜ 其余/无产区→413 海外合集
+//	综艺 tv_shows：陆港澳台→403 国产综艺 ｜ 其余/无产区→415 海外合集
+//
 // 产区数据源=meta.PTGenSourceJSON→src.Region（Tab1"作品信息-产地"同源
 // ——葡萄先例复用；首值优先+全数组兜底）。无产区证据默认海外（海外
 // 剧集大盘——预览可手改）。403 配 [tv_shows] 键：综艺特化 miss 时
@@ -2905,21 +2929,25 @@ func hdskyIsDomesticRegion(meta *model.TorrentMetadata) bool {
 // value：站方改值不破+错拼容错 "TVSereis"(453)+"TVShows"(452) 复数+
 // "Sport 8K"(511) 单数）。
 // prefix（category 键→归一大写前缀）：
-//   movie→MOVIES ｜ tv_series→TVSER ｜ tv_shows→TVSHOW ｜ documentary
-//   (单复数)→DOC ｜ animation→ANIME ｜ music/lossless_music→MUSICS
-//   （音频格式词 FLAC/APE 子路由）｜ sports→SPORT ｜ mv/music_video→
-//   MUSICS+MV ｜ 其余（education/ebook/software/game/concert 等）→nil
-//   （杂项站方概不接受/无独立项——通用链兜底）。
+//
+//	movie→MOVIES ｜ tv_series→TVSER ｜ tv_shows→TVSHOW ｜ documentary
+//	(单复数)→DOC ｜ animation→ANIME ｜ music/lossless_music→MUSICS
+//	（音频格式词 FLAC/APE 子路由）｜ sports→SPORT ｜ mv/music_video→
+//	MUSICS+MV ｜ 其余（education/ebook/software/game/concert 等）→nil
+//	（杂项站方概不接受/无独立项——通用链兜底）。
+//
 // suffix 路由矩阵（medium 单源+resolution 归一，label 归一去连字符
 // 大写后 Contains 匹配）：
-//   uhd_bluray: 8K(r4320p)→"8K"+"UHD BD" ｜ 其余→"UHD"+"BLURAY"
-//   bluray→"BLURAY"（排除 UHD/8K）
-//   uhd_remux: 8K→"8K"+"REMUX" ｜ 其余→"UHD"+"REMUX"
-//   remux→"REMUX"（排除 UHD/8K）
-//   encode/webdl/webrip/hdtv/minibd/hddvd/dvd/dvdr/other+分辨率：
-//     r4320p→"4320P" ｜ r2160p→"2160P" ｜ r1080p→"1080P" ｜ r1080i→
-//     "1080I" ｜ r720p→"720P" ｜ sd→"SD" ｜ 空分辨率→nil
-//   music 类 cd/track 媒介→音频词形 FLAC/APE（tp.AudioCodec）
+//
+//	uhd_bluray: 8K(r4320p)→"8K"+"UHD BD" ｜ 其余→"UHD"+"BLURAY"
+//	bluray→"BLURAY"（排除 UHD/8K）
+//	uhd_remux: 8K→"8K"+"REMUX" ｜ 其余→"UHD"+"REMUX"
+//	remux→"REMUX"（排除 UHD/8K）
+//	encode/webdl/webrip/hdtv/minibd/hddvd/dvd/dvdr/other+分辨率：
+//	  r4320p→"4320P" ｜ r2160p→"2160P" ｜ r1080p→"1080P" ｜ r1080i→
+//	  "1080I" ｜ r720p→"720P" ｜ sd→"SD" ｜ 空分辨率→nil
+//	music 类 cd/track 媒介→音频词形 FLAC/APE（tp.AudioCodec）
+//
 // 匹配：prefix 子集内 suffix 词形首中；REMUX 项由 remux 族分支独占
 // （原盘分支排除 REMUX 词防 529 "Doc 8K UHD BD REMUX" 撞 8K 原盘）。
 // nil=非家园/无 prefix/无分辨率（encode 族）——通用链零变化。
@@ -2955,7 +2983,10 @@ func hdhomeCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *mo
 		return strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(s, "-", ""), " ", ""))
 	}
 	// 路由目标词形（norm 后 Contains 匹配）
-	type wordMatch struct{ words []string; exclude []string }
+	type wordMatch struct {
+		words   []string
+		exclude []string
+	}
 	var m wordMatch
 	isMV := cat == "category.mv" || cat == "category.music_video"
 	switch {
@@ -3066,13 +3097,15 @@ func cbgCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model
 // 类（动画 3D 归 405/MV/剧集等）回退通用链直配（416 命名 *Movies* 3D
 // 只服务电影）。
 // 路由矩阵（判定优先级自上而下，用户定案）：
-//  ① Stereo3D → 416（定案1：3D 最优先）
-//  ② uhd_bluray → 300 ｜ ③ bluray → 401 ｜ ④ remux/uhd_remux → 415
-//  ⑤ dvdr/dvd → 414 ｜ ⑥ webdl/webrip → 412（定案4：不看分辨率——
-//     4K WEB 也进，分辨率由 standard_sel 表达）｜ ⑦ hdtv → 413
-//  ⑧ 兜底（encode/minibd/hddvd/ipad 等）按分辨率（定案2/3）：
-//     2160p → 300 ｜ 1080p/1080i → 410 ｜ 720p → 411 ｜ SD/其它 → 414
-//     （414=DVD 分辨率宽语义=原盘/镜像/DVDRip/SD 重编码——用户定义）
+//
+//	① Stereo3D → 416（定案1：3D 最优先）
+//	② uhd_bluray → 300 ｜ ③ bluray → 401 ｜ ④ remux/uhd_remux → 415
+//	⑤ dvdr/dvd → 414 ｜ ⑥ webdl/webrip → 412（定案4：不看分辨率——
+//	   4K WEB 也进，分辨率由 standard_sel 表达）｜ ⑦ hdtv → 413
+//	⑧ 兜底（encode/minibd/hddvd/ipad 等）按分辨率（定案2/3）：
+//	   2160p → 300 ｜ 1080p/1080i → 410 ｜ 720p → 411 ｜ SD/其它 → 414
+//	   （414=DVD 分辨率宽语义=原盘/镜像/DVDRip/SD 重编码——用户定义）
+//
 // 数据源：mediumStdKeyOf 媒介单源+tp.Resolution+tp.Stereo3D（§59.380
 // 联动同源）。
 func hdareaCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
@@ -3379,10 +3412,12 @@ func (e *PublishExecutor) styleMappingOf(cfg *model.PublishFormConfig, siteName 
 // haidanSeasonEpisodeInject §59.472: 海胆季/集/合集三字段注入（From S04 案——
 // 纯季包 §59.424 合集形态放行但海胆站方要求剧集类必填季集信息·集数 0=全季）。
 // 数据源 tp.SeasonEpisode 归一终态（§59.424 同源——挂载点同在归一后）：
-//   S04 纯季 → season=4 episode=0（全季）；S01-S02 跨季 → 0/0+勾合集；
-//   S04E01 单集（eps=1 全集豁免形态）→ season=4 episode=1；
-//   剧集类无季信号（国产剧）→ 0/0（站方语义：不区分季+全季）；
-//   电影等范围外（§59.424 豁免类）→ 不填（站方仅剧集类要求）。
+//
+//	S04 纯季 → season=4 episode=0（全季）；S01-S02 跨季 → 0/0+勾合集；
+//	S04E01 单集（eps=1 全集豁免形态）→ season=4 episode=1；
+//	剧集类无季信号（国产剧）→ 0/0（站方语义：不区分季+全季）；
+//	电影等范围外（§59.424 豁免类）→ 不填（站方仅剧集类要求）。
+//
 // 未配置 season 键（其它站）零动作。
 func haidanSeasonEpisodeInject(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp *titleparser.TechProfile) {
 	sf, hasSeason := cfg.FormFields[model.FieldDomainSeason]
