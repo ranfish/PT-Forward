@@ -498,6 +498,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleDeclBackfillCancel(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/fix-source-description") && r.Method == http.MethodPost:
 		h.handleFixSourceDescription(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/fix-stale-dolby") && r.Method == http.MethodPost:
+		h.handleFixStaleDolbyTags(w, r)
 		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/backfill") && r.Method == http.MethodPost:
 		h.handleBDInfoBackfill(w, r)

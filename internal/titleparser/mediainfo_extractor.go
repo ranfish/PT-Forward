@@ -23,6 +23,12 @@ type MediaInfoTech struct {
 	// miss」正是 MergeMediaInfoInto 清零标题值的场景）。影视无音轨=废种
 	// 理论必在（用户定案）——false=MI 文本缺失/异常形态，标题回退。
 	HasAudio bool
+	// §59.541 附十 修3: Video 段在场标志（同 HasAudio 语义——段级探测）。
+	// 「MI 在场而 hdr format 行无」= SDR 铁证：HDR 族从「有值才覆盖」
+	// 升级为「MI 在场即权威」（标题/声明 HDR 词形不再存留——piggo 57291
+	// 拒案：fetch 时态标题 HDR 词×本地 MI 无 HDR 行→DB hdr=HDR10→
+	// 站方按 MI 判 SDR 拒收）。false=MI 无 Video 段（数据缺失），标题回退。
+	HasVideo bool
 	HDR             string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
 	BitDepth        string // 8bit/10bit
 	Encoded         bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
@@ -83,6 +89,9 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	result.WEBVerdict, result.WEBRule = ExtractWEBdlVerdict(sections)
 	for _, s := range streams {
 		if s.name == "video" {
+			// §59.541 附十 修3: Video 段在场置位（先于提取——提取 miss
+			// 不影响段级在场判定）
+			result.HasVideo = true
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
 			// §59.235 P3: BDAV 语境 Format 优先（AVC 规范名——V1.05 原盘写法；
 			// Writing library 的 x264 是制作管线痕迹，非民间压制标识）

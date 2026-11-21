@@ -49,7 +49,12 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 			p.AudioTracks = mi.AudioTracks
 		}
 	}
-	if mi.HDR != "" {
+	// §59.541 附十 修3: HDR 族「MI 在场即权威」（§59.514 附六音频族同款
+	// 语义延伸）——Video 段在场（HasVideo）时 MI 是 HDR 判定唯一真相：
+	// mi.HDR 空 = hdr format 行不存在 = SDR 铁证，标题/DOM/声明的 HDR
+	// 词形（fetch 时态污染·源站错标）不再存留。MI 无 Video 段（数据
+	// 缺失）走原回退：标题值保留。
+	if mi.HasVideo || mi.HDR != "" {
 		p.HDR = mi.HDR
 	}
 	if mi.BitDepth != "" {
@@ -66,6 +71,18 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 	// §59.151: MI 编码铁证传递（IsEncode MI 驱动）
 	p.MIEncoded = mi.Encoded
 	p.MIHasVideo = mi.Encoded || mi.Resolution != "" || mi.VideoCodec != ""
+	// §59.541 附十 修3: 规格×编码铁证互斥仲裁——MIEncoded（Writing
+	// library 压制痕迹）与 Remux/Untouched 物理互斥（§59.496 tags 层
+	// 同语义延伸到 specification 层——piggo 57292 拒案：源站错标 Remux
+	// ×MI x265 压制铁证→发布投 Remux 被站方判应 Encode）。铁证在→
+	// Remux/原盘规格降格 Encode；无铁证不干预（证据缺席忠实提取）。
+	if mi.Encoded {
+		switch p.Specification {
+		case "Remux", "remux", "Untouched", "untouched":
+			p.Specification = "Encode"
+			p.Medium = ""
+		}
+	}
 	// §59.517 WEB 族引擎裁决传递——§59.536 起唯一消费方=IsEncode WEB 豁免（发布链改写已撤·跟随源站标注）
 	p.MIWebVerdict = mi.WEBVerdict
 	p.MIWebRule = mi.WEBRule
