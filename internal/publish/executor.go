@@ -2832,11 +2832,11 @@ func discfanCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *m
 	}
 	// 产区匹配（首值优先+全数组兜底——葡萄定案）
 	pick := func(words []string) bool {
-		if len(regions) > 0 && containsAnyWord(regions[0], words) {
+		if len(regions) > 0 && util.ContainsAny(regions[0], words...) {
 			return true
 		}
 		for _, r := range regions {
-			if containsAnyWord(r, words) {
+			if util.ContainsAny(r, words...) {
 				return true
 			}
 		}
@@ -3233,29 +3233,20 @@ var (
 // 本身是"中国大陆 / 中国香港"复合串，splitBySlash 已拆但保守 contains）。
 func classifyRegionWords(regions []string) regionClass {
 	for _, r := range regions {
-		if containsAnyWord(r, regionMainlandWords) {
+		if util.ContainsAny(r, regionMainlandWords...) {
 			return regionMainland
 		}
-		if containsAnyWord(r, regionHKTWWords) {
+		if util.ContainsAny(r, regionHKTWWords...) {
 			return regionHKTW
 		}
-		if containsAnyWord(r, regionJapanKoreaWr) {
+		if util.ContainsAny(r, regionJapanKoreaWr...) {
 			return regionJapanKorea
 		}
-		if containsAnyWord(r, regionAsianOtherWr) {
+		if util.ContainsAny(r, regionAsianOtherWr...) {
 			return regionAsianOther
 		}
 	}
 	return regionNone
-}
-
-func containsAnyWord(s string, words []string) bool {
-	for _, w := range words {
-		if strings.Contains(s, w) {
-			return true
-		}
-	}
-	return false
 }
 
 // sjtuRegionCategoryValue §59.391: 葡萄产区×类型映射。产区数据源=

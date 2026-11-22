@@ -4,9 +4,10 @@ package publish
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/util"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -14,7 +15,7 @@ import (
 
 // 分级失效检测时间阈值（§56.17 Q7）。
 const (
-	ScreenshotFreshThreshold = 5 * time.Minute  // ≤5min: 直接复用
+	ScreenshotFreshThreshold  = 5 * time.Minute // ≤5min: 直接复用
 	ScreenshotRecentThreshold = 24 * time.Hour  // 5min~24h: HEAD 检查
 	// >24h: 重新上传
 )
@@ -32,7 +33,7 @@ func CheckImageCompatibility(screenshotURLs []string, targetSite *model.Site) (c
 	blacklist := parseHostList(targetSite.ImageBlacklist)
 
 	for _, u := range screenshotURLs {
-		host := extractHost(u)
+		host := util.ExtractHost(u)
 		// 白名单制度优先
 		if len(whitelist) > 0 {
 			if isHostInList(host, whitelist) {
@@ -58,10 +59,11 @@ func CheckImageCompatibility(screenshotURLs []string, targetSite *model.Site) (c
 }
 
 // ResolveScreenshots §56.17 Q7: 分级失效检测。
-//   ≤5min: 直接复用（本次任务刚上传）
-//   5min~24h: HEAD 检查第 1 张可达性
-//   >24h: 重新上传（返回空切片，调用方触发上传）
-//   cached 为空: 直接上传
+//
+//	≤5min: 直接复用（本次任务刚上传）
+//	5min~24h: HEAD 检查第 1 张可达性
+//	>24h: 重新上传（返回空切片，调用方触发上传）
+//	cached 为空: 直接上传
 func ResolveScreenshots(ctx context.Context, cached []string, generatedAt time.Time, logger *zap.Logger) (reuse bool) {
 	if len(cached) == 0 {
 		return false // 无缓存，需上传
@@ -105,18 +107,6 @@ func isURLReachable(ctx context.Context, rawURL string) bool {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode == http.StatusOK
-}
-
-// extractHost 从 URL 提取 host（小写）。
-func extractHost(rawURL string) string {
-	if rawURL == "" {
-		return ""
-	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return strings.ToLower(u.Host)
 }
 
 // parseHostList 解析逗号分隔的 host 列表。

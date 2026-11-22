@@ -1,8 +1,10 @@
 package publish
 
 import (
-	"github.com/ranfish/pt-forward/internal/titleparser"
+	"slices"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/titleparser"
 
 	"github.com/ranfish/pt-forward/internal/model"
 )
@@ -208,7 +210,7 @@ func TestTagApplier_CheckboxSpanMode(t *testing.T) {
 	config := &model.SiteTagConfig{
 		Mode: model.TagModeCheckboxSpan,
 		Tags: map[string]string{
-			"chinese_audio": "5",
+			"chinese_audio":    "5",
 			"chinese_subtitle": "6",
 		},
 	}
@@ -353,7 +355,9 @@ func TestCantoneseCompositeScenarios(t *testing.T) {
 	tags1 := inf.InferFull(TagInput{MediaInfo: mi1, Title: "Thunderbolt", Region: "中国香港"})
 	found := false
 	for _, tg := range tags1 {
-		if tg == "cantonese_audio" { found = true }
+		if tg == "cantonese_audio" {
+			found = true
+		}
 	}
 	if !found {
 		t.Errorf("霹雳火场景应产 cantonese, got %v", tags1)
@@ -363,7 +367,9 @@ func TestCantoneseCompositeScenarios(t *testing.T) {
 	tags2 := inf.InferFull(TagInput{MediaInfo: mi2, Title: "Flight", Subtitle: "国粤台英音轨", Region: "美国"})
 	found2 := false
 	for _, tg := range tags2 {
-		if tg == "cantonese_audio" { found2 = true }
+		if tg == "cantonese_audio" {
+			found2 = true
+		}
 	}
 	if found2 {
 		t.Errorf("迫降航班场景(Mandarin反证)不应产 cantonese, got %v", tags2)
@@ -373,7 +379,9 @@ func TestCantoneseCompositeScenarios(t *testing.T) {
 	tags3 := inf.InferFull(TagInput{MediaInfo: mi3, Title: "Laputa", Subtitle: "国粤英日四语", Region: "日本"})
 	found3 := false
 	for _, tg := range tags3 {
-		if tg == "cantonese_audio" { found3 = true }
+		if tg == "cantonese_audio" {
+			found3 = true
+		}
 	}
 	if !found3 {
 		t.Errorf("天空之城场景(副标题声明无反证)应产 cantonese, got %v", tags3)
@@ -387,12 +395,12 @@ func TestInferHDRTagsFromMI(t *testing.T) {
 	}
 	// dvhe.08 = DV+HDR10 双层
 	out := inferHDRTagsFromMI(mkV("Dolby Vision, Version 1.0, Profile 8.1, dvhe.08.06, BL+RPU, no metadata compression, HDR10"), nil)
-	if !containsStr(out, "dolby_vision") || !containsStr(out, "hdr10") {
+	if !slices.Contains(out, "dolby_vision") || !slices.Contains(out, "hdr10") {
 		t.Errorf("dvhe.08 应双产 dv+hdr10, got %v", out)
 	}
 	// ST2086 = HDR10
 	out2 := inferHDRTagsFromMI(mkV("SMPTE ST 2086, HDR10 compatible"), nil)
-	if !containsStr(out2, "hdr10") || containsStr(out2, "dolby_vision") {
+	if !slices.Contains(out2, "hdr10") || slices.Contains(out2, "dolby_vision") {
 		t.Errorf("ST2086 应仅 hdr10, got %v", out2)
 	}
 	// 空 = 全不产
@@ -402,12 +410,12 @@ func TestInferHDRTagsFromMI(t *testing.T) {
 	}
 	// 无 Video 段 = 剔除后返回（纯音频种子）
 	out4 := inferHDRTagsFromMI(titleparser.MISections{}, []string{"hdr10", "other"})
-	if containsStr(out4, "hdr10") || !containsStr(out4, "other") {
+	if slices.Contains(out4, "hdr10") || !slices.Contains(out4, "other") {
 		t.Errorf("无 Video 段应剔除 HDR 族保留其它, got %v", out4)
 	}
 	// ST2094 = HDR10+ 不叠 HDR10
 	out5 := inferHDRTagsFromMI(mkV("SMPTE ST 2094-40, HDR10+"), nil)
-	if !containsStr(out5, "hdr10_plus") || containsStr(out5, "hdr10") {
+	if !slices.Contains(out5, "hdr10_plus") || slices.Contains(out5, "hdr10") {
 		t.Errorf("HDR10+ 应仅 hdr10_plus, got %v", out5)
 	}
 }
@@ -422,22 +430,22 @@ func TestLuckyEnglishAudioConditional(t *testing.T) {
 	// 此处断言条件前提（english_audio 存在且无华语区标签）
 	mi1 := "Audio #1\nFormat : FLAC\nLanguage : English\nText #1\nLanguage : English\n"
 	tags1 := inf.InferFull(TagInput{MediaInfo: mi1, Title: "Buried Alive 1990"})
-	if !containsStr(tags1, "english_audio") {
+	if !slices.Contains(tags1, "english_audio") {
 		t.Errorf("纯英语种应产 english_audio, got %v", tags1)
 	}
-	if containsStr(tags1, "chinese_audio") || containsStr(tags1, "cantonese_audio") || containsStr(tags1, "chinese_subtitle") {
+	if slices.Contains(tags1, "chinese_audio") || slices.Contains(tags1, "cantonese_audio") || slices.Contains(tags1, "chinese_subtitle") {
 		t.Errorf("纯英语种不应有华语区标签, got %v", tags1)
 	}
 	// 场景2 英语音轨+中文字幕（爱情抓马形态）→ 不产
 	mi2 := mi1 + "Text #2\nLanguage : Chinese\n"
 	tags2 := inf.InferFull(TagInput{MediaInfo: mi2, Title: "The Drama 2026"})
-	if containsStr(tags2, "lucky_english_audio") {
+	if slices.Contains(tags2, "lucky_english_audio") {
 		t.Errorf("有中字不应产 lucky_english_audio, got %v", tags2)
 	}
 	// 场景3 国语音轨+英语音轨 → 不产
 	mi3 := "Audio #1\nFormat : TrueHD\nLanguage : English\nAudio #2\nLanguage : Chinese\nTitle : Mandarin\n"
 	tags3 := inf.InferFull(TagInput{MediaInfo: mi3, Title: "Movie"})
-	if containsStr(tags3, "lucky_english_audio") {
+	if slices.Contains(tags3, "lucky_english_audio") {
 		t.Errorf("有国语不应产 lucky_english_audio, got %v", tags3)
 	}
 }
@@ -450,7 +458,9 @@ func TestCantoneseMultiTrackCoexist(t *testing.T) {
 	tags := inf.InferFull(TagInput{MediaInfo: mi, Title: "A Better Tomorrow II", Subtitle: "英雄本色2 国粤英三语 简繁英字幕"})
 	found := false
 	for _, tg := range tags {
-		if tg == "cantonese_audio" { found = true }
+		if tg == "cantonese_audio" {
+			found = true
+		}
 	}
 	if !found {
 		t.Errorf("多语并存场景（Mandarin 纯标记+国粤声明）应产 cantonese, got %v", tags)

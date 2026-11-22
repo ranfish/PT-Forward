@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,7 +38,6 @@ func NewAGSVPTHost(email, password string, logger *zap.Logger) *AGSVPTHost {
 }
 
 func (a *AGSVPTHost) Name() string { return "agsvpt" }
-
 
 func (a *AGSVPTHost) SetCredentials(email, password string) {
 	a.mu.Lock()
@@ -106,12 +106,12 @@ func (a *AGSVPTHost) doUpload(ctx context.Context, data []byte, filename string)
 	}
 
 	var apiResp struct {
-		Status  bool `json:"status"`
+		Status  bool   `json:"status"`
 		Message string `json:"message"`
 		Data    struct {
-			Key     string `json:"key"`
-			Name    string `json:"name"`
-			Links   struct {
+			Key   string `json:"key"`
+			Name  string `json:"name"`
+			Links struct {
 				URL       string `json:"url"`
 				BBCode    string `json:"bbcode"`
 				Thumbnail string `json:"thumbnail_url"`
@@ -218,18 +218,5 @@ func (a *AGSVPTHost) getToken() string {
 }
 
 func (a *AGSVPTHost) isAuthError(err error) bool {
-	return err != nil && (contains(err.Error(), "HTTP 401") || contains(err.Error(), "auth error"))
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsInner(s, substr))
-}
-
-func containsInner(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return err != nil && (strings.Contains(err.Error(), "HTTP 401") || strings.Contains(err.Error(), "auth error"))
 }

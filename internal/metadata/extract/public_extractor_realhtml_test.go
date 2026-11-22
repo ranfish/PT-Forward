@@ -93,10 +93,3 @@ func TestPublicExtractor_PTerRealHTML(t *testing.T) {
 		t.Logf("MediaInfo: (前60) %q", seed.MediaInfo[:min(60, len(seed.MediaInfo))])
 	}
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

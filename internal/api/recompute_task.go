@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -70,15 +70,15 @@ func (h *PublishTorrentsHandler) handleRecomputeProgress(w http.ResponseWriter, 
 	h.recompute.mu.Lock()
 	defer h.recompute.mu.Unlock()
 	Success(w, map[string]interface{}{
-		"active":        h.recompute.active,
-		"total":         h.recompute.total,
-		"done":          h.recompute.done,
-		"failed":        h.recompute.failed,
+		"active":         h.recompute.active,
+		"total":          h.recompute.total,
+		"done":           h.recompute.done,
+		"failed":         h.recompute.failed,
 		"stop_requested": h.recompute.stopRequested,
-		"finished":      h.recompute.finished,
-		"error":         h.recompute.error,
-		"started_at":    h.recompute.startedAt,
-		"finished_at":   h.recompute.finishedAt,
+		"finished":       h.recompute.finished,
+		"error":          h.recompute.error,
+		"started_at":     h.recompute.startedAt,
+		"finished_at":    h.recompute.finishedAt,
 	})
 }
 
@@ -100,7 +100,7 @@ func (h *PublishTorrentsHandler) runRecomputeTask(rows []model.TorrentMetadata) 
 		h.recompute.mu.Unlock()
 		if stopped {
 			h.recompute.mu.Lock()
-			h.recompute.error = "用户取消（已完成 " + itoa(h.recompute.done) + "/" + itoa(h.recompute.total) + "）"
+			h.recompute.error = "用户取消（已完成 " + strconv.Itoa(h.recompute.done) + "/" + strconv.Itoa(h.recompute.total) + "）"
 			h.finishRecompute()
 			h.recompute.mu.Unlock()
 			return
@@ -192,9 +192,4 @@ func (h *PublishTorrentsHandler) finishRecompute() {
 	h.recompute.active = false
 	h.recompute.finished = true
 	h.recompute.finishedAt = time.Now()
-}
-
-func itoa(n int) string {
-	b, _ := json.Marshal(n)
-	return string(b)
 }

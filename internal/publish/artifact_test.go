@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/util"
 )
 
 func TestGenerateTimePoints(t *testing.T) {
@@ -174,9 +176,9 @@ func TestContainsAny(t *testing.T) {
 		{"", []string{"test"}, false},
 	}
 	for _, tt := range tests {
-		got := containsAny(tt.s, tt.keywords...)
+		got := util.ContainsAny(tt.s, tt.keywords...)
 		if got != tt.want {
-			t.Errorf("containsAny(%q, %v) = %v, want %v", tt.s, tt.keywords, got, tt.want)
+			t.Errorf("util.ContainsAny(%q, %v) = %v, want %v", tt.s, tt.keywords, got, tt.want)
 		}
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -158,9 +159,9 @@ done:
 	// §59.542 追记十一（用户定案：复检与簇脱钩）: 复检对象=源站+该种子
 	// （站方对某 tid 的标记）·簇副本行不是独立复检对象——同 (site,tid)
 	// 一组一次判定·组内行统一应用；计数按组（16 副本行=「检测 1 颗」）。
-	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + itoa(len(resolved)) +
-		" 颗（行 " + itoa(len(metas)) + "：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +
-		" · 续期 " + itoa(renewed) + " · 变化 " + itoa(changed) + " · 失败 " + itoa(failed) + "）"
+	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + strconv.Itoa(len(resolved)) +
+		" 颗（行 " + strconv.Itoa(len(metas)) + "：放行 " + strconv.Itoa(cleared) + " · 保留 " + strconv.Itoa(kept) +
+		" · 续期 " + strconv.Itoa(renewed) + " · 变化 " + strconv.Itoa(changed) + " · 失败 " + strconv.Itoa(failed) + "）"
 	h.noTransferRecheck.mu.Lock()
 	h.noTransferRecheck.lastRun = time.Now().Format("2006-01-02 15:04:05")
 	h.noTransferRecheck.lastStats = stats

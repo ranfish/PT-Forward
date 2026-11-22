@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -140,7 +141,7 @@ func TestMusicOfficialGroupWords(t *testing.T) {
 		t.Fatalf("词表应 5 词（影视组出局）: %v", words)
 	}
 	for _, want := range []string{"OpenCD", "LLM", "TSxD", "KHQ", "Musopia"} {
-		if !containsStr(words, want) {
+		if !slices.Contains(words, want) {
 			t.Errorf("词表缺 %s: %v", want, words)
 		}
 	}

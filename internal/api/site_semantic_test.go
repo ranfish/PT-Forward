@@ -1,12 +1,12 @@
 package api
 
 import (
-	"net/url"
-	"net/http/httptest"
-	"encoding/json"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -28,7 +28,7 @@ func TestSiteIsTargetGate(t *testing.T) {
 		}
 		return s
 	}
-	unsupported := mk("未适配站", "unadapted.example.com", "")                          // supported 外假域名（§59.444 原占位 piggo.me·§59.541 值集刀开闸后 105 站全适配无真未适配站——miss 路径同走 403 分支）
+	unsupported := mk("未适配站", "unadapted.example.com", "")                            // supported 外假域名（§59.444 原占位 piggo.me·§59.541 值集刀开闸后 105 站全适配无真未适配站——miss 路径同走 403 分支）
 	unconfigured := mk("幸运", "pt.luckpt.de", "")                                      // 适配但未配置
 	configured := mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配已配置(暂停)
 
@@ -101,7 +101,7 @@ func TestSiteImportDegradeWarning(t *testing.T) {
 	// §59.541: 值集刀开闸后 105 站全 publish_supported——「未适配导入降级」
 	// 无现实数据面（死路径·未来新站 false 时恢复）。语义迁移：piggo 开闸站
 	// 导入 is_target=true 不降级（反向锁死 §59.541 开闸）+passkey 加密载体保留。
-	mk("二师兄", "piggo.me", "")                                  // 已适配开闸（§59.444 曾为未适配占位）
+	mk("二师兄", "piggo.me", "")                                           // 已适配开闸（§59.444 曾为未适配占位）
 	mk("修道院", "xdypt.vip", `{"enabled":false,"form_fields":{"a":"b"}}`) // 适配
 
 	const plainPasskey = "0123456789abcdef0123456789abcdef"
@@ -241,14 +241,14 @@ func TestBatchRepushCriteriaAligned(t *testing.T) {
 		}
 	}
 	rows := []*model.PublishResultRecord{
-		mk("duplicate", "49104", false, 2, "/PT"),   // ✓ 应入（用户案主形态）
-		mk("duplicate", "", false, 2, "/PT"),        // ✗ 无 tid
-		mk("duplicate", "0", false, 2, "/PT"),       // ✗ tid='0'
-		mk("duplicate", "49105", true, 2, "/PT"),    // ✗ 已做种
-		mk("duplicate", "49106", false, 0, "/PT"),   // ✗ 无下载器
-		mk("duplicate", "49107", false, 2, ""),      // ✗ 无保存路径
-		mk("failed", "99001", false, 2, "/PT"),      // ✓ 应入（failed-but-tid 边缘行）
-		mk("existing", "", false, 2, "/PT"),         // ✗ 无 tid（辅种范畴）
+		mk("duplicate", "49104", false, 2, "/PT"), // ✓ 应入（用户案主形态）
+		mk("duplicate", "", false, 2, "/PT"),      // ✗ 无 tid
+		mk("duplicate", "0", false, 2, "/PT"),     // ✗ tid='0'
+		mk("duplicate", "49105", true, 2, "/PT"),  // ✗ 已做种
+		mk("duplicate", "49106", false, 0, "/PT"), // ✗ 无下载器
+		mk("duplicate", "49107", false, 2, ""),    // ✗ 无保存路径
+		mk("failed", "99001", false, 2, "/PT"),    // ✓ 应入（failed-but-tid 边缘行）
+		mk("existing", "", false, 2, "/PT"),       // ✗ 无 tid（辅种范畴）
 	}
 	for _, r := range rows {
 		if err := env.db.Create(r).Error; err != nil {
@@ -335,11 +335,4 @@ func TestSiteBatchCancelIdempotent(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "无运行中任务") {
 		t.Errorf("已完成应 no-op, got %d", code)
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

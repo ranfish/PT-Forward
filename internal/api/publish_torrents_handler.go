@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -6620,25 +6621,16 @@ func (h *PublishTorrentsHandler) musicFallbackSites(ctx context.Context) []strin
 	}
 	var out []string
 	for _, p := range publish.FetchPriorityList(ctx, h.db) {
-		if enabledSet[p] && site.IsMusicSourceSite(p) && !containsStr(out, p) {
+		if enabledSet[p] && site.IsMusicSourceSite(p) && !slices.Contains(out, p) {
 			out = append(out, p)
 		}
 	}
 	for _, m := range site.MusicSourceSites() {
-		if enabledSet[m] && !containsStr(out, m) {
+		if enabledSet[m] && !slices.Contains(out, m) {
 			out = append(out, m)
 		}
 	}
 	return out
-}
-
-func containsStr(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }
 
 // resolveMusicReplicaHash §59.476 位置3: 簇内音乐源站副本优先——批量/

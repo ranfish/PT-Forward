@@ -7,9 +7,10 @@ package extract
 import (
 	_ "embed"
 	"encoding/json"
-	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/ranfish/pt-forward/internal/util"
 )
 
 //go:embed data/unwanted_images.json
@@ -61,7 +62,7 @@ func loadRules() {
 func IsUnwantedImage(imageURL string) bool {
 	loadRules()
 	lower := strings.ToLower(imageURL)
-	host := extractHost(imageURL)
+	host := util.ExtractHost(imageURL)
 
 	for _, rule := range unwantedImageRules {
 		switch rule.MatchType {
@@ -88,7 +89,7 @@ func IsUnwantedImage(imageURL string) bool {
 // 白名单优先于黑名单：白名单命中的 URL 即使含黑名单关键字也保留。
 func IsWhitelistedImage(imageURL string) bool {
 	loadRules()
-	host := extractHost(imageURL)
+	host := util.ExtractHost(imageURL)
 	if host == "" {
 		return false
 	}
@@ -98,16 +99,4 @@ func IsWhitelistedImage(imageURL string) bool {
 		}
 	}
 	return false
-}
-
-// extractHost 从 URL 中提取 host（小写）。
-func extractHost(rawURL string) string {
-	if rawURL == "" {
-		return ""
-	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return strings.ToLower(u.Host)
 }

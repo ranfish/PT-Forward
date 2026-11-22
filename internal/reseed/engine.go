@@ -3961,13 +3961,6 @@ func wordBoundaryIn(w, lowerText string) bool {
 	return regexp.MustCompile(`\b` + regexp.QuoteMeta(w) + `\b`).MatchString(lowerText)
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // stripCJKParenNote §59.217: CJK 后挂括号注记剥离（半角/全角括号，
 // 前邻 CJK 且内容含 CJK 才剥）。"雅尼雅典卫城音乐会(25周年纪念版)" →
 // "雅尼雅典卫城音乐会"；"[杀人回忆].Memories"（方括号）/"Movie.(2019)"
@@ -6713,10 +6706,3 @@ var musicCatalogNoRe = regexp.MustCompile(`^[A-Z]{2,6}\d{2,6}$`)
 // RCA 案回归推演："60SACD"→[60,SACD] 拆分后两词保留——皇后站方标题
 // "60 SACD"（空格形态）AND Contains 命中·不回归（更精准）。
 var musicSpecTokenRe = regexp.MustCompile(`(?i)^\d+bit$|^(?:cdep|ep|web|single|flac|wav|ape|alac|mp3|m4a)$`)
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

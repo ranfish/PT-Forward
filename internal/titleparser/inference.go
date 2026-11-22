@@ -2,6 +2,8 @@ package titleparser
 
 import (
 	"strings"
+
+	"github.com/ranfish/pt-forward/internal/util"
 )
 
 // InferCategory 从多源信号推断类型分类
@@ -28,19 +30,19 @@ func InferCategory(c TitleComponents, sourceCategory string, ptgenGenre string, 
 	// ③ PTGen genre 辅助
 	genreLower := strings.ToLower(ptgenGenre)
 	if genreLower != "" {
-		if containsAny(genreLower, "动画", "anime", "animation") {
+		if util.ContainsAny(genreLower, "动画", "anime", "animation") {
 			return "category.animation"
 		}
-		if containsAny(genreLower, "纪录", "documentary") {
+		if util.ContainsAny(genreLower, "纪录", "documentary") {
 			return "category.documentary"
 		}
-		if containsAny(genreLower, "综艺", "variety", "show") {
+		if util.ContainsAny(genreLower, "综艺", "variety", "show") {
 			return "category.tv_shows"
 		}
-		if containsAny(genreLower, "音乐", "music", "演唱会", "concert") {
+		if util.ContainsAny(genreLower, "音乐", "music", "演唱会", "concert") {
 			return "category.music"
 		}
-		if containsAny(genreLower, "体育", "sport") {
+		if util.ContainsAny(genreLower, "体育", "sport") {
 			return "category.sports"
 		}
 	}
@@ -68,40 +70,40 @@ func NormalizeSourceCategory(raw string) string {
 
 	switch {
 	// §59.317 新键族（特定→泛化排序）
-	case containsAny(lower, "lossless", "无损"):
+	case util.ContainsAny(lower, "lossless", "无损"):
 		return "category.lossless_music"
-	case containsAny(lower, "audiobook", "有声书", "有聲書"):
+	case util.ContainsAny(lower, "audiobook", "有声书", "有聲書"):
 		return "category.audiobook"
-	case containsAny(lower, "ebook", "电子书", "電子書"):
+	case util.ContainsAny(lower, "ebook", "电子书", "電子書"):
 		return "category.ebook"
-	case containsAny(lower, "concert", "演唱"):
+	case util.ContainsAny(lower, "concert", "演唱"):
 		return "category.concert"
-	case containsAny(lower, "education", "教育", "study"):
+	case util.ContainsAny(lower, "education", "教育", "study"):
 		return "category.education"
-	case containsAny(lower, "game", "游戏", "遊戲"):
+	case util.ContainsAny(lower, "game", "游戏", "遊戲"):
 		return "category.game"
-	case containsAny(lower, "software", "软件", "軟體"):
+	case util.ContainsAny(lower, "software", "软件", "軟體"):
 		return "category.software"
-	case containsAny(lower, "short_drama", "短剧", "短劇", "playlet"):
+	case util.ContainsAny(lower, "short_drama", "短剧", "短劇", "playlet"):
 		return "category.short_drama"
-	case containsAny(lower, "comic", "漫画", "漫畫"):
+	case util.ContainsAny(lower, "comic", "漫画", "漫畫"):
 		return "category.comic"
-	case containsAny(lower, "adult", "成人"):
+	case util.ContainsAny(lower, "adult", "成人"):
 		return "category.adult"
 	// 媒体主类（原有键族保持）
-	case containsAny(lower, "电影", "movie"):
+	case util.ContainsAny(lower, "电影", "movie"):
 		return "category.movie"
-	case containsAny(lower, "电视剧", "剧集", "tv series", "tv-series", "series"):
+	case util.ContainsAny(lower, "电视剧", "剧集", "tv series", "tv-series", "series"):
 		return "category.tv_series"
-	case containsAny(lower, "综艺", "variety", "tv show", "show"):
+	case util.ContainsAny(lower, "综艺", "variety", "tv show", "show"):
 		return "category.tv_shows"
-	case containsAny(lower, "动画", "动漫", "anime", "animation", "cartoon"):
+	case util.ContainsAny(lower, "动画", "动漫", "anime", "animation", "cartoon"):
 		return "category.animation"
-	case containsAny(lower, "纪录", "documentary", "document"):
+	case util.ContainsAny(lower, "纪录", "documentary", "document"):
 		return "category.documentary"
-	case containsAny(lower, "音乐", "music", "演唱会"):
+	case util.ContainsAny(lower, "音乐", "music", "演唱会"):
 		return "category.music"
-	case containsAny(lower, "体育", "sport"):
+	case util.ContainsAny(lower, "体育", "sport"):
 		return "category.sports"
 	default:
 		return ""
@@ -119,15 +121,6 @@ var FallbackChain = map[string][]string{
 	"category.other":       {"category.movie"},
 }
 
-func containsAny(s string, substrs ...string) bool {
-	for _, sub := range substrs {
-		if strings.Contains(s, sub) {
-			return true
-		}
-	}
-	return false
-}
-
 // ptgenGenreToSpecificCategory §59.319 附二十六: PTGen genre → 具体
 // category（仅当比泛化 movie 更具体时有值）。documentary/music/sports/
 // tv_shows/animation 均比 movie 更具体。
@@ -136,19 +129,19 @@ func ptgenGenreToSpecificCategory(ptgenGenre string) string {
 	if genreLower == "" {
 		return ""
 	}
-	if containsAny(genreLower, "动画", "anime", "animation") {
+	if util.ContainsAny(genreLower, "动画", "anime", "animation") {
 		return "category.animation"
 	}
-	if containsAny(genreLower, "纪录", "documentary") {
+	if util.ContainsAny(genreLower, "纪录", "documentary") {
 		return "category.documentary"
 	}
-	if containsAny(genreLower, "综艺", "variety", "show") {
+	if util.ContainsAny(genreLower, "综艺", "variety", "show") {
 		return "category.tv_shows"
 	}
-	if containsAny(genreLower, "音乐", "music", "演唱会", "concert") {
+	if util.ContainsAny(genreLower, "音乐", "music", "演唱会", "concert") {
 		return "category.music"
 	}
-	if containsAny(genreLower, "体育", "sport") {
+	if util.ContainsAny(genreLower, "体育", "sport") {
 		return "category.sports"
 	}
 	return ""

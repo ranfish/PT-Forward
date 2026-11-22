@@ -5,6 +5,7 @@
 package description
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -33,8 +34,8 @@ type MusicArtist struct {
 
 // MusicTrack 曲目。
 type MusicTrack struct {
-	Number int    // 曲号
-	Title  string // 曲名
+	Number   int    // 曲号
+	Title    string // 曲名
 	Duration string // 时长
 }
 
@@ -128,27 +129,7 @@ func formatTrackNumber(n int) string {
 	if n < 10 {
 		return string(rune('0' + n))
 	}
-	return formatInt(n)
-}
-
-// formatInt 简单整数转字符串。
-func formatInt(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var digits []byte
-	negative := n < 0
-	if negative {
-		n = -n
-	}
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	if negative {
-		digits = append([]byte{'-'}, digits...)
-	}
-	return string(digits)
+	return strconv.Itoa(n)
 }
 
 // filterByImportance 按角色过滤艺术家。

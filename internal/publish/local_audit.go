@@ -168,7 +168,7 @@ var localAuditRules = []localAuditRule{
 			// 实战命中面=force 审核旁路（§59.484）+DryRun 未审核种子引导。
 			shots := model.ParseScreenshotColumn(in.Meta.Screenshots)
 			if len(shots) < 3 {
-				return "截图不足（" + itoa(len(shots)) + " 张）"
+				return "截图不足（" + strconv.Itoa(len(shots)) + " 张）"
 			}
 			return ""
 		},
@@ -217,10 +217,6 @@ func containsBannedGroup(title string) string {
 
 func isAlnum(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-}
-
-func itoa(n int) string {
-	return strconv.Itoa(n)
 }
 
 // FormatLocalAudit 提示格式化（成功态 message 后缀）。

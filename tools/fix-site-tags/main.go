@@ -9,9 +9,10 @@
 // （§59.531 从 Execute ⑤段提取——工具与发布同源消费·防双链分叉）。
 //
 // 用法（29 上运行）：
-//   go run ./tools/fix-site-tags -hash <info_hash> -site 财神 [-tid 257204] [-dry]
-//   tid 省略=按 info_hash+站名查发布记录最新 torrent_id
-//   -dry 只打印「站上现值 vs 应投值」差异·不提交
+//
+//	go run ./tools/fix-site-tags -hash <info_hash> -site 财神 [-tid 257204] [-dry]
+//	tid 省略=按 info_hash+站名查发布记录最新 torrent_id
+//	-dry 只打印「站上现值 vs 应投值」差异·不提交
 //
 // 交互：GET edit.php（取表单全域现值）→ 只替换 tags[4][] 域 → POST
 // takeedit.php（其余域原样回传——最小干预）。幂等：重复执行=提交同样的
@@ -28,8 +29,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"mime/multipart"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -284,13 +285,6 @@ func postForm(c *http.Client, u, cookie string, form url.Values) (*http.Response
 func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, "✗ "+msg)
 	os.Exit(1)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // extractErrHint NP 错误提示提取（std 提示页/表单错误文案）

@@ -293,9 +293,9 @@ func parseGazelleTorrentDetail(body []byte) (*model.TorrentDetail, error) {
 		Tags:         g.Tags,
 		PosterURL:    firstNonEmpty(g.WikiImage, g.Conver),
 		// §59.485: 组 ID 透出（海豚 torrentgroup 补采锚）
-		GroupID:      fmt.Sprintf("%d", g.ID),
-		IMDbID:       g.ImdbID,
-		DoubanID:     g.DoubanID,
+		GroupID:  fmt.Sprintf("%d", g.ID),
+		IMDbID:   g.ImdbID,
+		DoubanID: g.DoubanID,
 	}
 	if g.Year > 0 && g.MusicInfo == nil {
 		// 年份拼副标：电影版行为保持（音乐版年份在 MusicMeta.Year——副标留给 remasterTitle）
@@ -731,9 +731,9 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 
 	// 响应 JSON：{"status":200,"response":{"torrent_id":N}} 或错误
 	var result struct {
-		Status  int    `json:"status"`
-		Error   string `json:"error"`
-		Message string `json:"message"`
+		Status   int    `json:"status"`
+		Error    string `json:"error"`
+		Message  string `json:"message"`
 		Response struct {
 			TorrentID interface{} `json:"torrent_id"`
 		} `json:"response"`
@@ -763,8 +763,6 @@ func firstNonEmpty(ss ...string) string {
 	}
 	return ""
 }
-
-func min(a, b int) int { if a < b { return a }; return b }
 
 // SearchTorrents §59.462: browse AJAX 搜索（sections/ajax/browse.php——
 // 黄金规则"须通过 API"禁页面抓取，GenericAdapter 的 HTML 解析违规）。

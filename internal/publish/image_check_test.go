@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/util"
+
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -24,7 +26,7 @@ func TestCheckImageCompatibility_NoRestriction(t *testing.T) {
 
 func TestCheckImageCompatibility_Whitelist(t *testing.T) {
 	urls := []string{
-		"https://pixhost.to/1.jpg",     // 白名单内
+		"https://pixhost.to/1.jpg",      // 白名单内
 		"https://blacklisted.com/2.jpg", // 不在白名单
 	}
 	site := &model.Site{ImageWhitelist: "pixhost.to,doubanio.com"}
@@ -39,8 +41,8 @@ func TestCheckImageCompatibility_Whitelist(t *testing.T) {
 
 func TestCheckImageCompatibility_Blacklist(t *testing.T) {
 	urls := []string{
-		"https://bad.com/1.jpg",   // 黑名单内
-		"https://good.com/2.jpg",  // 不在黑名单
+		"https://bad.com/1.jpg",  // 黑名单内
+		"https://good.com/2.jpg", // 不在黑名单
 	}
 	site := &model.Site{ImageBlacklist: "bad.com,evil.com"}
 	compatible, incompatible := CheckImageCompatibility(urls, site)
@@ -54,7 +56,7 @@ func TestCheckImageCompatibility_Blacklist(t *testing.T) {
 
 func TestCheckImageCompatibility_SubdomainMatch(t *testing.T) {
 	urls := []string{
-		"https://cdn.pixhost.to/1.jpg",  // 子域名应匹配
+		"https://cdn.pixhost.to/1.jpg", // 子域名应匹配
 		"https://other.com/2.jpg",
 	}
 	site := &model.Site{ImageWhitelist: "pixhost.to"}
@@ -154,8 +156,8 @@ func TestIsHostInList(t *testing.T) {
 		want bool
 	}{
 		{"pixhost.to", true},
-		{"cdn.pixhost.to", true},   // 子域名
-		{"PIXHOST.TO", false},       // 大小写敏感（调用前应 lower）
+		{"cdn.pixhost.to", true}, // 子域名
+		{"PIXHOST.TO", false},    // 大小写敏感（调用前应 lower）
 		{"other.com", false},
 		{"", false},
 	}
@@ -176,8 +178,8 @@ func TestExtractHost(t *testing.T) {
 		{"", ""},
 	}
 	for _, c := range cases {
-		if got := extractHost(c.in); got != c.want {
-			t.Errorf("extractHost(%q) = %q, want %q", c.in, got, c.want)
+		if got := util.ExtractHost(c.in); got != c.want {
+			t.Errorf("util.ExtractHost(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

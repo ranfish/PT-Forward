@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/util"
+
 	bdrom "github.com/ranfish/pt-forward/internal/bdinfo/bdrom"
 	bdsettings "github.com/ranfish/pt-forward/internal/bdinfo/settings"
 	"go.uber.org/zap"
@@ -122,11 +124,11 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 		}
 
 		switch {
-		case containsAny(title, "简", "chs", "sc", "simplified"):
+		case util.ContainsAny(title, "简", "chs", "sc", "simplified"):
 			score += 5
-		case containsAny(title, "繁", "cht", "tc", "traditional"):
+		case util.ContainsAny(title, "繁", "cht", "tc", "traditional"):
 			score += 3
-		case containsAny(title, "中", "chinese"):
+		case util.ContainsAny(title, "中", "chinese"):
 			score += 2
 		}
 
@@ -182,16 +184,16 @@ func PickSubtitleSidFromBDInfo(report string) int {
 // 繁中标记先判（防宽松词 "zh" 误吞 zh-hant）；不分简繁的中文
 // （chi/zho/zh/chinese/标题"中"）默认归简体级（中文即中，尽量烧上）。
 func chineseTier(lang, title string) int {
-	if containsAny(lang, "zh-hant", "zh-tw", "zh-hk", "cht") {
+	if util.ContainsAny(lang, "zh-hant", "zh-tw", "zh-hk", "cht") {
 		return 2
 	}
-	if containsAny(title, "繁", "cht", "traditional") {
+	if util.ContainsAny(title, "繁", "cht", "traditional") {
 		return 2
 	}
-	if containsAny(lang, "zh-hans", "zh-cn", "chs", "chi", "zho", "zh", "chinese") {
+	if util.ContainsAny(lang, "zh-hans", "zh-cn", "chs", "chi", "zho", "zh", "chinese") {
 		return 3
 	}
-	if containsAny(title, "简", "chs", "simplified") || containsAny(title, "中", "chinese") {
+	if util.ContainsAny(title, "简", "chs", "simplified") || util.ContainsAny(title, "中", "chinese") {
 		return 3
 	}
 	return 0
@@ -277,15 +279,6 @@ func getDispositionFlag(d map[string]interface{}, key string) bool {
 			return b
 		case bool:
 			return val
-		}
-	}
-	return false
-}
-
-func containsAny(s string, keywords ...string) bool {
-	for _, kw := range keywords {
-		if strings.Contains(s, kw) {
-			return true
 		}
 	}
 	return false

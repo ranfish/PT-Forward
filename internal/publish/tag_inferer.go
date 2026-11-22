@@ -7,8 +7,11 @@ package publish
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/ranfish/pt-forward/internal/util"
 
 	"github.com/ranfish/pt-forward/internal/titleparser"
 )
@@ -105,7 +108,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		tags = filtered
 	}
 	for _, lt := range inferLanguageFromMIAudios(miSec) {
-		if !containsStr(tags, lt) {
+		if !slices.Contains(tags, lt) {
 			tags = append(tags, lt)
 		}
 	}
@@ -115,7 +118,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// ② 副标题"粤"字声明（天空之城"国粤英日四语"）——仅在 MI 无 Mandarin/
 	//    国语 Title 反证时生效（迫降航班反例：粤配轨 MI 标记 Mandarin，幸运按
 	//    MI Language 判无粤语→勾了=WRONGLY）
-	if !containsStr(tags, "cantonese_audio") {
+	if !slices.Contains(tags, "cantonese_audio") {
 		if hasHKOriginalTrack(miSec, in.Region) ||
 			(strings.Contains(in.Subtitle, "粤") && !hasCantoneseDubbedTrapTrack(miSec)) {
 			tags = append(tags, "cantonese_audio")
@@ -128,7 +131,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// §59.151: 字幕语言 MI Text 段补充（Language 行直证——副标题声明之外的
 	// 铁证通道；挽救计划案例：特效字幕声明 ≠ 中字 tag，MI Text 中文轨才是）
 	for st := range inferSubtitleFromMITexts(miSec) {
-		if !containsStr(tags, st) {
+		if !slices.Contains(tags, st) {
 			tags = append(tags, st)
 		}
 	}
@@ -142,7 +145,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// MI 语言证据+双中文标签 → 去 cantonese 留 chinese（流媒体单轨
 	// 主流=国语，站方 WRONGLY 实证方向）。
 	if len(miSec.Audios) == 1 && !miHasLangEvidence &&
-		containsStr(tags, "chinese_audio") && containsStr(tags, "cantonese_audio") {
+		slices.Contains(tags, "chinese_audio") && slices.Contains(tags, "cantonese_audio") {
 		filtered := tags[:0]
 		for _, t := range tags {
 			if t != "cantonese_audio" {
@@ -212,17 +215,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			tags = append(tags, "resolution_4k")
 		}
 	}
-	return ApplyTagRules(dedupTags(tags))
-}
-
-// containsStr 小工具。
-func containsStr(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
+	return ApplyTagRules(util.DedupStrings(tags))
 }
 
 // inferLanguageFromMIAudios §59.117: MI Audios 层语言判据——Language 字段直证
@@ -354,7 +347,7 @@ func parseMIIntStr(s string) int {
 }
 
 var (
-	miWidthRe          = regexp.MustCompile(`(?im)^\s*Width\s*:\s*([\d\s]+)\s*pixels`)
+	miWidthRe = regexp.MustCompile(`(?im)^\s*Width\s*:\s*([\d\s]+)\s*pixels`)
 )
 
 // parseMIWidthPixels 解析 Video 段 Width（像素，含千分位空格）。
@@ -383,20 +376,6 @@ func parseDoubanRatingScore(desc string) float64 {
 	}
 	return v
 }
-
-// dedupTags 保序去重。
-func dedupTags(tags []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, t := range tags {
-		if !seen[t] {
-			seen[t] = true
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
 
 // inferHDRTagsFromMI §59.151: HDR 族标签 MI 层结构化产出（唯一真相源）。
 // 先剔除文本 regex 可能残留的 HDR 族（防双源冲突），再按 MI Video 层
@@ -456,7 +435,6 @@ func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 	return out
 }
 
-
 // inferSubtitleFromMITexts §59.151: MI Text 段字幕语言（Language 行直证）。
 // Commentary 排除同 §59.114 判据（评论字幕不承载内容语言）。
 func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
@@ -473,7 +451,7 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 		// "Mandarin (Hans)/(Hant)"/"Cantonese (Hant)" 形态（不含 chinese），
 		// Title 用 "Chinese (Simplified)" 全词（词表原只认 chs/cht 缩写）——
 		// 鸡皮疙瘩 37 字幕轨中字全漏案。
-		cnSub := containsAny(lang, "chinese", "mandarin", "cantonese") ||
+		cnSub := util.ContainsAny(lang, "chinese", "mandarin", "cantonese") ||
 			regexAny(title, []string{"chs", "cht", "简", "繁", "中文", "chinese", "mandarin", "cantonese"})
 		enSub := strings.Contains(lang, "english") || strings.Contains(title, "eng")
 		if cnSub {
@@ -485,7 +463,6 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 	}
 	return out
 }
-
 
 // hasHKOriginalTrack §59.151: 产地香港 × MI 原声轨（Language=Chinese）→ 粤语。
 // 一个好人反例：English|原声=英语原声（成龙港片的英语轨标记）不判粤语。
@@ -528,7 +505,6 @@ func hasCantoneseDubbedTrapTrack(s titleparser.MISections) bool {
 	}
 	return false
 }
-
 
 // regexAny 子串命中任一（小写化后匹配——CHS/CHT 形态）。
 func regexAny(s string, subs []string) bool {
@@ -586,18 +562,20 @@ func inferNumericSpecTagsBDInfo(nfo string) (highBitrate, highFrameRate bool) {
 // 语言联合推断——用户定案规则：
 //
 // 副标题路径（任何时候，不依赖零字幕轨）：
-//   副标题含 普通话/国语 → chinese_audio
-//   副标题含 粤语       → cantonese_audio
+//
+//	副标题含 普通话/国语 → chinese_audio
+//	副标题含 粤语       → cantonese_audio
 //
 // PTGen 联合回退（仅零字幕轨——MI 无语言证据时兜底）：
-//   零字幕轨 + 产地(中国/港/台) + 语言(汉语/普通话/国语) → chinese_audio
-//   零字幕轨 + 产地(香港) + 语言(粤语)                 → cantonese_audio
-//   零字幕轨 + 产地(中国/港/台)                        → chinese_subtitle（硬字幕推定）
+//
+//	零字幕轨 + 产地(中国/港/台) + 语言(汉语/普通话/国语) → chinese_audio
+//	零字幕轨 + 产地(香港) + 语言(粤语)                 → cantonese_audio
+//	零字幕轨 + 产地(中国/港/台)                        → chinese_subtitle（硬字幕推定）
 //
 // 产地=影片国别（非发行平台）——产地中国=中国影片，零字幕轨=Bilibili
 // 等流媒体平台烧字幕，硬字幕推定安全（零误报）。
 func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []string) []string {
-	has := func(k string) bool { return containsStr(tags, k) }
+	has := func(k string) bool { return slices.Contains(tags, k) }
 
 	// §59.326: MI 音轨完备门（用户三级定案：MI > 副标题 > 豆瓣元数据）——
 	// MI 有音轨语言证据时 A/B 音频声明让位：冲突信 MI（智齿案：LiTV 单
@@ -614,10 +592,10 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	// A. 副标题关键词（MI 无音轨语言证据时——源站声明是直接证据）
 	subLower := strings.ToLower(in.Subtitle)
 	if !miHasLangEvidence {
-		if !has("chinese_audio") && containsAny(subLower, "普通话", "国语") {
+		if !has("chinese_audio") && util.ContainsAny(subLower, "普通话", "国语") {
 			tags = append(tags, "chinese_audio")
 		}
-		if !has("cantonese_audio") && containsAny(subLower, "粤语", "广东话") {
+		if !has("cantonese_audio") && util.ContainsAny(subLower, "粤语", "广东话") {
 			tags = append(tags, "cantonese_audio")
 		}
 	}
@@ -640,7 +618,7 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 			regionLower = descLower
 		}
 	}
-	isChineseRegion := containsAny(regionLower, "中国大陆", "中国香港", "中国台湾", "大陆", "香港", "台湾", "中国")
+	isChineseRegion := util.ContainsAny(regionLower, "中国大陆", "中国香港", "中国台湾", "大陆", "香港", "台湾", "中国")
 	if !isChineseRegion {
 		return tags
 	}
@@ -654,7 +632,7 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	bdHasAudioEvidence := len(extractBDInfoAudioLangs(in.NFO)) > 0
 	hasAudioEvidence := miHasLangEvidence || bdHasAudioEvidence
 	// 中文音频：产地中文区 + 语言(汉语/普通话/国语)——MI 完备门让位（§59.326）
-	if !hasAudioEvidence && !has("chinese_audio") && containsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
+	if !hasAudioEvidence && !has("chinese_audio") && util.ContainsAny(descLower, "汉语普通话", "汉语", "普通话", "国语") {
 		tags = append(tags, "chinese_audio")
 	}
 	// 粤语音频：产地香港 + 语言(粤语)——MI/BDInfo 完备门让位（§59.326 附三）
@@ -663,7 +641,7 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	// WRONGLY_CANTONESE 实证）。双轨（≥2，国粤双语经典配置）与 MI
 	// 缺失（0，无从判轨数保守保留）不受影响。
 	if !hasAudioEvidence && !has("cantonese_audio") && len(miSec.Audios) != 1 &&
-		containsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
+		util.ContainsAny(regionLower, "香港") && strings.Contains(descLower, "粤语") {
 		tags = append(tags, "cantonese_audio")
 	}
 	// 硬字幕推定：产地中文区 + 零字幕轨（中国影片无软字幕=几乎确定硬字幕）
@@ -673,20 +651,21 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 	return tags
 }
 
-
 // inferBDInfoLanguageHDR §59.319 附三十一: BDInfo 报告语言/HDR 推断通道。
 // 原盘 MI 恒空（D8 停产）→ miSec 无 Text/Audio/Video 段 → 语言/HDR 推断
 // 全灭。BDInfo 报告（QUICK SUMMARY 格式）包含：
-//   Video 行: "MPEG-H HEVC Video / 81085 kbps / 2160p / ... / HDR10 / BT.2020"
-//   * Video 隐藏行: "... / Dolby Vision / BT.2020"（DoVi 双层盘增强层）
-//   Audio 行: "Chinese / Dolby TrueHD/Atmos Audio / 7.1 / ..."
-//   Subtitle 行: "Chinese / 29.516 kbps"
+//
+//	Video 行: "MPEG-H HEVC Video / 81085 kbps / 2160p / ... / HDR10 / BT.2020"
+//	* Video 隐藏行: "... / Dolby Vision / BT.2020"（DoVi 双层盘增强层）
+//	Audio 行: "Chinese / Dolby TrueHD/Atmos Audio / 7.1 / ..."
+//	Subtitle 行: "Chinese / 29.516 kbps"
+//
 // 解析这些行产出语言/HDR 标签——MI 已有证据时优先（不重复）。
 func inferBDInfoLanguageHDR(nfo string, miSec titleparser.MISections, tags []string) []string {
 	if !strings.Contains(nfo, "QUICK SUMMARY:") {
 		return tags
 	}
-	has := func(k string) bool { return containsStr(tags, k) }
+	has := func(k string) bool { return slices.Contains(tags, k) }
 
 	miHasAudio := len(miSec.Audios) > 0
 	miHasText := len(miSec.Texts) > 0
@@ -700,27 +679,27 @@ func inferBDInfoLanguageHDR(nfo string, miSec titleparser.MISections, tags []str
 				case lang == "chinese":
 					if !has("chinese_audio") {
 						tags = append(tags, "chinese_audio")
-						has = func(k string) bool { return containsStr(tags, k) }
+						has = func(k string) bool { return slices.Contains(tags, k) }
 					}
 				case lang == "cantonese":
 					if !has("cantonese_audio") {
 						tags = append(tags, "cantonese_audio")
-						has = func(k string) bool { return containsStr(tags, k) }
+						has = func(k string) bool { return slices.Contains(tags, k) }
 					}
 				case lang == "english":
 					if !has("english_audio") {
 						tags = append(tags, "english_audio")
-						has = func(k string) bool { return containsStr(tags, k) }
+						has = func(k string) bool { return slices.Contains(tags, k) }
 					}
 				case lang == "japanese":
 					if !has("japanese_audio") {
 						tags = append(tags, "japanese_audio")
-						has = func(k string) bool { return containsStr(tags, k) }
+						has = func(k string) bool { return slices.Contains(tags, k) }
 					}
 				case lang == "korean":
 					if !has("korean_audio") {
 						tags = append(tags, "korean_audio")
-						has = func(k string) bool { return containsStr(tags, k) }
+						has = func(k string) bool { return slices.Contains(tags, k) }
 					}
 				}
 			}
@@ -845,11 +824,12 @@ func mapBDInfoLang(raw string) string {
 
 // extractBDInfoHDR 从 BDInfo Video 行提取 HDR 类型。
 // 判据与 ExtractBDInfo 的 hdrFromBD 同构：
-//   主行 HDR10 + 隐藏行 Dolby Vision → "DoVi HDR"
-//   主行 HDR10+ → "HDR10+"（+隐藏 DV → "DoVi HDR10+"）
-//   主行 Dolby Vision（无 HDR10）→ "DoVi"
-//   主行 HDR10 → "HDR10"
-//   主行 HDR Vivid → "HDR Vivid"
+//
+//	主行 HDR10 + 隐藏行 Dolby Vision → "DoVi HDR"
+//	主行 HDR10+ → "HDR10+"（+隐藏 DV → "DoVi HDR10+"）
+//	主行 Dolby Vision（无 HDR10）→ "DoVi"
+//	主行 HDR10 → "HDR10"
+//	主行 HDR Vivid → "HDR Vivid"
 func extractBDInfoHDR(nfo string) string {
 	mainHDR := ""
 	hasDoVi := false
@@ -894,7 +874,6 @@ func extractBDInfoHDR(nfo string) string {
 	return mainHDR
 }
 
-
 // audioLanguageTags §59.326: 音频语言族标签清单——推断独占域
 // （InferFull 完备门剔除 + fetch 合并前清旧——两处共用）。
 var audioLanguageTags = map[string]bool{
@@ -907,11 +886,12 @@ var audioLanguageTags = map[string]bool{
 // IsAudioLanguageTag 判定是否音频语言族标签（§59.326 推断独占域）。
 // CleanExistingForMerge §59.496 附二: tags 合并前 existing 清理（t0/t2/
 // BDInfo 重推三处单点）。两类剔除：
-//   ① 音频语言族（§59.326 推断独占域——旧推断自我强化防治）
-//   ② MIEncoded 时的 original_disc/remux（243 Black Snow 案：t2 重推先于
-//     localMI 落库执行——MI 空文案兜底写入 OD→t0 铁证在场却把 t2 产物
-//     当"源站显式"豁免保留——推断产物自我强化·与音频族同构；MI 铁证下
-//     与推断产出同门剔除零豁免。MI 空/无铁证时保留=文案兜底语义不收紧）
+//
+//	① 音频语言族（§59.326 推断独占域——旧推断自我强化防治）
+//	② MIEncoded 时的 original_disc/remux（243 Black Snow 案：t2 重推先于
+//	  localMI 落库执行——MI 空文案兜底写入 OD→t0 铁证在场却把 t2 产物
+//	  当"源站显式"豁免保留——推断产物自我强化·与音频族同构；MI 铁证下
+//	  与推断产出同门剔除零豁免。MI 空/无铁证时保留=文案兜底语义不收紧）
 func CleanExistingForMerge(existing []string, mi string) []string {
 	miEncoded := titleparser.ExtractMediaInfo(mi).Encoded
 	out := make([]string, 0, len(existing))

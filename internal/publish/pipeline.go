@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
-	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -21,6 +21,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/ptgen"
 	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/screenshot"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
@@ -47,21 +48,19 @@ type Pipeline struct {
 	imageHostStrategy string
 	// §59.254 附: settings 引用——截图策略运行时动态读（改配置即生效，
 	// 免重启。此前启动快照注入——用户改 local_upload 后不生效 PT30 实证）
-	settingsRepo *setting.Repository
-	imageHostMgr      *imagehost.Manager
-	pusher            *pusher.Pusher // §56.30: 发布后自动加种
-	wsBroadcaster     event.WSBroadcaster
+	settingsRepo  *setting.Repository
+	imageHostMgr  *imagehost.Manager
+	pusher        *pusher.Pusher // §56.30: 发布后自动加种
+	wsBroadcaster event.WSBroadcaster
 	// §59.146: TagApplier 灰度站点查询（nil=关闭；返回 settings 逗号分隔串）
 }
-
-
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 	logger = logger.With(zap.String("component", "publish"))
 	return &Pipeline{
-		db:        db,
-		logger:    logger,
-		ptgen:     ptgen.NewProvider(db, logger),
+		db:         db,
+		logger:     logger,
+		ptgen:      ptgen.NewProvider(db, logger),
 		limitGuard: NewPublishLimitGuard(db, logger),
 		// §59.294: 内建默认 compliance checker（单通道化后 nil 即缺陷——
 		// 构造即装配；main.go 显式 Set 仍可覆写同款实例）
@@ -72,7 +71,6 @@ func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 func (p *Pipeline) SetSiteProvider(sp model.SiteInfoProvider) {
 	p.siteProvider = sp
 }
-
 
 func (p *Pipeline) SetClientProvider(cp model.DownloaderProvider) {
 	p.clientProvider = cp
@@ -426,7 +424,6 @@ type piecesHashSearcher interface {
 	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
 }
 
-
 // dedupByPiecesHashFull §59.166: 增强——返回站上 tid（此前 API matches 的 tid 被
 // 丢弃；拦截记录消费展示"站上已有种"直达链接）。
 func (p *Pipeline) dedupByPiecesHashFull(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentData []byte) (bool, string, int) {
@@ -460,9 +457,6 @@ func (p *Pipeline) dedupByPiecesHashFull(ctx context.Context, adapter model.Site
 	return false, "", 0
 }
 
-
-
-
 // applyUserOverrides 将手动转发时用户编辑的字段覆盖到 PublishRequest
 // UserOverrides 是 JSON 字符串，包含 subtitle/statement/poster/douban_link/imdb_link/tmdb_link/tags/media_info/screenshots/description/bdinfo
 
@@ -472,8 +466,6 @@ func (p *Pipeline) dedupByPiecesHashFull(ctx context.Context, adapter model.Site
 
 // applyTitleComponents 用用户编辑的标题组件覆盖表单字段
 // 走标准化路径：原始值 → 标准键 → 规范显示名 → 表单字段
-
-
 
 func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int, status, search string) ([]model.PublishCandidate, int64, error) {
 	var total int64
@@ -598,8 +590,6 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 
 	return results, total, nil
 }
-
-
 
 // DistinctTargetSites §59.506: 发布记录出现过的目标站去重列表（日志页
 // 搜索自动完成候选源——候选一定有记录可搜·按记录数降序）。
@@ -726,7 +716,7 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 		return false, ""
 	}
 	// §59.162: 限时禁转两态——now<until 才拦（24h 窗到期自动放行）
-	if containsStr(flags, "限时禁转") {
+	if slices.Contains(flags, "限时禁转") {
 		if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
 			return true, "源站 flags 标记限时禁转（窗口内），跳过发布"
 		}
@@ -735,7 +725,7 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	// "限转"标签语义：① 发布 72h 内禁一切 ② 72h 后永久禁定向名单站。
 	// 窗判定用 torrent_metadata 首见时间近似（官种 RSS 即时抓首见≈发布，
 	// 误差小；老种首采低估窗=放行偏宽可接受——方案 A 用户确认）。
-	if containsStr(flags, "限转") {
+	if slices.Contains(flags, "限转") {
 		// 72h 全站窗+定向名单语义仅深度站（rules.php 定义）——
 		// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
 		if siteName == "深度" {
@@ -791,8 +781,8 @@ var siteDirectedNoTransferTargets = map[string][]string{
 // HardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改。
 var HardcodedExclusionPairs = map[string]map[string]bool{
 	"不可说": {"优堡": true},
-	"优堡":   {"不可说": true},
-	"家园":   {"铂金家": true},
+	"优堡":  {"不可说": true},
+	"家园":  {"铂金家": true},
 	"铂金家": {"家园": true},
 }
 
@@ -879,7 +869,6 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 	return nil
 }
 
-
 func extractTMDBID(tmdbURL string) string {
 	m := reTMDBID.FindStringSubmatch(tmdbURL)
 	if len(m) > 1 {
@@ -959,8 +948,6 @@ func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields
 		fields["medium"] = mapped
 	}
 }
-
-
 
 // CaptureScreenshots §59.50: 本地 mpv 截图（Tab3 "重新获取截图（mpv）" 专用）。
 //

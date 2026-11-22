@@ -103,5 +103,3 @@ func main() {
 		fmt.Printf("  %s: %d cookies\n", d, len(result.CookieData[d]))
 	}
 }
-
-func min(a, b int) int { if a < b { return a }; return b }

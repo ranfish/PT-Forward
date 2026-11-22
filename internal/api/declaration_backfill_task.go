@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -140,7 +141,6 @@ func (h *PublishTorrentsHandler) declBackfillSelectRows(ctx context.Context, pat
 	return rows, nil
 }
 
-
 // runDeclBackfillTask 逐行清洗（graceful 检查点每行前）。
 func (h *PublishTorrentsHandler) runDeclBackfillTask(rows []model.TorrentMetadata, patterns []string) {
 	ctx := context.Background()
@@ -150,7 +150,7 @@ func (h *PublishTorrentsHandler) runDeclBackfillTask(rows []model.TorrentMetadat
 		h.declBackfill.mu.Unlock()
 		if stopped {
 			h.declBackfill.mu.Lock()
-			h.declBackfill.error = "用户取消（已完成 " + itoa(h.declBackfill.done) + "/" + itoa(h.declBackfill.total) + "）"
+			h.declBackfill.error = "用户取消（已完成 " + strconv.Itoa(h.declBackfill.done) + "/" + strconv.Itoa(h.declBackfill.total) + "）"
 			h.finishDeclBackfill()
 			h.declBackfill.mu.Unlock()
 			return
