@@ -32,16 +32,16 @@ func buildDomainResolver(ps *preloadedSites) *domainResolver {
 		if site == nil {
 			continue
 		}
-		primary := normalizeDomain(site.Domain)
+		primary := normalizeLookupDomain(site.Domain)
 		if primary == "" {
-			primary = normalizeDomain(site.BaseURL)
+			primary = normalizeLookupDomain(site.BaseURL)
 		}
 		if primary != "" {
 			dr.domainToName[primary] = name
 			dr.nameToDomain[name] = primary
 		}
 		if site.BaseURL != "" {
-			if d := normalizeDomain(site.BaseURL); d != "" && d != primary {
+			if d := normalizeLookupDomain(site.BaseURL); d != "" && d != primary {
 				dr.domainToName[d] = name
 			}
 		}
@@ -49,7 +49,7 @@ func buildDomainResolver(ps *preloadedSites) *domainResolver {
 			var alts []string
 			if err := json.Unmarshal([]byte(site.AlternativeDomains), &alts); err == nil {
 				for _, alt := range alts {
-					if d := normalizeDomain(alt); d != "" {
+					if d := normalizeLookupDomain(alt); d != "" {
 						dr.domainToName[d] = name
 					}
 				}
@@ -59,7 +59,10 @@ func buildDomainResolver(ps *preloadedSites) *domainResolver {
 	return dr
 }
 
-func normalizeDomain(raw string) string {
+// normalizeLookupDomain §59.552: 域名查找归一（trim/URL 解析取 host/
+// ToLower）——云指纹站映射查找语义。原名 normalizeDomain 与 cookiecloud
+// cookie 域语义同名异义——改名隔离（P1-02 定案）。
+func normalizeLookupDomain(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
