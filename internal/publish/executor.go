@@ -1587,6 +1587,10 @@ func mediumStdKeyOf(tp titleparser.TechProfile, preset string) string {
 // 输入通用翻译产物 stdKey·命中源键条件且值集有该槽时改写·否则原样返回。
 // 保守面：仅改写 medium.encode（BD 源压制→BDRip 的适配期定案保持——
 // bdrip/dvdrip spec 不进血统通道〔spec 显式声明优先〕·非 encode 键零触碰）。
+// ⚠ 仅 medium 域投值链消费（mediumMappingOf/mediumMapping 两处）——
+// codec 联动（:1272）与原盘编码分维（blurayCodecOption）的
+// mediumStdKeyOf(tp,"") 直调是「形态判定」语义（WEB 压制的 codec 归并
+// 仍需 encode 判定）·禁止把源保真统一接进去（会破坏 x265→H.265 联动）。
 func (e *PublishExecutor) applyMediumSourceFidelity(cfg *model.PublishFormConfig, tp titleparser.TechProfile, stdKey string) string {
 	if stdKey != "medium.encode" || cfg == nil {
 		return stdKey
