@@ -22,8 +22,10 @@ func (r *Repository) Create(ctx context.Context, task *model.DownloadTask) error
 
 func (r *Repository) GetByID(ctx context.Context, id uint) (*model.DownloadTask, error) {
 	var task model.DownloadTask
-	err := r.db.WithContext(ctx).First(&task, id).Error
-	return &task, err
+	if err := r.db.WithContext(ctx).First(&task, id).Error; err != nil {
+		return nil, err
+	}
+	return &task, nil
 }
 
 func (r *Repository) List(ctx context.Context, page, size int, clientUID uint, status string) ([]model.DownloadTask, int64, error) {
