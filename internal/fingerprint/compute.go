@@ -115,7 +115,7 @@ func extractFileTree(infoDict map[string]any) map[string]int64 {
 	if length, ok := infoDict["length"]; ok {
 		name := getStr(infoDict, "name")
 		if name != "" {
-			files[name] = toInt64(length)
+			files[name] = int64OrZero(length)
 		}
 		return files
 	}
@@ -130,7 +130,7 @@ func extractFileTree(infoDict map[string]any) map[string]int64 {
 		if !ok {
 			continue
 		}
-		length := toInt64(fd["length"])
+		length := int64OrZero(fd["length"])
 		pathParts, ok := fd["path"].([]any)
 		if !ok {
 			continue
@@ -189,7 +189,9 @@ func getStr(m map[string]any, key string) string {
 	return s
 }
 
-func toInt64(v any) int64 {
+// int64OrZero §59.552: 窄契约整数提取（仅 int64/int·其他返回 0）。
+// 原名 toInt64 与 gazelle 宽松版同名异义——改名隔离（P1-04 定案不合并）。
+func int64OrZero(v any) int64 {
 	switch n := v.(type) {
 	case int64:
 		return n

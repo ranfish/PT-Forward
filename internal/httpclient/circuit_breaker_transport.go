@@ -99,7 +99,7 @@ func NewCircuitBreakerTransport(base http.RoundTripper, cfg CircuitBreakerConfig
 }
 
 func (t *circuitBreakerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	domain := extractDomain(req.URL)
+	domain := extractOrigin(req.URL)
 	circuit := t.getOrCreate(domain)
 
 	circuit.mu.Lock()

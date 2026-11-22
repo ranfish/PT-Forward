@@ -780,7 +780,7 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 					if r.Title == "" {
 						r.Title = tmdb.Title
 					}
-					r.Size = toInt64(t["size"])
+					r.Size = looseInt64(t["size"])
 					if r.TorrentID != "" {
 						results = append(results, r)
 					}

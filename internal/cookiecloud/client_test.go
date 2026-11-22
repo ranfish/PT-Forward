@@ -114,9 +114,9 @@ func TestExtractDomain(t *testing.T) {
 		{"", ""},
 	}
 	for _, tt := range tests {
-		got := extractDomain(tt.input)
+		got := extractHost(tt.input)
 		if got != tt.expect {
-			t.Errorf("extractDomain(%q) = %q, want %q", tt.input, got, tt.expect)
+			t.Errorf("extractHost(%q) = %q, want %q", tt.input, got, tt.expect)
 		}
 	}
 }

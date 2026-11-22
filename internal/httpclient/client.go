@@ -129,7 +129,7 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 	// chrome 站点全部流量绕过站点限流/熔断/重试/WAF 检测防线（好大 L2
 	// 辅种 825 颗全速轰炸触发站方 hang·30s/颗静默爬行 79 分钟案·根因②）。
 	// session 复用语义不变（getChromeSession 站点级单例·与 newChromeClient
-	// 同源）。limiter 的 domain 为空时由 transport 层 extractDomain(req.URL)
+	// 同源）。limiter 的 domain 为空时由 transport 层 extractOrigin(req.URL)
 	// 兜底=真实域名；站点 RPS 已由 provider.GetAdapter 的
 	// RegisterSiteRateLimit 幂等注册（fetch_rps 配置生效闭环）。
 	baseTransport := http.RoundTripper(transport)

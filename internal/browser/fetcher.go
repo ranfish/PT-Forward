@@ -124,7 +124,7 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 // 否则详情页 302 到 login.php。做法：导航到同域轻量路径 →
 // CDP 设置 cookie → 后续真实导航自动携带。
 func prependCookieTask(rawURL, cookie string, next chromedp.Tasks) chromedp.Tasks {
-	domain := extractDomain(rawURL)
+	domain := extractHostNoPort(rawURL)
 	scheme := "https"
 	if strings.HasPrefix(rawURL, "http://") {
 		scheme = "http"
@@ -162,8 +162,10 @@ func prependCookieTask(rawURL, cookie string, next chromedp.Tasks) chromedp.Task
 	return append(pre, next...)
 }
 
-// extractDomain 从 URL 提取域名（去 scheme/路径/端口）
-func extractDomain(rawURL string) string {
+// extractHostNoPort §59.552: 从 URL 提取 host（去 scheme/路径/端口）——
+// 限流域键。原名 extractDomain 与 httpclient origin 版/cookiecloud 端口
+// 保留版同名异义——改名隔离（P1-01 定案）。
+func extractHostNoPort(rawURL string) string {
 	s := strings.TrimPrefix(rawURL, "https://")
 	s = strings.TrimPrefix(s, "http://")
 	if idx := strings.Index(s, "/"); idx > 0 {

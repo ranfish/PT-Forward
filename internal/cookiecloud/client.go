@@ -148,15 +148,18 @@ func FetchAndDecrypt(serverURL, uuid, password string) (map[string][]CookieData,
 	return DecryptFromEncrypted(body.Encrypted, uuid, password)
 }
 
-func normalizeDomain(d string) string {
+// normalizeCookieDomain §59.552: cookie 域名匹配归一（去前导 ./www.）——
+// cookie domain 语义。原名 normalizeDomain 与 reseed 查找语义同名异义——
+// 改名隔离（P1-02 定案：先改名澄清·不合并逻辑）。
+func normalizeCookieDomain(d string) string {
 	d = strings.TrimPrefix(d, ".")
 	d = strings.TrimPrefix(d, "www.")
 	return d
 }
 
 func DomainMatches(cookieDomain, target string) bool {
-	cd := normalizeDomain(cookieDomain)
-	td := normalizeDomain(target)
+	cd := normalizeCookieDomain(cookieDomain)
+	td := normalizeCookieDomain(target)
 	if cd == td {
 		return true
 	}

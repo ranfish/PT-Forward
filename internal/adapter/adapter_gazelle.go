@@ -817,7 +817,7 @@ func (a *GazelleAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 			all = append(all, &model.SeedingSearchResult{
 				TorrentID: toStr(t.TorrentID),
 				Title:     fmt.Sprintf("%s (%d)", g.GroupName, g.GroupYear),
-				Size:      toInt64(t.Size),
+				Size:      looseInt64(t.Size),
 				Seeders:   t.Seeders,
 				Leechers:  t.Leechers,
 			})
@@ -966,23 +966,26 @@ func parseGazelleStatsAPI(body []byte) (*model.UserStatsResult, error) {
 		Ratio:     result.Response.Userstats.Ratio,
 	}
 
-	stats.UploadBytes = toInt64(result.Response.Userstats.Uploaded)
-	stats.DownloadBytes = toInt64(result.Response.Userstats.Downloaded)
+	stats.UploadBytes = looseInt64(result.Response.Userstats.Uploaded)
+	stats.DownloadBytes = looseInt64(result.Response.Userstats.Downloaded)
 
-	if bp := toInt64(result.Response.Userstats.BonusPoints); bp > 0 {
+	if bp := looseInt64(result.Response.Userstats.BonusPoints); bp > 0 {
 		stats.BonusPoints = float64(bp)
 	}
 	if sc := result.Response.Userstats.SeedingCount; sc > 0 {
 		stats.SeedingCount = sc
 	}
-	if ss := toInt64(result.Response.Userstats.SeedingSize); ss > 0 {
+	if ss := looseInt64(result.Response.Userstats.SeedingSize); ss > 0 {
 		stats.SeedingSize = ss
 	}
 
 	return stats, nil
 }
 
-func toInt64(v interface{}) int64 {
+// looseInt64 §59.552: 宽松契约整数提取（float64/int64/json.Number/string
+// 去逗号后 ParseInt/ParseFloat·失败返回 0）——Gazelle JSON 数值多形态适配。
+// 原名 toInt64 与 fingerprint 窄契约版同名异义——改名隔离（P1-04 定案）。
+func looseInt64(v interface{}) int64 {
 	switch val := v.(type) {
 	case float64:
 		return int64(val)
@@ -1087,7 +1090,7 @@ func (a *GazelleAdapter) fetchSeedingFromCommunityStats(ctx context.Context, con
 	if result.Status != "success" {
 		return
 	}
-	if n := toInt64(result.Response.Seeding); n > 0 {
+	if n := looseInt64(result.Response.Seeding); n > 0 {
 		stats.SeedingCount = int(n)
 	}
 }

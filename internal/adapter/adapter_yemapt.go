@@ -675,9 +675,9 @@ func parseYeMPTList(raw json.RawMessage) []*model.SeedingSearchResult {
 		if r.Title == "" {
 			r.Title = toString(item["name"])
 		}
-		r.Size = toInt64(item["fileSize"])
+		r.Size = looseInt64(item["fileSize"])
 		if r.Size == 0 {
-			r.Size = toInt64(item["size"])
+			r.Size = looseInt64(item["size"])
 		}
 		r.Seeders = toInt(item["seeders"])
 		if r.TorrentID != "" {

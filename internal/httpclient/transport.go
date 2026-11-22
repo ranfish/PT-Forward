@@ -122,7 +122,7 @@ type domainLimiterTransport struct {
 func (t *domainLimiterTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	domain := t.domain
 	if domain == "" {
-		domain = extractDomain(req.URL)
+		domain = extractOrigin(req.URL)
 	}
 
 	if err := t.limiter.Acquire(req.Context(), domain); err != nil {
@@ -162,6 +162,9 @@ func (t *domainLimiterTransport) CloseIdleConnections() {
 	}
 }
 
-func extractDomain(u *url.URL) string {
+// extractOrigin §59.552: 返回 scheme://host（含端口）——限流/熔断分键用
+// origin 语义（同站不同端口不同桶）。原名 extractDomain 与 browser/
+// cookiecloud 的 host 语义同名异义——改名隔离（P1-01 定案）。
+func extractOrigin(u *url.URL) string {
 	return u.Scheme + "://" + u.Host
 }

@@ -343,7 +343,10 @@ func (s *SyncService) updateConfigSyncTime(ctx context.Context) {
 	s.db.WithContext(ctx).Model(&cfg).Update("last_sync_at", &now)
 }
 
-func extractDomain(baseURL string) string {
+// extractHost §59.552: 从 baseURL 提取 host（去 scheme/尾斜杠/路径·
+// **保留端口**——TestExtractDomain 用例锁定的既有契约；243 现实数据
+// 零端口但契约不因实态改写）。原名 extractDomain 同名异义——改名隔离。
+func extractHost(baseURL string) string {
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
 	baseURL = strings.TrimSuffix(baseURL, "/")
@@ -357,7 +360,7 @@ func (s *SyncService) buildCookieDomains(site *model.Site) []string {
 	if site.CookieCloudDomain != "" {
 		primary = site.CookieCloudDomain
 	} else {
-		primary = extractDomain(site.BaseURL)
+		primary = extractHost(site.BaseURL)
 	}
 	if primary != "" {
 		domains = append(domains, primary)
@@ -366,7 +369,7 @@ func (s *SyncService) buildCookieDomains(site *model.Site) []string {
 		var alts []string
 		if err := json.Unmarshal([]byte(site.AlternativeDomains), &alts); err == nil {
 			for _, alt := range alts {
-				domain := extractDomain(alt)
+				domain := extractHost(alt)
 				if domain != "" && domain != primary {
 					domains = append(domains, domain)
 				}
