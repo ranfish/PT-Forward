@@ -70,9 +70,8 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 	if groupName != "" {
 		siteName := d.LookupGroup(ctx, groupName)
 		if siteName != "" {
-			var site model.Site
 			// §59.20: Step 2 加 cookie 检查——源站无 cookie 时降级到 Step 3
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+			if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
