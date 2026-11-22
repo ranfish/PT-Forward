@@ -271,7 +271,10 @@ function siteTagColor(st: SiteTagRow, target: string): string {
     return st.ours ? 'green' : 'blue'
   }
   if (st.ours) return 'green'
-  if (st.seeded) return '' // 有副本=默认样式（黑字）
+  // §59.547 回归审核：看似与默认返回等价实为必要顺序拦截——
+  // seeded+covered 组合（已辅种且覆盖表有记录）必须显示黑（已辅种）
+  // 而非 fallthrough 到 gold（黄=辅种机会·语义错误）。勿当死代码清理。
+  if (st.seeded) return ''
   if (st.covered) return 'gold'
   return ''
 }
