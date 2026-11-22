@@ -4688,12 +4688,8 @@ func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group s
 	if len(exact) > 0 {
 		return exact[0]
 	}
-	// 前缀回退（CMCTf→CMCT——词表标准键）
-	var all []string
-	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &all)
-	if fk := util.FuzzyGroupPrefixKey(group, all); fk != "" {
-		return fk
-	}
+	// §59.550: 前缀回退退役（用户定案「官组必须显式映射·系统不推导」）——
+	// miss 返回原词（诚实形态）。变体由映射表显式收编（DSWeb 先例）。
 	return group
 }
 

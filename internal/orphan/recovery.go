@@ -3,19 +3,19 @@ package orphan
 import (
 	"context"
 	"errors"
-	"regexp"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/compliance"
-	"github.com/ranfish/pt-forward/internal/reseed"
-	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/classify"
+	"github.com/ranfish/pt-forward/internal/compliance"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -171,7 +171,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID u
 			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
 			if siteName == "" {
 				// §59.187 ②: 文件级未命中回退目录级——form 误判安全网
-			 // （关键词含集粒度 token + 单集尺寸基准双错形态，目录级总尺寸可救）
+				// （关键词含集粒度 token + 单集尺寸基准双错形态，目录级总尺寸可救）
 				siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
 			}
 		default:
@@ -594,7 +594,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						zap.String("site", sourceSite),
 						zap.String("torrent_id", match.TorrentID),
 						zap.String("matched_title", match.Title))
-					return sourceSite, match.TorrentID, "l2:priority:"+sourceSite
+					return sourceSite, match.TorrentID, "l2:priority:" + sourceSite
 				}
 				r.logger.Debug("orphan L2 priority: no match",
 					zap.String("site", sourceSite))
@@ -618,7 +618,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", m3.TorrentID))
-							return sourceSite, m3.TorrentID, "l2:priority-mix:"+sourceSite
+							return sourceSite, m3.TorrentID, "l2:priority-mix:" + sourceSite
 						}
 					}
 				}
@@ -641,7 +641,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", m4.TorrentID))
-							return sourceSite, m4.TorrentID, "l2:priority-purify:"+sourceSite
+							return sourceSite, m4.TorrentID, "l2:priority-purify:" + sourceSite
 						}
 					}
 				}
@@ -665,7 +665,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 									zap.String("orphan", orphan.Name),
 									zap.String("site", sourceSite),
 									zap.String("torrent_id", m2.TorrentID))
-								return sourceSite, m2.TorrentID, "l2:priority-cn:"+sourceSite
+								return sourceSite, m2.TorrentID, "l2:priority-cn:" + sourceSite
 							}
 						}
 					}
@@ -692,7 +692,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", m5.TorrentID))
-							return sourceSite, m5.TorrentID, "l2:priority-yearless:"+sourceSite
+							return sourceSite, m5.TorrentID, "l2:priority-yearless:" + sourceSite
 						}
 					}
 				}
@@ -718,7 +718,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", mc.TorrentID))
-							return sourceSite, mc.TorrentID, "l2:priority-colon:"+sourceSite
+							return sourceSite, mc.TorrentID, "l2:priority-colon:" + sourceSite
 						}
 					}
 				}
@@ -743,7 +743,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", m6.TorrentID))
-							return sourceSite, m6.TorrentID, "l2:priority-rawname:"+sourceSite
+							return sourceSite, m6.TorrentID, "l2:priority-rawname:" + sourceSite
 						}
 					}
 				}
@@ -753,7 +753,6 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 			zap.String("source_site", sourceSite),
 			zap.Int("remaining_sites", len(sites)-1))
 	}
-
 
 	// Phase 2: 并发搜索全部站
 	r.logger.Info("orphan L2: searching all sites concurrently",
@@ -868,7 +867,9 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				firstTitle := ""
 				if len(results2) > 0 {
 					t := results2[0].Title
-					if len(t) > 80 { t = t[:80] }
+					if len(t) > 80 {
+						t = t[:80]
+					}
 					firstTitle = t
 				}
 				r.logger.Debug("orphan L2: verify breakdown",
@@ -971,17 +972,8 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 			Order("is_official DESC").
 			Pluck("site_name", &sourceSites)
 		if len(sourceSites) == 0 {
-			// §59.220: 组名前缀回退（CMCTf→CMCT 生死格斗案重议）
-			var fkeys []string
-			r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-				Where("site_name IN ?", enabledSites).
-				Pluck("group_name", &fkeys)
-			if fk := util.FuzzyGroupPrefixKey(lookupG, fkeys); fk != "" {
-				r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-					Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", fk, enabledSites).
-					Order("is_official DESC").
-					Pluck("site_name", &sourceSites)
-			}
+			// §59.550: 前缀回退退役（用户定案「官组必须显式映射·系统不推导」）——
+			// CMCTf 类变体由映射表显式收编·此处 miss 即 miss（诚实空）。
 		}
 		for _, site := range sourceSites {
 			if !seen[site] {
@@ -1182,7 +1174,9 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 // downloadWithFallback §59.185 ③: 下载失败三层兜底。
 // 层1 胜者站下载（失败即落日志——① 黑洞修复）
 // 层2 cuhash 模板站懒刷新 + 原站重试一次（cuhash 轮换窗口未知，6h 定时同步有缺口；
-//     刷新即变化则回写 DB 后重试——保源站偏好，keepfrds 429 类失败不直接跳站）
+//
+//	刷新即变化则回写 DB 后重试——保源站偏好，keepfrds 429 类失败不直接跳站）
+//
 // 层3 次优站递补：排除已败站重搜（优先站/中文线链路复用），最多递补 2 站
 // downloadWithFallback 返回实际下载成功的站点（§59.203：次优站递补成功时
 // 主匹配站点≠实际站点——绝望的牛仔案结果消息误报主站）。

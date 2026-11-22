@@ -8,25 +8,12 @@ func TestOfficialGroupKey(t *testing.T) {
 		{"SHB931@UBits", "UBits"},
 		{"CMCT", "CMCT"},
 		{"cXcY@", "cXcY@"},   // 空 @ 后段——原样（LastIndex 条件排除）
-		{"@FRDS", "FRDS"},     // 空前段——后段仍有效
-		{"a@b@FRDS", "FRDS"},  // 多 @ 取最末
+		{"@FRDS", "FRDS"},    // 空前段——后段仍有效
+		{"a@b@FRDS", "FRDS"}, // 多 @ 取最末
 	}
 	for _, c := range cases {
 		if got := OfficialGroupKey(c.in); got != c.want {
 			t.Errorf("OfficialGroupKey(%q) = %q, want %q", c.in, got, c.want)
 		}
-	}
-}
-
-func TestFuzzyGroupPrefixKey(t *testing.T) {
-	keys := []string{"CMCT", "CMCTA", "CMCTV", "UBits", "FRDS"}
-	if got := FuzzyGroupPrefixKey("CMCTf", keys); got != "CMCT" {
-		t.Errorf("CMCTf → %q, want CMCT", got)
-	}
-	if got := FuzzyGroupPrefixKey("CMCT", keys); got != "" {
-		t.Errorf("精确键自身不回退: %q", got)
-	}
-	if got := FuzzyGroupPrefixKey("XX", keys); got != "" {
-		t.Errorf("无前缀关系: %q", got)
 	}
 }
