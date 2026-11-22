@@ -358,7 +358,7 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Request, trimmed string) {
 	if trimmed == "/api/v1/torrent-events" || trimmed == "/api/v1/torrent-events/" {
 		if r.Method != http.MethodGet {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 			return
 		}
 
@@ -394,7 +394,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 
 	if remaining == "cleanup" {
 		if r.Method != http.MethodPost {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 			return
 		}
 		before := time.Now().AddDate(0, 0, -30)
@@ -410,7 +410,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 	}
 
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 

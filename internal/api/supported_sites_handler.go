@@ -26,7 +26,7 @@ const supportedSitesBase = "/api/v1/supported-sites"
 
 func (h *SupportedSitesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 

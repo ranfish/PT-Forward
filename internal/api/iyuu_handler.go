@@ -64,7 +64,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleStatus(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -75,7 +75,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -86,7 +86,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleSyncSites(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -94,7 +94,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleQuery(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -102,7 +102,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleTest(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -110,7 +110,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleCoverageRun(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -118,7 +118,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleCoverageStatus(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -126,7 +126,7 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleSupportedTargets(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}

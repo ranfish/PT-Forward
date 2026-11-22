@@ -69,7 +69,7 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleClearLogs(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case strings.HasSuffix(trimmed, "/system/audit-logs"):
 		h.handleListAuditLogs(w, r)
@@ -79,7 +79,7 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleUpdate(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case strings.HasSuffix(trimmed, "/system/encryption-key"):
 		h.handleEncryptionKey(w, r)
@@ -117,7 +117,7 @@ func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Reque
 		h.logger.Warn("encryption key updated via API", zap.String("actor", actorFromRequest(r)))
 		Success(w, map[string]interface{}{"message": "密钥已更新,请重启服务生效;注意:旧密钥加密的数据无法用新密钥解密"})
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 	}
 }
 

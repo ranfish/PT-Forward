@@ -108,7 +108,7 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		if r.Method == http.MethodPost {
 			h.handleRefresh(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")

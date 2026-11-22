@@ -172,7 +172,8 @@ import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
-import { formatTime } from '@/utils/format'
+import { formatDateForFilename, formatTime } from '@/utils/format'
+import { downloadBlob } from '@/utils/download'
 
 const route = useRoute()
 const router = useRouter()
@@ -549,11 +550,6 @@ function exportCSV() {
   ])
   const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `publish-logs-${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(blob, `publish-logs-${formatDateForFilename()}.csv`)
 }
 </script>

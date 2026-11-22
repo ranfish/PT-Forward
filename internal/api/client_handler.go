@@ -121,7 +121,7 @@ func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.Clien
 
 func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -202,7 +202,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (h *ClientHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -338,7 +338,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -490,7 +490,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -551,7 +551,7 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -584,7 +584,7 @@ func (h *ClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleTorrents(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -614,7 +614,7 @@ func (h *ClientHandler) HandleTorrents(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClientHandler) HandleFreeSpace(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -754,7 +754,7 @@ func (h *ClientHandler) HandleRouteByPath(w http.ResponseWriter, r *http.Request
 			h.HandleCreate(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许 dl")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -766,7 +766,7 @@ func (h *ClientHandler) HandleRouteByPath(w http.ResponseWriter, r *http.Request
 		case http.MethodPost:
 			h.HandleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -784,7 +784,7 @@ func (h *ClientHandler) HandleRouteByPath(w http.ResponseWriter, r *http.Request
 		case http.MethodDelete:
 			h.HandleDelete(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -1020,6 +1020,6 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 		Success(w, map[string]string{"status": "deleted"})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
+		methodNotAllowed(w)
 	}
 }

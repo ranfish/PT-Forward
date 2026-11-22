@@ -48,7 +48,7 @@ func (h *DeleteRuleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -83,7 +83,7 @@ func (h *DeleteRuleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		h.handleDelete(w, r, id)
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 	}
 }
 

@@ -180,13 +180,13 @@
         </template>
 
         <template v-else-if="column.key === 'status'">
-          <a-tooltip v-if="record.status === 'observing'" :title="`消失于 ${new Date(record.last_seen || '').toLocaleString()}（${record.variants || 0} 个变体）`">
+          <a-tooltip v-if="record.status === 'observing'" :title="`消失于 ${formatTime(record.last_seen || '')}（${record.variants || 0} 个变体）`">
             <a-tag :color="statusColor(record.status)" size="small">
               观察期 {{ record.cleanup_in_days }}天
             </a-tag>
           </a-tooltip>
           <!-- §59.361 A: 扫描失败态——红 tag 带原因时间（非"扫描中"永转蓝圈） -->
-          <a-tooltip v-else-if="record.disc_scan_failed" :title="`扫描失败：${record.disc_scan_error || '未知原因'}（${record.disc_scan_failed_at ? new Date(record.disc_scan_failed_at).toLocaleString() : ''}）——可重扫`">
+          <a-tooltip v-else-if="record.disc_scan_failed" :title="`扫描失败：${record.disc_scan_error || '未知原因'}（${record.disc_scan_failed_at ? formatTime(record.disc_scan_failed_at) : ''}）——可重扫`">
             <a-tag color="error" size="small">扫描失败</a-tag>
           </a-tooltip>
           <!-- §59.319 附十八: 原盘扫描中提示——bd_info 落库前 5-11 分钟窗口 -->
@@ -314,7 +314,7 @@ import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import MusicDetailPanel from './MusicDetailPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 import { seedConfigApi, type SeedDetail, type SeedListItem } from '@/api/publish'
 
 const route = useRoute()

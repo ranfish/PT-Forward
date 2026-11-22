@@ -35,19 +35,19 @@ func (h *CloudFPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case path == "/api/v1/cloud-fp/test":
 		if r.Method == http.MethodPost {
 			h.handleTest(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case path == "/api/v1/cloud-fp/status":
 		if r.Method == http.MethodGet {
 			h.handleStatus(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")

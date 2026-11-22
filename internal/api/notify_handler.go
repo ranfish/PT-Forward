@@ -155,7 +155,7 @@ func (h *NotifyHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 			h.handleCreate(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *NotifyHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 		case http.MethodPost:
 			h.handleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -191,10 +191,10 @@ func (h *NotifyHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 		if len(parts) == 2 && parts[1] == "test" {
 			h.handleTest(w, r, parts[0])
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 	}
 }
 

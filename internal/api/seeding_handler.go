@@ -38,7 +38,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleCreateConfig(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -46,7 +46,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleListRecords(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -58,7 +58,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleScoringDryrun(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -94,7 +94,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleListHistory(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -142,7 +142,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDeleteConfig(w, r, uint(id))
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -183,7 +183,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			h.handleScoringConfigByID(w, r, remaining)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -213,7 +213,7 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleDryrunAll(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 

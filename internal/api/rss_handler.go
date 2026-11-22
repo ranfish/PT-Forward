@@ -337,7 +337,7 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 			h.handleCreate(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -349,7 +349,7 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -367,7 +367,7 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDelete(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -380,31 +380,31 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleTrigger(w, r, idStr)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "pause":
 		if r.Method == http.MethodPost {
 			h.handleSetPause(w, r, idStr, true)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "resume":
 		if r.Method == http.MethodPost {
 			h.handleSetPause(w, r, idStr, false)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "dryrun":
 		if r.Method == http.MethodPost {
 			h.handleDryrun(w, r, idStr)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "rules":
 		if r.Method == http.MethodPut {
 			h.handleUpdateRules(w, r, idStr)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "seen":
 		// §59.33: /seen 列表 + /seen/clear 清除重推

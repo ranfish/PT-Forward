@@ -34,7 +34,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleCreateTask(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -42,7 +42,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleListCandidates(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -50,7 +50,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.handleListResults(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -61,7 +61,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"sites": h.pipeline.DistinctTargetSites(r.Context()),
 			})
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -77,7 +77,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleDeleteResult(w, r, uint(id))
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDeleteTask(w, r, uint(id))
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -123,7 +123,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDeleteCandidate(w, r, uint(id))
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}

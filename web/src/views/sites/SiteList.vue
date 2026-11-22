@@ -234,7 +234,8 @@ import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import { ensureSupportedSitesCache, type SupportedSite } from '@/api/supported-sites'
 import { publishTorrentsApi } from '@/api/publish'
-import { formatBytes, formatTime } from '@/utils/format'
+import { formatBytes, formatDateForFilename, formatTime } from '@/utils/format'
+import { downloadBlob } from '@/utils/download'
 
 const { t } = useI18n()
 
@@ -593,12 +594,7 @@ async function handleExport() {
   try {
     const { data } = await sitesApi.exportConfig()
     const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `pt-forward-sites-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `pt-forward-sites-${formatDateForFilename()}.json`)
     message.success('已导出站点配置（含明文凭证，请妥善保管）')
   } catch (e: unknown) {
     message.error('导出失败：' + (e instanceof Error ? e.message : String(e)))

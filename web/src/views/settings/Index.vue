@@ -205,6 +205,8 @@ import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api/settings'
 import CookieCloudModule from './CookieCloudModule.vue'
 import { switchAutoSave } from '@/utils/switch-auto-save'
+import { formatDateForFilename } from '@/utils/format'
+import { downloadBlob } from '@/utils/download'
 import ImageHostSettings from './ImageHostSettings.vue'
 
 const { t } = useI18n()
@@ -414,12 +416,7 @@ async function backupSettings() {
   try {
     const resp = await settingsApi.backup()
     const blob = new Blob([JSON.stringify(resp.data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `pt-forward-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `pt-forward-backup-${formatDateForFilename()}.json`)
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

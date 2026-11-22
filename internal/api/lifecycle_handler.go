@@ -35,7 +35,7 @@ func (h *LifecycleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -46,7 +46,7 @@ func (h *LifecycleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			h.handleUpdateBackpressure(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}

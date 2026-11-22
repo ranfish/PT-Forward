@@ -34,7 +34,7 @@ func (h *PTGenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.handleQuery(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 
@@ -45,7 +45,7 @@ func (h *PTGenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleCleanCache(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}

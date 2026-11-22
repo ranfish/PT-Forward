@@ -403,7 +403,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 			h.handleList(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -412,7 +412,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodGet {
 			h.handleList(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -425,7 +425,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodPost {
 			h.handleSyncAllStats(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -434,7 +434,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodPost {
 			h.handleBatchUpdate(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -443,7 +443,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodPost {
 			h.handleBatchSyncSiteStats(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -452,7 +452,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodGet {
 			h.handleExport(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -461,7 +461,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodPost {
 			h.handleImport(w, r)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -473,7 +473,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		case http.MethodPut:
 			h.handleUpdate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -494,7 +494,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		if r.Method == http.MethodPut {
 			h.handleUpdateCredentials(w, r, idStr)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "stats":
 		switch r.Method {
@@ -503,7 +503,7 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		case http.MethodPost:
 			h.handleSyncSiteStats(w, r, idStr)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	case "overrides":
 		h.handleOverrides(w, r, idStr)
@@ -1832,7 +1832,7 @@ func (h *SiteHandler) handleOverrides(w http.ResponseWriter, r *http.Request, id
 	case http.MethodDelete:
 		h.handleDeleteOverride(w, r, site.Name)
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 	}
 }
 
@@ -1956,7 +1956,7 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 		httpclient.GlobalLimiter.ManualUnfreeze(req.Domain)
 		Success(w, map[string]string{"status": "unfrozen", "domain": req.Domain})
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
+		methodNotAllowed(w)
 	}
 }
 
@@ -2007,7 +2007,7 @@ func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request
 		Success(w, map[string]string{"status": "reset", "domain": req.Domain})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
+		methodNotAllowed(w)
 	}
 }
 
@@ -2038,7 +2038,7 @@ func (h *SiteHandler) handleDomainFreeze(w http.ResponseWriter, r *http.Request,
 		Success(w, status)
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
+		methodNotAllowed(w)
 	}
 }
 
@@ -2156,7 +2156,7 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		Success(w, map[string]string{"status": "deleted"})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
+		methodNotAllowed(w)
 	}
 }
 
@@ -2170,7 +2170,7 @@ type searchRequest struct {
 
 func (h *SiteHandler) handleSearch(w http.ResponseWriter, r *http.Request, idStr string) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	if h.provider == nil {
@@ -2249,7 +2249,7 @@ type discountRequest struct {
 
 func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Request, idStr string) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	if h.provider == nil {
@@ -2310,7 +2310,7 @@ func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Reques
 
 func (h *SiteHandler) handleDownloadTest(w http.ResponseWriter, r *http.Request, idStr string) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	if h.provider == nil {

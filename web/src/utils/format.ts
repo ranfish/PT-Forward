@@ -73,3 +73,9 @@ export function maskDomain(url: string | undefined): string {
   if (parts.length >= 2) return `***.${parts[parts.length - 1]}`
   return '***'
 }
+
+// §59.553 P2-10: 导出文件名日期（YYYY-MM-DD）——收敛三处 toISOString().slice(0, 10)。
+// 与展示用 formatTime 分离（文件名格式不强塞展示函数）。
+export function formatDateForFilename(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10)
+}

@@ -97,7 +97,7 @@ func (h *FilterHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 			h.handleCreate(w, r)
 			return
 		}
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *FilterHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 		case http.MethodPost:
 			h.handleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -129,10 +129,10 @@ func (h *FilterHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 			idStr := strings.TrimSuffix(remaining, "/test")
 			h.handleTest(w, r, idStr)
 		} else {
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 	}
 }
 

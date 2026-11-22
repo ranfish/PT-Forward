@@ -32,7 +32,7 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			h.handleCreate(w, r)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -62,7 +62,7 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDelete(w, r, taskID)
 		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			methodNotAllowed(w)
 		}
 		return
 	}
@@ -360,7 +360,7 @@ func (h *ReseedHandler) handleDelete(w http.ResponseWriter, r *http.Request, id 
 
 func (h *ReseedHandler) handleTrigger(w http.ResponseWriter, r *http.Request, id uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -402,7 +402,7 @@ func (h *ReseedHandler) handleTrigger(w http.ResponseWriter, r *http.Request, id
 
 func (h *ReseedHandler) handleCancel(w http.ResponseWriter, r *http.Request, id uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -423,7 +423,7 @@ func (h *ReseedHandler) handleCancel(w http.ResponseWriter, r *http.Request, id 
 
 func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -525,7 +525,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 
 func (h *ReseedHandler) handleListFeatureLogs(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）
@@ -560,7 +560,7 @@ func (h *ReseedHandler) handleListFeatureLogs(w http.ResponseWriter, r *http.Req
 
 func (h *ReseedHandler) handleListIYUULogs(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -602,7 +602,7 @@ func (h *ReseedHandler) handleListIYUULogs(w http.ResponseWriter, r *http.Reques
 
 func (h *ReseedHandler) handleGetMatch(w http.ResponseWriter, r *http.Request, taskIDStr string, matchID string) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -623,7 +623,7 @@ func (h *ReseedHandler) handleGetMatch(w http.ResponseWriter, r *http.Request, t
 
 func (h *ReseedHandler) handleRetryMatch(w http.ResponseWriter, r *http.Request, id uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -645,7 +645,7 @@ func (h *ReseedHandler) handleRetryMatch(w http.ResponseWriter, r *http.Request,
 
 func (h *ReseedHandler) handleBatchRetryMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	var req struct {
@@ -691,7 +691,7 @@ func (h *ReseedHandler) handleBatchRetryMatches(w http.ResponseWriter, r *http.R
 
 func (h *ReseedHandler) handleBatchDeleteMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	var req struct {
@@ -725,7 +725,7 @@ func (h *ReseedHandler) handleBatchDeleteMatches(w http.ResponseWriter, r *http.
 
 func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 	result := h.engine.DB().Where("task_id = ? OR task_id = 0", taskID).Delete(&model.ReseedMatch{})
@@ -781,7 +781,7 @@ func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+	methodNotAllowed(w)
 }
 
 // parseMatchID §59.552: 委托 parseUintStrict（旧裸 err 改统一错误码——

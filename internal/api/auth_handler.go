@@ -24,7 +24,7 @@ type loginRequest struct {
 
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -54,7 +54,7 @@ type refreshRequest struct {
 
 func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *AuthHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -131,7 +131,7 @@ type changePasswordRequest struct {
 
 func (h *AuthHandler) HandlePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
@@ -177,7 +177,7 @@ func (h *AuthHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodPut {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		methodNotAllowed(w)
 		return
 	}
 
