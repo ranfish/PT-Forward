@@ -53,6 +53,7 @@ var (
 	tid       = flag.String("tid", "", "详情页种子 ID（verify·对应 detail.html）")
 	proxy     = flag.String("proxy", "", "curl 代理（空=直连）")
 	baseURL   = flag.String("base", "", "站根 URL（空=https://<domain>）")
+	enckey    = flag.String("enckey", "", "外部注入加密密钥（key 在 config.yaml 的环境·DB 无记录时用）")
 )
 
 func main() {
@@ -98,6 +99,11 @@ func loadSite() *model.Site {
 	}
 	srepo := setting.NewRepository(gdb)
 	key, _ := srepo.Get(context.Background(), "encryption_key")
+	if *enckey != "" {
+		// §59.554: 外部注入密钥（key 在 config.yaml 的环境·DB 无记录）——
+		// 内存使用不落盘·与 -cred bash 管道同纪律。
+		key = *enckey
+	}
 	enc, err := crypto.NewCredentialEncryptor(key)
 	if err != nil {
 		panic(err)

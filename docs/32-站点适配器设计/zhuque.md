@@ -455,3 +455,44 @@ Origin: https://zhuque.in
 - **方案 a 定案**：首颗实测不填——站方审核放行则方案 c 无需立项
 - **豆影（doubaninfo）能力边界**：无 tmdbid 反查（实测功夫零 tmdb 字段+provider 零消费）；其 imdb_id 是**豆影自身兜底能力**——场景=较新影视只有 IMDb 无豆瓣条目时兜底提供 imdb 信息防空简介（正常种子自带 IMDb 链接是 PT 发布共识，非获取链刚需）
 - **方案 c 挂账**（若首颗被拒再立项）：获取链 TMDb find 反查（external_source=imdb_id+用户配 key 零内置——同 PTGen 端点模式；获取链位=白名单合规，发布链纯消费 meta.TMDbURL）
+
+## 五、发布链实测修正（§59.554·2026-11-22·首两颗真实发布复盘）
+
+### 5.1 上传响应 id 双形态
+
+实测朱雀响应 id 为**数字**形态（`"id":12345`）——与 §1.3 摸站记录的字符串占位不同（MTeam 测试样例亦为字符串）。适配器 `Data.ID` 已改 `any` 三态断言（string/float64/json.Number·§59.554 anyIDToString）。
+
+### 5.2 tmdbid 反查链（站方元数据自渲染）
+
+站方以 TMDb 渲染简介/封面（封面直接用 IMDB 数据）。发布页「查询」功能的 API 直发等价：
+
+```
+GET /api/tmdb/findByImdb/{tt号}
+头：登录 cookie + x-csrf-token + X-Requested-With
+响应：{"status":200,"data":[{"id":83277,"media_type":"movie","title":"寻枪",…}]}
+取 data[0]：tmdbid = id · tmdbtype = media_type=="tv" ? "1" : "0"
+（与站方前端 findByImdb 取值逻辑逐字对齐·chunk-vendors 业务码还原+实测 200 双验证）
+```
+
+降级语义：网络/解析错=**fail fast**（我方数据链问题不盲投）；data 空数组（无词条）=继续发布（站方「有词条则必填」→无词条免填）。
+
+### 5.3 note 三件套（descr 域 TNode 形态）
+
+站方简介由 TMDb 渲染·我方不投 PT-Gen 简介。note 投递：
+
+```
+{stripBBCode(statement)}
+IMDb链接：{im_db_url}
+豆瓣链接：{douban_url}
+```
+
+- 行格式：**全角冒号「：」统一·零空格**（站方发布页行格式定案）
+- 声明投**纯文本**（BBCode 标签全剥·内文换行保留）——引用也只投纯文本
+- 空值矩阵：三源独立缺省各自跳行·全空不投
+- 判据：`site.Framework=="tnode"`（与工厂路由同源·特化面≡适配器面）
+
+### 5.4 边界与观察
+
+- `Data.Code=="UPLOAD_SUCCESS" || Status==200` 或条件：若站方失败响应带顶层 status:200 可能误判——无失败样本佐证·观察不动
+- [url] BBCode 剥离丢链接文本——实证声明形态（quote 纯文本）无此场景·按需
+- 首两颗存量（note 错内容+无 tmdbid）：站方编辑页手动补救（torrent/edit/{id}）

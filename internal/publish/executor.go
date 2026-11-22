@@ -560,6 +560,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return failRec("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
 	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta, cfg)
+	// §59.554 刀2: TNode 站方元数据自渲染（朱雀形态）——descr 域值重组为
+	// note 三件套（纯文本声明+IMDb/豆瓣链接行·全角冒号格式），PT-Gen 简介
+	// 不投（站方以 TMDb 渲染简介/封面）。判据与工厂路由同源（site.Framework
+	// ——factory.Create 同字段·特化面≡适配器面永不漂移）。DescrQuoteOnly
+	// （§59.541 劳改所·豆瓣自渲染）同族不同种：朱雀更彻底——链接行替代全部。
+	if site.Framework == "tnode" {
+		form[cfg.FormFields[model.FieldDomainDescription]] = tnodeNoteOf(meta)
+	}
 	// §59.541 附四: piggo {{ptgen}} 模板——已填豆瓣/IMDb 时站方要求简介含
 	// {{ptgen}} 占位符（站方自营 PTGen 服务端渲染）；自制 PTGen 正文换占位符
 	if cfg.Framework == "piggo" {

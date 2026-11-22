@@ -319,6 +319,15 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
+	// §59.554 刀3: tmdbid 反查前置——朱雀形态站方元数据自渲染·上传前用
+	// tab4 IMDb 链接反查站方 tmdb 端点填 tmdbid/tmdbtype（网络错 fail fast·
+	// 无词条继续）。失败=我方数据链问题·不盲投出去。
+	if req.IMDbLink != "" {
+		if err := a.fillTMDBByImdb(ctx, config, req); err != nil {
+			return nil, uploadError("TMDB 反查失败", err)
+		}
+	}
+
 	baseURL := config.Domain
 	if !strings.HasPrefix(baseURL, "http") {
 		baseURL = "https://" + baseURL
@@ -453,14 +462,14 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		Status int `json:"status"`
 		Data   struct {
 			Code string `json:"code"`
-			ID   string `json:"id"`
+			ID   any    `json:"id"`
 		} `json:"data"`
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	}
 	if err := json.Unmarshal(body, &result); err == nil {
 		if result.Data.Code == "UPLOAD_SUCCESS" || result.Status == 200 {
-			torrentID := result.Data.ID
+			torrentID := anyIDToString(result.Data.ID)
 			return &model.PublishResponse{
 				Success:    true,
 				TorrentID:  torrentID,
@@ -483,10 +492,110 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	html := string(body)
 	if strings.Contains(html, "成功") || strings.Contains(html, "UPLOAD_SUCCESS") {
+		// §59.554 刀1: 降级路径必须可观测——JSON 解析失败掉进 html 兜底的
+		// 场景 TorrentID 恒空（推种链断·终态停 uploaded）。朱雀首两颗实证：
+		// 响应 id 数字形态 → string 字段 unmarshal 炸 → 静默降级无日志可查。
+		if a.logger != nil {
+			head := html
+			if len(head) > 200 {
+				head = head[:200]
+			}
+			a.logger.Warn("tnode upload json parse failed, html fallback hit (no torrent ID)",
+				zap.String("site", config.Domain),
+				zap.Int("http_status", resp.StatusCode),
+				zap.String("body_head", head))
+		}
 		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
 	}
 
 	return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}
+}
+
+// anyIDToString §59.554 刀1: TNode 上传响应 id 双形态兼容——JSON 数字
+// （朱雀实测·"id":12345）与字符串（MTeam 样例·"id":"42"）。string 字段
+// 接数字形态 unmarshal 报错→整解析炸→html fallback 静默丢 ID（朱雀首两颗
+// 推种断的根因）。nil/其它形态返回空（走 fallback 告警）。
+func anyIDToString(v any) string {
+	switch n := v.(type) {
+	case string:
+		return n
+	case float64:
+		return strconv.FormatFloat(n, 'f', 0, 64)
+	case json.Number:
+		return n.String()
+	}
+	return ""
+}
+
+// imdbIDRe §59.554 刀3: IMDb 链接中的 tt 号提取（容忍尾斜杠/query 形态）。
+var imdbIDRe = regexp.MustCompile(`tt\d+`)
+
+// fillTMDBByImdb §59.554 刀3: 朱雀形态 tmdbid 反查——站方元数据自渲染
+// （简介/封面走 TMDb），发布页「IMDbID 查询 TMDb」功能的 API 直发等价：
+// GET /api/tmdb/findByImdb/{tt号} → data[0].id=tmdbid·media_type=="tv"?
+// "1":"0"=tmdbtype（与站方前端 findByImdb 取值逻辑逐字对齐·chunk-vendors
+// 业务码还原+实测 200 双验证）。
+// 降级语义：网络/解析错返回 error（fail fast——我方数据链问题不盲投）；
+// data 空数组（无词条）返回 nil 不填（站方「有词条则必填」→无词条免填）。
+func (a *TNodeAdapter) fillTMDBByImdb(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) error {
+	tt := imdbIDRe.FindString(req.IMDbLink)
+	if tt == "" {
+		return fmt.Errorf("IMDb 链接无 tt 号: %s", req.IMDbLink)
+	}
+	baseURL := resolveBaseURL(config)
+	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
+
+	u := baseURL + "/api/tmdb/findByImdb/" + tt
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return fmt.Errorf("构造反查请求失败: %w", err)
+	}
+	setCommonHeaders(httpReq, config.Cookie)
+	if csrfToken != "" {
+		httpReq.Header.Set("x-csrf-token", csrfToken)
+	}
+	httpReq.Header.Set("X-Requested-With", "XMLHttpRequest")
+
+	resp, err := a.doer.Client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("反查请求失败: %w", err)
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("反查响应异常: HTTP %d", resp.StatusCode)
+	}
+	body, err := readBody(resp)
+	if err != nil {
+		return err
+	}
+	var result struct {
+		Status int `json:"status"`
+		Data   []struct {
+			ID        any    `json:"id"`
+			MediaType string `json:"media_type"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("反查响应解析失败: %w", err)
+	}
+	if len(result.Data) == 0 {
+		// 无词条：站方免填场景（「有词条则必填」）——不填继续发布。
+		if a.logger != nil {
+			a.logger.Info("tnode tmdb lookup: no entry for imdb id",
+				zap.String("site", config.Domain), zap.String("imdb", tt))
+		}
+		return nil
+	}
+	if req.ExtraFields == nil {
+		req.ExtraFields = map[string]string{}
+	}
+	req.ExtraFields["tmdbid"] = anyIDToString(result.Data[0].ID)
+	tmdbType := "0"
+	if result.Data[0].MediaType == "tv" {
+		tmdbType = "1"
+	}
+	req.ExtraFields["tmdbtype"] = tmdbType
+	return nil
 }
 
 func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteConfig, pageURL string) (string, error) {
@@ -747,7 +856,9 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	bodyStr := string(body)
 	if resp.StatusCode != http.StatusOK {
 		snippet := bodyStr
-		if len(snippet) > 200 { snippet = snippet[:200] }
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
