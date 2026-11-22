@@ -1,9 +1,9 @@
 package publish
 
 import (
-	"github.com/ranfish/pt-forward/internal/comment"
 	"context"
 	"encoding/json"
+	"github.com/ranfish/pt-forward/internal/comment"
 	"sort"
 	"strings"
 	"sync"
@@ -33,11 +33,11 @@ func ExtractGroupName(title string) string {
 }
 
 type SourceDetectResult struct {
-	SourceSite    string
-	SourceSiteID  uint
-	GroupName     string
-	TorrentID     string
-	AutoDetected  bool
+	SourceSite   string
+	SourceSiteID uint
+	GroupName    string
+	TorrentID    string
+	AutoDetected bool
 }
 
 func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string, coverageSites []model.SiteCoverageCache) SourceDetectResult {
@@ -53,8 +53,7 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 		}
 		for _, siteName := range priority {
 			if c, ok := siteMap[siteName]; ok {
-				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+				if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -96,8 +95,8 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 		}
 	}
 	if len(siteMap) > 0 {
-		var sites []model.Site
-		if err := d.db.WithContext(ctx).Where("enabled = ? AND is_source = ?", true, true).Find(&sites).Error; err != nil {
+		sites, ok := d.listEnabledSourceSites(ctx)
+		if !ok {
 			return result
 		}
 		for _, site := range sites {
@@ -283,8 +282,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 				if ct.SiteName != siteName || ct.TorrentID == "" {
 					continue
 				}
-				var site2 model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site2).Error; err == nil {
+				if site2, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 					result.SourceSite = site2.Name
 					result.SourceSiteID = site2.ID
 					result.TorrentID = ct.TorrentID
@@ -295,8 +293,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 			}
 			// 优先：coverage 命中 + cookie → 有 tid 可直接获取
 			if c, ok := siteMap[siteName]; ok {
-				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+				if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -307,8 +304,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 				}
 			}
 			// §59.25: 无 coverage 时也允许选站（batch-fetch 场景），用搜索方式获取
-			var site model.Site
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+			if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
@@ -324,8 +320,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 		if ct.TorrentID == "" {
 			continue
 		}
-		var site2 model.Site
-		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", ct.SiteName, true).First(&site2).Error; err == nil {
+		if site2, ok := d.findEnabledCredentialSiteByName(ctx, ct.SiteName); ok {
 			result.SourceSite = site2.Name
 			result.SourceSiteID = site2.ID
 			result.TorrentID = ct.TorrentID
@@ -339,8 +334,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 	if priority := d.getFetchPriority(ctx); len(priority) > 0 {
 		for _, siteName := range priority {
 			if c, ok := siteMap[siteName]; ok {
-				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+				if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -378,8 +372,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 		})
 		for _, siteName := range coverSites {
 			c := siteMap[siteName]
-			var site model.Site
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+			if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.TorrentID = c.TorrentID
@@ -416,8 +409,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 				}
 			}
 			for _, siteName := range tryOrder {
-				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
+				if site, ok := d.findEnabledCredentialSiteByName(ctx, siteName); ok {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = ""
@@ -470,4 +462,27 @@ func (d *SourceSiteDetector) persistSelectEvent(layer, groupName, siteName, torr
 		// 静默失败——落库是可观测增强非主链
 		_ = err
 	}
+}
+
+// findEnabledCredentialSiteByName §59.553: 按名查启用且有凭证（cookie/api_key）
+// 的站点——收敛九处逐字重复的查询条件（一处改条件九处漏的漂移风险）。
+func (d *SourceSiteDetector) findEnabledCredentialSiteByName(ctx context.Context, name string) (model.Site, bool) {
+	var site model.Site
+	if err := d.db.WithContext(ctx).
+		Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", name, true).
+		First(&site).Error; err != nil {
+		return model.Site{}, false
+	}
+	return site, true
+}
+
+// listEnabledSourceSites §59.553: 启用中的源站列表。
+func (d *SourceSiteDetector) listEnabledSourceSites(ctx context.Context) ([]model.Site, bool) {
+	var sites []model.Site
+	if err := d.db.WithContext(ctx).
+		Where("enabled = ? AND is_source = ?", true, true).
+		Find(&sites).Error; err != nil {
+		return nil, false
+	}
+	return sites, true
 }
