@@ -2601,10 +2601,10 @@ func TestFindMainVideoFile(t *testing.T) {
 		{
 			name: "largest video wins",
 			fileTree: map[string]int64{
-				"small.mkv":    500000,
-				"big.mkv":      5000000,
-				"cover.jpg":    100000,
-				"info.txt":     1000,
+				"small.mkv": 500000,
+				"big.mkv":   5000000,
+				"cover.jpg": 100000,
+				"info.txt":  1000,
 			},
 			want: "big.mkv",
 		},
@@ -2624,9 +2624,9 @@ func TestFindMainVideoFile(t *testing.T) {
 		{
 			name: "subdirectory path",
 			fileTree: map[string]int64{
-				"Subs/sub1.srt":                 50000,
-				"Movie.2020.mkv":                5000000,
-				"Movie.2020_s.jpg":              100000,
+				"Subs/sub1.srt":    50000,
+				"Movie.2020.mkv":   5000000,
+				"Movie.2020_s.jpg": 100000,
 			},
 			want: "Movie.2020.mkv",
 		},
@@ -2651,10 +2651,10 @@ func TestFindMainVideoFile(t *testing.T) {
 
 func TestExtractFromFileTree(t *testing.T) {
 	fileTree := map[string]int64{
-		"[斯巴达克斯].Spartacus.1960.4K.Restored.Edition.BluRay.1080p.x264.DTS.2Audios-CMCT.mkv": 23628070195,
+		"[斯巴达克斯].Spartacus.1960.4K.Restored.Edition.BluRay.1080p.x264.DTS.2Audios-CMCT.mkv":   23628070195,
 		"[斯巴达克斯].Spartacus.1960.4K.Restored.Edition.BluRay.1080p.x264.DTS.2Audios-CMCT_s.jpg": 800000,
-		"斯巴达克斯 1960 蓝光封面.jpg": 500000,
-		"斯巴达克斯 1960 内容简介.txt":  1000,
+		"斯巴达克斯 1960 蓝光封面.jpg":                                                                 500000,
+		"斯巴达克斯 1960 内容简介.txt":                                                                 1000,
 	}
 
 	keyword, groupName := extractFromFileTree(fileTree)
@@ -2772,8 +2772,8 @@ func TestKeywordHasNoTitle_YearPrefix(t *testing.T) {
 
 func TestExtractSearchKeyword_YearTitle(t *testing.T) {
 	tests := []struct {
-		title    string
-		wantEmpty bool
+		title       string
+		wantEmpty   bool
 		wantNoTitle bool
 	}{
 		{"2001太空漫游.4K修复版.1968.中英字幕￡CMCT旧梦", false, false},
@@ -2867,7 +2867,10 @@ func TestVerifyMatch(t *testing.T) {
 	const gb = int64(1073741824)
 	sourceSize := 10 * gb
 
-	makeResults := func(items ...struct{ id, title string; size int64 }) []*model.SeedingSearchResult {
+	makeResults := func(items ...struct {
+		id, title string
+		size      int64
+	}) []*model.SeedingSearchResult {
 		out := make([]*model.SeedingSearchResult, len(items))
 		for i, it := range items {
 			out[i] = &model.SeedingSearchResult{TorrentID: it.id, Title: it.title, Size: it.size}
@@ -2883,52 +2886,73 @@ func TestVerifyMatch(t *testing.T) {
 		wantID    string
 	}{
 		{
-			name:     "empty results",
-			results:  nil,
-			wantID:   "",
+			name:    "empty results",
+			results: nil,
+			wantID:  "",
 		},
 		{
-			name:    "group in title, size match",
-			results: makeResults(struct{ id, title string; size int64 }{"t1", "Movie.1999.GROUP", sourceSize}),
+			name: "group in title, size match",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t1", "Movie.1999.GROUP", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "t1",
 		},
 		{
 			// §59.184 三态：点分隔无组名后缀=组名不可见=中性；size 精确短路放行
-			name:    "group invisible (dot form), exact size matches via neutral",
-			results: makeResults(struct{ id, title string; size int64 }{"t1", "Movie.1999.OTHER", sourceSize}),
+			name: "group invisible (dot form), exact size matches via neutral",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t1", "Movie.1999.OTHER", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "t1",
 		},
 		{
 			// §59.184 三态：显式异组名后缀（dash 形态）→ 组名反驳
-			name:    "explicit different group suffix refuted",
-			results: makeResults(struct{ id, title string; size int64 }{"t1b", "Movie.1999-OTHER", sourceSize}),
+			name: "explicit different group suffix refuted",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t1b", "Movie.1999-OTHER", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "",
 		},
 		{
-			name:    "empty group, match on size only",
-			results: makeResults(struct{ id, title string; size int64 }{"t2", "Movie.1999.ANY", sourceSize}),
+			name: "empty group, match on size only",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t2", "Movie.1999.ANY", sourceSize}),
 			groupName: "",
 			sourceSz:  sourceSize,
 			wantID:    "t2",
 		},
 		{
-			name:    "size mismatch",
-			results: makeResults(struct{ id, title string; size int64 }{"t3", "Movie.1999.GROUP", 5 * gb}),
+			name: "size mismatch",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t3", "Movie.1999.GROUP", 5 * gb}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "",
 		},
 		{
-			name:    "empty torrent id skipped",
+			name: "empty torrent id skipped",
 			results: makeResults(
-				struct{ id, title string; size int64 }{"", "Movie.1999.GROUP", sourceSize},
-				struct{ id, title string; size int64 }{"t4", "Movie.1999.GROUP", sourceSize},
+				struct {
+					id, title string
+					size      int64
+				}{"", "Movie.1999.GROUP", sourceSize},
+				struct {
+					id, title string
+					size      int64
+				}{"t4", "Movie.1999.GROUP", sourceSize},
 			),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
@@ -2936,22 +2960,31 @@ func TestVerifyMatch(t *testing.T) {
 		},
 		{
 			// §59.184 三态：CSS 截断=组名不可见=中性（原 strict 拒绝消融）；size 精确短路
-			name:    "truncated title neutral, exact size matches",
-			results: makeResults(struct{ id, title string; size int64 }{"t5", "Movie.1999..", sourceSize}),
+			name: "truncated title neutral, exact size matches",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t5", "Movie.1999..", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "t5",
 		},
 		{
-			name:    "truncated title relaxed via empty group",
-			results: makeResults(struct{ id, title string; size int64 }{"t6", "Movie.1999..", sourceSize}),
+			name: "truncated title relaxed via empty group",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t6", "Movie.1999..", sourceSize}),
 			groupName: "",
 			sourceSz:  sourceSize,
 			wantID:    "t6",
 		},
 		{
-			name:    "zero size skipped",
-			results: makeResults(struct{ id, title string; size int64 }{"t7", "Movie.1999.GROUP", 0}),
+			name: "zero size skipped",
+			results: makeResults(struct {
+				id, title string
+				size      int64
+			}{"t7", "Movie.1999.GROUP", 0}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "",
