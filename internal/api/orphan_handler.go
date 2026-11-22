@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
@@ -139,8 +138,7 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 		Path      string `json:"path"`
 		ClientUID uint   `json:"client_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Path == "" {
@@ -223,8 +221,7 @@ func (h *OrphanHandler) handleIgnore(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path string `json:"path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Path == "" {
@@ -253,8 +250,7 @@ func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		Path     string `json:"path"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Path == "" {
@@ -340,8 +336,7 @@ func (h *OrphanHandler) handleUnignore(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Path string `json:"path"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		path = req.Path
@@ -367,8 +362,7 @@ func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Reque
 		ScanPath  string `json:"scan_path"`
 		Enabled   bool   `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.ClientUID == 0 || req.ScanPath == "" {

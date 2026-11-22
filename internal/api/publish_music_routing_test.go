@@ -54,11 +54,11 @@ func TestMusicTitleMatch(t *testing.T) {
 	// 组位权威形态（用户定义·括号外）——恒过（含影视技术词也过：
 	// 组位=组名声明·影视圈无此组名）
 	groupPos := []string{
-		"Various Artist-NAXOS 25周年纪念 9Box 90CDs-wav-OpenCD",            // 尾段（12 环境实证下载名）
+		"Various Artist-NAXOS 25周年纪念 9Box 90CDs-wav-OpenCD",                                // 尾段（12 环境实证下载名）
 		"Gwyneth Herbert - Bittersweet And Blue 2005-FLAC Multi File-OpenCD 16bit 44.1kHz", // 尾段+spec 后缀
-		"Thelonious Monk - Misterioso 1965-FLAC 分轨-Rosebudx@OpenCD🌱 保种区 ×2（已保护 88 小时）", // @锚+装饰（乌托邦实证）
-		"陈慧娴 - 归来吧 1992 FLAC 分轨 - ZHENGLIFAN@Musopia", // @锚 Musopia
-		"群星 - XXX 2019 FLAC - OpenCD",                     // 尾段
+		"Thelonious Monk - Misterioso 1965-FLAC 分轨-Rosebudx@OpenCD🌱 保种区 ×2（已保护 88 小时）",     // @锚+装饰（乌托邦实证）
+		"陈慧娴 - 归来吧 1992 FLAC 分轨 - ZHENGLIFAN@Musopia",                                      // @锚 Musopia
+		"群星 - XXX 2019 FLAC - OpenCD",                                                      // 尾段
 	}
 	for _, good := range groupPos {
 		if !musicTitleMatch(good, testMusicWords) {

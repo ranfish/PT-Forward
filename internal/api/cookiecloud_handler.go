@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -108,8 +107,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		SyncEnabled  *bool  `json:"syncEnabled"`
 		SyncInterval *int   `json:"syncInterval"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

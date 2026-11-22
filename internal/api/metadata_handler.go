@@ -134,8 +134,7 @@ func (h *MetadataHandler) handleUpdateType(w http.ResponseWriter, r *http.Reques
 		SiteName     string `json:"siteName"`
 		StandardType string `json:"standardType"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.InfoHash == "" || req.StandardType == "" {
@@ -192,8 +191,7 @@ func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Description  string `json:"description"`
 		Screenshots  string `json:"screenshots"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.InfoHash == "" {
@@ -265,8 +263,7 @@ func (h *MetadataHandler) handleReview(w http.ResponseWriter, r *http.Request) {
 		SiteName string `json:"siteName"`
 		Reviewed bool   `json:"reviewed"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.InfoHash == "" {

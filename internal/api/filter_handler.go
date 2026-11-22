@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -165,8 +164,7 @@ func (h *FilterHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *FilterHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req createFilterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -252,8 +250,7 @@ func (h *FilterHandler) handleUpdate(w http.ResponseWriter, r *http.Request, idS
 	}
 
 	var req updateFilterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -345,8 +342,7 @@ func (h *FilterHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr
 		Tags          string `json:"tags"`
 		DiscountLevel string `json:"discountLevel"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

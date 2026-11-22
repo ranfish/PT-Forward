@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -82,8 +81,7 @@ func (h *PublishLimitHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 
 func (h *PublishLimitHandler) handleUpsert(w http.ResponseWriter, r *http.Request) {
 	var req model.SitePublishLimit
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.SiteName == "" {

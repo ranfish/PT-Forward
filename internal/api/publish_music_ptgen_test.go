@@ -93,10 +93,10 @@ func TestRunMainlinePTGenMusicResidueCleanup(t *testing.T) {
 	// 旧行带 PTGen 残留（12 九簇实测形态）
 	old := &model.TorrentMetadata{
 		InfoHash: "3a8b93e4e67c", SiteName: "皇后",
-		Title: "[2005.04.27] School Rumble",
-		Description:       "◎片名 校园迷糊大王",
-		PTGenSourceJSON:   `{"chinese_title":"校园迷糊大王"}`,
-		DetailSourceJSON:  musicJSON,
+		Title:            "[2005.04.27] School Rumble",
+		Description:      "◎片名 校园迷糊大王",
+		PTGenSourceJSON:  `{"chinese_title":"校园迷糊大王"}`,
+		DetailSourceJSON: musicJSON,
 	}
 	if err := db.Create(old).Error; err != nil {
 		t.Fatalf("seed: %v", err)

@@ -47,9 +47,9 @@ func TestComputeSubHealth(t *testing.T) {
 	h := &RSSHandler{db: db}
 
 	// 订阅 A：error → 检测全败 → error（连续 3 轮失败，最新 error 带原因）
-	addFetchLog(t, db, "1", "ok", 10, 3, "")    // 最早：部分失败=健康断点之外
+	addFetchLog(t, db, "1", "ok", 10, 3, "") // 最早：部分失败=健康断点之外
 	addFetchLog(t, db, "1", "error", 0, 0, "请求失败: 超时")
-	addFetchLog(t, db, "1", "ok", 50, 50, "")   // 检测全败（隐性停摆）
+	addFetchLog(t, db, "1", "ok", 50, 50, "") // 检测全败（隐性停摆）
 	addFetchLog(t, db, "1", "error", 0, 0, "读取响应失败: xxx")
 	f, capped, reason, first := h.computeSubHealth(context.Background(), 1)
 	if f != 3 || capped {

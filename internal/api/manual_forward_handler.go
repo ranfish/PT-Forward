@@ -50,10 +50,10 @@ type MetadataFetcherProvider interface {
 	GetMetadata(ctx context.Context, infoHash, siteName string) (*model.TorrentMetadata, bool)
 	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string, sourceLocalMI ...string) (*model.TorrentMetadata, error)
 	FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64, sourceLocalMI ...string) (*model.TorrentMetadata, error)
-	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) // §59.61 D3
-	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)         // §59.65 直取
+	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error)              // §59.61 D3
+	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)                      // §59.65 直取
 	FetchAndStoreIYUU(ctx context.Context, infoHash string, excludeSites []string, sourceLocalMI ...string) (*model.TorrentMetadata, error) // §59.65 IYUU 末位兜底（§59.337 变参排除集；§59.348 切片化+互斥门信号）
-	PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string) // §59.482 刀7 簇兄弟标题桥 coverage 回写
+	PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string)                                                           // §59.482 刀7 簇兄弟标题桥 coverage 回写
 }
 
 type PublishPipeline interface {
@@ -159,8 +159,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		// §59.341 ③: 用户手动注入的豆瓣链接（Tab4 输入框）——空走 DB 键三级链
 		DoubanLink string `json:"doubanLink"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Name == "" {
@@ -489,7 +488,10 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		// §59.298 C: 指定字幕轨（人工纠偏——tab3 轨下拉；0/缺省=自动选择）
 		SubtitleSid int `json:"subtitleSid"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.SavePath == "" || req.ClientUID == 0 {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" || req.SavePath == "" || req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "name/savePath/clientId 必填")
 		return
 	}

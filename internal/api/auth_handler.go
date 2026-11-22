@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -30,8 +29,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Username == "" || req.Password == "" {
@@ -61,8 +59,7 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.RefreshToken == "" {
@@ -115,8 +112,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -140,8 +136,7 @@ func (h *AuthHandler) HandlePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req changePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.OldPassword == "" || req.NewPassword == "" {
@@ -187,8 +182,7 @@ func (h *AuthHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req updateProfileRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.DisplayName == "" {

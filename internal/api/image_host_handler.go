@@ -76,8 +76,7 @@ func (h *ImageHostHandler) handlePut(w http.ResponseWriter, r *http.Request) {
 		AGSVPTEmail    string `json:"agsvpt_email"`
 		AGSVPTPassword string `json:"agsvpt_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

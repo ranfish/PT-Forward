@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -111,13 +110,13 @@ func (h *DeleteRuleHandler) handleGet(w http.ResponseWriter, _ *http.Request, id
 
 func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Alias                string `json:"alias"`
-		Priority             int    `json:"priority"`
-		Enabled              bool   `json:"enabled"`
-		Type                 string `json:"type"`
-		Logic                string `json:"logic"`
-		Conditions           string `json:"conditions"`
-		Action               string `json:"action"`
+		Alias      string `json:"alias"`
+		Priority   int    `json:"priority"`
+		Enabled    bool   `json:"enabled"`
+		Type       string `json:"type"`
+		Logic      string `json:"logic"`
+		Conditions string `json:"conditions"`
+		Action     string `json:"action"`
 		// §59.313: 指针形态区分"未填"与"显式 0"——0=不限是合法语义（引擎
 		// rule_evaluator DeleteNum>0 才截断；前端提示"0=不限"）。曾用 int 零值
 		// 强改 1（创建假 1/编辑正常的不对称根因——update 走 map presence）
@@ -131,8 +130,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		ReannounceIntervalMs int    `json:"reannounce_interval_ms"`
 		DeleteCompanions     bool   `json:"delete_companions"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Alias == "" {
@@ -195,8 +193,7 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 	}
 
 	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -425,8 +422,7 @@ func (h *DeleteRuleHandler) handleTestRuleDryrun(w http.ResponseWriter, r *http.
 		Size        int64  `json:"size"`
 		Seeders     int    `json:"seeders"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

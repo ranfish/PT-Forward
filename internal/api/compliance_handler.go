@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -67,8 +66,7 @@ type createComplianceRuleReq struct {
 
 func (h *ComplianceHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req createComplianceRuleReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.RuleType = strings.TrimSpace(req.RuleType)
@@ -165,8 +163,7 @@ func (h *ComplianceHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 		Subtitle string `json:"subtitle"`
 		Scope    string `json:"scope"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Title == "" && req.Subtitle == "" {

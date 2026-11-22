@@ -102,7 +102,10 @@ func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Reque
 		var req struct {
 			Key string `json:"key"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Key == "" {
+		if !decodeJSONBody(w, r, &req) {
+			return
+		}
+		if req.Key == "" {
 			Error(w, http.StatusBadRequest, 40001, "key 不能为空")
 			return
 		}

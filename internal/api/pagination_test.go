@@ -11,10 +11,10 @@ import (
 // 并在提交说明中写明契约变化。
 func TestParsePagination(t *testing.T) {
 	cases := []struct {
-		name      string
-		query     url.Values
-		wantPage  int
-		wantSize  int
+		name     string
+		query    url.Values
+		wantPage int
+		wantSize int
 	}{
 		{"空参用默认", url.Values{}, 1, 20},
 		{"size 键有效", url.Values{"page": {"2"}, "size": {"50"}}, 2, 50},

@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/ranfish/pt-forward/internal/model"
-	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/publish"
+	sitepkg "github.com/ranfish/pt-forward/internal/site"
 )
 
 // FormConfigHandler 配置中心端点。
@@ -189,7 +189,10 @@ func (h *FormConfigHandler) handleSetAnonymous(w http.ResponseWriter, r *http.Re
 		SiteName  string `json:"site_name"`
 		Anonymous bool   `json:"anonymous"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SiteName == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.SiteName == "" {
 		Error(w, http.StatusBadRequest, 40001, "site_name 必填")
 		return
 	}
@@ -236,7 +239,10 @@ func (h *FormConfigHandler) handleSetOffer(w http.ResponseWriter, r *http.Reques
 		SiteName string `json:"site_name"`
 		Offer    bool   `json:"offer"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SiteName == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.SiteName == "" {
 		Error(w, http.StatusBadRequest, 40001, "site_name 必填")
 		return
 	}

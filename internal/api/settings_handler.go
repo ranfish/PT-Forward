@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -170,8 +169,7 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 	var req struct {
 		Value string `json:"value"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -248,8 +246,7 @@ func (h *SettingsHandler) handleRestore(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Settings map[string]string `json:"settings"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.Settings) == 0 {

@@ -4005,6 +4005,7 @@ func TestSite_Create_Validation(t *testing.T) {
 		}
 	}
 }
+
 // §59.318 N1: 收权后重复域校验随 create 端点消亡——占位验证 405。
 func TestSite_Create_DuplicateDomain(t *testing.T) {
 	env := setupTestEnv(t)
@@ -4091,6 +4092,7 @@ func TestSite_Create_InvalidFramework(t *testing.T) {
 		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
+
 // §59.318 N1: authType 校验随 create 收回——占位验证 405。
 func TestSite_Create_InvalidAuthType(t *testing.T) {
 	env := setupTestEnv(t)
@@ -4120,6 +4122,7 @@ func TestSite_Delete(t *testing.T) {
 		t.Fatalf("delete 应已收回(405), got %d", w.Code)
 	}
 }
+
 // §59.318 N1: delete 收回后 404 语义消亡——验证恒 405。
 func TestSite_Delete_NotFound(t *testing.T) {
 	env := setupTestEnv(t)
@@ -6100,6 +6103,7 @@ func TestSiteV2_CreateMissingRequired(t *testing.T) {
 		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
+
 // §59.318 N1: create 收回（坏 body 也 405——路由层拦截先于解析）。
 func TestSiteV2_CreateInvalidBody(t *testing.T) {
 	env := setupTestEnv(t)
@@ -6112,6 +6116,7 @@ func TestSiteV2_CreateInvalidBody(t *testing.T) {
 		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
+
 // §59.318 N1: create 收回——seed 强覆盖语义随端点消亡，验证恒 405。
 func TestSiteV2_CreateDefaultsFramework(t *testing.T) {
 	env := setupTestEnv(t)
@@ -6254,6 +6259,7 @@ func TestSiteV2_DeleteSuccess(t *testing.T) {
 		t.Fatalf("站点应保留可读, got %d", w.Code)
 	}
 }
+
 // §59.318 N1: delete 收回——恒 405。
 func TestSiteV2_DeleteNotFound(t *testing.T) {
 	env := setupTestEnv(t)
@@ -6794,6 +6800,7 @@ func TestSiteV2_CreateInvalidFramework(t *testing.T) {
 		t.Fatalf("create 应已收回(405), got %d", w.Code)
 	}
 }
+
 // §59.318 N1: create 收回——验证恒 405。
 func TestSiteV2_CreateInvalidAuthType(t *testing.T) {
 	env := setupTestEnv(t)

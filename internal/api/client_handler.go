@@ -39,13 +39,13 @@ func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) 
 }
 
 type createDownloaderRequest struct {
-	Name              string               `json:"name"`
-	Type              string               `json:"type"`
-	URL               string               `json:"url"`
-	Username          string               `json:"username"`
-	Password          string               `json:"password"`
-	Role              string               `json:"role"`
-	IsLocal           *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+	IsLocal  *bool  `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
 	// §59.508 附: 三字段指针化——零值不可区分类型的无条件覆盖是静默
 	// 清空陷阱（65 实测实锤：不带 transferTargetUid 的 PUT 清空转移
 	// 目标；Enabled 省略=静默禁用更严重）。nil=不覆盖；显式零值=主动
@@ -238,8 +238,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createDownloaderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -360,8 +359,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createDownloaderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -931,8 +929,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			NotifyOnPublish bool   `json:"notify_on_publish"`
 			Enabled         bool   `json:"enabled"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if req.ClientUID == 0 || req.SiteName == "" {
@@ -969,8 +966,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			NotifyOnPublish *bool  `json:"notify_on_publish"`
 			Enabled         *bool  `json:"enabled"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		var target model.ClientPublishTarget
@@ -1013,8 +1009,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 		var req struct {
 			ID uint `json:"id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		result := h.db.WithContext(r.Context()).Delete(&model.ClientPublishTarget{}, req.ID)

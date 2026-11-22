@@ -276,8 +276,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		ReannounceWaitMs         int     `json:"reannounceWaitMs"`
 		MinSeedHoursBeforeDelete float64 `json:"minSeedHoursBeforeDelete"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.ClientUID == 0 {
@@ -377,8 +376,7 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -698,8 +696,7 @@ func (h *SeedingHandler) handleScoringDryrun(w http.ResponseWriter, r *http.Requ
 		HalfLifeHours float64 `json:"halfLifeHours"`
 		SiteWeight    float64 `json:"siteWeight"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -933,8 +930,7 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 
 	if r.Method == http.MethodPut {
 		var req map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		updates := make(map[string]interface{})
@@ -1011,8 +1007,7 @@ func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *ht
 		var body struct {
 			Keywords []string `json:"keywords"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			Error(w, http.StatusBadRequest, 40000, "invalid body")
+		if !decodeJSONBody(w, r, &body) {
 			return
 		}
 		data, _ := json.Marshal(body.Keywords)
@@ -1154,8 +1149,7 @@ func (h *SeedingHandler) handleScoringConfigByID(w http.ResponseWriter, r *http.
 
 	if r.Method == http.MethodPut {
 		var req map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		updates := make(map[string]interface{})

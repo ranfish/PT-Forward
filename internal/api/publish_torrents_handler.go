@@ -878,8 +878,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	}
 
 	var req coverageQueryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.InfoHash == "" || req.ClientUID == 0 {
@@ -985,8 +984,7 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 		ClientUID  uint     `json:"clientId"`
 		InfoHashes []string `json:"infoHashes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.ClientUID == 0 || len(req.InfoHashes) == 0 {
@@ -1159,8 +1157,7 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 	}
 
 	var req detectSourceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.InfoHash == "" || req.Name == "" {
@@ -1298,8 +1295,7 @@ func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWrit
 	var req struct {
 		Patterns []string `json:"patterns"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if err := h.declFilter.SetPatterns(r.Context(), req.Patterns); err != nil {
@@ -1321,8 +1317,7 @@ type previewTitleRequest struct {
 
 func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *http.Request) {
 	var req previewTitleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.TargetSite == "" {
@@ -1379,8 +1374,7 @@ func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, 
 		TargetSites     []string          `json:"targetSites"`
 		TitleComponents map[string]string `json:"titleComponents"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1432,8 +1426,7 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 		SiteName   string `json:"siteName"`
 		IsOfficial bool   `json:"isOfficial"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.GroupName == "" {
@@ -1472,8 +1465,7 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 		SiteName   string `json:"siteName"`
 		IsOfficial bool   `json:"isOfficial"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if err := h.db.Model(&model.ReleaseGroupMapping{}).Where("id = ?", id).Updates(map[string]interface{}{
@@ -1553,8 +1545,7 @@ type batchPublishRequest struct {
 
 func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *http.Request) {
 	var req batchPublishRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.Items) == 0 {
@@ -1828,8 +1819,7 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		MediaInfo   string `json:"mediainfo"`
 		Tags        string `json:"tags"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1885,8 +1875,7 @@ func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *htt
 		InfoHashes []string `json:"info_hashes"`
 		Reviewed   bool     `json:"reviewed"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	ids := req.IDs
@@ -1940,8 +1929,7 @@ func (h *PublishTorrentsHandler) handleBatchDelete(w http.ResponseWriter, r *htt
 	var req struct {
 		IDs []uint `json:"ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.IDs) == 0 {
@@ -2192,8 +2180,7 @@ func (h *PublishTorrentsHandler) handleSetSourcePriority(w http.ResponseWriter, 
 	var req struct {
 		Priority []string `json:"priority"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	data, _ := json.Marshal(req.Priority)
@@ -2268,8 +2255,7 @@ func (h *PublishTorrentsHandler) handleSetFetchPriority(w http.ResponseWriter, r
 	var req struct {
 		Priority []string `json:"priority"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "invalid body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	data, _ := json.Marshal(req.Priority)
@@ -2317,8 +2303,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 			SavePath string `json:"savePath"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.Items) == 0 {
@@ -3403,7 +3388,10 @@ func (h *PublishTorrentsHandler) handlePurgeObserving(w http.ResponseWriter, r *
 		ClientUID uint   `json:"clientId"`
 		Name      string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientUID == 0 || req.Name == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.ClientUID == 0 || req.Name == "" {
 		Error(w, http.StatusBadRequest, 40001, "clientId 和 name 必填")
 		return
 	}
@@ -4411,7 +4399,10 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 		TorrentID  string `json:"torrent_id"`
 		ExpectHash string `json:"expect_hash"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Site == "" || req.TorrentID == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.Site == "" || req.TorrentID == "" {
 		Error(w, http.StatusBadRequest, 40001, "site/torrent_id 必填")
 		return
 	}
@@ -4978,8 +4969,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 
 	var req putSeedRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -5689,7 +5679,10 @@ func (h *PublishTorrentsHandler) handleBDInfoBackfill(w http.ResponseWriter, r *
 	var req struct {
 		ClientUID uint `json:"clientId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientUID == 0 {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "clientId 必填")
 		return
 	}
@@ -5771,8 +5764,10 @@ func (h *PublishTorrentsHandler) handleBDInfoRescan(w http.ResponseWriter, r *ht
 		SavePath  string `json:"savePath"`
 		Name      string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
-		req.ClientUID == 0 || req.SavePath == "" || req.Name == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.ClientUID == 0 || req.SavePath == "" || req.Name == "" {
 		Error(w, http.StatusBadRequest, 40001, "clientId/savePath/name 必填")
 		return
 	}
@@ -5935,7 +5930,10 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 		Anonymous    bool     `json:"anonymous"`
 		TagOverrides []string `json:"tag_overrides"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || len(req.TargetSites) == 0 {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.InfoHash == "" || len(req.TargetSites) == 0 {
 		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_sites 必填")
 		return
 	}
@@ -6002,7 +6000,10 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 		InfoHashes []string `json:"infoHashes"`
 		TargetSite string   `json:"targetSite"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.InfoHashes) == 0 || req.TargetSite == "" {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if len(req.InfoHashes) == 0 || req.TargetSite == "" {
 		Error(w, http.StatusBadRequest, 40001, "infoHashes 与 targetSite 必填")
 		return
 	}
@@ -6353,7 +6354,10 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 	var req struct {
 		IDs []uint `json:"ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.IDs) == 0 {
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if len(req.IDs) == 0 {
 		Error(w, http.StatusBadRequest, 40001, "ids 必填")
 		return
 	}

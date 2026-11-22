@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -66,8 +65,7 @@ func (h *CloudFPHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request)
 
 func (h *CloudFPHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var input model.CloudFPConfig
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "无效的请求体")
+	if !decodeJSONBody(w, r, &input) {
 		return
 	}
 	input.ID = 1

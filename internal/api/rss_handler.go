@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,9 +9,9 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/middleware"
-	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/rss"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -504,8 +503,7 @@ func (h *RSSHandler) computeSubHealth(ctx context.Context, subID uint) (failures
 
 func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req createRSSRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -666,8 +664,7 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req updateRSSRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1008,8 +1005,7 @@ func (h *RSSHandler) handleUpdateRules(w http.ResponseWriter, r *http.Request, i
 		RejectRuleIDs []uint                `json:"rejectRuleIds"`
 		Conditions    []model.RuleCondition `json:"conditions"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1055,8 +1051,7 @@ func (h *RSSHandler) handleClearSeen(w http.ResponseWriter, r *http.Request, idS
 		TorrentIDs []string `json:"torrent_ids"`
 		All        bool     `json:"all"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if !req.All && len(req.TorrentIDs) == 0 {

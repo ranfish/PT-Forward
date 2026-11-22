@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -165,8 +164,7 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		MaxRetries           int     `json:"maxRetries"`
 		RetryIntervalH       int     `json:"retryIntervalH"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Name == "" {
@@ -250,8 +248,7 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -654,8 +651,7 @@ func (h *ReseedHandler) handleBatchRetryMatches(w http.ResponseWriter, r *http.R
 	var req struct {
 		MatchIDs []uint `json:"match_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.MatchIDs) == 0 {
@@ -701,8 +697,7 @@ func (h *ReseedHandler) handleBatchDeleteMatches(w http.ResponseWriter, r *http.
 	var req struct {
 		MatchIDs []uint `json:"match_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.MatchIDs) == 0 {

@@ -78,8 +78,7 @@ func (h *LifecycleHandler) handleGetConfig(w http.ResponseWriter, r *http.Reques
 
 func (h *LifecycleHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -148,8 +147,7 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 		MaxConcurrent   *int  `json:"max_concurrent"`
 		PauseOnPressure *bool `json:"pause_on_pressure"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

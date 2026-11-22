@@ -58,7 +58,6 @@ func NewSiteHandler(repo *site.Repository, logger *zap.Logger, db *gorm.DB) *Sit
 	return &SiteHandler{repo: repo, db: db, logger: logger}
 }
 
-
 func applySiteMaxConcurrent(domain string, maxConcurrent int) {
 	if maxConcurrent > 0 {
 		// Default limiter is 30 reqs/60s for maxConcurrent=2 (15 reqs per concurrent
@@ -536,10 +535,10 @@ type siteExportImport struct {
 	CookieCloudSync   bool   `json:"cookie_cloud_sync"`
 	CookieCloudDomain string `json:"cookie_cloud_domain"`
 
-	IsSource               bool   `json:"is_source"`
-	IsTarget               bool   `json:"is_target"`
-	IsReseedTarget         bool   `json:"is_reseed_target"`
-	ParticipateAutoPublish bool   `json:"participate_auto_publish"`
+	IsSource               bool `json:"is_source"`
+	IsTarget               bool `json:"is_target"`
+	IsReseedTarget         bool `json:"is_reseed_target"`
+	ParticipateAutoPublish bool `json:"participate_auto_publish"`
 
 	HRStrategy       string `json:"hr_strategy"`
 	OverrideRSSURL   string `json:"override_rss_url"`
@@ -653,8 +652,7 @@ func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Sites []siteExportImport `json:"sites"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	result := siteImportResult{Skipped: []string{}, Warnings: []string{}, Errors: []string{}}
@@ -821,8 +819,7 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req updateSiteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1128,8 +1125,7 @@ func (h *SiteHandler) handleUpdateCredentials(w http.ResponseWriter, r *http.Req
 	}
 
 	var req updateCredentialsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -1214,8 +1210,7 @@ func (h *SiteHandler) handleBatchUpdate(w http.ResponseWriter, r *http.Request) 
 		IDs    []uint                 `json:"ids"`
 		Fields map[string]interface{} `json:"fields"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.IDs) == 0 {
@@ -1286,8 +1281,7 @@ func (h *SiteHandler) handleBatchSyncSiteStats(w http.ResponseWriter, r *http.Re
 	var req struct {
 		IDs []uint `json:"ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.IDs) == 0 {
@@ -1859,8 +1853,7 @@ func (h *SiteHandler) handleUpsertOverride(w http.ResponseWriter, r *http.Reques
 		FieldPath  string `json:"fieldPath"`
 		FieldValue string `json:"fieldValue"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.FieldPath == "" {
@@ -1953,8 +1946,7 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 		var req struct {
 			Domain string `json:"domain"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if req.Domain == "" {
@@ -2004,8 +1996,7 @@ func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request
 		var req struct {
 			Domain string `json:"domain"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if req.Domain == "" {
@@ -2027,8 +2018,7 @@ func (h *SiteHandler) handleDomainFreeze(w http.ResponseWriter, r *http.Request,
 			Duration string `json:"duration"`
 			Reason   string `json:"reason"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		dur, err := time.ParseDuration(req.Duration)
@@ -2115,8 +2105,7 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			TargetSite string `json:"target_site"`
 			SourceSite string `json:"source_site"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if req.TargetSite == "" || req.SourceSite == "" {
@@ -2142,8 +2131,7 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			TargetSite string `json:"target_site"`
 			SourceSite string `json:"source_site"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) {
@@ -2203,8 +2191,7 @@ func (h *SiteHandler) handleSearch(w http.ResponseWriter, r *http.Request, idStr
 	}
 
 	var req searchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40003, "请求参数错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Query == "" {
@@ -2283,8 +2270,7 @@ func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req discountRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40003, "请求参数错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.TorrentID == "" {

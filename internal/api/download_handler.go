@@ -222,8 +222,7 @@ type bulkActionRequest struct {
 
 func (h *DownloadHandler) handleBulkAction(w http.ResponseWriter, r *http.Request) {
 	var req bulkActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.IDs) == 0 {
@@ -343,8 +342,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 		paused = r.FormValue("paused") == "true"
 	} else {
 		var req addTaskRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		clientUID = req.ClientUID
@@ -622,8 +620,7 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 		Success(w, configs)
 	case rest == "" && r.Method == http.MethodPost:
 		var req model.SeedingClientConfig
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		if !decodeJSONBody(w, r, &req) {
 			return
 		}
 		if req.ClientUID == 0 {
@@ -666,8 +663,7 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 		switch r.Method {
 		case http.MethodPut:
 			var req map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+			if !decodeJSONBody(w, r, &req) {
 				return
 			}
 			delete(req, "id")

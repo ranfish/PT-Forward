@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -58,8 +57,7 @@ func (h *PTGenHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Query string `json:"query"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Query == "" {

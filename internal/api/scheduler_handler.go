@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -118,8 +117,7 @@ func (h *SchedulerHandler) handleReschedule(w http.ResponseWriter, r *http.Reque
 	var req struct {
 		Schedule string `json:"schedule"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Schedule == "" {

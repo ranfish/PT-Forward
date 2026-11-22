@@ -1,7 +1,6 @@
 package api
 
 import (
-	"github.com/ranfish/pt-forward/internal/coverage"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/coverage"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/middleware"
@@ -146,8 +147,8 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 			"enabled":           false,
 			"baseUrl":           "https://2025.iyuu.cn",
 			"syncIntervalHours": 24,
-			"coverageEnabled":  false, // §59.535 刀3 联合回归 P1：GET 回读缺字段→前端刷新回 off 显示假象（DB 实存 1 实证）
-			"coverageSchedule": "",
+			"coverageEnabled":   false, // §59.535 刀3 联合回归 P1：GET 回读缺字段→前端刷新回 off 显示假象（DB 实存 1 实证）
+			"coverageSchedule":  "",
 		})
 		return
 	}
@@ -220,8 +221,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		CoverageEnabled  *bool  `json:"coverageEnabled"`
 		CoverageSchedule string `json:"coverageSchedule,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -380,8 +380,7 @@ func (h *IYUUHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		InfoHashes []string `json:"infoHashes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if len(req.InfoHashes) == 0 {
@@ -546,7 +545,6 @@ func normalizeIYUUDomain(s string) string {
 	s = strings.TrimSuffix(s, "/")
 	return s
 }
-
 
 // handleCoverageRun §59.535 刀3: 手动触发一轮覆盖同步（异步·防重入 409）。
 func (h *IYUUHandler) handleCoverageRun(w http.ResponseWriter, r *http.Request) {
