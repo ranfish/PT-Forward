@@ -8,10 +8,13 @@ import (
 
 // §59.556 锚: 路由分发修正双态锁定——
 // ① recompute-profiles 同步版路由退役（11-11 §59.539 异步化改造的残骸·
-//    空壳 case 曾致「命中但空响应」）→ 现应 404（调用方立即发现用错端点·
-//    正主是 recompute-profiles-task）
+//
+//	空壳 case 曾致「命中但空响应」）→ 现应 404（调用方立即发现用错端点·
+//	正主是 recompute-profiles-task）
+//
 // ② fix-stale-dolby 单响应（双 handler 串联曾致 superfluous WriteHeader
-//    风险+全量 recompute 负载）→ 响应体应为 Dolby 清洗结构且唯一。
+//
+//	风险+全量 recompute 负载）→ 响应体应为 Dolby 清洗结构且唯一。
 func TestRoute_RecomputeProfilesRetired(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest(http.MethodPost, "/api/v1/publish/seeds/recompute-profiles", nil)
