@@ -528,7 +528,7 @@ func (s *Service) QuerySharedCoverage(ctx context.Context, infoHashes []string, 
 	var rows []model.SiteCoverageCache
 	if err := s.db.WithContext(ctx).
 		Where("info_hash IN ? AND status IN ?", cleaned,
-			[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+			model.CoverageHasStatuses).
 		Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -581,7 +581,7 @@ func (s *Service) GetCoveredSiteNames(ctx context.Context, infoHash string) ([]s
 	err := s.db.WithContext(ctx).
 		Model(&model.SiteCoverageCache{}).
 		Where("info_hash = ? AND status IN ?", infoHash,
-			[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+			model.CoverageHasStatuses).
 		Pluck("site_name", &names).Error
 	return names, err
 }

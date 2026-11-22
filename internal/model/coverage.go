@@ -3,11 +3,11 @@ package model
 import "time"
 
 const (
-	CoverageConfirmedHas    = "confirmed_has"
-	CoverageProbablyHas     = "probably_has"
-	CoverageConfirmedNot    = "confirmed_not"
-	CoverageProbablyNot     = "probably_not"
-	CoverageUnknown         = "unknown"
+	CoverageConfirmedHas = "confirmed_has"
+	CoverageProbablyHas  = "probably_has"
+	CoverageConfirmedNot = "confirmed_not"
+	CoverageProbablyNot  = "probably_not"
+	CoverageUnknown      = "unknown"
 
 	CoverageSourceTracker    = "tracker"
 	CoverageSourceDownload   = "download" // §59.196: 恢复链下载成功——原发页确定性证据（高于 tracker 存在性）
@@ -17,6 +17,13 @@ const (
 	CoverageSourceNameSize   = "name_size"
 	CoverageSourcePublish    = "publish"
 )
+
+// CoverageHasStatuses 「站上有」语义的覆盖状态集（§59.547 回归审核单点化：
+// 散布 31 处判定——IN 清单形态必须引用此常量·新增「站上有」态状态时在此
+// 登记。if 双条件形态（== X || == Y）挂账按需收编）。
+var CoverageHasStatuses = []string{
+	CoverageConfirmedHas, CoverageProbablyHas,
+}
 
 type SiteCoverageCache struct {
 	ID uint `gorm:"primaryKey;autoIncrement" json:"id"`

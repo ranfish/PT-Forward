@@ -3781,7 +3781,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 					Table("site_coverage_cache").
 					Select("info_hash, site_name").
 					Where("info_hash IN ? AND status IN ?", batch,
-						[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+						model.CoverageHasStatuses).
 					Find(&br)
 				covRows = append(covRows, br...)
 			}
@@ -3798,7 +3798,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 					coverageTargetClusters[key] = true
 				}
 			}
-			// 四色绿：我们发过的站（发布记录成功终态·PublishedListStatuses）
+			// 四色绿：我们发过的站（发布事实口径=PublishSkipStatuses 五终态——
+			// §59.547 回归审核修正：原用 PublishedListStatuses 六终态·existing
+			// （文案信任·没发上去）会误标绿——绿语义=「我们发的」必须是发上去了）
 			type oursRow struct {
 				SourceInfoHash string
 				TargetSite     string
@@ -3810,7 +3812,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 					Table("publish_result_records").
 					Select("source_info_hash, target_site").
 					Where("source_info_hash IN ? AND target_site != '' AND status IN ?",
-						batch, model.PublishedListStatuses).
+						batch, model.PublishSkipStatuses).
 					Find(&br)
 				oursRows = append(oursRows, br...)
 			}

@@ -51,6 +51,14 @@ func TestListSeedsThreeFaceFilterAndSiteTags(t *testing.T) {
 	db.Create(&model.TorrentSnapshot{Hash: Z("cmiss"), ClientUID: 1, SavePath: "/v", Name: "C.Miss.2026", Progress: 1})
 	db.Create(meta(Z("cmiss"), "TC"))
 
+	// 簇 D：existing 终态（文案信任·没发上去）——§59.547 回归审核补：
+	// 四色绿必须是发布事实口径（Skip 五终态）·existing 不得标绿
+	// （站上其实是别人的·标绿会误导归属）
+	db.Create(&model.TorrentSnapshot{Hash: Z("dexist"), ClientUID: 1, SavePath: "/v", Name: "D.Exist.2026", Progress: 1})
+	db.Create(meta(Z("dexist"), "TD"))
+	db.Create(&model.PublishResultRecord{SourceInfoHash: Z("dexist"), TargetSite: "目标站",
+		Status: "existing", Trigger: "manual"})
+
 	fetch := func(state string) map[string]map[string]interface{} {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/publish/seeds", nil)
 		q := url.Values{}
@@ -76,16 +84,18 @@ func TestListSeedsThreeFaceFilterAndSiteTags(t *testing.T) {
 		return out
 	}
 
-	// ① publishable：仅簇 C（三面全 miss）
+	// ① publishable：仅簇 C（三面全 miss）——簇 D（existing）命中记录面 List
+	// 也不在可发布（List 六终态筛选用）·簇 C 是唯一三面 miss
 	pub := fetch("publishable")
 	if len(pub) != 1 || pub["C.Miss.2026"] == nil {
 		t.Fatalf("① 可发布应仅含簇 C（三面 miss）·got %d 项: %v", len(pub), keysOf(pub))
 	}
 
-	// ② published：簇 A（覆盖面）+ 簇 B（记录面）——覆盖面命中也归已发布
+	// ② published：簇 A（覆盖面）+ 簇 B（记录面）+ 簇 D（existing 记录）——
+	// 覆盖面命中也归已发布；existing 属 List 六终态（记录在案口径）
 	ped := fetch("published")
-	if ped["A.Cover.2026"] == nil || ped["B.Rec.2026"] == nil {
-		t.Fatalf("② 已发布应含簇 A（覆盖面）与簇 B（记录面）·got %v", keysOf(ped))
+	if ped["A.Cover.2026"] == nil || ped["B.Rec.2026"] == nil || ped["D.Exist.2026"] == nil {
+		t.Fatalf("② 已发布应含簇 A（覆盖面）/B（记录面）/D（existing）·got %v", keysOf(ped))
 	}
 	if ped["C.Miss.2026"] != nil {
 		t.Fatalf("② 簇 C 不应在已发布")
@@ -103,6 +113,15 @@ func TestListSeedsThreeFaceFilterAndSiteTags(t *testing.T) {
 	tagsB := siteTagsOf(ped["B.Rec.2026"])
 	if len(tagsB) == 0 || tagsB[0]["ours"] != true {
 		t.Fatalf("③ 簇 B 选中站应 ours=true（绿）·got %v", tagsB)
+	}
+	// 簇 D 选中站 tag（existing·记录面命中→蓝置顶）：绿=发布事实口径
+	// （Skip 五终态）·existing 不标绿（ours=false·别人发的蓝）
+	tagsD := siteTagsOf(ped["D.Exist.2026"])
+	if len(tagsD) == 0 || tagsD[0]["name"] != "目标站" {
+		t.Fatalf("③ 簇 D 选中站应置顶（existing 命中记录面）·got %v", tagsD)
+	}
+	if tagsD[0]["ours"] != false {
+		t.Fatalf("③ 簇 D existing 终态不应标绿（ours 应 false——站上是别人的）·got %v", tagsD[0])
 	}
 	// 簇 C（可发布）：三面 miss → 选中站无 tag（site_tags 为空或不含目标站）
 	tagsC := siteTagsOf(pub["C.Miss.2026"])

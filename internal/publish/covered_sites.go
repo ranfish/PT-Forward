@@ -80,7 +80,7 @@ func coveredOfHashes(ctx context.Context, db *gorm.DB, tm *site.TrackerMatcher, 
 	db.WithContext(ctx).
 		Model(&model.SiteCoverageCache{}).
 		Where("info_hash IN ? AND status IN ?", hashes,
-			[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+			model.CoverageHasStatuses).
 		Pluck("site_name", &covRows)
 	for _, s := range covRows {
 		if s != "" {
