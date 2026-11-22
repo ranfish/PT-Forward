@@ -7,7 +7,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
-
 // §59.163: MI 误判防御——段名冒号全角化（探针 H1 实证；用户定案内容零丢失）。
 func TestFullwidthMIColons(t *testing.T) {
 	src := `感谢 FRDS 组

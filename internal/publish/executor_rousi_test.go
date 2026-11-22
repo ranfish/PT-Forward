@@ -10,7 +10,7 @@ import (
 // poster 直塞（站方词表内直投+外词剥除+空兜其它）。
 func TestRousiPublishInject(t *testing.T) {
 	meta := &model.TorrentMetadata{
-		Poster: "https://doubaninfo.com/dbposter/x.jpg",
+		Poster:          "https://doubaninfo.com/dbposter/x.jpg",
 		PTGenSourceJSON: `{"genre": ["动画", "歌舞", "同性"], "region": ["中国大陆 / 中国香港"]}`,
 	}
 	form := map[string]string{}
@@ -51,7 +51,7 @@ func TestRousiPublishInject(t *testing.T) {
 // §59.459: 野马注入锚——regionList 多产区全投≤3 去重/译名/poster。
 func TestYemaPublishInject(t *testing.T) {
 	meta := &model.TorrentMetadata{
-		Poster: "https://img.example/p.jpg",
+		Poster:          "https://img.example/p.jpg",
 		PTGenSourceJSON: `{"region": ["中国大陆 / 美国", "日本"], "translated_titles": "测试译名"}`,
 	}
 	form := map[string]string{}

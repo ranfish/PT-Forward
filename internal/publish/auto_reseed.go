@@ -28,11 +28,13 @@ type AutoReseedResult struct {
 }
 
 // AutoReseed §56.30: 发布成功后自动加种到源下载器。
-//   downloader: 目标站 .torrent 下载器
-//   pusher: 下载器推种接口
-//   targetSite/torrentID: 目标站种子标识
-//   sourceClientID: 源下载器 ID（文件已在此下载器共享存储）
-//   savePath: 源种子的保存路径（复用）
+//
+//	downloader: 目标站 .torrent 下载器
+//	pusher: 下载器推种接口
+//	targetSite/torrentID: 目标站种子标识
+//	sourceClientID: 源下载器 ID（文件已在此下载器共享存储）
+//	savePath: 源种子的保存路径（复用）
+//
 // 加种失败不回滚，仅记录错误。
 func AutoReseed(
 	ctx context.Context,

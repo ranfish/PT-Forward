@@ -1,19 +1,19 @@
 package publish
 
 import (
-	"sync"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"errors"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/imagehost"
-	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/screenshot"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 )
 
