@@ -1401,11 +1401,21 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, siteName
 	case "bdrip", "dvdrip", "tvrip", "encode", "webrip":
 		// WEBRip→Encode 槽（§59.166 站方 TYPE_MISMATCH 对照定案·站方媒介槽
 		// 体系无 WEBRip 独立槽的翻译映射）。§59.536: 仅源站原生 WEBRip 触发
-		// ——MI 改写已撤（源站 WEB-DL→WEB-DL 槽不再落入本分支）
+		// ——MI 改写已撤（源站 WEB-DL→WEB-DL 槽不再落入本分支）。
+		// §59.549: 源分立站（劳改所式 WEBRiP/TVRip 独立槽）的精确分流在
+		// mediumStdKeyOf 调用后统一改写（见 applyMediumSourceFidelity）。
 		stdKey = "medium.encode"
 	}
 	// §59.380: stdKey 推导抽单源（codec 压制形态联动复用——防双实现漂移）
 	stdKey = mediumStdKeyOf(tp, stdKey)
+	// §59.549 媒介源保真：源分立站（值集按源分立项——劳改所 BDRip/WEBRiP/
+	// TVRip/DVDRiP 四源分立·与通用「Encode 大类」体系不同）优先精确源键·
+	// 值集无该槽回退 §59.166 通用翻译（Encode→BDRip·适配期定案「蓝光压制
+	// 要求 BDRip」保持——BD 源/无源血统不在改写面）。判据双通道：spec 显式
+	// （webrip/tvrip）∨ 血统隐式（encode 判定+SourceType=WEB——标题无
+	// webrip 词但血统 WEB·AMZN x265 式标注）。Quacks 案：WEB 源压制被通用
+	// 翻译投 BDRip·站方标题检测 WEBRiP=TYPE_MISMATCH。
+	stdKey = e.applyMediumSourceFidelity(cfg, tp, stdKey)
 	// §59.427: 好多油 TV 双轨分发——站方媒介 Remux/Encode/WEB-DL 各带
 	// TV 后缀分立项（Remux TV 12/UHD Remux TV 16/Encode TV 14/WEB-DL TV
 	// 13）：剧集（tv_series）种分发 TV 项（电影形态主键归 Remux/Encode/
@@ -1573,6 +1583,36 @@ func mediumStdKeyOf(tp titleparser.TechProfile, preset string) string {
 	return extract.LookupStandardKey("medium", tp.SourceType)
 }
 
+// applyMediumSourceFidelity §59.549: 媒介源保真改写（源分立站精确分流）。
+// 输入通用翻译产物 stdKey·命中源键条件且值集有该槽时改写·否则原样返回。
+// 保守面：仅改写 medium.encode（BD 源压制→BDRip 的适配期定案保持——
+// bdrip/dvdrip spec 不进血统通道〔spec 显式声明优先〕·非 encode 键零触碰）。
+func (e *PublishExecutor) applyMediumSourceFidelity(cfg *model.PublishFormConfig, tp titleparser.TechProfile, stdKey string) string {
+	if stdKey != "medium.encode" || cfg == nil {
+		return stdKey
+	}
+	srcKey := ""
+	switch strings.ToLower(tp.Specification) {
+	case "webrip":
+		srcKey = "medium.webrip"
+	case "tvrip":
+		srcKey = "medium.tvrip"
+	case "encode", "":
+		// 血统隐式：encode 判定+WEB 血统（SourceType=WEB——标题无 webrip 词
+		// 但提取层判 WEB 源·AMZN x265 式）→ WEB 源压制语义
+		if strings.EqualFold(tp.SourceType, "WEB") {
+			srcKey = "medium.webrip"
+		}
+	}
+	if srcKey == "" {
+		return stdKey
+	}
+	if e.lookupByStdKey(cfg, model.FieldDomainMedium, srcKey) == nil {
+		return stdKey // 值集无该槽（通用 Encode 大类站）——回退通用翻译
+	}
+	return srcKey
+}
+
 // mediumMapping 媒介域（二维规则 §59.150：规格优先，Encode 判定 IsEncode 铁证 §59.151）。
 func (e *PublishExecutor) mediumMapping(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
 	spec := strings.ToLower(meta.Specification)
@@ -1608,6 +1648,12 @@ func (e *PublishExecutor) mediumMapping(cfg *model.PublishFormConfig, meta *mode
 			stdKey = extract.LookupStandardKey("medium", meta.SourceType)
 		}
 	}
+	// §59.549 媒介源保真（与 mediumMappingOf 同源——修一处 grep 另一处纪律）：
+	// 源分立站精确分流·值集无该槽回退通用翻译。
+	stdKey = e.applyMediumSourceFidelity(cfg, titleparser.TechProfile{
+		SourceType: meta.SourceType, Specification: meta.Specification,
+		VideoCodec: meta.VideoCodec, RawTitle: meta.Title,
+	}, stdKey)
 	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
 }
 
