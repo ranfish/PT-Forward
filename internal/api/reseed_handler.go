@@ -442,14 +442,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	videoOnly := r.URL.Query().Get("video_only") == "1" || r.URL.Query().Get("video_only") == "true"
 	orderField := r.URL.Query().Get("orderField")
 	order := r.URL.Query().Get("order")
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if pageSize < 1 || pageSize > 200 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）
 
 	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("task_id = ? OR task_id = 0", taskID)
 
@@ -538,14 +531,7 @@ func (h *ReseedHandler) handleListFeatureLogs(w http.ResponseWriter, r *http.Req
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return
 	}
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if pageSize < 1 || pageSize > 200 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）
 	query := h.engine.DB().Model(&model.ReseedFeatureLog{}).Where("task_id = ?", taskID)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -581,14 +567,7 @@ func (h *ReseedHandler) handleListIYUULogs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if pageSize < 1 || pageSize > 200 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）
 
 	query := h.engine.DB().Model(&model.ReseedIYUULog{}).Where("task_id = ?", taskID)
 
@@ -767,14 +746,7 @@ func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Reques
 
 func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method == http.MethodGet {
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-		pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-		if pageSize < 1 || pageSize > 200 {
-			pageSize = 20
-		}
+		page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）
 		query := h.engine.DB().Model(&model.ReseedNegativeCache{})
 		var total int64
 		if err := query.Count(&total).Error; err != nil {
@@ -817,10 +789,8 @@ func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Reque
 	Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 }
 
+// parseMatchID §59.552: 委托 parseUintStrict（旧裸 err 改统一错误码——
+// 唯一消费方 reseed retry 自包 40001 文案·仅判 err 非空·行为等价）。
 func parseMatchID(s string) (uint, error) {
-	n, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return uint(n), nil
+	return parseUintStrict(s)
 }

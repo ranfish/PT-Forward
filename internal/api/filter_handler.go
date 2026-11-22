@@ -380,8 +380,8 @@ func matchRuleDirect(rule *model.FilterRule, ctx *filter.EvalContext) bool {
 	return true
 }
 
+// parseUint §59.552: 委托 parseUintStrict（旧 Sscanf 版 "42abc"→42 静默
+// 接受·实测坐实——严格化后拒绝·消费面自家前端零实际影响）。
 func parseUint(s string) (uint, error) {
-	var n uint
-	_, err := fmt.Sscanf(s, "%d", &n)
-	return n, err
+	return parseUintStrict(s)
 }

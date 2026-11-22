@@ -10,6 +10,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -320,15 +321,14 @@ func (p *Pusher) GetClientRole(ctx context.Context, clientID string) string {
 	return ""
 }
 
+// parseUint §59.552: 内部委托 util.ParseUint（手写逐字符版溢出静默回绕已
+// 修正——现溢出报错）；错误文案保持原样（外部可观察行为不变）。
 func parseUint(s string) (uint, error) {
-	var n uint
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("not a number")
-		}
-		n = n*10 + uint(c-'0')
+	v, err := util.ParseUint(s)
+	if err != nil {
+		return 0, fmt.Errorf("not a number")
 	}
-	return n, nil
+	return v, nil
 }
 
 var _ = httpclient.DrainBody

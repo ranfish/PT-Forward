@@ -1759,14 +1759,9 @@ func inferTypeFromName(name string) string {
 // 用于 /publish/data 页面（一站多种）。P1 优先级，P0 先实现基本列表。
 func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	page, _ := strconv.Atoi(q.Get("page"))
-	if page == 0 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(q.Get("page_size"))
-	if pageSize == 0 {
-		pageSize = 20
-	}
+	// §59.552 统一分页契约（顺修负数/超大 page_size 直通：旧版仅 ==0 回落，
+	// ?page_size=-5 会以 Limit(-5) 直通 GORM=SQLite 无限制全表拉取）
+	page, pageSize := parsePagination(r)
 	search := q.Get("search")
 	sourceSite := q.Get("source_site")
 	reviewStatus := q.Get("review_status") // all（默认）/ reviewed / unreviewed
@@ -3319,17 +3314,8 @@ const observingGracePeriod = 7 * 24 * time.Hour
 // 行内容：name + 变体数 + 消失时间（max last_seen）+ 清理倒计时 + 下载器/路径。
 // 资源实体语义（用户定案）：辅种 = 同下载器同资源不同站点；跨下载器为独立副本互不影响。
 func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *http.Request, clientUID uint, savePath, search string) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page == 0 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
-	if pageSize == 0 {
-		pageSize = 50
-	}
-	if pageSize > 100 {
-		pageSize = 100 // §59.166 单批发布上限 100 对齐（localStorage 脏值防线）
-	}
+	// §59.552 变体：默认 50+上限 100 为 §59.166 单批发布业务定案（不迁标准 200）
+	page, pageSize := parsePaginationWith(r, 50, 100, 10000)
 
 	// 观察组 = (client, name) 聚合：全变体 hidden（组内无活跃行）且 name 非空
 	type obsRow struct {
@@ -3553,17 +3539,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		return
 	}
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page == 0 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
-	if pageSize == 0 {
-		pageSize = 50
-	}
-	if pageSize > 100 {
-		pageSize = 100 // §59.166 单批发布上限 100 对齐（localStorage 脏值防线）
-	}
+	// §59.552 变体：默认 50+上限 100 为 §59.166 单批发布业务定案（不迁标准 200）
+	page, pageSize := parsePaginationWith(r, 50, 100, 10000)
 
 	// 1. 查 snapshots——§59.26: 先去重再分页；§59.29: SQL 层分组去重（20w+ 行时
 	// 避免 Go 全量载入）。同 client+path+name 的多站点 hash 只取 updated_at 最新一行。

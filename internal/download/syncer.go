@@ -1,11 +1,11 @@
 package download
 
 import (
-	"net/url"
-	"strings"
-	"path/filepath"
 	"context"
 	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
@@ -13,20 +13,21 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/rule"
 	"github.com/ranfish/pt-forward/internal/setting"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type Syncer struct {
-	db          *gorm.DB
-	repo        *Repository
-	clientMgr   *client.Manager
-	ruleModule  *rule.Module
-	fitTimer    *rule.FitTimer
-	runtimeCfg  *setting.RuntimeConfig
-	logger      *zap.Logger
-	schedules   map[uint]*clientSchedule // §59.251: 键=client UID
+	db         *gorm.DB
+	repo       *Repository
+	clientMgr  *client.Manager
+	ruleModule *rule.Module
+	fitTimer   *rule.FitTimer
+	runtimeCfg *setting.RuntimeConfig
+	logger     *zap.Logger
+	schedules  map[uint]*clientSchedule // §59.251: 键=client UID
 }
 
 type clientSchedule struct {
@@ -195,7 +196,6 @@ func (s *Syncer) restoreFitTimer(ctx context.Context) {
 	}
 }
 
-
 func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 	clientUID := c.GetID()
 
@@ -262,17 +262,17 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientUID uint, torrents []*
 		// §59.44: 路径规范化——TR 上报可能带尾斜杠（"PT6/SSD/" vs "PT6/SSD"），
 		// 字符串差异会劈裂三元组资源键，Clean 统一形态
 		records = append(records, model.TorrentSnapshot{
-			Hash:     t.Hash,
-			ClientUID: clientUID,
-			Name:     t.Name,
-			SavePath: filepath.Clean(t.SavePath),
-			Size:     t.TotalSize,
-			State:    t.State,
-			Progress: t.Progress,
-			Uploaded: t.Uploaded,
-			IsHidden: false,
-			LastSeen: now,
-			Comment:  t.Comment, // §59.61: 簇直达判据凭证
+			Hash:          t.Hash,
+			ClientUID:     clientUID,
+			Name:          t.Name,
+			SavePath:      filepath.Clean(t.SavePath),
+			Size:          t.TotalSize,
+			State:         t.State,
+			Progress:      t.Progress,
+			Uploaded:      t.Uploaded,
+			IsHidden:      false,
+			LastSeen:      now,
+			Comment:       t.Comment,                                     // §59.61: 簇直达判据凭证
 			TrackerDomain: firstTrackerHost(t.TrackerURL, t.TrackerURLs), // §59.296: 下载来源站首域
 		})
 	}
@@ -367,15 +367,15 @@ func (s *Syncer) importTask(ctx context.Context, clientUID uint, ti *model.Torre
 	}
 
 	task := &model.DownloadTask{
-		Source:       "import",
-		ClientUID:    clientUID,
-		InfoHash:     ti.Hash,
-		TorrentName:  ti.Name,
-		SavePath:     ti.SavePath,
-		TotalSize:    ti.TotalSize,
-		Category:     ti.Category,
-		Status:       model.DownloadStatusDownloading,
-		Progress:     ti.Progress * 100,
+		Source:      "import",
+		ClientUID:   clientUID,
+		InfoHash:    ti.Hash,
+		TorrentName: ti.Name,
+		SavePath:    ti.SavePath,
+		TotalSize:   ti.TotalSize,
+		Category:    ti.Category,
+		Status:      model.DownloadStatusDownloading,
+		Progress:    ti.Progress * 100,
 	}
 
 	if ti.IsFinished {
@@ -746,15 +746,14 @@ func splitCSV(s string) []string {
 	return result
 }
 
+// parseUint §59.552: 内部委托 util.ParseUint（手写版溢出静默回绕已修正）；
+// 哨兵 errInvalidNumber 保留（包内历史错误域·零 errors.Is 外部依赖）。
 func parseUint(s string) (uint, error) {
-	var n uint
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, errInvalidNumber
-		}
-		n = n*10 + uint(c-'0')
+	v, err := util.ParseUint(s)
+	if err != nil {
+		return 0, errInvalidNumber
 	}
-	return n, nil
+	return v, nil
 }
 
 var errInvalidNumber = fmt.Errorf("invalid number")

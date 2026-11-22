@@ -130,14 +130,7 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DownloadHandler) handleList(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page <= 0 {
-		page = 1
-	}
-	size, _ := strconv.Atoi(r.URL.Query().Get("size"))
-	if size <= 0 || size > 200 {
-		size = 20
-	}
+	page, size := parsePagination(r) // §59.552 统一（补 page>10000 截断）
 	clientUID := uint(0)
 	if v := r.URL.Query().Get("client_id"); v != "" {
 		if n, err := strconv.ParseUint(v, 10, 64); err == nil {

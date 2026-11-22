@@ -661,16 +661,12 @@ func extractLastSegment(path, prefix string) string {
 	return remaining
 }
 
+// parseUintParam §59.552: path 尾段 ID 提取+委托 parseUintStrict（统一契约）。
 func parseUintParam(path, prefix string) (uint, error) {
 	remaining := strings.TrimPrefix(path, prefix)
 	remaining = strings.TrimRight(remaining, "/")
 	parts := strings.Split(remaining, "/")
-	last := parts[len(parts)-1]
-	n, err := strconv.ParseUint(last, 10, 64)
-	if err != nil {
-		return 0, apiError(ErrAPIInvalidID, fmt.Sprintf("invalid ID: %s", last), nil)
-	}
-	return uint(n), nil
+	return parseUintStrict(parts[len(parts)-1])
 }
 
 func (h *SeedingHandler) handleStats(w http.ResponseWriter, _ *http.Request) {
@@ -839,16 +835,7 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 		q = q.Where("client_uid IN (SELECT id FROM clients WHERE role = 'seeding')")
 	}
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
-	if page < 1 {
-		page = 1
-	} else if page > 10000 {
-		page = 10000
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	offset := (page - 1) * pageSize
 
 	var total int64
@@ -1475,17 +1462,8 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
+	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	sortBy := r.URL.Query().Get("sort")
-	if page < 1 {
-		page = 1
-	} else if page > 10000 {
-		page = 10000
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
 	offset := (page - 1) * pageSize
 
 	status := r.URL.Query().Get("status")

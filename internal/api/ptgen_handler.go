@@ -77,16 +77,7 @@ func (h *PTGenHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
-	if page < 1 {
-		page = 1
-	} else if page > 10000 {
-		page = 10000
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	offset := (page - 1) * pageSize
 
 	q := h.db.Model(&model.PTGenCache{})

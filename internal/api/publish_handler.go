@@ -133,16 +133,7 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PublishHandler) handleListTasks(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if page < 1 {
-		page = 1
-	} else if page > 10000 {
-		page = 10000
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	offset := (page - 1) * pageSize
 
 	tasks, total, err := h.pipeline.ListTasks(r.Context(), offset, pageSize)
@@ -256,17 +247,7 @@ func (h *PublishHandler) handleCancelTask(w http.ResponseWriter, r *http.Request
 }
 
 func (h *PublishHandler) handleListCandidates(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if pageSize == 0 {
-		pageSize, _ = strconv.Atoi(r.URL.Query().Get("size"))
-	}
-	if pageSize < 1 || pageSize > 200 {
-		pageSize = 20
-	}
+	page, pageSize := parsePagination(r) // §59.552 统一（旧 pageSize 优先+size 回退→size 优先·前端单键传参无触发）
 
 	candidates, total, err := h.pipeline.ListAllCandidates(r.Context(), page, pageSize, r.URL.Query().Get("status"), r.URL.Query().Get("search"))
 	if err != nil {
@@ -302,6 +283,9 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 	trigger := r.URL.Query().Get("trigger")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
+	// §59.552 保留局部（不迁 parsePagination）：§59.509 附七 clamp 语义定案
+	// ——pageSize>200 clamp 到 200（用户显式要大页不能静默缩回比默认小），
+	// 与统一契约的"超限回落默认"语义冲突·按 P1 原则 5 契约冲突即停。
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	if pageSize == 0 {
