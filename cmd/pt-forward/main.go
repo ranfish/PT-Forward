@@ -13,9 +13,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,16 +23,16 @@ import (
 
 	"github.com/ranfish/pt-forward/frontend"
 	"github.com/ranfish/pt-forward/internal/adapter"
-	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/api"
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/auth"
+	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/client"
-	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/cloudfp"
-	"github.com/ranfish/pt-forward/internal/config"
 	"github.com/ranfish/pt-forward/internal/compliance"
+	"github.com/ranfish/pt-forward/internal/config"
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
+	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/crypto"
 	dbpkg "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
@@ -46,22 +46,22 @@ import (
 	"github.com/ranfish/pt-forward/internal/iyuu"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
-	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
+	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/pusher"
-	"github.com/ranfish/pt-forward/internal/titleparser"
-	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
 	"github.com/ranfish/pt-forward/internal/scheduler"
+	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/seeding"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/stats"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/watcher"
 
@@ -320,18 +320,8 @@ func main() {
 				Where("LOWER(group_name) = LOWER(?) AND is_official = ?", lookup, true).
 				Limit(1).Pluck("domain", &domains)
 			if len(domains) == 0 {
-				// §59.220: 组名前缀回退（CMCTf→CMCT）——验证层组门家族豁免
-				var fkeys []string
-				db.WithContext(context.Background()).
-					Model(&model.ReleaseGroupMapping{}).
-					Where("is_official = ?", true).
-					Pluck("group_name", &fkeys)
-				if fk := util.FuzzyGroupPrefixKey(lookup, fkeys); fk != "" {
-					db.WithContext(context.Background()).
-						Model(&model.ReleaseGroupMapping{}).
-						Where("LOWER(group_name) = LOWER(?) AND is_official = ?", fk, true).
-						Limit(1).Pluck("domain", &domains)
-				}
+				// §59.550: 前缀回退退役（用户定案「官组必须显式映射·系统不推导」）
+				// ——CMCTf 类变体由映射表显式收编·此处 miss 即 miss（诚实空）。
 			}
 			if len(domains) == 0 {
 				return ""
@@ -1255,7 +1245,6 @@ func registerSchedulerTasks(
 		clientMgr.HealthCheck(ctx)
 		return nil
 	})
-
 
 	register("publish_lifecycle", "publish", "*/30 * * * *", func(ctx context.Context) error {
 		_, err := lifecycleMgr.CheckOnce(ctx)
