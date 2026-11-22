@@ -78,7 +78,9 @@ func main() {
 		if c.file == "internal/api/reseed_handler.go" && strings.Contains(strings.Join(whereFrags(c), " "), "source_info_hash IN") {
 			return true
 		}
-		if c.file == "internal/api/publish_torrents_handler.go" && strings.Contains(strings.Join(whereFrags(c), " "), "(client_uid, save_path, name) IN") {
+		// §59.557: 拆分后行值 IN 迁至 _seeddata.go 等子域文件——精确文件名豁免
+		// 失效（build 门实证拦截）。改前缀匹配覆盖主文件+全部子域文件。
+		if strings.HasPrefix(c.file, "internal/api/publish_torrents_handler") && strings.Contains(strings.Join(whereFrags(c), " "), "(client_uid, save_path, name) IN") {
 			return true
 		}
 		return false
