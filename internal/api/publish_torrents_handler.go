@@ -476,8 +476,6 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleSetFetchPriority(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/audit-infohash") && r.Method == http.MethodPost:
 		h.handleAuditInfoHash(w, r)
-	case strings.HasSuffix(path, "/publish/seeds/recompute-profiles") && r.Method == http.MethodPost:
-
 	// §59.539: 禁转标记复检——手动触发/状态/配置三端点
 	case strings.HasSuffix(path, "/publish/seeds/no-transfer-recheck/run") && r.Method == http.MethodPost:
 		h.handleNoTransferRecheckRun(w, r)
@@ -501,7 +499,6 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleFixSourceDescription(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/fix-stale-dolby") && r.Method == http.MethodPost:
 		h.handleFixStaleDolbyTags(w, r)
-		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/backfill") && r.Method == http.MethodPost:
 		h.handleBDInfoBackfill(w, r)
 	case strings.HasSuffix(path, "/publish/bdinfo/rescan") && r.Method == http.MethodPost:
@@ -4149,87 +4146,6 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	})
 }
 
-// handleRecomputeProfiles §59.151: 批量重推 MI 派生列+tags（存量自愈端点）。
-// 对全部有本地 MI 的 metadata 行：读 MI → BuildTechProfile → 更新 v1.05 技术列
-// + 重推 tags（MI 层判据版）。幂等——MI 是唯一真相，重推收敛同一值。
-func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	var rows []model.TorrentMetadata
-	if err := h.db.WithContext(ctx).
-		Where("media_info != ''").Find(&rows).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询失败: "+err.Error())
-		return
-	}
-	recomputed, skipped := 0, 0
-	for _, m := range rows {
-		mi := m.MediaInfo
-		if mi == "" {
-			mi = m.SourceMediaInfo
-		}
-		if mi == "" {
-			skipped++
-			continue
-		}
-		domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
-		profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
-		profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
-		// §59.514 附八: recompute 同走 FinalizeTitle 共享单点（逻辑升级后
-		// 存量刷列通道——torrentData 尽力拉（下载器在场则终态仲裁）·
-		// 失败降级与 t0 同款）
-		var torrentData []byte
-		if h.clientMgr != nil && m.InfoHash != "" {
-			// recompute 无 clientUID 上下文——遍历快照定位该 hash 的下载器
-			var snap model.TorrentSnapshot
-			if err := h.db.WithContext(ctx).Where("hash = ?", m.InfoHash).First(&snap).Error; err == nil {
-				if cl, clErr := h.clientMgr.Get(snap.ClientUID); clErr == nil && cl != nil {
-					fetchCtx, fetchCancel := context.WithTimeout(ctx, 30*time.Second)
-					if td, tdErr := cl.ExportTorrent(fetchCtx, m.InfoHash); tdErr == nil {
-						torrentData = td
-					}
-					fetchCancel()
-				}
-			}
-		}
-		reassembledTitle, reassembledNotes := h.executor.FinalizeTitle(ctx, &m, &profile, torrentData)
-		components := titleparser.TechProfileToComponents(profile)
-		category := titleparser.InferCategory(components, m.SourceCategory, "", "")
-		updates := map[string]interface{}{
-			"reassembled_title": reassembledTitle,
-			"reassembled_notes": strings.Join(reassembledNotes, "；"),
-			"category":          category,
-			"resolution":        profile.Resolution,
-			"video_codec":       profile.VideoCodec,
-			"audio_codec":       profile.AudioCodec,
-			"audio_channels":    profile.AudioChannels,
-			"audio_tech":        profile.AudioTechnology,
-			"audio_tracks":      profile.AudioTracks,
-			"hdr":               profile.HDR,
-			"bit_depth":         profile.BitDepth,
-			"source_type":       profile.SourceType,
-			"specification":     profile.Specification,
-			"source_platform":   profile.SourcePlatform,
-			"edition_info":      profile.EditionInfo,
-			"region_code":       profile.RegionCode,
-		}
-		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
-			Updates(updates).Error; err != nil {
-			h.logger.Warn("recompute profile failed",
-				zap.String("hash", m.InfoHash[:10]), zap.Error(err))
-			skipped++
-			continue
-		}
-		// §59.500 刀4: tags 重推收编 inferFinalTags 单点——闸门（完整才
-		// 推理）+MI 素材融合 a+铁证门与 fetch 链同源（原段三参 Infer/
-		// 无闸门/单列 MI 三处偏差归一；存量自愈与增量定型同语义）
-		h.inferFinalTags(ctx, 0, m.InfoHash, m.SiteName)
-		recomputed++
-	}
-	Success(w, map[string]interface{}{
-		"recomputed": recomputed,
-		"skipped":    skipped,
-	})
-}
 
 // handleSeedUniquePaths §59.29: 返回有快照的 下载器→路径 树（筛选弹层数据源）。
 func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r *http.Request) {
