@@ -172,7 +172,19 @@ export interface SeedListItem {
   // §59.131 ②: 簇口径增量字段（发布页一种多站）
   copy_count?: number
   sites?: string[]
+  // §59.547 四色 tag（选站上下文·target_site 在场时后端产出）：
+  // 选中站（第一位）：绿=ours（我们发的）/ 蓝=非 ours（别人发的）
+  // 非选中站：绿=ours / 黑=seeded（有副本） / 黄=covered（站上有+无副本=辅种机会）
+  site_tags?: SiteTagRow[]
   category?: string
+}
+
+// §59.547: sites 列四色 tag 行
+export interface SiteTagRow {
+  name: string
+  ours: boolean
+  seeded: boolean
+  covered: boolean
 }
 
 export interface SeedDetail {

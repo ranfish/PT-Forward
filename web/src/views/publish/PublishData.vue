@@ -39,6 +39,16 @@
             <a-radio-button value="publishable" :disabled="!selectedTarget">可发布</a-radio-button>
             <a-radio-button value="published" :disabled="!selectedTarget">已发布</a-radio-button>
           </a-radio-group>
+          <!-- §59.547: 手动刷新（重拉列表——用最新覆盖表/发布记录重算三态过滤与四色） -->
+          <a-button
+            size="small"
+            style="margin-left: 10px"
+            :loading="injectLoading"
+            title="重拉列表（用最新覆盖数据重算）"
+            @click="fetchInjectList"
+          >
+            <template #icon><ReloadOutlined /></template>
+          </a-button>
           <a-input-search
             v-model:value="injectSearch"
             placeholder="搜索簇名称..."
@@ -119,7 +129,36 @@
             </template>
             <template v-if="column.key === 'sites'">
               <!-- §59.521: 已有站点=做种面（tracker 归属）——前 7 tag + +N 悬浮卡片（Popover）全量网格 -->
-              <template v-if="record.sites?.length">
+              <!-- §59.547 四色 tag（选站上下文·site_tags 在场时）：
+                   选中站（第一位）：绿=我们发的 / 蓝=别人发的
+                   非选中站：绿=我们发的 / 黑=有副本 / 黄=站上有+无副本（辅种机会） -->
+              <template v-if="record.site_tags?.length">
+                <a-tag
+                  v-for="st in record.site_tags.slice(0, 7)"
+                  :key="st.name"
+                  :color="siteTagColor(st, selectedTarget || '')"
+                  style="margin: 1px"
+                >
+                  {{ st.name }}
+                </a-tag>
+                <a-popover v-if="record.site_tags.length > 7" trigger="click" placement="left">
+                  <template #content>
+                    <div style="max-width: 360px">
+                      <div style="margin-bottom: 6px; color: #999; font-size: 12px">共 {{ record.site_tags.length }} 站（绿=我们发 黑=做种 黄=辅种机会 蓝=选中站别人发）</div>
+                      <a-tag
+                        v-for="st in record.site_tags"
+                        :key="st.name"
+                        :color="siteTagColor(st, selectedTarget || '')"
+                        style="margin: 2px"
+                      >
+                        {{ st.name }}
+                      </a-tag>
+                    </div>
+                  </template>
+                  <a-tag color="blue" style="margin: 1px; cursor: pointer">+{{ record.site_tags.length - 7 }}</a-tag>
+                </a-popover>
+              </template>
+              <template v-else-if="record.sites?.length">
                 <a-tag v-for="st in record.sites.slice(0, 7)" :key="st" style="margin: 1px">{{ st }}</a-tag>
                 <a-popover v-if="record.sites.length > 7" trigger="click" placement="left">
                   <template #content>
@@ -204,6 +243,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import client from '@/api/client'
 import { executeApi, type SiteBatchTask } from '@/api/formConfig'
+import type { SiteTagRow } from '@/api/publish'
+import { ReloadOutlined } from '@ant-design/icons-vue'
 import SiteTiles from './SiteTiles.vue'
 import PublishProgressPanel from './PublishProgressPanel.vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
@@ -219,6 +260,20 @@ import { formatBytes } from '@/utils/format'
 
 const targetSites = ref<Array<{ name: string; has_pre_audit: boolean }>>([])
 const selectedTarget = ref<string | undefined>(undefined)
+
+// §59.547: sites 列四色 tag 着色（选站上下文）
+//   选中站：绿=我们发的（ours·永久） / 蓝=别人发的
+//   非选中站：绿=我们发的 / 黑(#262636)=有副本（做种/已辅种） / 黄(gold)=
+//   站上有+无副本（辅种机会）
+function siteTagColor(st: SiteTagRow, target: string): string {
+  if (target && st.name === target) {
+    return st.ours ? 'green' : 'blue'
+  }
+  if (st.ours) return 'green'
+  if (st.seeded) return '#262636'
+  if (st.covered) return 'gold'
+  return ''
+}
 const clients = ref<Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }>>([])
 const clientsLoading = ref(false)
 const selectedClient = ref<number | undefined>(undefined)

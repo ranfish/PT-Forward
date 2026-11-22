@@ -3516,7 +3516,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	publishState := r.URL.Query().Get("publish_state")
 	publishTargetSite := r.URL.Query().Get("target_site")
 	var publishedClusters map[string]bool
-	if (publishState == "publishable" || publishState == "published") && publishTargetSite != "" {
+	// §59.547: 填充条件宽化为 target 在场（原含 publishState 前置——API 直调
+	// target+无 state 时 site_tags 的选中站置顶判断会漏记录面）
+	if publishTargetSite != "" {
 		var pubHashes []string
 		h.db.WithContext(r.Context()).
 			Table("publish_result_records").
@@ -3753,6 +3755,78 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 	}
 
+	// §59.547 三态筛选·覆盖面预查 + 四色 tag 数据（选站上下文）：
+	// 三面并集（记录∪覆盖∪tracker）与执行层 CoveredSitesOfCluster 同口径——
+	// 列表说可发布的种子发布时永不撞跳过（列表即真相）。tracker 面零预查
+	// （循环内 siteSet 现成）；覆盖面按当前域 hash 分批查覆盖表（500/批·
+	// SQLite IN 变量上限）；ours/covered 为四色数据（簇级站点属性集合·
+	// 用户四色定案：绿=我们发/蓝=选中站别人发/黑=有副本/黄=站上有无副本）。
+	coverageTargetClusters := map[string]bool{}      // 簇键→目标站覆盖面命中（筛选面2）
+	oursByCluster := map[string]map[string]bool{}    // 簇键→我们发过的站集合（四色绿）
+	coveredByCluster := map[string]map[string]bool{} // 簇键→覆盖面站集合（四色黄）
+	if publishTargetSite != "" {
+		domainHashes := make([]string, 0, len(tripleByHash))
+		for h := range tripleByHash {
+			domainHashes = append(domainHashes, h)
+		}
+		if len(domainHashes) > 0 {
+			type covRow struct {
+				InfoHash string
+				SiteName string
+			}
+			var covRows []covRow
+			for _, batch := range util.ChunkStrings(domainHashes, 500) {
+				var br []covRow
+				h.db.WithContext(r.Context()).
+					Table("site_coverage_cache").
+					Select("info_hash, site_name").
+					Where("info_hash IN ? AND status IN ?", batch,
+						[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+					Find(&br)
+				covRows = append(covRows, br...)
+			}
+			for _, cr := range covRows {
+				key := tripleByHash[cr.InfoHash]
+				if key == "" {
+					continue
+				}
+				if coveredByCluster[key] == nil {
+					coveredByCluster[key] = map[string]bool{}
+				}
+				coveredByCluster[key][cr.SiteName] = true
+				if cr.SiteName == publishTargetSite {
+					coverageTargetClusters[key] = true
+				}
+			}
+			// 四色绿：我们发过的站（发布记录成功终态·PublishedListStatuses）
+			type oursRow struct {
+				SourceInfoHash string
+				TargetSite     string
+			}
+			var oursRows []oursRow
+			for _, batch := range util.ChunkStrings(domainHashes, 500) {
+				var br []oursRow
+				h.db.WithContext(r.Context()).
+					Table("publish_result_records").
+					Select("source_info_hash, target_site").
+					Where("source_info_hash IN ? AND target_site != '' AND status IN ?",
+						batch, model.PublishedListStatuses).
+					Find(&br)
+				oursRows = append(oursRows, br...)
+			}
+			for _, or := range oursRows {
+				key := tripleByHash[or.SourceInfoHash]
+				if key == "" {
+					continue
+				}
+				if oursByCluster[key] == nil {
+					oursByCluster[key] = map[string]bool{}
+				}
+				oursByCluster[key][or.TargetSite] = true
+			}
+		}
+	}
+
 	// §59.131 ②: 簇副本数——发布页（一种多站）增量字段。
 	// 按 (client,path,name) 聚合活跃快照行数；不施加 search 过滤（簇成员数与
 	// 搜索无关，search 只决定哪些簇可见）。name='' 行不入此表，副本数退化 1。
@@ -3948,6 +4022,49 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		sort.Strings(sites)
 		item["sites"] = sites
 
+		// §59.547 四色 tag 数据（选站上下文·target_site 在场）——前端着色消费：
+		//   选中站（置顶）：绿=ours（我们发的·永久） / 蓝=非 ours（别人发的）
+		//   非选中站：     绿=ours / 黑=seeded（有副本·做种/已辅种） / 黄=covered
+		//                 （站上有+无副本=辅种机会）
+		// 三面任一命中才渲染选中站 tag（可发布行=三面 miss=选中站无 tag）；
+		// 覆盖面发现的站（不在做种面）注入（黄 tag 场景——别人发的站我们
+		// 通常无副本·sites 列天然无此站名）。
+		if publishTargetSite != "" {
+			type siteTagRow struct {
+				Name    string `json:"name"`
+				Ours    bool   `json:"ours"`
+				Seeded  bool   `json:"seeded"`
+				Covered bool   `json:"covered"`
+			}
+			tags := make([]siteTagRow, 0, len(sites)+2)
+			seen := map[string]bool{}
+			addTag := func(name string) {
+				if name == "" || seen[name] {
+					return
+				}
+				seen[name] = true
+				tags = append(tags, siteTagRow{
+					Name:    name,
+					Ours:    oursByCluster[clusterKey][name],
+					Seeded:  siteSet[name],
+					Covered: coveredByCluster[clusterKey][name],
+				})
+			}
+			if publishedClusters[clusterKey] || coverageTargetClusters[clusterKey] || siteSet[publishTargetSite] {
+				addTag(publishTargetSite) // 三面命中→选中站置顶第一位
+			}
+			for _, s := range sites {
+				addTag(s)
+			}
+			for s := range coveredByCluster[clusterKey] {
+				addTag(s)
+			}
+			for s := range oursByCluster[clusterKey] {
+				addTag(s)
+			}
+			item["site_tags"] = tags
+		}
+
 		// §59.143: 发布页隐藏源站禁转簇（种子配置页不传此参数——数据维护视角可见）
 		if excludeForbidden && status == "forbidden" {
 			continue
@@ -3966,13 +4083,18 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 
 		// §59.166 一站多种：发布维度过滤（publishable 自含 reviewed——三态筛选
 		// 无独立 ready 选项；published=历史事实回溯）
+		// §59.547: 三面并集（记录∪覆盖∪tracker·与执行层 CoveredSitesOfCluster
+		// 同口径）——tracker 面循环内 siteSet 现成零预查；列表说可发布的种子
+		// 发布时永不撞跳过（列表即真相·Hatfields 案教训：两层口径差制造惊吓）。
 		if (publishState == "publishable" || publishState == "published") && publishTargetSite != "" {
-			isPub := publishedClusters[fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)]
-			if publishState == "published" && !isPub {
+			isHas := publishedClusters[clusterKey] ||
+				coverageTargetClusters[clusterKey] ||
+				siteSet[publishTargetSite]
+			if publishState == "published" && !isHas {
 				continue
 			}
 			if publishState == "publishable" {
-				if isPub || meta == nil || !meta.Reviewed {
+				if isHas || meta == nil || !meta.Reviewed {
 					continue
 				}
 			}

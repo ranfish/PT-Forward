@@ -73,7 +73,6 @@ func (l *siteLimiter) checkAndIncr(siteName string, maxCount int) bool {
 	return true
 }
 
-
 type l2Stats struct {
 	mu           sync.Mutex
 	searched     map[string]int
@@ -488,16 +487,10 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 
 const preloadBatchSize = 500
 
+// chunkStrings §59.547 提升至 util.ChunkStrings（api 列表端点跨包消费——
+// 「私有跨包先提升公共」纪律）·此处保留薄包装零调用点改动。
 func chunkStrings(slice []string, size int) [][]string {
-	var chunks [][]string
-	for i := 0; i < len(slice); i += size {
-		end := i + size
-		if end > len(slice) {
-			end = len(slice)
-		}
-		chunks = append(chunks, slice[i:end])
-	}
-	return chunks
+	return util.ChunkStrings(slice, size)
 }
 
 func (e *Engine) preloadFingerprints(ctx context.Context, infoHashes []string) *fpCache {
@@ -1394,7 +1387,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				InfoHash:  t.Hash,
 				TorrentID: seedTorrentIDs[t.Hash],
 				SiteName:  siteName,
-				ClientUID:  clientUID,
+				ClientUID: clientUID,
 				Name:      t.Name,
 				SavePath:  t.SavePath,
 			})
@@ -1871,7 +1864,7 @@ func (e *Engine) runSeedFeatureScan(
 
 		match := &model.ReseedMatch{
 			TaskID:          task.ID,
-			ClientUID:        sr.src.ClientUID,
+			ClientUID:       sr.src.ClientUID,
 			SourceSite:      sr.src.SiteName,
 			SourceTorrentID: sr.src.TorrentID,
 			SourceInfoHash:  sr.src.InfoHash,
@@ -1919,7 +1912,7 @@ func (e *Engine) runSeedFeatureScan(
 
 				match := &model.ReseedMatch{
 					TaskID:          task.ID,
-					ClientUID:        src.ClientUID,
+					ClientUID:       src.ClientUID,
 					SourceSite:      src.SiteName,
 					SourceTorrentID: src.TorrentID,
 					SourceInfoHash:  src.InfoHash,
@@ -2076,7 +2069,7 @@ func (e *Engine) runLegacyScan(
 
 			match := &model.ReseedMatch{
 				TaskID:          task.ID,
-				ClientUID:        src.ClientUID,
+				ClientUID:       src.ClientUID,
 				SourceSite:      src.SiteName,
 				SourceTorrentID: src.TorrentID,
 				SourceInfoHash:  src.InfoHash,
@@ -3985,7 +3978,7 @@ func stripCJKParenNote(s string) string {
 	for i := 0; i < len(runes); i++ {
 		r := runes[i]
 		if r == '(' || r == '（' {
-			closer := ')' 
+			closer := ')'
 			if r == '（' {
 				closer = '）'
 			}
@@ -4082,61 +4075,61 @@ func stripMediumTokensLoose(kw string) string {
 
 // loosePick 宽松候选筛选（组名/标题相关/TechProfile 三层，各含标注差异豁免）。
 func loosePick(results []*model.SeedingSearchResult, groupName, sourceTitle string) *L2MatchResult {
-		for _, r := range results {
-			if r.TorrentID == "" {
+	for _, r := range results {
+		if r.TorrentID == "" {
+			continue
+		}
+		// §59.196: 双盲拒绝——源标题含 CJK×候选无 CJK×源无 meaningful 英文词
+		// （纯中文名种子）：titleKeywordRelevant 尾部盲放行（return true）曾致
+		// 同年同组不同电影错挂（侠女×Valerie 案）。loose 宁漏勿错——正确路径
+		// 是主轮（纯 CJK area=1 补线 + size/组名确认）或 ①coverage_tid 直达。
+		if hasCJKWord(sourceTitle) && !hasCJKWord(r.Title) &&
+			len(extractMeaningfulTitleWords(sourceTitle, groupName)) == 0 {
+			continue
+		}
+		// 组名（CSS 截断标题放宽，与主路径一致；
+		// §59.30 纯中文标题（如 keepfrds 部分行 </a> 后无英文名）不含组名，
+		// 候选含源标题 CJK 片段时视为同资源放行）
+		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
+			truncRelaxed := strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)
+			cjkRelaxed := false
+			for _, cjk := range extractCJKSubstrings(sourceTitle) {
+				if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
+					cjkRelaxed = true
+					break
+				}
+			}
+			if !truncRelaxed && !cjkRelaxed {
 				continue
 			}
-			// §59.196: 双盲拒绝——源标题含 CJK×候选无 CJK×源无 meaningful 英文词
-			// （纯中文名种子）：titleKeywordRelevant 尾部盲放行（return true）曾致
-			// 同年同组不同电影错挂（侠女×Valerie 案）。loose 宁漏勿错——正确路径
-			// 是主轮（纯 CJK area=1 补线 + size/组名确认）或 ①coverage_tid 直达。
-			if hasCJKWord(sourceTitle) && !hasCJKWord(r.Title) &&
-				len(extractMeaningfulTitleWords(sourceTitle, groupName)) == 0 {
+		}
+		// 标题相关性 + TechProfile
+		// §59.30: 候选纯中文标题（无英文词）时 meaningfulWords 英文匹配必败，
+		// 需补 CJK 分支判定（源中文名命中候选中文标题）
+		if !titleKeywordRelevant(extractMeaningfulTitleWords(sourceTitle, groupName), extractCJKSubstrings(sourceTitle), sourceTitle, r.Title) {
+			cjkHit := false
+			for _, cjk := range extractCJKSubstrings(sourceTitle) {
+				if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
+					cjkHit = true
+					break
+				}
+			}
+			if !cjkHit {
 				continue
 			}
-			// 组名（CSS 截断标题放宽，与主路径一致；
-			// §59.30 纯中文标题（如 keepfrds 部分行 </a> 后无英文名）不含组名，
-			// 候选含源标题 CJK 片段时视为同资源放行）
-			if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
-				truncRelaxed := strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)
-				cjkRelaxed := false
-				for _, cjk := range extractCJKSubstrings(sourceTitle) {
-					if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
-						cjkRelaxed = true
-						break
-					}
-				}
-				if !truncRelaxed && !cjkRelaxed {
-					continue
-				}
+		}
+		// §59.30: CSS 截断标题（含 ..）的 token 不完整（如 DTS-H.. 解析成 DTS），
+		// TechProfile 比较失真 → 跳过冲突检查，靠组名+标题相关性+size（主轮）兜底
+		// §59.36: 音频冲突豁免（元数据获取场景）——站点数据源头的文件名/标题
+		// 音轨标注不一致（FRDS 挽救计划案例：文件名 DTS-HD MA、站内标题 TrueHD7.1，
+		// .torrent 实证同一资源，内容物实为 TrueHD+国配 AC-3）。音频规格差异
+		// 不影响海报/声明/简介正确性；注入层 ValidateInjection 独立兜底。
+		if !strings.Contains(r.Title, "..") {
+			p := titleparser.ParseTitleTech(sourceTitle)
+			if techProfileConflictFields(p, r.Title, true) {
+				continue
 			}
-			// 标题相关性 + TechProfile
-			// §59.30: 候选纯中文标题（无英文词）时 meaningfulWords 英文匹配必败，
-			// 需补 CJK 分支判定（源中文名命中候选中文标题）
-			if !titleKeywordRelevant(extractMeaningfulTitleWords(sourceTitle, groupName), extractCJKSubstrings(sourceTitle), sourceTitle, r.Title) {
-				cjkHit := false
-				for _, cjk := range extractCJKSubstrings(sourceTitle) {
-					if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
-						cjkHit = true
-						break
-					}
-				}
-				if !cjkHit {
-					continue
-				}
-			}
-			// §59.30: CSS 截断标题（含 ..）的 token 不完整（如 DTS-H.. 解析成 DTS），
-			// TechProfile 比较失真 → 跳过冲突检查，靠组名+标题相关性+size（主轮）兜底
-			// §59.36: 音频冲突豁免（元数据获取场景）——站点数据源头的文件名/标题
-			// 音轨标注不一致（FRDS 挽救计划案例：文件名 DTS-HD MA、站内标题 TrueHD7.1，
-			// .torrent 实证同一资源，内容物实为 TrueHD+国配 AC-3）。音频规格差异
-			// 不影响海报/声明/简介正确性；注入层 ValidateInjection 独立兜底。
-			if !strings.Contains(r.Title, "..") {
-				p := titleparser.ParseTitleTech(sourceTitle)
-				if techProfileConflictFields(p, r.Title, true) {
-					continue
-				}
-			}
+		}
 		return &L2MatchResult{TorrentID: r.TorrentID, Title: r.Title, Size: r.Size}
 	}
 	return nil
@@ -4290,7 +4283,9 @@ var reAnnotNoiseToken = regexp.MustCompile(`^(?:国英|国粤|国日|国粤日|�
 // 站方副标题桥要求精确子串，而中文关键词常带装饰元素（六案实证：
 // 午夜凶铃 tid=270313/宝贝计划 tid=5824/安娜·卡列尼娜 tid=46343 等）：
 // ① 版式词 token 剥离——站方副标题纯片名（REMASTERED 在英文标题，
-//   中文 4K修复版 词 AND 必失配）
+//
+//	中文 4K修复版 词 AND 必失配）
+//
 // ② CJK 词尾版式后缀修剪——"宝贝计划加长版"（词内粘连）→"宝贝计划"
 // ③ 中点消解——"安娜·卡列尼娜"→"安娜卡列尼娜"（副标题无点形态）
 // 无 CJK / 无变化 / 剥空 均返回 ""（调用方跳过该轮）。
@@ -5103,7 +5098,7 @@ func sizeDisplayWindow(parsedBytes int64) int64 {
 	switch {
 	case parsedBytes >= 1024*1024*1024*1024:
 		return 1024 * 1024 * 1024 * 1024 / 200
-	case parsedBytes >= 1024 * 1024 * 1024:
+	case parsedBytes >= 1024*1024*1024:
 		return 1024 * 1024 * 1024 / 200
 	default:
 		return 1024 * 1024 / 200
@@ -5483,8 +5478,8 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 	}
 
 	src := sourceTorrent{
-		InfoHash: record.InfoHash,
-		SiteName: record.SiteName,
+		InfoHash:  record.InfoHash,
+		SiteName:  record.SiteName,
 		ClientUID: record.ClientUID,
 	}
 	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil, nil, nil)
@@ -5504,7 +5499,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		}
 		for _, clientID := range reseedClientIDs {
 			match := &model.ReseedMatch{
-				ClientUID:        clientID,
+				ClientUID:       clientID,
 				SourceSite:      record.SiteName,
 				SourceTorrentID: record.TorrentID,
 				SourceInfoHash:  record.InfoHash,
@@ -5600,7 +5595,6 @@ func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string
 	}
 	return names
 }
-
 
 func partsToUint(parts []string) []uint {
 	result := make([]uint, 0, len(parts))
