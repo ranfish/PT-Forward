@@ -263,14 +263,15 @@ const selectedTarget = ref<string | undefined>(undefined)
 
 // §59.547: sites 列四色 tag 着色（选站上下文）
 //   选中站：绿=我们发的（ours·永久） / 蓝=别人发的
-//   非选中站：绿=我们发的 / 黑(#262636)=有副本（做种/已辅种） / 黄(gold)=
-//   站上有+无副本（辅种机会）
+//   非选中站：绿=我们发的 / 默认（白底黑字·黑字）=有副本（做种/已辅种） /
+//   黄(gold)=站上有+无副本（辅种机会）
+// v0.0.1547 用户观感修正：黑=黑字（antd 默认样式白底黑字）非黑底标签
 function siteTagColor(st: SiteTagRow, target: string): string {
   if (target && st.name === target) {
     return st.ours ? 'green' : 'blue'
   }
   if (st.ours) return 'green'
-  if (st.seeded) return '#262636'
+  if (st.seeded) return '' // 有副本=默认样式（黑字）
   if (st.covered) return 'gold'
   return ''
 }
