@@ -3168,7 +3168,10 @@ const thanksNoTransferTail = "[quote][b][color=red][size=5]" + thanksCoreText + 
 // 我方追加或回流·剥除安全）；tail 锚内容锁 thanksCoreText 单源。
 var (
 	thanksHeadBlockRe = regexp.MustCompile(`(?s)\[quote\]\s*\[b\]\s*\[color=(?:blue|#0000ff)\]\s*\[size=5\]\s*[^\[]{1,400}?\[/size\]\s*\[/color\]\s*\[/b\]\s*\[/quote\]`)
-	thanksTailBlockRe = regexp.MustCompile(`(?s)\[quote\]\s*\[b\]\s*\[color=(?:red|#ff0000)\]\s*\[size=5\]\s*` + regexp.QuoteMeta(thanksCoreText) + `\s*\[/size\]\s*\[/color\]\s*\[/b\]\s*\[/quote\]`)
+	// §59.555: 尾锚用 Legacy（无句号）+可选句号——ThanksCoreText 句号化后
+	// 纯句号锚漏剥存量无句号形态（回流治回归）。Legacy 为句号版子串·
+	// `。?` 使单锚双形态兼容。
+	thanksTailBlockRe = regexp.MustCompile(`(?s)\[quote\]\s*\[b\]\s*\[color=(?:red|#ff0000)\]\s*\[size=5\]\s*` + regexp.QuoteMeta(description.ThanksCoreTextLegacy) + `。?\s*\[/size\]\s*\[/color\]\s*\[/b\]\s*\[/quote\]`)
 )
 
 // stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等 + §59.260 通用化 +

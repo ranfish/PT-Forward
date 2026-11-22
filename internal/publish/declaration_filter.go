@@ -42,7 +42,9 @@ var defaultDeclarationPatterns = []string{
 	// #0000ff 站方规范化形态+13 颗双份累积）。两条均为转种致谢模板文本·
 	// 语义上不属于「源站官组声明」；ThanksCoreText 系统独有措辞（用户确认
 	// 未见于其它发布者）零误伤——单源引用 description.ThanksCoreText。
-	description.ThanksCoreText,
+	// §59.555: 锚改 Legacy 形态（无句号=句号版子串）——存量无句号与
+	// 新句号形态双兼容（ThanksCoreText 句号化后原锚漏剥存量）。
+	description.ThanksCoreTextLegacy,
 	"官组作品，感谢原制作者发布",
 	// ② 音乐站「试听/免责」声明族（皇后/乌托邦/我堡/红豆饭模板变体群——
 	//   短锚按内容子串整块删·299+226+203+93+53+40… 颗 4 环境实证）。
@@ -71,7 +73,6 @@ type DeclarationFilter struct {
 	repo   *setting.Repository
 	logger *zap.Logger
 }
-
 
 // BuiltinPatterns 内置默认清单（只读导出——handler 透出给前端锁定展示）。
 func BuiltinPatterns() []string {
@@ -164,8 +165,8 @@ func (f *DeclarationFilter) SetPatterns(ctx context.Context, patterns []string) 
 }
 
 type FilterResult struct {
-	CleanedText      string
-	RemovedDecls     []string
+	CleanedText  string
+	RemovedDecls []string
 }
 
 func (f *DeclarationFilter) Filter(text string, patterns []string) FilterResult {

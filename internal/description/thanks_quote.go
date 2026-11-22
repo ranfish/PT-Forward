@@ -35,14 +35,23 @@ const (
 	// ThanksCoreText §59.542 刀1: 禁转引言文本单源——追加锚/剥离锚/
 	// 声明过滤词表全部派生于此（改措辞只动这一处·生成与剥离永不漂移）。
 	// 系统独有措辞（用户确认未见于其它发布者）。
-	ThanksCoreText = "互珍互重，禁转PTT"
+	// §59.555: 末尾句号为显示对称新增（用户改）——剥离锚须走 Legacy
+	// 形态（无句号是句号版子串·Contains/正则双形态兼容）。
+	ThanksCoreText = "互珍互重，禁转PTT。"
 )
 
+// ThanksCoreTextLegacy §59.555: 无句号历史形态锚——v0.0.1555 前生成与
+// 存量 backfill 声明均无句号；剥离消费面（词表/正则）用本锚=同时命中
+// 存量与新形态（无句号子串在句号文本中亦 Contains）。
+var ThanksCoreTextLegacy = strings.TrimSuffix(ThanksCoreText, "。")
+
 // GenerateThanksQuote 生成感谢引言。
-//   sourceSite: 源站名
-//   groupName: 制作组名（§59.20 新增）
-//   isEnglishSite: 是否英文站（true=用英文模板）
-//   config: 配置（nil=默认配置，Enabled=true）
+//
+//	sourceSite: 源站名
+//	groupName: 制作组名（§59.20 新增）
+//	isEnglishSite: 是否英文站（true=用英文模板）
+//	config: 配置（nil=默认配置，Enabled=true）
+//
 // 返回空字符串表示禁用或模板为空。
 func GenerateThanksQuote(sourceSite, groupName string, isEnglishSite bool, config *ThanksQuoteConfig) string {
 	if config != nil && !config.Enabled {

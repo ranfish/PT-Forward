@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -25,12 +26,16 @@ func stripBBCodeTags(s string) string {
 // 缺省各自跳行（空值矩阵：statement 空→仅链接行·链接空→缺行·全空→空串
 // 不投）。数据源全在素材表（statement/im_db_url/douban_url·朱雀首两颗
 // 实测全中）。
+// §59.555 复测修正: 声明源改走 description.ComposeStatement（与通用链/
+// tab2 展示同一单点·§59.542 追记十二消费时合成——官组行无致谢时动态
+// 追加两行官方致谢「{站}官组作品…」「互珍互重，禁转PTT」）。首颗复测
+// 用户抓漏：直接用原始 statement 列漏掉合成层。
 func tnodeNoteOf(meta *model.TorrentMetadata) string {
 	if meta == nil {
 		return ""
 	}
 	var lines []string
-	if stmt := stripBBCodeTags(meta.Statement); stmt != "" {
+	if stmt := stripBBCodeTags(description.ComposeStatement(meta.Statement, meta.SiteName, meta.Title)); stmt != "" {
 		lines = append(lines, stmt)
 	}
 	if meta.IMDbURL != "" {
