@@ -31,8 +31,8 @@ import (
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
-	"go.uber.org/zap"
 	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
 )
 
 // noTransferForbiddenWords 禁转族八词（§59.539 定案+回归审核 P7 补
@@ -100,11 +100,16 @@ func (h *PublishTorrentsHandler) RunNoTransferRecheck(ctx context.Context) {
 
 	// 查禁转族行（LIKE 超集——flags JSON 数组串含任一禁转词；子集替换回写
 	// 兜底分集/adult 不被触碰）。
+	// §59.548: 活跃快照校验——只复检 info_hash 仍有活跃快照行（种子还在
+	// 下载器）的 metadata 行。下载器删种后快照行消失但 metadata 行残留
+	// （孤儿·flags 保留历史）——复检对孤儿行 apply 是无效操作且「行 N」
+	// 虚高失实（243 实案：簇删部分种子后仍显示「行 16 失败 16」）。
 	var metas []model.TorrentMetadata
 	h.db.WithContext(ctx).
 		Where("flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ?",
-			`%"禁转"%`, `%"禁止转载"%`, `%"限时禁转"%`, `%"限转"%`, `%"谢决转载"%`, `%"独占"%`, `%"严禁转载"%`, `%"谢决搬运"%`).
+			`%"禁转"%`, `%"禁止转载"%`, `%"限时禁转"%`, `%"限转"%`, `%"谢绝转载"%`, `%"独占"%`, `%"严禁转载"%`, `%"谢决搬运"%`).
 		Where("torrent_id != ''").
+		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE is_hidden = 0)").
 		Find(&metas)
 
 	cleared, kept, renewed, changed, failed := 0, 0, 0, 0, 0
@@ -154,8 +159,8 @@ done:
 	// （站方对某 tid 的标记）·簇副本行不是独立复检对象——同 (site,tid)
 	// 一组一次判定·组内行统一应用；计数按组（16 副本行=「检测 1 颗」）。
 	stats := time.Now().Format("01-02 15:04:05") + " 检测 " + itoa(len(resolved)) +
-		" 颗（行 " + itoa(len(metas)) + "）：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +
-		" · 续期 " + itoa(renewed) + " · 变化 " + itoa(changed) + " · 失败 " + itoa(failed)
+		" 颗（行 " + itoa(len(metas)) + "：放行 " + itoa(cleared) + " · 保留 " + itoa(kept) +
+		" · 续期 " + itoa(renewed) + " · 变化 " + itoa(changed) + " · 失败 " + itoa(failed) + "）"
 	h.noTransferRecheck.mu.Lock()
 	h.noTransferRecheck.lastRun = time.Now().Format("2006-01-02 15:04:05")
 	h.noTransferRecheck.lastStats = stats
@@ -393,11 +398,11 @@ func (h *PublishTorrentsHandler) handleNoTransferRecheckStatus(w http.ResponseWr
 	h.noTransferRecheck.mu.Lock()
 	defer h.noTransferRecheck.mu.Unlock()
 	Success(w, map[string]interface{}{
-		"running":     h.noTransferRecheck.running,
-		"last_run":    h.noTransferRecheck.lastRun,
-		"last_stats":  h.noTransferRecheck.lastStats,
-		"enabled":     enabled,
-		"schedule":    schedule,
+		"running":    h.noTransferRecheck.running,
+		"last_run":   h.noTransferRecheck.lastRun,
+		"last_stats": h.noTransferRecheck.lastStats,
+		"enabled":    enabled,
+		"schedule":   schedule,
 	})
 }
 

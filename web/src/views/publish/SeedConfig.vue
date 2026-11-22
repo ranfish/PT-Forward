@@ -794,11 +794,13 @@ let ntrTimer: ReturnType<typeof setInterval> | null = null
 // §59.542 追记十四：stats 拆段渲染——「检测 X 颗（行 Y）」X≠Y 时
 // 「行 Y」段标 hot（红色粗体·字号不变）。行>颗=簇内副本存在=资源
 // 跨站存在信号（不同站 .torrent 因 source 字段 hash 不同）。
+// §59.548: 文案结构适配——括号闭合挪到结尾（「（行 N：放行...失败 E）」），
+// 正则不再要求「行 N」后紧跟「）」。
 const ntrStatsParts = computed<{ text: string; hot: boolean }[]>(() => {
   const s = ntrStatus.value.last_stats || ntrStatus.value.last_run || ''
-  const m = s.match(/检测 (\d+) 颗（行 (\d+)）/)
+  const m = s.match(/检测 (\d+) 颗（行 (\d+)/)
   if (!m || m[1] === m[2]) return [{ text: s, hot: false }]
-  const seg = `行 ${m[2]}）`
+  const seg = `行 ${m[2]}`
   const i = s.indexOf(seg)
   if (i < 0) return [{ text: s, hot: false }]
   return [

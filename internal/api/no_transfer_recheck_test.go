@@ -55,7 +55,7 @@ func newRecheckTestHandler(t *testing.T) *PublishTorrentsHandler {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.PublishSetting{}, &model.Site{}); err != nil {
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &model.TorrentSnapshot{}, &model.PublishSetting{}, &model.Site{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
@@ -70,6 +70,17 @@ func seedRecheckRow(t *testing.T, h *PublishTorrentsHandler, siteName string, fl
 	}
 	if err := h.db.Create(&row).Error; err != nil {
 		t.Fatalf("seed: %v", err)
+	}
+	// §59.548: 复检查询含活跃快照校验——seed 行顺路建快照（种子在）
+	seedRecheckSnapshot(t, h, row.InfoHash)
+}
+
+// seedRecheckSnapshot §59.548: 复检对象的活跃快照（种子在下载器）。
+func seedRecheckSnapshot(t *testing.T, h *PublishTorrentsHandler, hash string) {
+	t.Helper()
+	if err := h.db.Create(&model.TorrentSnapshot{Hash: hash, ClientUID: 1,
+		SavePath: "/v", Name: "n", Progress: 1}).Error; err != nil {
+		t.Fatalf("seed snapshot: %v", err)
 	}
 }
 
@@ -258,7 +269,6 @@ func TestIsNoTransferWord(t *testing.T) {
 	}
 }
 
-
 // §59.542 追记十一锚: 簇脱钩——同 (site,tid) 一组一次判定（详情只拉一次）·
 // 组内行统一应用·计数按组（16 副本行=检测 1 颗）。
 func TestNoTransferRecheckClusterDedup(t *testing.T) {
@@ -266,13 +276,15 @@ func TestNoTransferRecheckClusterDedup(t *testing.T) {
 	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
 	for i := 0; i < 16; i++ {
 		fj, _ := json.Marshal([]string{"禁转"})
+		hash := fmt.Sprintf("dedup%02dhash00000000000000000000000000", i)
 		row := model.TorrentMetadata{
-			InfoHash: fmt.Sprintf("dedup%02dhash00000000000000000000000000", i),
+			InfoHash: hash,
 			SiteName: "朋友", TorrentID: "2782403", Flags: string(fj),
 		}
 		if err := h.db.Create(&row).Error; err != nil {
 			t.Fatalf("seed: %v", err)
 		}
+		seedRecheckSnapshot(t, h, hash) // §59.548: 活跃快照（种子在）
 	}
 	adapter := &fakeRecheckAdapter{detail: &model.TorrentDetail{
 		RawListRow: "<td>某片 2000 1080p [禁转]</td>", AddedAtText: "3天前",
@@ -286,13 +298,51 @@ func TestNoTransferRecheckClusterDedup(t *testing.T) {
 	if adapter.calls != 1 {
 		t.Errorf("详情请求次数=%d（同 tid 簇副本应去重为 1 次）", adapter.calls)
 	}
-	if !strings.Contains(h.noTransferRecheck.lastStats, "检测 1 颗（行 16）") {
-		t.Errorf("lastStats=%q（计数应按组：1 颗·行 16）", h.noTransferRecheck.lastStats)
+	// §59.548: 文案括号闭合到结尾（整段明细被包）
+	if !strings.Contains(h.noTransferRecheck.lastStats, "检测 1 颗（行 16：") ||
+		!strings.HasSuffix(h.noTransferRecheck.lastStats, "）") {
+		t.Errorf("lastStats=%q（计数应按组：1 颗·行 16·结尾闭合）", h.noTransferRecheck.lastStats)
 	}
 	var keptN int64
 	h.db.Model(&model.TorrentMetadata{}).Where("flags LIKE ?", `%"禁转"%`).Count(&keptN)
 	if keptN != 16 {
 		t.Errorf("kept 行数=%d（组内 16 行应统一应用 kept）", keptN)
+	}
+}
+
+// §59.548 锚: 孤儿行过滤——下载器删种（快照行消失）后 metadata 残留行
+// 不再进入复检名单（「行 N」=实时实态·243 案：簇删部分种子后仍「行 16」）。
+func TestNoTransferRecheckOrphanFiltered(t *testing.T) {
+	h := newRecheckTestHandler(t)
+	seedRecheckSite(t, h, "朋友", "pt.keepfrds.com")
+	// 两行同 tid：一行活跃（有快照）·一行孤儿（快照已随删种消失）
+	for _, hash := range []string{"orphAhash000000000000000000000000000", "orphBhash000000000000000000000000000"} {
+		fj, _ := json.Marshal([]string{"禁转"})
+		if err := h.db.Create(&model.TorrentMetadata{InfoHash: hash, SiteName: "朋友",
+			TorrentID: "2782403", Flags: string(fj)}).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	seedRecheckSnapshot(t, h, "orphAhash000000000000000000000000000") // 仅 A 活跃
+	adapter := &fakeRecheckAdapter{detail: &model.TorrentDetail{
+		RawListRow: "<td>某片 2000 1080p [禁转]</td>", AddedAtText: "3天前",
+	}}
+	h.siteProvider = &fakeRecheckProvider{
+		config:  &model.SiteConfig{Domain: "pt.keepfrds.com"},
+		adapter: adapter,
+	}
+	h.RunNoTransferRecheck(context.Background())
+
+	if !strings.Contains(h.noTransferRecheck.lastStats, "行 1：") {
+		t.Errorf("lastStats=%q（孤儿行应被过滤·只计活跃 1 行）", h.noTransferRecheck.lastStats)
+	}
+	// 孤儿行的 flags 保持原样（历史资产·不被无效 apply 触碰）
+	var orphanRow model.TorrentMetadata
+	if err := h.db.Where("info_hash = ?", "orphBhash000000000000000000000000000").First(&orphanRow).Error; err != nil {
+		t.Fatalf("load orphan: %v", err)
+	}
+	if !strings.Contains(orphanRow.Flags, "禁转") {
+		t.Errorf("孤儿行 flags 应保持原样, got %q", orphanRow.Flags)
 	}
 }
 
