@@ -496,56 +496,54 @@ func (h *PublishTorrentsHandler) getFetchPrioritySetting(ctx context.Context) []
 
 // ==================== 种子配置页 API（§59.20） ====================
 
-// handleBatchFetch §59.20: 异步批量获取种子 metadata（"获取数据"按钮）。
-func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http.Request) {
-	if h.metadataFetcher == nil {
-		Error(w, http.StatusServiceUnavailable, 50001, "metadata fetcher 未初始化")
-		return
-	}
-	if h.sourceDetector == nil {
-		Error(w, http.StatusServiceUnavailable, 50001, "source detector 未初始化")
-		return
+// handleListSeedData §56.37: /publish/seed-data 列表（torrent_metadata 已 review 的记录）。
+// 用于 /publish/data 页面（一站多种）。P1 优先级，P0 先实现基本列表。
+func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	// §59.552 统一分页契约（顺修负数/超大 page_size 直通：旧版仅 ==0 回落，
+	// ?page_size=-5 会以 Limit(-5) 直通 GORM=SQLite 无限制全表拉取）
+	page, pageSize := parsePagination(r)
+	search := q.Get("search")
+	sourceSite := q.Get("source_site")
+	reviewStatus := q.Get("review_status") // all（默认）/ reviewed / unreviewed
+
+	fetchSource := q.Get("fetch_source")
+	if fetchSource == "" {
+		fetchSource = "batch_fetch"
 	}
 
-	var req struct {
-		ClientUID uint `json:"clientId"`
-		// §59.479: force=true 批量重获——绕过 hasCompleteMetadata 簇跳过
-		// + forcePTGen 强刷（§59.173）。来源：禁转/无映射筛选视图「批量重获」
-		// 按钮（该视图行多为已获取簇·常规批量获取会被簇跳过全部 no-op）。
-		Force bool `json:"force"`
-		Items []struct {
-			Hash     string `json:"hash"`
-			Name     string `json:"name"`
-			Size     int64  `json:"size"`
-			SavePath string `json:"savePath"`
-		} `json:"items"`
-	}
-	if !decodeJSONBody(w, r, &req) {
-		return
-	}
-	if len(req.Items) == 0 {
-		Error(w, http.StatusBadRequest, 40001, "items 为空")
-		return
+	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("torrent_id != '' AND torrent_id != '0'")
+	if fetchSource != "all" {
+		query = query.Where("fetch_source = ?", fetchSource)
 	}
 
-	h.batchFetch.mu.Lock()
-	if h.batchFetch.active {
-		h.batchFetch.mu.Unlock()
-		Error(w, http.StatusConflict, 40901, "已有批量获取任务在运行")
-		return
+	if search != "" {
+		query = query.Where("title LIKE ? OR subtitle LIKE ? OR info_hash LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
-	h.batchFetch.active = true
-	h.batchFetch.stopRequested = false // §59.495: 新批次重置停止请求
-	h.batchFetch.total = len(req.Items)
-	h.batchFetch.done = 0
-	h.batchFetch.failed = 0
-	h.batchFetch.items = make([]batchFetchItem, len(req.Items))
-	for i, item := range req.Items {
-		h.batchFetch.items[i] = batchFetchItem{Hash: item.Hash, Name: item.Name, Size: item.Size, SavePath: item.SavePath, Status: "pending"}
+	if sourceSite != "" {
+		query = query.Where("site_name = ?", sourceSite)
 	}
-	h.batchFetch.mu.Unlock()
+	switch reviewStatus {
+	case "reviewed":
+		query = query.Where("reviewed = ?", true)
+	case "unreviewed":
+		query = query.Where("reviewed = ?", false)
+	}
 
-	go h.runBatchFetch(req.ClientUID, req.Items, req.Force)
+	var total int64
+	query.Count(&total)
 
-	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
+	var metas []model.TorrentMetadata
+	query.Order("updated_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&metas)
+
+	Success(w, map[string]interface{}{
+		"items":     metas,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }

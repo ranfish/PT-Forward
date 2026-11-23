@@ -644,24 +644,3 @@ func (h *PublishTorrentsHandler) handleBatchRepush(w http.ResponseWriter, r *htt
 		"outcomes":  outcomes,
 	})
 }
-
-// isMusicSeedForRouting §59.469+§59.476 音乐种分流判定：
-// S1 = coverage 含音乐源站（纯音乐站无影视内容——逻辑必然）
-// S2+ = 标题含音乐官组词（词表=release_group_mappings 音乐源站行推导·
-//
-//	§59.476 扩表 {OpenCD,LLM,TSxD,KHQ,Musopia}·见到即判·否决闸见
-//	musicTitleMatch）。
-//
-// 宁漏勿误：漏判走影视链（music 空可接受）；误判影视种锁进音乐链不可
-// 接受（误判成本=音乐链搜索无果·干净失败可重试）。
-func (h *PublishTorrentsHandler) isMusicSeedForRouting(ctx context.Context, title string, coverageSites []model.SiteCoverageCache) bool {
-	for _, c := range coverageSites {
-		if site.IsMusicSourceSite(c.SiteName) {
-			return true
-		}
-	}
-	if h == nil || h.db == nil {
-		return false
-	}
-	return musicTitleMatch(title, publish.MusicOfficialGroupWords(ctx, h.db))
-}
