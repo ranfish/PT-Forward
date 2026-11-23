@@ -29,6 +29,15 @@ type executeUploadContext struct {
 	publishTitle string
 }
 
+// existingStatusSentinel §59.559 PR-C 备注定案（2026-11-23 收敛）：
+// executeUploadAndDedup 的 failStatus 通道哨兵——站上已有同种且未定位
+// 站内 ID 时返回·Execute 主函数识别后映射 existing 终态（信文案不信
+// 页面 ID·recordResult 已在函数内落库）。与普通失败 status 语义不同：
+// existing=终态非失败。范围局限同包两处（生产 executor_upload.go·
+// 消费 executor.go）——后续若再动上传段可升级为显式 result struct
+// 字段（当前命名常量形态=魔法字符串消除的最小收敛·零行为变更）。
+const existingStatusSentinel = "__existing__"
+
 // executeUploadAndDedup §59.559 PR-C: 上传段（原 Execute :331-566 抽取）——
 // 审核门+pubReq 组装+ExtraFields 注入+adapter 获取+dedup 三路+上传+超时复查+已存在分流。
 // 失败经 (failStatus, failMsg) 返回（主函数 failRec 落库）·成功返回 (resp, timeoutRecheckMsg)。
@@ -219,7 +228,7 @@ func (e *PublishExecutor) executeUploadAndDedup(ctx context.Context, uc *execute
 		if resp.ExistingID == "" && resp.TorrentID == "" {
 			msg2 := "站上已有同种（未定位站内 ID，未推种——辅种业务范畴）"
 			e.recordResult(ctx, in, meta, rv, "existing", msg2, "", "")
-			return &model.PublishResponse{DetailURL: resp.DetailURL}, "", "__existing__", msg2
+			return &model.PublishResponse{DetailURL: resp.DetailURL}, "", existingStatusSentinel, msg2
 		}
 		if resp.ExistingID != "" && resp.TorrentID == "" {
 			resp.TorrentID = resp.ExistingID

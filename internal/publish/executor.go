@@ -330,7 +330,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		torrentData: torrentData, publishTitle: publishTitle}
 	resp, timeoutMsg, fs, fm := e.executeUploadAndDedup(ctx, uc)
 	if fs != "" {
-		if fs == "__existing__" {
+		if fs == existingStatusSentinel {
 			// §59.159 existing 终态：信文案不信页面 ID（recordResult 已在函数内落库）
 			return &ExecuteResult{Status: "existing", Message: fm, TargetTorrentURL: resp.DetailURL}
 		}
