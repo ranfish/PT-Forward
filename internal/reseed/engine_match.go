@@ -59,12 +59,7 @@ func MatchDecision(input MatchInput, sizeTolerance float64) model.DecisionType {
 }
 
 func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *model.ReseedExecutionResult, retErr error) {
-	// §59.544 修1：无条件覆盖注册——原 `if !exists` 会被 startTask 引擎启动时
-	// 预注册的残留 cancel 占位：本任务的 ctx 与 tasks[id] 里的 cancel 断链，
-	// CancelTask cancel 的是无人在用的旧链（任务失控无法停止·status 永久
-	// running——2026-11-21 两次 dump+cancel 行为实验实锤）。无条件覆盖使
-	// CancelTask 永远指向「当前在跑的任务」；old.cancel() 幂等（正常路径
-	// handleTrigger 有 running 检查·不会有并发旧任务）。
+	// §59.544 修1：无条件覆盖注册（cancel 永远指向当前在跑的任务）。
 	e.mu.Lock()
 	if old, ok := e.tasks[task.ID]; ok {
 		old.cancel()
@@ -75,9 +70,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	e.mu.Unlock()
 	ctx = taskCtx
 
-	// §59.544 修1 附：defer 自清理（防残留累积——本次病灶的形成机制）。
-	// 最先注册=最后执行（晚于下方 status 回写 defer）：cancel 幂等不影响
-	// 已判定的 status；指针比较确保只删自己的注册（后来者覆盖时不误删）。
+	// §59.544 修1 附：defer 自清理（指针比较确保只删自己的注册）。
 	defer func() {
 		tc.cancel()
 		e.mu.Lock()
@@ -144,186 +137,40 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	e.retryFailedForTask(ctx, task, clientUIDs)
 
-	// 预加载 seeding_torrent_records 的 InfoHash→TorrentID 映射（关联源站数字种子ID）
-	var seedRecords []model.SeedingTorrentRecord
-	if err := e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords).Error; err != nil {
-		e.logger.Warn("query seed records failed", zap.Error(err))
-	}
-	seedTorrentIDs := make(map[string]string, len(seedRecords))
-	for _, r := range seedRecords {
-		if r.InfoHash != "" && r.TorrentID != "" {
-			seedTorrentIDs[r.InfoHash] = r.TorrentID
-		}
-	}
-
-	var sourceTorrents []sourceTorrent
-	clientHashes := make(map[string]bool)
-	seenSourceNames := make(map[string]bool)
-	nameSites := make(map[string]map[string]bool)
-	for _, clientUID := range clientUIDs {
-		dlClient, err := e.clientProvider.Get(clientUID)
-		if err != nil {
-			e.logger.Warn("failed to get downloader", zap.Uint("client_uid", clientUID), zap.Error(err))
-			continue
-		}
-		allTorrents, err := dlClient.GetAllTorrents(ctx)
-		if err != nil {
-			e.logger.Warn("failed to get all torrents", zap.Uint("client_uid", clientUID), zap.Error(err))
-			continue
-		}
-		for _, t := range allTorrents {
-			clientHashes[t.Hash] = true
-			if t.Progress < 1.0 {
-				continue
-			}
-			siteName := ""
-			if e.trackerResolver != nil {
-				siteName = e.trackerResolver.Resolve(t.TrackerURL)
-			}
-			if siteName == "" {
-				continue
-			}
-			if t.Name != "" {
-				if nameSites[t.Name] == nil {
-					nameSites[t.Name] = make(map[string]bool)
-				}
-				nameSites[t.Name][siteName] = true
-				if seenSourceNames[t.Name] {
-					continue
-				}
-				seenSourceNames[t.Name] = true
-			}
-			sourceTorrents = append(sourceTorrents, sourceTorrent{
-				InfoHash:  t.Hash,
-				TorrentID: seedTorrentIDs[t.Hash],
-				SiteName:  siteName,
-				ClientUID: clientUID,
-				Name:      t.Name,
-				SavePath:  t.SavePath,
-			})
-		}
-	}
-	result.TotalSources = len(sourceTorrents)
-
-	multiSiteCount := 0
-	for _, sites := range nameSites {
-		if len(sites) > 1 {
-			multiSiteCount++
-		}
-	}
-	e.logger.Debug("reseed source torrent parse completed",
-		zap.Int("totalSeeding", result.TotalSources),
-		zap.Int("multiSiteNames", multiSiteCount),
-		zap.String("taskID", fmt.Sprintf("%d", task.ID)))
-
-	if len(sourceTorrents) == 0 {
+	// §59.558 PR-4: 准备段三 helper（源收集/参数解析/预载族——engine_match_prepare.go）
+	src := e.collectRunTaskSources(ctx, clientUIDs)
+	result.TotalSources = len(src.sourceTorrents)
+	e.logRunTaskSources(task, result.TotalSources, src.nameSites)
+	if len(src.sourceTorrents) == 0 {
 		return result, nil
 	}
 
-	var sourceSites []string
-	if task.SourceSiteIDs != "" {
-		sourceSites = e.resolveSiteIDsToNames(ctx, task.SourceSiteIDs)
+	params := e.resolveRunTaskParams(ctx, task)
+
+	infoHashes := make([]string, 0, len(src.sourceTorrents))
+	for _, s := range src.sourceTorrents {
+		infoHashes = append(infoHashes, s.InfoHash)
 	}
-
-	targetSites := e.resolveSiteIDsToNames(ctx, task.TargetSiteIDs)
-
-	var excludedSites []string
-	if task.TargetSiteExcludes != "" {
-		excludedSites = ParseClientIDs(task.TargetSiteExcludes)
-	}
-
-	sizeTolerance := task.SizeTolerancePercent
-	if sizeTolerance <= 0 {
-		sizeTolerance = 1.0
-	}
-
-	var infoHashes []string
-	for _, src := range sourceTorrents {
-		infoHashes = append(infoHashes, src.InfoHash)
-	}
-
-	e.computeMissingFingerprints(ctx, sourceTorrents, infoHashes)
+	e.computeMissingFingerprints(ctx, src.sourceTorrents, infoHashes)
 
 	e.logger.Info("preload started",
-		zap.Int("sources", len(sourceTorrents)),
-		zap.Strings("targetSites", targetSites))
+		zap.Int("sources", len(src.sourceTorrents)),
+		zap.Strings("targetSites", params.targetSites))
 
-	ps := e.preloadSites(ctx, targetSites, excludedSites)
-	fpCache := e.preloadFingerprints(ctx, infoHashes)
-	existingMatchesMap, deletedCount := e.preloadExistingMatches(ctx, infoHashes, clientHashes)
-	negCache := e.preloadNegativeCache(ctx, infoHashes)
+	pl := e.preloadRunTaskData(ctx, task, src, params, infoHashes)
 
-	var phCache *piecesHashCache
-	if hasMatchMethod(task.MatchMethods, "pieces_hash") {
-		scanConc := task.ScanConcurrency
-		if scanConc <= 0 {
-			scanConc = 10
-		}
-		e.preflightCheck(ctx, ps, scanConc)
-		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc, task.ID)
-	}
-
-	dr := buildDomainResolver(ps)
-	e.currentDomainResolver = dr
+	// 上下文指针（defer 清理必须留主函数——闭包引用）
+	e.currentDomainResolver = pl.dr
 	defer func() { e.currentDomainResolver = nil }()
-
-	cfCache := e.preloadCloudFingerprints(ctx, fpCache, dr)
-	e.currentCloudFPCache = cfCache
+	e.currentCloudFPCache = pl.cfCache
 	defer func() { e.currentCloudFPCache = nil }()
-
-	if phCache != nil && e.contributeReporter != nil && e.cloudFPService != nil && e.cloudFPService.IsEnabled() {
-		var contributeRecords []model.CloudFPContribute
-		for siteName, hashMap := range phCache.bySite {
-			domain := dr.toDomain(siteName)
-			for ph, tid := range hashMap {
-				contributeRecords = append(contributeRecords, model.CloudFPContribute{
-					PiecesHash: ph,
-					SiteName:   domain,
-					TorrentID:  strconv.Itoa(tid),
-				})
-			}
-		}
-		if len(contributeRecords) > 0 {
-			e.contributeReporter.Upload(contributeRecords)
-		}
-	}
-
-	phSites := 0
-	if phCache != nil {
-		phSites = len(phCache.bySite)
-	}
-	e.logger.Info("preload completed",
-		zap.Int("fpCache", len(fpCache.byKey)),
-		zap.Int("existingMatches", len(existingMatchesMap)),
-		zap.Int("deletedInClient", deletedCount),
-		zap.Int("piecesHashSites", phSites))
-
-	confirmedTargets := make(map[string]bool)
-	for _, matches := range existingMatchesMap {
-		for _, m := range matches {
-			key := m.TargetSite + ":" + m.TargetTorrentID
-			confirmedTargets[key] = true
-		}
-	}
-
-	var iyuuResults map[string][]*model.IYUUReseedResult
-	var iyuuSidMap map[int]string
-	if task.EngineMode == model.ReseedModeIYUUCloud && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
-		iyuuResults = e.preloadIYUUResults(ctx, task.ID, infoHashes)
-		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
-	}
-
-	// §59.26: IYUU 覆盖联动——将 IYUU 查询结果同步到 site_coverage_cache
-	if iyuuResults != nil && iyuuSidMap != nil {
-		e.syncIYUUCoverage(ctx, iyuuResults, iyuuSidMap)
-	}
 
 	l2s := newL2Stats()
 
 	if task.EngineMode == model.ReseedModeSeedFeature {
-		e.runSeedFeatureScan(ctx, task, ps, sourceTorrents, sourceSites, fpCache, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites, iyuuResults, iyuuSidMap, targetSites, excludedSites, result)
+		e.runSeedFeatureScan(ctx, task, pl.ps, src.sourceTorrents, params.sourceSites, pl.fpCache, pl.negCache, pl.phCache, pl.cfCache, l2s, pl.confirmedTargets, src.nameSites, pl.iyuuResults, pl.iyuuSidMap, params.targetSites, params.excludedSites, result)
 	} else {
-		e.runLegacyScan(ctx, task, ps, sourceTorrents, sourceSites, fpCache, sizeTolerance, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites, iyuuResults, iyuuSidMap, targetSites, excludedSites, result)
+		e.runLegacyScan(ctx, task, pl.ps, src.sourceTorrents, params.sourceSites, pl.fpCache, params.sizeTolerance, pl.negCache, pl.phCache, pl.cfCache, l2s, pl.confirmedTargets, src.nameSites, pl.iyuuResults, pl.iyuuSidMap, params.targetSites, params.excludedSites, result)
 	}
 
 	if task.EngineMode == model.ReseedModeSeedFeature {
