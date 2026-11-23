@@ -49,6 +49,6 @@
 | 审计发现 | 落地刀 | 状态 |
 |---|---|---|
 | client reload 静默失败（§3.3） | 刀1 v0.0.1582 | 已完成 |
-| eventbus consumer 无超时（§3.2） | 刀2（60s `eventBusConsumerTimeout`） | 待实施 |
+| eventbus consumer 无超时（§3.2） | 刀2 v0.0.1583 | 已完成 |
 | batch/manual/stats 脱离停机（§3.1） | 刀3 | 待实施 |
 | seeding 自建局部根 ctx（§3.4） | 刀4 | 待实施 |

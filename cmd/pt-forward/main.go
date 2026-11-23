@@ -451,7 +451,8 @@ func main() {
 	torrentPusher := pusher.NewPusher(db, log)
 	torrentPusher.SetSiteProvider(siteProvider)
 	torrentPusher.SetClientProvider(clientManager)
-	eventBus := pusher.NewEventBus(log, 256)
+	// §59.562 刀2: baseCtx=根 ctx（停机 cancel 传播到消费者派生 ctx）
+	eventBus := pusher.NewEventBus(ctx, log, 256)
 	rssEngine.SetEventBus(eventBus)
 
 	rssEngine.SetWSBroadcaster(wsHub)

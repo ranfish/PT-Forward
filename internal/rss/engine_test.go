@@ -1346,7 +1346,7 @@ func TestRetryBlockedStates(t *testing.T) {
 
 	var mu sync.Mutex
 	var published []*pusher.PushedEvent
-	bus := pusher.NewEventBus(zap.NewNop(), 16)
+	bus := pusher.NewEventBus(context.Background(), zap.NewNop(), 16)
 	bus.Register(&testRetryConsumer{fn: func(ev *pusher.PushedEvent) {
 		mu.Lock()
 		defer mu.Unlock()
