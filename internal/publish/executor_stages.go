@@ -64,11 +64,6 @@ func (e *PublishExecutor) executePushOnly(ctx context.Context, in ExecuteInput, 
 	if res.Status == "pushed" || res.Status == "pushed_existing" {
 		e.repushConverge(ctx, in, time.Now())
 	}
-
-	// §59.159 回归审核：补推成功回写原记录（同 tid 最新行 Status/Seeded）
-	if res.Status == "pushed" || res.Status == "pushed_existing" {
-		e.repushConverge(ctx, in, time.Now())
-	}
 	return res, "", ""
 }
 
