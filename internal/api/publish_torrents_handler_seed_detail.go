@@ -815,3 +815,78 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 		zap.Error(result.Error))
 	Success(w, map[string]interface{}{"message": "已清除"})
 }
+
+// buildPutSeedUpdates §59.89: PUT 更新构造（空值不覆盖）——部分保存场景（只改
+// tags 不带 description）不得清空简介/海报/截图；v0.0.738 验证脚本 PUT {} 污染
+// 预览实锤的根因修复。清空语义: 显式传空串 poster=""/description="" 视为清空
+// 仍生效（需求方主动清空 vs 漏传的区分——JSON 里 nil 与 "" 无法区分，取保守:
+// 一律不覆盖空值；主动清空走"重新获取"链）。
+// §59.170: screenshots 空数组同 policy——[] 与 nil 一律不覆盖（直开预览自动
+// 保存空表单实锤：[] 覆盖 + reviewed 合成降级 + 簇连坐三连击；空值清除无合法
+// 消费者，主动清空走"重新获取"链）。
+func buildPutSeedUpdates(req putSeedRequest, existingPoster, existingDesc, existingShots string) map[string]interface{} {
+	updates := map[string]interface{}{}
+	if req.Poster != "" {
+		updates["poster"] = req.Poster
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if len(req.Screenshots) > 0 {
+		updates["screenshots"] = model.FormatScreenshotColumn(req.Screenshots)
+	}
+	if req.Tags != nil {
+		if data, err := json.Marshal(req.Tags); err == nil {
+			updates["tags"] = string(data)
+		}
+	}
+	return updates
+}
+
+// tagDisplayNames §59.106: tag canonical 键 → dict 显示名列表（miss 保留原文）。
+func tagDisplayNames(tags []string) []string {
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if l := titleparser.ReverseLookup("tag." + t); l != "" {
+			out = append(out, l)
+		} else {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// normalizeDomainValues §59.75: 域值归一（PTGen 原词→canonical）+ label 映射。
+// 返回 {"keys": ["region.us"], "labels": ["美国"]} 双形态——Tab1 显示 label，
+// 发布映射消费 keys。miss（未收录国名/类型词）保留原文双形态。
+func normalizeDomainValues(domain string, raws []string) map[string][]string {
+	if len(raws) == 0 {
+		return nil
+	}
+	keys, labels := make([]string, 0, len(raws)), make([]string, 0, len(raws))
+	seen := map[string]bool{}
+	for _, r := range raws {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		key := titleparser.LookupDictKey(domain, r)
+		if key == "" {
+			key = r // miss 保留原文
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		keys = append(keys, key)
+		if label := titleparser.ReverseLookup(key); label != "" {
+			labels = append(labels, label)
+		} else {
+			labels = append(labels, r)
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return map[string][]string{"keys": keys, "labels": labels}
+}
