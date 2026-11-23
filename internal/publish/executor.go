@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/pusher"
 	sitepkg "github.com/ranfish/pt-forward/internal/site"
 )
 
@@ -296,14 +294,13 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	form, tp, publishTitle := fb.form, fb.tp, fb.publishTitle
 	arbNotes, jobs := fb.arbNotes, fb.jobs
-	tags, tagArrayFields, applied := fb.tags, fb.tagArrayFields, fb.applied
-	gpwExtra, gpwArtists, gpwSubs := fb.gpwExtra, fb.gpwArtists, fb.gpwSubs
+	applied := fb.applied
 
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
 	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）
 	var preAudit *PreAuditResult
 	if cfg.PreAuditURL != "" {
-		if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, tagArrayFields, publishTitle); pa != nil {
+		if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, fb.tagArrayFields, publishTitle); pa != nil {
 			preAudit = pa
 		} else {
 			preAudit = &PreAuditResult{Passed: false, TotalScore: -1,
@@ -328,306 +325,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return e.dryRunCheckpoint(ctx, in, meta, torrentData, cfg, form, preAudit, localFindings, applied, arbNotes)
 	}
 
-	// ⑧ 上传（adapter UploadTorrent 复用）
-	// §59.273: 审核门——未审核种子禁止直接发布（一种多站/一站多种/单发全
-	// 路径收口在 executor 单点；DryRun 预览不受限。249 案：清除→重获后
-	// reviewed 重置为 false，页面显示未审核但发布无门可拦）
-	if !meta.Reviewed {
-		return failRec("unreviewed", "种子未审核（reviewed=false）——请先在种子配置页完成预览审核")
-	}
-	// §59.159: 匿名发布取站点默认（form_config.Anonymous——站点配置勾选项）
-	if cfg.Anonymous {
-		in.Anonymous = true
-	}
-	pubReq := &model.PublishRequest{
-		TorrentData: torrentData,
-		FormFields:  form,
-		// §59.462 刀⑤: 海豹翻译层产物注入（jobs 段局部变量→此处消费）
-		ExtraArtists:   gpwArtists,
-		SubtitleLangs:  gpwSubs,
-		Title:          publishTitle,
-		Subtitle:       meta.Subtitle, // §59.541 附二: 直读素材——原 form 字面量读在缺域/非恒等映射站断流（好学/朱雀缺域·馒头smallDescr/肉丝subtitle/野马shortDesc 非恒等·五站实锤）
-		Description:    form[cfg.FormFields[model.FieldDomainDescription]],
-		MediaInfo:      meta.MediaInfo,
-		BDInfo:         meta.BDInfo,
-		Screenshots:    parseScreenshotsCol(meta.Screenshots),
-		IMDbLink:       meta.IMDbURL,
-		DoubanLink:     meta.DoubanURL,
-		Anonymous:      in.Anonymous,
-		SourceSite:     meta.SiteName,
-		SourceInfoHash: in.InfoHash,
-		TargetSite:     in.TargetSite,
-		ClientUID:      rv.ClientUID,
-	}
-	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
-	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
-	pubReq.TagArrayFields = tagArrayFields
-	// §59.451: 馒头 labels 位掩码注入（站方特化——API TorrentUploadForm
-	// labels int：bit0=DIY/bit1=中配/bit2=中字，无 tags checkbox 槽——
-	// TagArrayFields 空，标签经 ExtraFields 通道翻译投递；adapter
-	// uploadViaAPI 透传。0=无标签不写（bit 全零省字段）。
-	if in.TargetSite == "馒头" {
-		if bits := mteamLabelsBits(tags); bits > 0 {
-			if pubReq.ExtraFields == nil {
-				pubReq.ExtraFields = map[string]string{}
-			}
-			pubReq.ExtraFields["labels"] = strconv.Itoa(bits)
+	// §59.559 PR-C: 上传/dedup/落库段抽为 executeUploadAndDedup + finalizeExecuteResult
+	uc := &executeUploadContext{in: in, meta: meta, rv: rv, cfg: cfg, form: form, fb: fb,
+		torrentData: torrentData, publishTitle: publishTitle}
+	resp, timeoutMsg, fs, fm := e.executeUploadAndDedup(ctx, uc)
+	if fs != "" {
+		if fs == "__existing__" {
+			// §59.159 existing 终态：信文案不信页面 ID（recordResult 已在函数内落库）
+			return &ExecuteResult{Status: "existing", Message: fm, TargetTorrentURL: resp.DetailURL}
 		}
+		return failRec(fs, fm)
 	}
-	// §59.462 刀⑤: 海豹 ExtraFields 注入（局部变量——非目标站恒 nil 零注入）
-	if in.TargetSite == "海豹" && len(gpwExtra) > 0 {
-		if pubReq.ExtraFields == nil {
-			pubReq.ExtraFields = map[string]string{}
-		}
-		for k, v := range gpwExtra {
-			pubReq.ExtraFields[k] = v
-		}
-		// §59.462 附七: gpw_image Rehost 转投——源值=dbposter（豆瓣域，
-		// 站方抓不到）→默认图床域（系统配置）。失败降级保留原 URL
-		// （图床故障不阻塞发布——肉丝同款降级语义）。DryRun 在此前已
-		// 返回——预览值为原始 URL（无网络动作）。
-		if src := pubReq.ExtraFields["gpw_image"]; src != "" &&
-			e.pipe != nil && e.pipe.imageHostMgr != nil {
-			if r, rErr := e.pipe.imageHostMgr.Rehost(ctx, src); rErr == nil && r != nil && r.URL != "" {
-				pubReq.ExtraFields["gpw_image"] = r.URL
-				e.logger.Info("gpw image rehosted", zap.String("to", r.URL))
-			} else {
-				e.logger.Warn("gpw image rehost failed（降级保留原 URL）", zap.Error(rErr))
-			}
-		}
-	}
-	// §59.458: 肉丝 ExtraFields 搬运（form 段注入的显示键→adapter
-	// 消费通道；genre=JSON 数组串/region=slug 终态/poster=URL）
-	if in.TargetSite == "肉丝" {
-		if pubReq.ExtraFields == nil {
-			pubReq.ExtraFields = map[string]string{}
-		}
-		for _, k := range []string{"rs_genre", "rs_region", "rs_poster"} {
-			if v := form[k]; v != "" {
-				pubReq.ExtraFields[k] = v
-			}
-		}
-	}
-	// §59.459: 野马 ExtraFields 搬运（regionList JSON 数组/译名/封面）
-	if in.TargetSite == "野马" {
-		if pubReq.ExtraFields == nil {
-			pubReq.ExtraFields = map[string]string{}
-		}
-		for _, k := range []string{"yema_regions", "yema_translated", "yema_poster"} {
-			if v := form[k]; v != "" {
-				pubReq.ExtraFields[k] = v
-			}
-		}
-	}
-
-	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
-	if aErr != nil {
-		return failRec("failed", fmt.Sprintf("获取站点适配器失败: %v", aErr))
-	}
-	siteConfig, scErr := e.pipe.siteProvider.GetSiteConfig(ctx, in.TargetSite)
-	if scErr != nil {
-		return failRec("failed", fmt.Sprintf("获取站点配置失败: %v", scErr))
-	}
-
-	// dedup 双路（§59.166 本地记忆优先——修道院 18:49 批实战：站方 pieces-hash API
-	// 密集查询间歇空返回致 4 种重传（站方复用 tid 无损但应防御）；本地零依赖零延迟，
-	// 站方 API 作本地未命中补充。一种多站/一站多种发布链公共生效。
-	piecesHash := fingerprintPiecesHash(torrentData)
-	if piecesHash != "" {
-		// ① 本地记忆（同站同 pieces_hash 已有终态记录→拦；tid 有值则复用展示）
-		var rec model.PublishResultRecord
-		if err := e.db.WithContext(ctx).
-			Where("target_site = ? AND pieces_hash = ? AND status IN ?", in.TargetSite, piecesHash,
-				model.PublishSkipStatuses).
-			Order("id DESC").First(&rec).Error; err == nil {
-			// 本地记忆 tid 补充：站方 API 查一次取真实 tid（失败不阻塞——记忆拦截已成立）
-			tidShown := rec.TorrentID
-			if tidShown == "" {
-				if _, mHash, mTID := e.pipe.dedupByPiecesHashFull(ctx, adapter, siteConfig, torrentData); mTID > 0 {
-					_ = mHash
-					tidShown = fmt.Sprintf("%d", mTID)
-				}
-			}
-			msg := "本地记忆命中（站上已有同内容种）: " + piecesHash
-			e.recordResult(ctx, in, meta, rv, "duplicate", msg, tidShown, detailURLOf(siteConfig, tidShown), piecesHash)
-			return fail("duplicate", msg)
-		}
-	}
-	// ② 站方 pieces-hash API（拦截记录带站上 tid——此前 API 返回的 tid 被丢弃）
-	if dup, dupMsg, mTID := e.pipe.dedupByPiecesHashFull(ctx, adapter, siteConfig, torrentData); dup {
-		msg := "目标站已存在同内容种子: " + dupMsg
-		tidShown := ""
-		if mTID > 0 {
-			tidShown = fmt.Sprintf("%d", mTID)
-		}
-		e.recordResult(ctx, in, meta, rv, "duplicate", msg, tidShown, detailURLOf(siteConfig, tidShown), piecesHash)
-		return fail("duplicate", msg)
-	}
-	// ③ 站方 check 预查重（§59.515 刀2 D1——好大 API 独有·file 通道清洗重算
-	// normalized_infohash 比我们本地指纹更准：源站私有字段清洗后 hash 不同·
-	// 本地指纹对不上。read scope 零副作用·网络失败 warning 放行 409 兜底（E3））
-	// 注：局部变量 adapter（SiteAdapter 接口）遮蔽包名——用 pkg 引用类型
-	if checker, ok := adapter.(hdareaPreChecker); ok {
-		pc, pcErr := checker.CheckBeforeUpload(ctx, siteConfig, torrentData)
-		if pcErr != nil {
-			// E3：check 网络失败 → warning 放行（409 是第二道防线）
-			e.logger.Warn("check 预查重失败（放行·409 兜底）", zap.String("site", in.TargetSite), zap.Error(pcErr))
-		} else if pc != nil && !pc.CanUpload {
-			if pc.IsBanned {
-				// E1：banned_duplicate → failed 终态（站方禁发资源·不是重复是禁止）
-				msg := "站方禁发此资源: " + pc.Reason
-				e.recordResult(ctx, in, meta, rv, "failed", msg, "", "", piecesHash)
-				return fail("failed", msg)
-			}
-			// active_duplicate → duplicate 终态（与①②同语义）
-			msg := "站方 check 拦截: " + pc.Reason
-			if pc.ExistingName != "" {
-				msg += "（" + pc.ExistingName + "）"
-			}
-			e.recordResult(ctx, in, meta, rv, "duplicate", msg, pc.ExistingID, detailURLOf(siteConfig, pc.ExistingID), piecesHash)
-			return fail("duplicate", msg)
-		} else if pc != nil && len(pc.ReplaceableDead) > 0 {
-			// D2：断种顶替——站方将自动删旧上架·日志透出顶替意图
-			e.logger.Info("check 顶替断种（站方将自动删旧上架）",
-				zap.String("site", in.TargetSite),
-				zap.Strings("dead_tids", pc.ReplaceableDead))
-		}
-	}
-
-	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
-	timeoutRecheckMsg := ""
-	if upErr != nil {
-		// §59.470: 超时≠失败——站方可能已完成入库（南洋案实证：30s 超时但
-		// 站方 09:43 实际入库 tid=225756·记录假失败+人工重试险重复发布）。
-		// 超时类错误先站方复查（复用 pieces-hash dedup 通道）·查到同内容种
-		// →按站上已有处理（uploaded_existing 语义·推种+pushed_existing）；
-		// 复查无 → 真 failed。
-		if isUploadTimeoutErr(upErr) {
-			// 复查子 ctx：上传已耗尽外层预算大部分——WithoutCancel 保 trace
-			// 值+去取消，再派生独立预算（复查=一次 pieces-hash 查询 60s 足够）
-			recheckCtx, recheckCancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second)
-			dup, dupMsg, mTID := e.pipe.dedupByPiecesHashFull(recheckCtx, adapter, siteConfig, torrentData)
-			recheckCancel()
-			if dup && mTID > 0 {
-				tidShown := fmt.Sprintf("%d", mTID)
-				if e.logger != nil {
-					e.logger.Info("upload timeout but site recheck hit (treat as existing)",
-						zap.String("site", in.TargetSite),
-						zap.String("tid", tidShown),
-						zap.Error(upErr))
-				}
-				timeoutRecheckMsg = "上传超时但站方复查确认已发布（tid=" + tidShown + "）: " + dupMsg
-				resp = &model.PublishResponse{
-					Success:    true,
-					IsExisting: true,
-					TorrentID:  tidShown,
-					DetailURL:  detailURLOf(siteConfig, tidShown),
-				}
-				upErr = nil
-			}
-		}
-		if upErr != nil {
-			// §59.473: 复查通道失效站（海胆 pieces-hash 404）超时兜底文案——
-			// 引导手动核验（超时≠失败·站方可能已入库）
-			if isUploadTimeoutErr(upErr) {
-				return failRec("failed", fmt.Sprintf("上传超时且站方复查不可用（%v）——超时≠失败，请上站核验是否已发布后再决定重试", upErr))
-			}
-			return failRec("failed", fmt.Sprintf("上传失败: %v", upErr))
-		}
-	}
-	if !resp.Success {
-		// §59.159 回归审核：优先消费 ErrorMessage（已存在等语义化失败信息——
-		// 旧代码拼 DetailURL[已存在形态为空]致"上传未成功: "空尾巴）
-		if resp.ErrorMessage != "" {
-			return failRec("failed", resp.ErrorMessage)
-		}
-		return failRec("failed", "上传未成功: "+resp.DetailURL)
-	}
-
-	// §59.159: 已存在分流（NP 302 existed=1 / stderr 文本——站上已有同种）。
-	// 加种照做=把站上已有种下回做种（辅种语义），Status 语义化区分新发/已有。
 	uploadedStatus := "uploaded"
 	if resp.IsExisting {
-		if resp.ExistingID == "" && resp.TorrentID == "" {
-			// §59.159 existing 终态：文本"已存在"（信文案不信页面 ID——无权威 ID
-			// 不推种；定位与推种走辅种业务）
-			msg2 := "站上已有同种（未定位站内 ID，未推种——辅种业务范畴）"
-			e.recordResult(ctx, in, meta, rv, "existing", msg2, "", "")
-			return &ExecuteResult{
-				Status: "existing", Message: msg2,
-				TargetTorrentURL: resp.DetailURL,
-			}
-		}
 		uploadedStatus = "uploaded_existing"
-		if resp.ExistingID != "" && resp.TorrentID == "" {
-			resp.TorrentID = resp.ExistingID
-		}
 	}
-
-	// ⑨ 加种（pusher 复用——SavePath 资源目录）
-	result := &ExecuteResult{
-		Status:           uploadedStatus,
-		Upload:           resp,
-		TargetTorrentURL: resp.DetailURL,
-	}
-	// §59.470: 超时复查命中场景的消息注入（uploaded_existing 语义正常路径无 message）
-	if timeoutRecheckMsg != "" {
-		result.Message = timeoutRecheckMsg
-	}
-	if e.pipe.pusher != nil {
-		pushReq := &pusher.PushRequest{
-			ClientUID: rv.ClientUID,
-			SiteName:  in.TargetSite,
-			TorrentID: resp.TorrentID,
-			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——已存在辅种快路径
-			Title:     meta.Title,
-			SavePath:  rv.SavePath,
-			// §59.515 刀4 D2: 站方回传终版种子直传（好大 return_torrent_base64
-			// 通道·非空时 pusher 跳过 DownloadTorrent；其他站/未回传=空零影响）
-			TorrentData: resp.TorrentData,
-		}
-		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
-			// §59.471 附: 推种分支消息与超时复查消息拼接（非覆盖——
-			// 回归审核发现 AlreadyExist/Error 分支整串替换会丢"上传超时
-			// 但站方复查确认已发布"的语义线索）
-			mergeMsg := func(m string) string {
-				if timeoutRecheckMsg != "" {
-					return timeoutRecheckMsg + "；" + m
-				}
-				return m
-			}
-			switch {
-			case pr.Success:
-				if uploadedStatus == "uploaded_existing" {
-					result.Status = "pushed_existing"
-				} else {
-					result.Status = "pushed"
-				}
-			case pr.AlreadyExist:
-				// 下载器已有同种（人工先行导入/跨链重复）——辅种语义达成
-				result.Status = "pushed_existing"
-				result.Message = mergeMsg("下载器已有该种子（已做种）")
-			default:
-				if pr.Error != nil {
-					result.Message = mergeMsg("加种失败: " + pr.Error.Error())
-				}
-			}
-		}
-	}
-
-	// ⑩ 结果落库（发布日志页消费——recordResultFull 统一单点）
-	seeded := result.Status == "pushed" || result.Status == "pushed_existing"
-	// §59.166 LocalAudit 出口：成功态 message 后缀（failed 态不拼防混淆站方错误——
-	// 回归审核定案③）；findings JSON 进 logs 列（实战回流分析对照站方结果）
-	if len(localFindings) > 0 {
-		result.Message = strings.TrimSpace(strings.TrimSuffix(result.Message, "；") +
-			"；" + FormatLocalAudit(localFindings))
-	}
-	e.recordResultFullWithLogs(ctx, in, meta, rv, result.Status,
-		joinNotes(paNoteOf(preAudit), result.Message),
-		resp.TorrentID, result.TargetTorrentURL, seeded, piecesHash,
-		SerializeLocalAudit(localFindings))
-	return result
+	return e.finalizeExecuteResult(ctx, uc, resp, uploadedStatus, timeoutMsg, preAudit, localFindings)
 }
 
 // paNoteOf 预检摘要（未过时——§59.160 非门控但记录）。
