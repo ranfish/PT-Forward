@@ -582,7 +582,7 @@ func (a *NexusPHPAdapter) GetTorrentInfoHash(ctx context.Context, config *model.
 
 func (a *NexusPHPAdapter) SupportsSearchByPiecesHash() bool { return true }
 
-// §33.32 §33.34 — SearchByPiecesHash calls NexusPHP pieces-hash API
+// SearchByPiecesHash calls NexusPHP pieces-hash API（§33.32 §33.34）。
 //
 // Authentication modes:
 //   - passkey (standard NP, 52 sites): passkey in body, cookie optional

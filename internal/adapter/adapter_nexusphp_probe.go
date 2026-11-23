@@ -359,7 +359,7 @@ func (a *NexusPHPAdapter) DetectHRAndDiscount(ctx context.Context, config *model
 	return hrResult, discResult, nil
 }
 
-// §55.19 根本修复：DetectHRDiscountAndSL 在 detect 阶段顺便提取 SL 数据。
+// DetectHRDiscountAndSL 在 detect 阶段顺便提取 SL 数据（§55.19 根本修复）。
 // 复用 DetectHRAndDiscount 已抓取的详情页 HTML，避免评分阶段 GetBatchSLData 重复请求同一 URL。
 // 实现 CombinedHRDiscountSLDetector 接口（包装扩展，rss/engine.go 用类型断言优先调用）。
 func (a *NexusPHPAdapter) DetectHRDiscountAndSL(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, *model.SLData, error) {

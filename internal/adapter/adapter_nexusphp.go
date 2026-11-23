@@ -633,9 +633,6 @@ var (
 	// 首页/userdetails/mybonus/列表页汇总均无），SeedingSize 保持 0。
 	reKfNewSeedingCount = regexp.MustCompile(`(?is)title=["']当前做种["'][^>]*>\s*</i>\s*(\d+)`)
 	reKfNewUploaded     = regexp.MustCompile(`(?i)class=["']?uploaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
-	reKfNewDownloaded   = regexp.MustCompile(`(?i)class=["']?downloaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
-	reKfNewRatio        = regexp.MustCompile(`(?is)color_ratio["']?>\s*分享率：?</span>\s*([\d.]+)`)
-	reKfNewBonus        = regexp.MustCompile(`(?i)id=["']?totalBonus["']?>([\d,.]+)`)
 	reLinkBonus         = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
 	reYuanbaoBonus      = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
 )
