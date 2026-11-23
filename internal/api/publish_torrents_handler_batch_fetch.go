@@ -812,18 +812,6 @@ func effectiveSpecification(p titleparser.TechProfile) string {
 	return ""
 }
 
-// putSeedRequest §59.89: PUT /publish/seeds 请求体（提升命名——buildPutSeedUpdates 测试锚）。
-type putSeedRequest struct {
-	Force bool `json:"force"` // §59.484: 强制审核——MDP 详情页 missing_fields 非空时
-	// 用户显式确认"站方源数据固有缺口"后旁路审核门（大合集老种 album 空案）
-	Poster      string   `json:"poster"`
-	Screenshots []string `json:"screenshots"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-	SiteName    string   `json:"siteName"`
-	Reviewed    bool     `json:"reviewed"` // §59.247: 显式审核通道（确认完成——带 9 字段门槛）
-}
-
 // applyScreenshotStrategy §59.53: 采集链截图策略异步执行（goroutine 内）。
 // screenshotStrategyFor §59.319 附十二：读当前截图策略（system_settings
 // 动态值；空默认 auto——与 pipeline.ApplyScreenshotStrategy 口径一致）。
