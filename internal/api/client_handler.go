@@ -326,7 +326,13 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "create", "client", fmt.Sprintf("%d", client.ID), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.Reload(context.Background())
+		// §59.562 刀1: reload 失败不再静默——界面/DB 已变更而运行态未刷新的
+		// 隐性不一致必须留日志证据（审计 01 §3.3）
+		if err := h.clientMgr.Reload(context.Background()); err != nil {
+			h.logger.Warn("client reload after create failed",
+				zap.String("op", "create"), zap.Uint("client_id", client.ID),
+				zap.String("client_name", client.Name), zap.Error(err))
+		}
 	}
 
 	var mappings []model.ClientPathMapping
@@ -478,7 +484,12 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "update", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.ReloadClient(context.Background(), client.ID)
+		// §59.562 刀1: reload 失败不再静默（审计 01 §3.3）
+		if err := h.clientMgr.ReloadClient(context.Background(), client.ID); err != nil {
+			h.logger.Warn("client reload after update failed",
+				zap.String("op", "update"), zap.Uint("client_id", client.ID),
+				zap.String("client_name", client.Name), zap.Error(err))
+		}
 	}
 
 	var mappings []model.ClientPathMapping
@@ -543,7 +554,12 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "delete", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.Reload(context.Background())
+		// §59.562 刀1: reload 失败不再静默（审计 01 §3.3）
+		if err := h.clientMgr.Reload(context.Background()); err != nil {
+			h.logger.Warn("client reload after delete failed",
+				zap.String("op", "delete"), zap.Uint("client_id", client.ID),
+				zap.String("client_name", client.Name), zap.Error(err))
+		}
 	}
 
 	Success(w, nil)
