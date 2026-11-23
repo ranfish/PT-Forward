@@ -18,6 +18,7 @@ import (
 )
 
 type ManualForwardHandler struct {
+	baseCtx             context.Context // §59.562 刀3: service ctx——截图后台任务停机信号
 	db                  *gorm.DB
 	logger              *zap.Logger
 	pipeline            PublishPipeline
@@ -73,10 +74,14 @@ type MFClientProvider interface {
 	Get(clientUID uint) (model.DownloaderClient, error)
 }
 
-func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHandler {
+func NewManualForwardHandler(ctx context.Context, db *gorm.DB, logger *zap.Logger) *ManualForwardHandler {
+	if ctx == nil { // 附录A §2.5 边界防御
+		ctx = context.Background()
+	}
 	h := &ManualForwardHandler{
-		db:     db,
-		logger: logger,
+		baseCtx: ctx,
+		db:      db,
+		logger:  logger,
 	}
 	return h
 }
@@ -530,9 +535,11 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 				h.capture.mu.Unlock()
 			}
 		}()
-		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——Background + 15min
+		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——15min
 		// （§59.300: DoVi 双流路径每点 IDR 前向解码+reshape 耗时数分钟，5min 不够）
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		// §59.562 刀3: Task ctx 派生自 service ctx（baseCtx）——停机 cancel
+		// 提前中止·capture 状态 failed·重启后手动重试（可接受：截图=临时工件）。
+		ctx, cancel := context.WithTimeout(h.baseCtx, 15*time.Minute)
 		defer cancel()
 
 		shots := h.pipeline.CaptureScreenshots(ctx, req.Name, req.SavePath, nil, req.SubtitleSid)

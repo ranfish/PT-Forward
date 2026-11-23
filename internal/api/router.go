@@ -75,7 +75,10 @@ type Router struct {
 	rateLimitCfg           middleware.RateLimitConfigFunc
 }
 
-func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logBroadcaster *LogBroadcaster, logger *zap.Logger) *Router {
+func NewRouter(ctx context.Context, authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logBroadcaster *LogBroadcaster, logger *zap.Logger) *Router {
+	if ctx == nil { // 附录A §2.5 边界防御
+		ctx = context.Background()
+	}
 	siteRepo := site.NewRepository(db)
 	rssRepo := rss.NewRepository(db)
 	filterRepo := filter.NewRepository(db)
@@ -91,7 +94,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 	}
 	adapterFactory := adapter.NewFactory(logger, nil) // router 内部用于 StatsSync，不需要 Engine
 	siteHandler := NewSiteHandler(siteRepo, logger, db)
-	siteHandler.SetStatsSync(site.NewStatsSyncService(db, adapterFactory, logger))
+	siteHandler.SetStatsSync(site.NewStatsSyncService(ctx, db, adapterFactory, logger))
 	var clientMgrIface ClientManager
 	if clientMgr != nil {
 		clientMgrIface = clientMgr
@@ -102,7 +105,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		dashHandler.SetSeedingEngine(seedingEngine)
 		sysHandler.SetSeedingEngine(seedingEngine)
 	}
-	manualForwardHandler := NewManualForwardHandler(db, logger)
+	manualForwardHandler := NewManualForwardHandler(ctx, db, logger)
 	if seedingEngine != nil {
 		manualForwardHandler.SetSeedingCache(seedingEngine)
 	}
@@ -119,7 +122,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		reseedHandler:          NewReseedHandler(reseedEngine, logger),
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
-		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger, publishPipeline),
+		publishTorrentsHandler: NewPublishTorrentsHandler(ctx, db, logger, publishPipeline),
 		formConfigHandler:      NewFormConfigHandler(db),
 		complianceHandler:      NewComplianceHandler(db, logger), publishLimitHandler: NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),

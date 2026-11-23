@@ -14,6 +14,7 @@ import (
 )
 
 type StatsSyncService struct {
+	baseCtx context.Context // §59.562 刀3: service ctx——同步 goroutine 停机信号
 	db      *gorm.DB
 	factory *adapter.Factory
 	logger  *zap.Logger
@@ -24,8 +25,13 @@ type StatsSyncService struct {
 	syncMu      sync.Mutex
 }
 
-func NewStatsSyncService(db *gorm.DB, factory *adapter.Factory, logger *zap.Logger) *StatsSyncService {
-	return &StatsSyncService{db: db, factory: factory, logger: logger}
+// NewStatsSyncService §59.562 刀3: ctx=service ctx（main 根 ctx）——StartSyncAll
+// 后台 goroutine 派生源；nil 兜底 Background（附录A §2.5）。
+func NewStatsSyncService(ctx context.Context, db *gorm.DB, factory *adapter.Factory, logger *zap.Logger) *StatsSyncService {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &StatsSyncService{baseCtx: ctx, db: db, factory: factory, logger: logger}
 }
 
 type SyncAllResult struct {
@@ -58,7 +64,9 @@ func (s *StatsSyncService) StartSyncAll() bool {
 	s.syncMu.Unlock()
 
 	go func() {
-		synced, failedSites := s.SyncAllSites(context.Background())
+		// §59.562 刀3: 派生自 service ctx——停机 cancel 中止同步（站点统计
+		// 刷新幂等·下次触发重查·最终一致可接受）。
+		synced, failedSites := s.SyncAllSites(s.baseCtx)
 		s.syncMu.Lock()
 		s.synced = synced
 		s.failedSites = failedSites

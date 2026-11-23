@@ -543,6 +543,7 @@ func main() {
 	reseedEngine.SetScheduler(taskRegistry)
 
 	router := api.NewRouter(
+		ctx,
 		authManager,
 		db,
 		rssEngine,
@@ -748,7 +749,7 @@ func main() {
 	}
 
 	syncManager := scheduler.NewSyncManager(setting.NewRuntimeConfig(settingsRepo, log), log)
-	statsSyncSvc := site.NewStatsSyncService(db, adapterFactory, log)
+	statsSyncSvc := site.NewStatsSyncService(ctx, db, adapterFactory, log)
 	registerSchedulerTasks(taskRegistry, syncManager, siteProvider, clientManager, rssEngine, seedingEngine, publishPipeline, lifecycleManager, seedingConfirmation, freeWaitMonitor, statsSyncSvc, notifyService, settingsRepo, db, log)
 	reseedEngine.RegisterAllTaskSchedules(ctx)
 	reseedEngine.StartInjectionConsumer(ctx)

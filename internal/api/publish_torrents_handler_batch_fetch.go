@@ -135,6 +135,9 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []batchFetc
 		h.batchFetch.active = false
 		h.batchFetch.mu.Unlock()
 	}()
+	// §59.562 刀3: 颗内操作沿用 Background——graceful 语义（§59.495 用户定案：
+	// 正在执行的颗完整跑完）·停机信号只作用于循环顶「不再开始新颗」·
+	// 不中断当前颗的网络/落库（见循环顶 baseCtx.Done 检查点注释）。
 	ctx := context.Background()
 	// §59.21: 查下载器 is_local
 	isLocal := false
@@ -156,6 +159,17 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []batchFetc
 		// §59.495: graceful 停止检查点——不再开始新颗（正在执行的颗已完整
 		// 跑完；剩余项保持 pending 原状=未获取语义·下次批量照跑——用户定案：
 		// 未获取列表是唯一真相源·pending/被跳过本质都是未获取）
+		// §59.562 刀3: baseCtx（service ctx）Done 同语义位接入——停机信号
+		// 与手动 stopRequested 等价：不开始新颗·当前颗完整跑完（graceful
+		// 保留——审计 01 §3.1「跑完当前颗再停」）；颗内操作沿用 Background
+		// 不被停机中断（现状语义零变化）。
+		select {
+		case <-h.baseCtx.Done():
+			h.logger.Info("batch-fetch shutdown: remaining items skipped",
+				zap.Int("remaining", len(items)-i))
+			return // defer 释放 active
+		default:
+		}
 		h.batchFetch.mu.Lock()
 		if h.batchFetch.stopRequested {
 			h.batchFetch.mu.Unlock()

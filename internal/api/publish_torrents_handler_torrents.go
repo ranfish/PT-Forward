@@ -220,7 +220,10 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientUID uint, cfg model.
 	h.bgState.start(clientUID, len(torrents))
 	defer h.bgState.stop(clientUID)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	// §59.562 刀3: Task ctx 派生自 service ctx（baseCtx）——脱离 HTTP 请求
+	// 合理（原 §59.50 根因）·但接入停机：停机 cancel 提前中止·结果状态
+	// 不更新=下次重查（幂等·最终一致）。
+	ctx, cancel := context.WithTimeout(h.baseCtx, 10*time.Minute)
 	defer cancel()
 
 	client, err := h.clientMgr.Get(cfg.ID)

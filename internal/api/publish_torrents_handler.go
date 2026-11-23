@@ -24,6 +24,7 @@ type SiteProviderGetter interface {
 }
 
 type PublishTorrentsHandler struct {
+	baseCtx               context.Context          // §59.562 刀3: service ctx——后台任务停机信号（main 根 ctx）
 	executor              *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
 	db                    *gorm.DB
 	coverage              *coverage.Service
@@ -114,11 +115,15 @@ type siteBatchResult struct {
 	URL       string `json:"url,omitempty"`
 }
 
-func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publish.Pipeline) *PublishTorrentsHandler {
+func NewPublishTorrentsHandler(ctx context.Context, db *gorm.DB, logger *zap.Logger, pipeline *publish.Pipeline) *PublishTorrentsHandler {
 	// §59.58: 容量 5——8 核实测每路 mpv ~6 核，5 路摊薄后单种子 ~145s < 4min ctx（60% 余量）。
 	// CPU 总量守恒：并发数不改变批量总时长，只消除无界并发导致的 ctx 超时作废功。
 	// §59.51 手动截图按钮不经过此信号量（独立单例，不与批量竞争）。
+	if ctx == nil { // 附录A §2.5 边界防御
+		ctx = context.Background()
+	}
 	return &PublishTorrentsHandler{
+		baseCtx:             ctx,
 		db:                  db,
 		logger:              logger,
 		executor:            publish.NewPublishExecutor(pipeline),
