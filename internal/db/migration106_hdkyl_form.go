@@ -46,6 +46,7 @@ import (
 //     零魔/麒麟火 label-only。
 //   - 字段：url+pt_gen+technical_info+uplver；nfo 不配（13城教训）；
 //     pos_state 促销字段不配（GTK 同款）。
+//
 // 站规人工把关：黑名单 23 组+官种/驻站标签规则矩阵（HDK 官种→
 // 官方+麒麟火必选/GodDramas 驻站→麒麟火必选/非官种禁选官方）+
 // 审核 20+ 规则+标题规范。

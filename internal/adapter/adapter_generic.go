@@ -20,14 +20,14 @@ import (
 )
 
 var (
-	reGenericTitle             = regexp.MustCompile(`<title>([^<]+)</title>`)
-	reGenericRow               = regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
-	reGenericDDBlock           = regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
-	reGenericFallbackDiv       = regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
-	reGenericInfoHash          = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
-	reGenericKdescr            = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
-	reGenericSeeders           = regexp.MustCompile(`(?i)(?:做种数|Seeders?|S[^<]*<[^>]*>)(\d+)`)
-	reGenericLeechers          = regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
+	reGenericTitle       = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reGenericRow         = regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	reGenericDDBlock     = regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
+	reGenericFallbackDiv = regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
+	reGenericInfoHash    = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reGenericKdescr      = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
+	reGenericSeeders     = regexp.MustCompile(`(?i)(?:做种数|Seeders?|S[^<]*<[^>]*>)(\d+)`)
+	reGenericLeechers    = regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
 	// §59.159 词边界修复：前置 [^a-zA-Z0-9_] 防 userdetails.php/user torrent 误命中
 	// （实战：四次发布 tid=10136 恒等于用户自身 ID——上传失败页的导航链接被误抓判"成功"）
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)

@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 // §59.265: 站点固定资源声明整块剥除——包子/农场真实形态（243 QHstudIo 案）
 func TestDeclarationFilter_SiteDisclaimers(t *testing.T) {
 	text := "[quote][b]BaoziPT · 资源声明[/b]\n[list]本站提供的所有资源，不得下载用于商业盈利[/list][/quote]\n\n" +
@@ -54,7 +53,7 @@ func TestDeclarationFilter_MusicAndPTBA(t *testing.T) {
 		"[quote]该下载内容仅做宽带测试使用，请在下载后24小时内删除。[/quote]\n" +
 		"[quote]本资源均通过网络收集，仅用于试听，严禁用于任何商业用途！[/quote]\n" +
 		"[quote]文件来源与网络，试听后请购买支持正版资源。[/quote]\n" +
-		"[quote][b]互珍互重，禁转PTT[/b][/quote]\n" +  // 我方声明——必须保留
+		"[quote][b]互珍互重，禁转PTT[/b][/quote]\n" + // 我方声明——必须保留
 		"◎片名 测试影片\n正文内容保留"
 
 	f := NewDeclarationFilter(nil, nil)
@@ -110,7 +109,14 @@ func TestDeclarationFilter_MergeSemantics(t *testing.T) {
 
 	// ② GetPatterns = 内置 ∪ 自定义（合并·随版）
 	got := f.GetPatterns(ctx)
-	has := func(list []string, s string) bool { for _, x := range list { if x == s { return true } } ; return false }
+	has := func(list []string, s string) bool {
+		for _, x := range list {
+			if x == s {
+				return true
+			}
+		}
+		return false
+	}
 	if !has(got, defaultDeclarationPatterns[0]) || !has(got, "我的自定义词") {
 		t.Errorf("合并集缺项: builtin=%v custom-in=%v", has(got, defaultDeclarationPatterns[0]), has(got, "我的自定义词"))
 	}

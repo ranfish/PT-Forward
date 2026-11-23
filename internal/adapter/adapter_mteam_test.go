@@ -2,7 +2,6 @@ package adapter
 
 import "testing"
 
-
 // §59.297: imdb/douban 字段双形态——纯 ID 拼接 vs 完整 URL 直用（防双拼）
 func TestMTeamURLFieldDualForm(t *testing.T) {
 	// 纯 ID 形态（标准）

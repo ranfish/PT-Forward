@@ -42,6 +42,7 @@ import (
 //   - 站规注记：<100MB 禁发（软件文档/单曲例外）+标清 upscale 禁+
 //     RMVB 禁+游戏类候选制（上传员以下须候选区）+RAR 压缩包禁+
 //     Dupe 媒介优先级——发布预览人工把关。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(96, "lajidui_publish_form_config", func(gormDB *gorm.DB) error {

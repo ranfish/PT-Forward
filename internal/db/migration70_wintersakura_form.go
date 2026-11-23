@@ -29,6 +29,7 @@ import (
 //   - tags 22 项：首发+官组标签（SakuraSUB/SakuraWEB/SakuraAcademic/
 //     WScode）+HDR 三级+排行榜 label-only；禁转/国语/中字/粤语/DIY 配键
 //   - 分叉族双键即防：410 纪录片+406 MV
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(70, "wintersakura_publish_form_config", func(gormDB *gorm.DB) error {

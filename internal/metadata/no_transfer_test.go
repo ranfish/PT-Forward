@@ -9,13 +9,13 @@ import (
 // §59.162: keepfrds 禁转两态判定锚定（用户站点经验权威）。
 func TestParseRelativeAge(t *testing.T) {
 	cases := map[string]time.Duration{
-		"20时46分前":  20*time.Hour + 46*time.Minute,
-		"3小时前":     3 * time.Hour,
-		"5分钟前":     5 * time.Minute,
-		"5天前":      5 * 24 * time.Hour,
-		"1月2天前":    365 * 24 * time.Hour,
-		"1年3月前":    365 * 24 * time.Hour,
-		"":         0,
+		"20时46分前": 20*time.Hour + 46*time.Minute,
+		"3小时前":    3 * time.Hour,
+		"5分钟前":    5 * time.Minute,
+		"5天前":     5 * 24 * time.Hour,
+		"1月2天前":   365 * 24 * time.Hour,
+		"1年3月前":   365 * 24 * time.Hour,
+		"":        0,
 	}
 	for in, want := range cases {
 		if got := ParseRelativeAge(in); got != want {

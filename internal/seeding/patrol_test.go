@@ -116,9 +116,9 @@ func TestMarkUnregistered(t *testing.T) {
 // patrolMockClient §59.31 二审 NEW-1：qb 分发/上限/游标单测的 mock 下载器。
 type patrolMockClient struct {
 	// GetTrackerMessagesAll 返回表：hash → 消息列表（不存在 = 模拟 API 错误）
-	msgs    map[string][]model.TrackerMessage
-	errSet  map[string]bool
-	calls   []string // 记录调用顺序
+	msgs   map[string][]model.TrackerMessage
+	errSet map[string]bool
+	calls  []string // 记录调用顺序
 }
 
 func (m *patrolMockClient) GetTrackerMessagesAll(_ context.Context, hash string) ([]model.TrackerMessage, error) {

@@ -37,7 +37,7 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 	if existingRedirectID != "" {
 		return &model.PublishResponse{
 			Success: true, IsExisting: true, ExistingID: existingRedirectID,
-			DetailURL: detailBase + "/details.php?id=" + existingRedirectID,
+			DetailURL:  detailBase + "/details.php?id=" + existingRedirectID,
 			TargetSite: site,
 		}
 	}
@@ -104,6 +104,7 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 	}
 	return nil
 }
+
 // reUploadFailH1P §59.289: 上传失败页 h1+p 组合——站方 stderr 模板
 // <h1>上传失败！</h1><p>Invalid integer format...</p> 中 p 内容不含
 // 失败/error 关键词（"Invalid integer" 全 miss）→ 原 reNexusErrorP 漏提

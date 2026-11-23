@@ -1,4 +1,3 @@
-
 package httpclient
 
 import (
@@ -70,4 +69,3 @@ func TestSmartDial_HealthyCache(t *testing.T) {
 		t.Log("IP literal path doesn't use cache (by design) — OK")
 	}
 }
-

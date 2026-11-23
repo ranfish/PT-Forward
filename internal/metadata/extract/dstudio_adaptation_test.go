@@ -3,7 +3,6 @@ package extract
 import (
 	"strings"
 	"testing"
-
 )
 
 // TestExtractTitleTopContainerGuard §59.366: #top 在外层 header（容器）

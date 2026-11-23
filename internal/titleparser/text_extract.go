@@ -7,7 +7,8 @@
 //
 // 返回值为中文识别结果（与 auto_feed_js 一致），上层用 extract.LookupStandardKey 标准化为 code。
 // 例如：ExtractType("大小：18.53 GB  类型: 电视剧") → "电视剧"
-//      上层 LookupStandardKey("type", "电视剧") → "category.tv_series"
+//
+//	上层 LookupStandardKey("type", "电视剧") → "category.tv_series"
 //
 // 数据来源：examples/auto_feed_js/auto_feed_2.1.1.2.js line 2469-2660
 // 这些规则经过 auto_feed_js 长期实战验证，覆盖率高。
@@ -75,8 +76,8 @@ func ExtractCodec(text string) string {
 		return ""
 	}
 	cases := []struct {
-		re      *regexp.Regexp
-		result  string
+		re     *regexp.Regexp
+		result string
 	}{
 		{regexp.MustCompile(`(?i)H264|H\.264|AVC`), "H264"},
 		{regexp.MustCompile(`(?i)HEVC|H265|H\.265`), "H265"},

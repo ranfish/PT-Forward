@@ -83,9 +83,9 @@ var utopiaMusicGenreTags = []struct{ word, val string }{
 
 // utopiaMusicRegionTags 地区映射（→ tags 值 + language_id 双消费）
 var utopiaMusicRegionTags = []struct {
-	word     string
-	tagVal   string
-	langVal  string
+	word    string
+	tagVal  string
+	langVal string
 }{
 	{"港台", "6", "41"},
 	{"大陆", "4", "41"},
@@ -357,7 +357,10 @@ var utopiaTagValues = map[string]bool{
 // bug 或数据异常·DryRun 人工核对；正式发布不变）。
 func utopiaMusicValueSetAudit(form map[string]string, tagArray []model.TagKV) []string {
 	var w []string
-	for _, slot := range []struct{ key, name string; set map[string]bool }{
+	for _, slot := range []struct {
+		key, name string
+		set       map[string]bool
+	}{
 		{"audiocodec_sel[4]", "音频编码", utopiaAudioCodecValues},
 		{"medium_sel[4]", "媒介", utopiaMediumValues},
 		{"team_sel[4]", "制作组", utopiaTeamValues},

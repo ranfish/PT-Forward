@@ -45,12 +45,12 @@ func TestE2E_RSSToSeedingRecord(t *testing.T) {
 	clientUID := seedClient(t, db, "seeding-client", "seeding")
 
 	sub := &model.RSSSubscription{
-		Name:     "test-sub",
-		SiteName: "source-site",
-		URLs:     []string{"https://source.com/rss"},
-		Cron:     "*/15 * * * *",
+		Name:      "test-sub",
+		SiteName:  "source-site",
+		URLs:      []string{"https://source.com/rss"},
+		Cron:      "*/15 * * * *",
 		ClientUID: 1,
-		Enabled:  true,
+		Enabled:   true,
 	}
 	require.NoError(t, db.Create(sub).Error)
 
@@ -152,7 +152,7 @@ func TestE2E_ReseedMatchAndInject(t *testing.T) {
 	seedRec := &model.SeedingTorrentRecord{
 		TorrentID: "torrent-001",
 		SiteName:  "source-site",
-		ClientUID:  sourceClientID,
+		ClientUID: sourceClientID,
 		InfoHash:  "abc123def456",
 		Status:    "seeding",
 		IsFree:    true,

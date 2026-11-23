@@ -43,6 +43,7 @@ import (
 //     music_video 项）；408 音乐→category.music
 //   - 分叉族双键即防：404 纪录
 //   - 有 uplver（anonymous: true）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(72, "ptcafe_publish_form_config", func(gormDB *gorm.DB) error {

@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	subtitleDDRe    = regexp.MustCompile(`(?s)副标题</dt>\s*<dd>(.*?)</dd>`)
-	subtitleSpanRe  = regexp.MustCompile(`(?s)<span[^>]*class=['"][^'"]*subtitle[^'"]*['"][^>]*>(.*?)</span>`)
+	subtitleDDRe   = regexp.MustCompile(`(?s)副标题</dt>\s*<dd>(.*?)</dd>`)
+	subtitleSpanRe = regexp.MustCompile(`(?s)<span[^>]*class=['"][^'"]*subtitle[^'"]*['"][^>]*>(.*?)</span>`)
 )
 
 // extractSubtitle 从详情页提取副标题。

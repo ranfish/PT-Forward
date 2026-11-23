@@ -233,17 +233,17 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 
 	var result struct {
 		Data struct {
-			Name        string `json:"name"`
-			Size        int64  `json:"size"`
-			InfoHash    string `json:"info_hash"`
-			Category    string `json:"category"`
-			Seeders     int    `json:"seeders"`
-			Leechers    int    `json:"leechers"`
-			Type        string `json:"type"`
-			Resolution  string `json:"resolution"`
-			Description string `json:"description"`
-			MediaInfo   string `json:"mediainfo"`
-			Imdb        string `json:"imdb"`
+			Name        string   `json:"name"`
+			Size        int64    `json:"size"`
+			InfoHash    string   `json:"info_hash"`
+			Category    string   `json:"category"`
+			Seeders     int      `json:"seeders"`
+			Leechers    int      `json:"leechers"`
+			Type        string   `json:"type"`
+			Resolution  string   `json:"resolution"`
+			Description string   `json:"description"`
+			MediaInfo   string   `json:"mediainfo"`
+			Imdb        string   `json:"imdb"`
 			Tags        []string `json:"tags"`
 		} `json:"data"`
 	}
@@ -1050,18 +1050,19 @@ func (a *Unit3DAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 
 	if resp.StatusCode != http.StatusOK {
 		snippet := string(body)
-		if len(snippet) > 200 { snippet = snippet[:200] }
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
-
 
 	var result struct {
 		Data []struct {
 			ID         string `json:"id"`
 			Attributes struct {
-				Name string `json:"name"`
-				Size int64  `json:"size"`
-				Seeders int `json:"seeders"`
+				Name    string `json:"name"`
+				Size    int64  `json:"size"`
+				Seeders int    `json:"seeders"`
 			} `json:"attributes"`
 		} `json:"data"`
 	}

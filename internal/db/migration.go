@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
+	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
@@ -292,7 +292,7 @@ func init() {
 		for _, sp := range snaps {
 			if sp.Name == "" {
 				continue
-		}
+			}
 			// 清簇截图缓存（观察期锚点作废, 强制走新策略）
 			if err := gormDB.Exec("DELETE FROM cluster_screenshot_cache WHERE client_uid = ? AND save_path = ? AND name = ?", sp.ClientUID, sp.SavePath, sp.Name).Error; err != nil {
 				return err

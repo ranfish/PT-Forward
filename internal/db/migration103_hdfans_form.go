@@ -49,6 +49,7 @@ import (
 //     产出——配键无收益 label-only）+微光星辰/甄选/驻站/原创/限转/
 //     源站转发/原生/特效/4K/8K/Hi-Res/刮削/AI修复/保种 label-only。
 //   - 字段：url+pt_gen+technical_info+uplver；nfo 不配（13城教训）。
+//
 // 站规人工把关：全站 H&R V2.0（考核+HP 系统）+盒子规则+黑名单组+
 // 游戏候选制+Dupe 媒介优先级+色情禁。
 // 幂等：仅空值行写入。

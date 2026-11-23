@@ -12,7 +12,7 @@ import (
 func TestClientSelector_Fixed(t *testing.T) {
 	s := NewClientSelector(nil, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:        1,
+		ClientUID:       1,
 		ClientSelection: model.SelectionFixed,
 	}
 	selected, err := s.Select(context.Background(), sub)
@@ -27,7 +27,7 @@ func TestClientSelector_Fixed(t *testing.T) {
 func TestClientSelector_EmptyCandidates(t *testing.T) {
 	s := NewClientSelector(nil, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         9,
+		ClientUID:        9,
 		CandidateClients: []uint{},
 		ClientSelection:  model.SelectionMostSpace,
 	}
@@ -60,7 +60,7 @@ func TestClientSelector_MostSpace(t *testing.T) {
 	}
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionMostSpace,
 	}
@@ -94,7 +94,7 @@ func TestClientSelector_LeastLoad(t *testing.T) {
 	}
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionLeastLoad,
 	}
@@ -126,7 +126,7 @@ func TestClientSelector_RoundRobin(t *testing.T) {
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
 		Name:             "test-sub",
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2, 3},
 		ClientSelection:  model.SelectionRoundRobin,
 	}
@@ -168,7 +168,7 @@ func TestClientSelector_BestFit(t *testing.T) {
 	}
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionBestFit,
 	}
@@ -208,7 +208,7 @@ func TestClientSelector_BestFit_AllFull(t *testing.T) {
 	}
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionBestFit,
 	}
@@ -242,7 +242,7 @@ func TestClientSelector_LeastUpload_EmptyTorrents(t *testing.T) {
 	}
 	s := NewClientSelector(provider, zap.NewNop())
 	sub := &model.RSSSubscription{
-		ClientUID:         1,
+		ClientUID:        1,
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionLeastLoad,
 	}

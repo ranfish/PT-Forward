@@ -3,6 +3,7 @@ package adapter
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	htmllib "html"
@@ -13,8 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-	"encoding/base64"
-"strings"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,29 +35,29 @@ var hashRowPatterns = []*regexp.Regexp{
 }
 
 var (
-	reNexusTitle          = regexp.MustCompile(`<title>([^<]+)</title>`)
-	reNexusRow            = regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
-	reNexusDDBlock        = regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
-	reNexusFallbackDiv    = regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
-	reNexusSubtitleDD     = regexp.MustCompile(`(?s)副标题</dt>\s*<dd>(.*?)</dd>`)
-	reNexusWhitespace     = regexp.MustCompile(`\s+`)
-	reNexusHashDD         = regexp.MustCompile(`(?i)Hash码</dt>\s*<dd>\s*([a-fA-F0-9]{40})`)
-	reNexusInfoHash       = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
-	reNexusKdescr         = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
-	reNexusDTDDBoundary   = regexp.MustCompile(`</d[t]>\s*<d[d]>`)
-	reNexusSizeValue      = regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|TiB|GiB|MiB|KiB)`)
-	reNexusImgAlt         = regexp.MustCompile(`<img[^>]*alt="([^"]+)"`)
-	reNexusCatLink        = regexp.MustCompile(`cat=\d+[^>]*>([^<]+)`)
-	reNexusRowFollow      = regexp.MustCompile(`(?s)class="rowfollow"[^>]*>(.*?)</td>`)
-	reNexusSeedersCount   = regexp.MustCompile(`(\d+)个做种者`)
-	reNexusLeechersCount  = regexp.MustCompile(`(\d+)个下载者`)
-	reNexusSeedersID      = regexp.MustCompile(`id=['"]seeders['"][^>]*>(?:<[^>]*>)*(\d+)`)
-	reNexusLeechersID     = regexp.MustCompile(`id=['"]leechers['"][^>]*>(?:<[^>]*>)*(\d+)`)
+	reNexusTitle         = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reNexusRow           = regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	reNexusDDBlock       = regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
+	reNexusFallbackDiv   = regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
+	reNexusSubtitleDD    = regexp.MustCompile(`(?s)副标题</dt>\s*<dd>(.*?)</dd>`)
+	reNexusWhitespace    = regexp.MustCompile(`\s+`)
+	reNexusHashDD        = regexp.MustCompile(`(?i)Hash码</dt>\s*<dd>\s*([a-fA-F0-9]{40})`)
+	reNexusInfoHash      = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reNexusKdescr        = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
+	reNexusDTDDBoundary  = regexp.MustCompile(`</d[t]>\s*<d[d]>`)
+	reNexusSizeValue     = regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|TiB|GiB|MiB|KiB)`)
+	reNexusImgAlt        = regexp.MustCompile(`<img[^>]*alt="([^"]+)"`)
+	reNexusCatLink       = regexp.MustCompile(`cat=\d+[^>]*>([^<]+)`)
+	reNexusRowFollow     = regexp.MustCompile(`(?s)class="rowfollow"[^>]*>(.*?)</td>`)
+	reNexusSeedersCount  = regexp.MustCompile(`(\d+)个做种者`)
+	reNexusLeechersCount = regexp.MustCompile(`(\d+)个下载者`)
+	reNexusSeedersID     = regexp.MustCompile(`id=['"]seeders['"][^>]*>(?:<[^>]*>)*(\d+)`)
+	reNexusLeechersID    = regexp.MustCompile(`id=['"]leechers['"][^>]*>(?:<[^>]*>)*(\d+)`)
 	// §59.159 词边界：防 userdetails.php 误命中（实战四次假成功真因——失败页用户导航链接）
-	reNexusErrorClass     = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
-	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
-	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
-	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details?\.php\?(?:id|group_id)=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
+	reNexusErrorClass    = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
+	reNexusErrorP        = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
+	reNexusBrowseLink    = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
+	reNexusBrowseAltLink = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details?\.php\?(?:id|group_id)=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
 	// §59.473: 海胆组行双层链接（group_id=N&torrent_id=M）——优先于
 	// altLink（altLink 捕组 id 会错投 tid·海胆搜索行实证）。仅含
 	// torrent_id 参数的行命中·其它站零影响。
@@ -71,7 +71,7 @@ var (
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
 	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
 	// §59.369 附二: torrent-content-tag 前缀（深度站 NP 新版前端标签形态）
-	reNexusTag            = regexp.MustCompile(`class="(?:tag|torrent-content-tag)[^"]*"[^>]*>([^<]+)`)
+	reNexusTag = regexp.MustCompile(`class="(?:tag|torrent-content-tag)[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg     = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
 	reBBCodeHTMLImg = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
@@ -83,10 +83,10 @@ var (
 type NexusPHPAdapter struct {
 	doer      *HTTPDoer
 	logger    *zap.Logger
-	engine    *extract.Engine    // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
-	browser   *browser.Fetcher   // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
-	listCache keepfrdsListCache  // §59.340 B: 列表页批次缓存（page=0 同 URL 批量去重）
-	hdwCache  keepfrdsListCache  // §59.510: hdwing 列表缓存（NP adapter 单例——与 keepfrds HTML 不同防互踩）
+	engine    *extract.Engine   // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
+	browser   *browser.Fetcher  // §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
+	listCache keepfrdsListCache // §59.340 B: 列表页批次缓存（page=0 同 URL 批量去重）
+	hdwCache  keepfrdsListCache // §59.510: hdwing 列表缓存（NP adapter 单例——与 keepfrds HTML 不同防互踩）
 }
 
 func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
@@ -177,7 +177,6 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	}
 	return data, nil
 }
-
 
 func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 	detailURL := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
@@ -288,12 +287,14 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 
 // enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页"标签"字段区块直提。
 // 判据演进（双正例对照实证 tid=173490 真禁转 vs tid=211544 非禁转）：
-//   ①纯文本（否）：顶部筛选器固定含"禁转"选项（checkbox+label 内包 a 链接，
-//     tag_id1=1 形态两区同现）→ 全量误判；②CSS 写法差异（弃）：样式巧合；
-//   ③class font-bold（次优）：表现层语义；④终案（字段区块定位）：详情页字段
-//     区块顺序固定"标题→副标题→标签→基本信息"——提取 >标签</div> 至
-//     >基本信息</div> 之间内容（该区块只含种子自身标签链接），区块内判
-//     "禁转"字符。字段区块名是页面数据结构语义（样式无关——用户结构化分析定案）。
+//
+//	①纯文本（否）：顶部筛选器固定含"禁转"选项（checkbox+label 内包 a 链接，
+//	  tag_id1=1 形态两区同现）→ 全量误判；②CSS 写法差异（弃）：样式巧合；
+//	③class font-bold（次优）：表现层语义；④终案（字段区块定位）：详情页字段
+//	  区块顺序固定"标题→副标题→标签→基本信息"——提取 >标签</div> 至
+//	  >基本信息</div> 之间内容（该区块只含种子自身标签链接），区块内判
+//	  "禁转"字符。字段区块名是页面数据结构语义（样式无关——用户结构化分析定案）。
+//
 // 首发/转载标签不消费——禁转才是拦发布语义。
 // §59.340 A: mainHTML 变参复用（同 keepfrds enrich——省憨憨站二次抓取）
 func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
@@ -395,10 +396,12 @@ var reHdwingNoTransferWords = regexp.MustCompile(`禁转|禁止转载|谢绝转�
 
 // enrichHdwingTransferFlags §59.510 hdwing（瓷器）share_rule 三态禁转采集。
 // 站方独有结构化转载规则列（列表行 img title·100 行采样三态分布 2%/32%/66%）：
-//   share_rule_1 = 禁止转载 → 硬禁转（Flags += "禁转"）
-//   share_rule_3 = 欢迎转载 → 可转（无操作）
-//   share_rule_255 = 其他情况(参考副标题及种子简介的标注语) → 软规则——
-//     副标题+简介扫词族（命中=禁转·未命中=可转）
+//
+//	share_rule_1 = 禁止转载 → 硬禁转（Flags += "禁转"）
+//	share_rule_3 = 欢迎转载 → 可转（无操作）
+//	share_rule_255 = 其他情况(参考副标题及种子简介的标注语) → 软规则——
+//	  副标题+简介扫词族（命中=禁转·未命中=可转）
+//
 // 判定收口：Flags += "禁转"（publish_torrents_handler 词集合消费契约同 hhan）。
 // 列表页锚定行（keepfrds 同构·批次缓存 10min·tid 不在第一页=无标记不误伤）。
 func (a *NexusPHPAdapter) enrichHdwingTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail, mainHTML ...string) {
@@ -561,7 +564,6 @@ func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *mod
 	}
 	// §59.162: keepfrds 发布时间提取收口在 enrichKeepfrdsTransferFlags（单点）
 
-
 	// §56.34 OpenCD 专用提取（音乐站 DOM 与标准 NexusPHP 差异大）
 	if isOpenCDDomain(config.Domain) {
 		return extractOpenCDDetail(html), html, nil
@@ -636,7 +638,7 @@ func (a *NexusPHPAdapter) fillMediaFromRawBlock(html string, detail *model.Torre
 	if preEnd < 0 {
 		return
 	}
-	raw := rest[preStart:preStart+preEnd]
+	raw := rest[preStart : preStart+preEnd]
 	// 剥 HTML 标签取纯文本（<pre> 内可能嵌 font/b 等）
 	text := stripTagsForPre(raw)
 	text = htmlEntityDecode(text)
@@ -1094,9 +1096,11 @@ var reHdwingCsrfMeta = regexp.MustCompile(`name="x-csrf" content="([a-f0-9]+)"`)
 // ① GET 详情页提 meta x-csrf
 // ② POST ajax_promotion.php（ids[]={tid}&csrf={token}·X-Requested-With）
 // ③ 响应 {"status":200,"message":{"{tid}":{"sp_state":"<img class=\"pro_free\" …
-//    title=\"免费\"/>","timeout":"…"}}}——class 词映射优惠档（pro_free=Free/
-//    pro_2free=2xFree/pro_50percent=50%/pro_30percent=30%/pro_2x=2xUp；
-//    timeout=限时截止·空=不限时——当前消费方 Level 即可·限时语义后续按需）。
+//
+//	title=\"免费\"/>","timeout":"…"}}}——class 词映射优惠档（pro_free=Free/
+//	pro_2free=2xFree/pro_50percent=50%/pro_30percent=30%/pro_2x=2xUp；
+//	timeout=限时截止·空=不限时——当前消费方 Level 即可·限时语义后续按需）。
+//
 // 实测（2026-11-10）：三 tid 全 pro_free 命中。
 func (a *NexusPHPAdapter) detectDiscountHdwing(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
 	base := config.Domain
@@ -2469,13 +2473,13 @@ var (
 	// §59.332: keepfrds 新版（NexusPHP tailwind/htmx——2026-10-05 改版，
 	// /api/user 下线+DOM 全换）。做种体积站方已不提供（页面体系全无展示——
 	// 首页/userdetails/mybonus/列表页汇总均无），SeedingSize 保持 0。
-	reKfNewSeedingCount        = regexp.MustCompile(`(?is)title=["']当前做种["'][^>]*>\s*</i>\s*(\d+)`)
-	reKfNewUploaded            = regexp.MustCompile(`(?i)class=["']?uploaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
-	reKfNewDownloaded          = regexp.MustCompile(`(?i)class=["']?downloaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
-	reKfNewRatio               = regexp.MustCompile(`(?is)color_ratio["']?>\s*分享率：?</span>\s*([\d.]+)`)
-	reKfNewBonus               = regexp.MustCompile(`(?i)id=["']?totalBonus["']?>([\d,.]+)`)
-	reLinkBonus                 = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
-	reYuanbaoBonus              = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
+	reKfNewSeedingCount = regexp.MustCompile(`(?is)title=["']当前做种["'][^>]*>\s*</i>\s*(\d+)`)
+	reKfNewUploaded     = regexp.MustCompile(`(?i)class=["']?uploaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
+	reKfNewDownloaded   = regexp.MustCompile(`(?i)class=["']?downloaded["']?>([\d.,]+\s*(?:PiB|TiB|GiB|MiB))`)
+	reKfNewRatio        = regexp.MustCompile(`(?is)color_ratio["']?>\s*分享率：?</span>\s*([\d.]+)`)
+	reKfNewBonus        = regexp.MustCompile(`(?i)id=["']?totalBonus["']?>([\d,.]+)`)
+	reLinkBonus         = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
+	reYuanbaoBonus      = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
 )
 
 func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -3452,7 +3456,6 @@ func extractMediaInfoFromBBCode(text string) string {
 	return ""
 }
 
-
 // extractFlagsFromStructured 只从结构化字段（标题/副标题/标签）提取禁转标记。
 // 不扫描简介正文，避免"禁转PTT"等误判（§56.37 合规修复）。
 func extractFlagsFromStructured(title, subtitle string, tags []string) []string {
@@ -3504,8 +3507,6 @@ func deriveSiteCode(domain string) string {
 	}
 	return strings.ToLower(parts[0])
 }
-
-
 
 // preflightUploadFormRe §59.176: 发布表单存在性信号——文件选择控件/takeupload
 // 提交端点/常见文件字段名（hdfans 实证：有权限页必含表单；帮助文本含
@@ -3594,7 +3595,6 @@ func stripTagsForPreflight(body string) string {
 	}
 	return text
 }
-
 
 // §59.494: NP 新版 CSRF _token 提取（优堡案——upload 表单 hidden
 // _token·Laravel 式）。GET upload 页正则提取；页面缺失/请求失败返回空

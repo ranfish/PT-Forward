@@ -26,10 +26,10 @@ type flushMockClient struct {
 
 func (m *flushMockClient) GetName() string                           { return "c1" }
 func (m *flushMockClient) GetRole() string                           { return "seeding" }
-func (m *flushMockClient) GetTransferTargetUID() uint                 { return 0 }
+func (m *flushMockClient) GetTransferTargetUID() uint                { return 0 }
 func (m *flushMockClient) GetID() uint                               { return 1 }
 func (m *flushMockClient) GetSharedPaths() []model.SharedPathMapping { return nil }
-func (m *flushMockClient) GetTorrentDir() string                      { return "" }
+func (m *flushMockClient) GetTorrentDir() string                     { return "" }
 func (m *flushMockClient) GetMainData(_ context.Context) (*model.Maindata, error) {
 	return m.maindata, m.maindataErr
 }
@@ -95,8 +95,8 @@ func (m *flushMockClient) GetTrackers(_ context.Context, _ string) ([]string, er
 }
 
 type flushMockProvider struct {
-	clients   map[uint]model.DownloaderClient
-	list     []uint
+	clients map[uint]model.DownloaderClient
+	list    []uint
 }
 
 func (p *flushMockProvider) Get(id uint) (model.DownloaderClient, error) {
@@ -144,9 +144,9 @@ func setupFlushTestDB(t *testing.T) *gorm.DB {
 func seedSubscription(t *testing.T, db *gorm.DB, scoringEnabled bool, include2xUp bool) uint {
 	t.Helper()
 	sub := &model.RSSSubscription{
-		Name:     "test-sub",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-sub",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          scoringEnabled,
@@ -288,9 +288,9 @@ func TestFlush_MaxActiveReached(t *testing.T) {
 	_ = e.Start(ctx)
 
 	sub := &model.RSSSubscription{
-		Name:     "test-sub",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-sub",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
@@ -327,7 +327,7 @@ func TestFlush_PushOne_HRProtect(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "hash1",
 		SiteName:       "site1",
 		TorrentID:      "42",
@@ -356,7 +356,7 @@ func TestFlush_PushOne_HRProtect(t *testing.T) {
 	e.recordMap[recordKey(1, "hash1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "hash1", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
-		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+		CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -385,7 +385,7 @@ func TestFlush_PushOne_TorrentExists(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "hash_exists",
 		SiteName:       "site1",
 		TorrentID:      "43",
@@ -412,7 +412,7 @@ func TestFlush_PushOne_TorrentExists(t *testing.T) {
 	e.recordMap[recordKey(1, "hash_exists")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "hash_exists", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
-		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+		CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -465,7 +465,7 @@ func TestFlush_CollectsOnlyFree(t *testing.T) {
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
-			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+			CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -574,7 +574,7 @@ func TestFlush_AssumeFreeSite(t *testing.T) {
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusPending,
 			SubscriptionID: fmt.Sprintf("%d", subID),
-			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+			CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -637,7 +637,7 @@ func TestFlush_AssumeFreeNotSet(t *testing.T) {
 	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
-		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+		CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -707,7 +707,7 @@ func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
 	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
-		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+		CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -813,7 +813,7 @@ func TestFlush_Sorting(t *testing.T) {
 		e.recordMap[recordKey(1, h)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: h, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
-			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+			CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -889,7 +889,7 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 		e.recordMap[recordKey(records[i].ClientUID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
 			ClientUID: records[i].ClientUID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
-			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
+			CreatedAt:      time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -970,9 +970,9 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 	_ = e.Start(ctx)
 
 	sub := &model.RSSSubscription{
-		Name:     "test-sub-sl",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-sub-sl",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
@@ -1095,14 +1095,14 @@ func TestFlush_DiskProtectBlocks(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientUID:           1,
+		ClientUID:          1,
 		Enabled:            true,
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     50,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "hash_dp",
 		SiteName:       "site1",
 		TorrentID:      "100",
@@ -1148,14 +1148,14 @@ func TestFlush_DiskProtectAllowsWhenSpaceOK(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientUID:           1,
+		ClientUID:          1,
 		Enabled:            true,
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "hash_ok",
 		SiteName:       "site1",
 		TorrentID:      "200",
@@ -1193,9 +1193,9 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	_ = e.Start(ctx)
 
 	sub := &model.RSSSubscription{
-		Name:     "test-sub",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-sub",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
@@ -1220,7 +1220,7 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	e.mu.Unlock()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "dr_hash",
 		SiteName:       "site1",
 		TorrentID:      "500",
@@ -1276,9 +1276,9 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	_ = e.Start(ctx)
 
 	sub := &model.RSSSubscription{
-		Name:     "test-sub",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-sub",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
@@ -1299,7 +1299,7 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	e.mu.Unlock()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		InfoHash:       "normal_hash",
 		SiteName:       "site1",
 		TorrentID:      "600",

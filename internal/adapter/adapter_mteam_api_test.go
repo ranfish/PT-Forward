@@ -125,7 +125,7 @@ func TestFetchItemsByAPI_OK(t *testing.T) {
 					"name": "Test Torrent FREE",
 					"size": 5640143360,
 					"status": map[string]interface{}{
-						"discount":         "FREE",
+						"discount":        "FREE",
 						"discountEndTime": "2026-06-10T00:00:00Z",
 					},
 				},

@@ -4,11 +4,12 @@
 // → 与现配置 diff 三分类 → 人工确认 → 落库（diff 确认是唯一写入路径）。
 //
 // diff 三分类（§59.147 用户定位修正：对不上=信号非异常）：
-//   matched  = 基线校准（label/value/语义全同）
-//   changed  = 改版信号（字段名变化/label 变化）
-//   added    = 新增选项（待标注——standard_keys 空，语义继承失败）
-//   removed  = 站方删除选项
-//   语义错位 = label 同 value 异 → kind=changed（首版适配审计信号）
+//
+//	matched  = 基线校准（label/value/语义全同）
+//	changed  = 改版信号（字段名变化/label 变化）
+//	added    = 新增选项（待标注——standard_keys 空，语义继承失败）
+//	removed  = 站方删除选项
+//	语义错位 = label 同 value 异 → kind=changed（首版适配审计信号）
 //
 // 语义继承：草稿只有站方 label/value——standard_keys/auto 按 label 从现配置继承
 // （新增选项无继承=待标注清单兜底，L3）。
@@ -300,11 +301,11 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 		"technical_info": model.FieldDomainTechInfo,
 		"pt_gen":         model.FieldDomainPTGen,
 		"dburl":          model.FieldDomainDoubanURL,
-		"imdbid":         model.FieldDomainIMDbID,   // §59.399: 学校站编号形态（仅收 tt4154756）
-		"doubanid":       model.FieldDomainDoubanID, // §59.399: 学校站编号形态（仅收纯数字）
+		"imdbid":         model.FieldDomainIMDbID,    // §59.399: 学校站编号形态（仅收 tt4154756）
+		"doubanid":       model.FieldDomainDoubanID,  // §59.399: 学校站编号形态（仅收纯数字）
 		"durl":           model.FieldDomainDoubanURL, // §59.404: 海胆豆瓣链接独有字段名（dburl 第三形态）
 		"url_douban":     model.FieldDomainDoubanURL, // §59.423: 天空豆瓣链接独立字段名（dburl 第四形态）
-		"team_suffix":    model.FieldDomainTeam,     // §59.404: 海胆制作组自由文本框（无 team_sel——文本框形态）
+		"team_suffix":    model.FieldDomainTeam,      // §59.404: 海胆制作组自由文本框（无 team_sel——文本框形态）
 	}
 	// §59.373: current 配置的文本域字段名优先（壹吧简介 name=b——
 	// 标准表无 b 恒 miss 致假"字段名改版"）；current 名页面存在才用。
@@ -336,7 +337,7 @@ func ParsePublishFormHTML(html string, currentFields map[string]string) *model.P
 	// offer 候选发布（checkbox——存在性记录；语义由 form_config.Offer 承载。
 	// §59.421: 站方字段名两形态优堡 asoffer/家园 offers——记录实际名）
 	for _, n := range []string{"asoffer", "offers"} {
-		if doc.Find("input[type='checkbox'][name='" + n + "']").Length() > 0 {
+		if doc.Find("input[type='checkbox'][name='"+n+"']").Length() > 0 {
 			draft.FormFields[model.FieldDomainOffer] = n
 			break
 		}
@@ -406,18 +407,18 @@ func MergeDraftWithCurrent(current, draft *model.PublishFormConfig) (*model.Publ
 		current = &model.PublishFormConfig{FormFields: map[string]string{}, ValueMappings: map[string][]model.FormValueMapping{}}
 	}
 	merged := &model.PublishFormConfig{
-		Enabled:      current.Enabled || draft.Enabled,
-		Framework:    draft.Framework,
-		PreAuditURL:  current.PreAuditURL, // 预检 URL 非站方 HTML 信息——继承现配置
+		Enabled:     current.Enabled || draft.Enabled,
+		Framework:   draft.Framework,
+		PreAuditURL: current.PreAuditURL, // 预检 URL 非站方 HTML 信息——继承现配置
 		// §59.421 回归审核修复：布尔开关继承（HTML 无此信息——改版 apply 不重置）。
 		// 既有缺口：Anonymous 自 §59.159 上线起 apply 改版会静默重置匿名开关；
 		// Offer 新增同款。两开关唯一写点=set-anonymous/set-offer 端点（§59.328
 		// 两写入口竞争同族——apply 是另一写点，不携带即重置）。
-		Anonymous: current.Anonymous,
-		Offer:     current.Offer,
-		FormFields:   map[string]string{},
+		Anonymous:     current.Anonymous,
+		Offer:         current.Offer,
+		FormFields:    map[string]string{},
 		ValueMappings: map[string][]model.FormValueMapping{},
-		TagConfig:    current.TagConfig,
+		TagConfig:     current.TagConfig,
 	}
 	diffs := []FormConfigDiffItem{}
 

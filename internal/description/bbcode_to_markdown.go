@@ -18,15 +18,16 @@ var (
 // 站方 description 禁图（markdownImagePattern 命中 ![](/<img 即 4001
 // 拒收）——本变体 [img] 整段剥除（截图走 images base64 字段）。
 // 复用 bbcodePatterns 正则集（单源），转换序列按肉丝契约定制：
-//   [img]            → 整段剥除（最先——防 URL 残留重组）
-//   [quote]          → > 行前缀（同款逻辑）
-//   [code]           → ``` 围栏（同款）
-//   [b]/[i]          → **/*（同款）
-//   [url=U]L         → [L](U)（同款）
-//   [url]U           → [U](U)（差异：不用 <$1> 尖括号形态——统一链接形态）
-//   [u]/[color]/[size]/[font]/[align] 族 → 剥壳保内容（差异：不产 HTML 标签）
-//   [spoiler]        → 剥壳保内容（差异：不产 <details> HTML）
-//   [list]/[*]       → - 列表（同款）
+//
+//	[img]            → 整段剥除（最先——防 URL 残留重组）
+//	[quote]          → > 行前缀（同款逻辑）
+//	[code]           → ``` 围栏（同款）
+//	[b]/[i]          → **/*（同款）
+//	[url=U]L         → [L](U)（同款）
+//	[url]U           → [U](U)（差异：不用 <$1> 尖括号形态——统一链接形态）
+//	[u]/[color]/[size]/[font]/[align] 族 → 剥壳保内容（差异：不产 HTML 标签）
+//	[spoiler]        → 剥壳保内容（差异：不产 <details> HTML）
+//	[list]/[*]       → - 列表（同款）
 func BBCodeToMarkdownNoImage(input string) string {
 	if input == "" {
 		return ""

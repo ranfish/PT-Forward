@@ -33,7 +33,7 @@ func (p *Pipeline) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 		HasHR:           event.HasHR,
 		PublishStatus:   model.CandidatePending,
 		Role:            role,
-		ClientUID: event.ClientUID,
+		ClientUID:       event.ClientUID,
 	}
 
 	if err := p.CreateCandidate(ctx, candidate); err != nil {

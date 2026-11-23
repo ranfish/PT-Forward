@@ -78,7 +78,7 @@ func TestRuleEvaluator_EvaluateRules_DeleteNum(t *testing.T) {
 	})
 	for i := 0; i < 3; i++ {
 		db.Create(&model.SeedingTorrentRecord{
-			ClientUID:  1,
+			ClientUID: 1,
 			InfoHash:  fmt.Sprintf("h%d", i),
 			SiteName:  "site1",
 			TorrentID: fmt.Sprintf("%d", i),
@@ -118,7 +118,7 @@ func TestRuleEvaluator_EvaluateRules_PriorityOrder(t *testing.T) {
 		DeleteNum:  0,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -149,7 +149,7 @@ func TestRuleEvaluator_EvaluateRules_EmptyConditions(t *testing.T) {
 		DeleteNum: 0,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -236,7 +236,7 @@ func TestEvalCondition_NumericOperators(t *testing.T) {
 		NumComplete: 42,
 	}
 	rec := model.SeedingTorrentRecord{
-		ClientUID:    1,
+		ClientUID:   1,
 		InfoHash:    "abc",
 		SiteName:    "site1",
 		TorrentID:   "1",

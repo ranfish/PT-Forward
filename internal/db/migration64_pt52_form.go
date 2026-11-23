@@ -9,8 +9,10 @@ import (
 // 资产（六槽映射）生成；29/243 凭证当前失效——实时比对延后（DryRun 纯
 // 本地组装先行验证，§59.370"组装层终点"）。
 // 槽位语义（NP 标准裸字段名——无 [4] 后缀无 data-mode）：
-//   type/medium_sel/codec_sel/audiocodec_sel/standard_sel/team_sel/tags[]
-//   +small_descr/descr/url(imdb)/uplver
+//
+//	type/medium_sel/codec_sel/audiocodec_sel/standard_sel/team_sel/tags[]
+//	+small_descr/descr/url(imdb)/uplver
+//
 // 关键映射决策：
 //   - type 404 纪录片：§59.376 双键教训（category.documentary+
 //     category.documentaries 并存——dict 单数/extended 复数分叉）
@@ -26,6 +28,7 @@ import (
 //   - tags 中文值：国语/粤语→audio 键、简中→chinese_subtitle（繁中/
 //     简繁/双语字幕同族 label-only 单键不重复）、DIY/官组；首发不存在
 //     ✓（转存禁勾首发铁律无风险）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(64, "pt52_publish_form_config", func(gormDB *gorm.DB) error {

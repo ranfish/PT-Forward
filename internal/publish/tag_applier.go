@@ -2,10 +2,11 @@
 //
 // 把 standard_keys 标准标签应用到 multipart 表单。
 // 4 种 Mode:
-//   taglist: 标准 NP tagList[] 数组
-//   checkbox_id: PTer 类 checkbox（tag_gf/tag_jz/...）
-//   checkbox_span: BTSchool span[] 数组
-//   independent_field: HDRoute 独立 input name
+//
+//	taglist: 标准 NP tagList[] 数组
+//	checkbox_id: PTer 类 checkbox（tag_gf/tag_jz/...）
+//	checkbox_span: BTSchool span[] 数组
+//	independent_field: HDRoute 独立 input name
 package publish
 
 import "github.com/ranfish/pt-forward/internal/model"

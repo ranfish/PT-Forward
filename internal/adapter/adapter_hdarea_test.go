@@ -43,9 +43,9 @@ func (s *hdareaShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	s.hits[file]++
 	return &http.Response{
 		StatusCode: 200, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(string(body))),
-		Request:    req,
+		Header:  http.Header{"Content-Type": []string{"application/json"}},
+		Body:    io.NopCloser(strings.NewReader(string(body))),
+		Request: req,
 	}, nil
 }
 
@@ -191,11 +191,11 @@ func TestHDAreaDownload(t *testing.T) {
 // TestHDAreaQueryEscape P1 锚（回归审核）：中文/&/空格关键词正确编码。
 func TestHDAreaQueryEscape(t *testing.T) {
 	cases := map[string]string{
-		"Dune":            "Dune",
-		"Dune Part Two":   "Dune+Part+Two",
-		"沙丘2":            "%E6%B2%99%E4%B8%982",
-		"Tom & Jerry":     "Tom+%26+Jerry",
-		"a=b?c":           "a%3Db%3Fc",
+		"Dune":          "Dune",
+		"Dune Part Two": "Dune+Part+Two",
+		"沙丘2":           "%E6%B2%99%E4%B8%982",
+		"Tom & Jerry":   "Tom+%26+Jerry",
+		"a=b?c":         "a%3Db%3Fc",
 	}
 	for in, want := range cases {
 		if got := urlQueryEscape(in); got != want {

@@ -33,6 +33,7 @@ import (
 //     中文译名）+DIY/国语/完结/分集；label-only 26 项
 //   - 字段：url+**pt_gen（文档称无——漂移修正）**+**technical_info
 //     （文档称无——漂移修正）**+descr；nfo 不配（13城教训）；无 uplver。
+//
 // 站规同垃圾堆系（<100MB 禁/upscale 禁/RMVB 禁/游戏候选制/Dupe
 // 媒介优先级+断种豁免）——发布预览人工把关。
 // 幂等：仅空值行写入。

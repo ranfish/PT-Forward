@@ -46,9 +46,9 @@ func (s *hxptShelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	s.hits[file]++
 	return &http.Response{
 		StatusCode: 200, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(string(body))),
-		Request:    req,
+		Header:  http.Header{"Content-Type": []string{"application/json"}},
+		Body:    io.NopCloser(strings.NewReader(string(body))),
+		Request: req,
 	}, nil
 }
 
@@ -210,9 +210,9 @@ func TestHxptGroupOfName(t *testing.T) {
 	}{
 		{"Movie 2026 1080p WEB-DL H264-UBWEB", "UBWEB"},
 		{"Movie 2026 1080p BluRay x265-cXcY@FRDS", "cXcY@FRDS"},
-		{"NoGroup Title", ""},          // 无 - 分隔
-		{"Title-Trailing Dash-", ""},   // 尾空
-		{"Has Space-Group Name", ""},   // 尾段含空格（非组形态）
+		{"NoGroup Title", ""},        // 无 - 分隔
+		{"Title-Trailing Dash-", ""}, // 尾空
+		{"Has Space-Group Name", ""}, // 尾段含空格（非组形态）
 	}
 	for _, c := range cases {
 		if got := hxptGroupOfName(c.in); got != c.want {
@@ -291,9 +291,9 @@ func (c *hxptUploadCapture) reply(req *http.Request) (*http.Response, error) {
 	}
 	return &http.Response{
 		StatusCode: status, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(c.respBody)),
-		Request:    req,
+		Header:  http.Header{"Content-Type": []string{"application/json"}},
+		Body:    io.NopCloser(strings.NewReader(c.respBody)),
+		Request: req,
 	}, nil
 }
 
@@ -468,10 +468,10 @@ func TestSiteBaseURL(t *testing.T) {
 	cases := []struct {
 		baseURL, domain, want string
 	}{
-		{"", "www.hxpt.org", "https://www.hxpt.org"},                                 // 裸域（标准形态）
-		{"https://hdarea.club/", "", "https://hdarea.club"},                         // BaseURL 优先
-		{"", "https://www.hxpt.org", "https://www.hxpt.org"},                        // ★ stats_sync 塞法（本案）
-		{"", "http://old.example.com", "http://old.example.com"},                    // http 协议域
+		{"", "www.hxpt.org", "https://www.hxpt.org"},             // 裸域（标准形态）
+		{"https://hdarea.club/", "", "https://hdarea.club"},      // BaseURL 优先
+		{"", "https://www.hxpt.org", "https://www.hxpt.org"},     // ★ stats_sync 塞法（本案）
+		{"", "http://old.example.com", "http://old.example.com"}, // http 协议域
 	}
 	for _, c := range cases {
 		cfg := &model.SiteConfig{BaseURL: c.baseURL, Domain: c.domain}

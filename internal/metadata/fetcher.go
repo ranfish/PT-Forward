@@ -1,23 +1,23 @@
 package metadata
 
 import (
-	"regexp"
-	"sync"
-		"github.com/ranfish/pt-forward/internal/imagehost"
-"github.com/ranfish/pt-forward/internal/fingerprint"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/imagehost"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/site"
-	"github.com/ranfish/pt-forward/internal/setting"
-	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/setting"
+	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -34,7 +34,7 @@ type Fetcher struct {
 	settingsRepo *setting.Repository
 
 	// §59.330 P4 补丁：IYUU 兜底最后候选错误（瞬态分类穿透链尾）
-	mu         sync.Mutex
+	mu          sync.Mutex
 	lastIYUUErr error
 
 	// §59.341 ②（方案 a）: PTGen 可行性回调——IYUU 候选循环内
@@ -764,13 +764,13 @@ func (f *Fetcher) buildMetadata(ctx context.Context, infoHash, siteName, torrent
 		// §59.542 刀3 补: 获取链声明过滤——回流声明（我方发布产物被
 		// 采集回来）在此剥除·与发布 handler 3105 同源词表。
 		Statement:       f.filterDecl(ctx, detail.Statement),
-		NoTransferUntil:   detail.NoTransferUntil, // §59.162 限时禁转让渡截止
-		Poster:            detail.PosterURL,
-		IMDbURL:           detail.IMDbURL,
-		DoubanURL:         detail.DoubanURL,
-		TMDbURL:           detail.TMDbURL,
-		FetchSource:       "rss_detail",
-		FetchedAt:         now,
+		NoTransferUntil: detail.NoTransferUntil, // §59.162 限时禁转让渡截止
+		Poster:          detail.PosterURL,
+		IMDbURL:         detail.IMDbURL,
+		DoubanURL:       detail.DoubanURL,
+		TMDbURL:         detail.TMDbURL,
+		FetchSource:     "rss_detail",
+		FetchedAt:       now,
 	}
 
 	meta.StandardType = f.normalizeCategory(detail.Category)
@@ -911,7 +911,6 @@ func (f *Fetcher) GetMetadataByHash(ctx context.Context, infoHash string) (*mode
 	return &meta, true
 }
 
-
 func containsFlag(flags []string, f string) bool {
 	for _, x := range flags {
 		if x == f {
@@ -935,9 +934,11 @@ func (f *Fetcher) PersistCoverageHit(ctx context.Context, infoHash, siteName, to
 // rehostMusicCover §59.485: 音乐封面转存 pixhost（系统资产固化）。
 // 唯一白名单=pixhost 系（用户定案：资产单一化——不依赖任何站点图床
 // 寿命·跨站通用·与影视截图"上传图床→URL 落库"同构）：
-//   已在 pixhost → 跳过（幂等·皇后新版面原生 pixhost 零成本）
-//   相对路径（皇后 attachments/ 站内附件）→ 绝对化后转存
-//   其余一切外域（musopia/picgo/免费床）→ 转存
+//
+//	已在 pixhost → 跳过（幂等·皇后新版面原生 pixhost 零成本）
+//	相对路径（皇后 attachments/ 站内附件）→ 绝对化后转存
+//	其余一切外域（musopia/picgo/免费床）→ 转存
+//
 // 失败降级：保留原 URL+Warn（发布链消费时发现非 pixhost 再试——刀 2）。
 // 影视种零触碰（Music 在场门控——发布现场下载零持久化铁律不变）。
 func (f *Fetcher) rehostMusicCover(ctx context.Context, detail *model.TorrentDetail, siteCfg *model.SiteConfig) {

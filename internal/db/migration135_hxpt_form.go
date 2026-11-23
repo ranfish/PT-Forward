@@ -10,8 +10,10 @@ import (
 // 410 details tid=23917 实态验证（视频/其他/1080p/其他/MKV/Other 七槽
 // 实填与用户描述完全一致）。
 // 站点形态：**NP 同名槽语义全面错位站**（全库最极端）——
-//   audiocodec_sel=年级（幼儿园~高三）/processing_sel=教材出版社版本/
-//   source_sel=发布年份/codec_sel=文件格式/medium_sel=内容形态。
+//
+//	audiocodec_sel=年级（幼儿园~高三）/processing_sel=教材出版社版本/
+//	source_sel=发布年份/codec_sel=文件格式/medium_sel=内容形态。
+//
 // 核心机制（用户定案，讨论终案）：
 //   - **站点级拦截**：hxptOnlyDocumentary（碟粉模式——非纪录片
 //     ineligible"仅接受纪录片特别通道"+DryRun 同拦）
@@ -42,6 +44,7 @@ import (
 //     standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
 //     technical_info+url（IMDb）+pt_gen+uplver；price（价格——站方
 //     付费资源机制）不配+nfo 不配（13城先例）
+//
 // 站规人工把关：纪录片特别通道规则（年级/版本恒其它）+官组非组员禁选。
 // 幂等：仅空值行写入。
 func init() {

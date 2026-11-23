@@ -3,14 +3,15 @@
 // 禁止在 pusher/executor/handler 自拼下载 URL）。
 //
 // 框架端点形态权威表（8 adapter 实测盘点）：
-//   NexusPHP : /download.php?id=N[&passkey=]  （signed 模式=POST 签名 URL；
-//              DownloadURLTemplate 站点覆盖优先——adapter 内分支）
-//   Generic  : 同 NP（本单点合并——原双副本 buildURL/buildGenericDownloadURL）
-//   Unit3D   : /torrents/download/{id} 或 /api/torrent/download/{id}（RSSKey）
-//   TNode    : /torrents.php?action=download&id=
-//   Gazelle  : /ajax.php?action=torrent&id=（authkey/rsskey）
-//   MTeam    : x-api-key JSON API → .torrent URL（全 API 族）
-//   YemaPT/Rousi: 特殊流程
+//
+//	NexusPHP : /download.php?id=N[&passkey=]  （signed 模式=POST 签名 URL；
+//	           DownloadURLTemplate 站点覆盖优先——adapter 内分支）
+//	Generic  : 同 NP（本单点合并——原双副本 buildURL/buildGenericDownloadURL）
+//	Unit3D   : /torrents/download/{id} 或 /api/torrent/download/{id}（RSSKey）
+//	TNode    : /torrents.php?action=download&id=
+//	Gazelle  : /ajax.php?action=torrent&id=（authkey/rsskey）
+//	MTeam    : x-api-key JSON API → .torrent URL（全 API 族）
+//	YemaPT/Rousi: 特殊流程
 package adapter
 
 import (

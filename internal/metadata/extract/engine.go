@@ -8,9 +8,9 @@ import (
 // Engine 提取器路由（§56.8）。
 // 先按 SiteCode/SiteNickname 查特殊提取器，失败或无意义 → fallback public。
 type Engine struct {
-	public           Extractor
-	specialByCode    map[string]Extractor
-	specialByNick    map[string]Extractor
+	public        Extractor
+	specialByCode map[string]Extractor
+	specialByNick map[string]Extractor
 }
 
 // NewEngine 创建 Engine。

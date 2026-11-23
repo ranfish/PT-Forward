@@ -71,21 +71,21 @@ type piggoNoticeGate struct {
 }
 
 type piggoItem struct {
-	ID             int64    `json:"id"`
-	Name           string   `json:"name"`
-	SmallDescr     string   `json:"small_descr"`
-	Cover          string   `json:"cover"`
-	Size           int64    `json:"size"`
-	SectionID      int      `json:"section_id"`
-	CategoryIDs    []int    `json:"category_ids"`
-	TaxonomyIDs    []int    `json:"taxonomy_ids"`
-	TagIDs         []int    `json:"tag_ids"`
+	ID             int64      `json:"id"`
+	Name           string     `json:"name"`
+	SmallDescr     string     `json:"small_descr"`
+	Cover          string     `json:"cover"`
+	Size           int64      `json:"size"`
+	SectionID      int        `json:"section_id"`
+	CategoryIDs    []int      `json:"category_ids"`
+	TaxonomyIDs    []int      `json:"taxonomy_ids"`
+	TagIDs         []int      `json:"tag_ids"`
 	Media          piggoMedia `json:"media"`
-	Seeders        int      `json:"seeders"`
-	Leechers       int      `json:"leechers"`
-	TimesCompleted int      `json:"times_completed"`
-	AddedAt        string   `json:"added_at"`
-	PageURL        string   `json:"page_url"`
+	Seeders        int        `json:"seeders"`
+	Leechers       int        `json:"leechers"`
+	TimesCompleted int        `json:"times_completed"`
+	AddedAt        string     `json:"added_at"`
+	PageURL        string     `json:"page_url"`
 }
 
 type piggoMedia struct {
@@ -96,12 +96,12 @@ type piggoMedia struct {
 }
 
 type piggoSearchResp struct {
-	Items      []piggoItem `json:"items"`
-	Page       int         `json:"page"`
-	Pages      int         `json:"pages"`
-	PerPage    int         `json:"per_page"`
-	Total      int         `json:"total"`
-	TotalCapped bool       `json:"total_capped"`
+	Items       []piggoItem `json:"items"`
+	Page        int         `json:"page"`
+	Pages       int         `json:"pages"`
+	PerPage     int         `json:"per_page"`
+	Total       int         `json:"total"`
+	TotalCapped bool        `json:"total_capped"`
 }
 
 type piggoMeResp struct {
@@ -112,9 +112,9 @@ type piggoMeResp struct {
 			Name string `json:"name"`
 		} `json:"class"`
 		Stats struct {
-			Bonus     json.Number `json:"bonus"`
-			Uploaded  string      `json:"uploaded"`
-			Downloaded string     `json:"downloaded"`
+			Bonus      json.Number `json:"bonus"`
+			Uploaded   string      `json:"uploaded"`
+			Downloaded string      `json:"downloaded"`
 		} `json:"stats"`
 	} `json:"user"`
 }
@@ -205,8 +205,8 @@ type piggoCatSection struct {
 }
 
 type piggoTaxonomy struct {
-	ID    int `json:"id"`
-	Name  string `json:"name"`
+	ID    int               `json:"id"`
+	Name  string            `json:"name"`
 	Items []piggoCatSection `json:"items"`
 }
 
@@ -292,13 +292,13 @@ func (a *PiggoAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 	detail := &model.TorrentDetail{
-		Title:       it.Name,
-		Subtitle:    it.SmallDescr,
-		Size:        it.Size,
-		PosterURL:   it.Cover,
-		IMDbID:      it.Media.IMDb,
-		DoubanID:    it.Media.Douban,
-		Tags:        a.tagNamesFor(ctx, config, it.TagIDs),
+		Title:     it.Name,
+		Subtitle:  it.SmallDescr,
+		Size:      it.Size,
+		PosterURL: it.Cover,
+		IMDbID:    it.Media.IMDb,
+		DoubanID:  it.Media.Douban,
+		Tags:      a.tagNamesFor(ctx, config, it.TagIDs),
 	}
 	if it.Media.IMDb != "" {
 		detail.IMDbURL = "https://www.imdb.com/title/" + it.Media.IMDb
@@ -705,9 +705,9 @@ func (a *PiggoAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	var env piggoEnvelope
 	var perr struct {
-		Message   string            `json:"message"`
+		Message   string              `json:"message"`
 		Errors    map[string][]string `json:"errors"`
-		TorrentID int64             `json:"torrent_id"`
+		TorrentID int64               `json:"torrent_id"`
 	}
 	_ = json.Unmarshal(rb, &env)
 	_ = json.Unmarshal(env.Data, &perr)

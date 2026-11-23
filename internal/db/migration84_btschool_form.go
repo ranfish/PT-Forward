@@ -39,6 +39,7 @@ import (
 //     编号提取功能另案实施）；无 pt_gen/url/technical_info
 //   - 标题只能英文/数字/拼音禁中文（v1.05 英文重组天然合规——
 //     大青虫同款）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(84, "btschool_publish_form_config", func(gormDB *gorm.DB) error {

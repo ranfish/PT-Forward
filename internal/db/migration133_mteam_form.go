@@ -48,9 +48,12 @@ import (
 //     （anonymous 走 API boolean 非 NP checkbox）；bangumi（spec 新增）
 //     发布链无域不配（熊猫 tmdb 定案）；offer 候选 ID 非候选流程不写；
 //     nfo/tags 自定义字符串不投递。
+//
 // 站规人工把关：上传规则（§15——双倍上传/候选审核/软件游戏病毒扫描）+
-//   标题规范（§14 wiki 分模板）+100GB 音乐区发布码+成人 15 叶发布层
-//   拦截在前（§59.222）。
+//
+//	标题规范（§14 wiki 分模板）+100GB 音乐区发布码+成人 15 叶发布层
+//	拦截在前（§59.222）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(133, "mteam_publish_form_config", func(gormDB *gorm.DB) error {

@@ -38,6 +38,7 @@ import (
 //     语义——末日 480p→sd 先例；无 SD 独立项）
 //   - url IMDb 真字段（url×2 按钮同款）；preview/bonus_sticky/
 //     bonus_free 付费_boost 字段不配
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(89, "haidan_publish_form_config", func(gormDB *gorm.DB) error {

@@ -165,7 +165,6 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 	}
 }
 
-
 // filterIPv4 从地址列表提取 IPv4（To4 非 nil）。
 func filterIPv4(addrs []net.IPAddr) []net.IPAddr {
 	var out []net.IPAddr

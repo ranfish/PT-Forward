@@ -10,9 +10,9 @@
 //   - ReassembleFromTechProfile：Canonical → TitleForm
 //
 // 核心不变量（round-trip，dict_consistency_test.go 持续护航）：
-//   parse(reassemble(profile)) == profile
+//
+//	parse(reassemble(profile)) == profile
 package titleparser
-
 
 // compileToken 编译 token pattern（长 token 在前由 dict 文件顺序保证）。
 // re() 方法在 dict_loader.go（v2：CaseSensitive 支持）。

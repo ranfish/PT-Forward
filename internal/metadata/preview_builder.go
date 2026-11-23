@@ -46,10 +46,11 @@ func (b *PreviewBuilder) BuildPreviewFromMeta(
 }
 
 // Build 从 MergedMetadata 构建预览响应。
-//   merged: 三源合并后的元数据
-//   userOverrides: 用户编辑覆盖（字段名 → 用户值）
-//   targetSite: 目标站名（用于标注）
-//   mode: 合并模式（ptgen_first/detail_first）
+//
+//	merged: 三源合并后的元数据
+//	userOverrides: 用户编辑覆盖（字段名 → 用户值）
+//	targetSite: 目标站名（用于标注）
+//	mode: 合并模式（ptgen_first/detail_first）
 func (b *PreviewBuilder) Build(
 	merged *MergedMetadata,
 	userOverrides map[string]string,

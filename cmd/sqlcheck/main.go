@@ -3,12 +3,15 @@
 // AssignmentColumns/Pluck/Exec/Raw 片段），在 AutoMigrate 后的空库上合成 SQL 逐条 EXPLAIN
 // ——no such column 即运行时地雷（编译器双盲区：map 键与原生 SQL 字符串）。
 // 已知假阳性（默认白名单跳过）：
-//   1. internal/db/migration*.go 与 internal/model/migrate.go 的 Exec——条件迁移 SQL
-//      （先 pragma 检查旧列存在才执行，空库必报=设计如此）
-//   2. download_handler.go:585 / reseed_handler.go:469——子查询参数与变量持有 builder 的
-//      片段缝合（真实 SQL 合法，人工已核）
+//  1. internal/db/migration*.go 与 internal/model/migrate.go 的 Exec——条件迁移 SQL
+//     （先 pragma 检查旧列存在才执行，空库必报=设计如此）
+//  2. download_handler.go:585 / reseed_handler.go:469——子查询参数与变量持有 builder 的
+//     片段缝合（真实 SQL 合法，人工已核）
+//
 // 已知假阴性：变量持有 query builder（q:=db.Model(); q=q.Where()）不跟踪；
-//   Clauses+Create（无 Model 调用）的 clause.Column 不验证（表名静态不可得）。
+//
+//	Clauses+Create（无 Model 调用）的 clause.Column 不验证（表名静态不可得）。
+//
 // 用法：go run ./cmd/sqlcheck [目录=internal]  ——suspects 非 0 即存在真实列引用地雷。
 package main
 

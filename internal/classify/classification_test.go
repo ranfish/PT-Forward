@@ -35,7 +35,7 @@ func TestClassifyTorrent_Title(t *testing.T) {
 		{"range not from E01 2", "Ren.Yu.S01E11-E12.2026.2160p", "tv_series", "partial_pack"},
 
 		// S01 无 E 无 Complete = unknown（CHDBits/HHanClub 模式）
-		{"S01 no E ambiguous", "The.Eternal.Fragrance.S01.2026.2160p.WEB-DL.H265.AAC-CHDWEB", "tv_series", "season_pack"}, // §59.514: v1.05 S01=单季合集声明
+		{"S01 no E ambiguous", "The.Eternal.Fragrance.S01.2026.2160p.WEB-DL.H265.AAC-CHDWEB", "tv_series", "season_pack"},     // §59.514: v1.05 S01=单季合集声明
 		{"S01 no E ambiguous 2", "Evil Hunter S01 2026 2160p WEB-DL H265 DV DDP5.1 Atmos-CHDWEB", "tv_series", "season_pack"}, // §59.514: v1.05 S01=单季合集声明
 
 		// 中文标记

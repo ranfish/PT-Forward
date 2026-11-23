@@ -35,6 +35,7 @@ import (
 //     杜比视界=[dolby_vision]；首发铁律+官方(3) 雷区 label-only。
 //   - 字段：url+pt_gen（四来源）+technical_info+uplver+anonymous:true
 //     （§59.422 附二默认）；nfo 不配（13城定案——实时有 nfo file 控件）。
+//
 // 站规人工把关：转发规则（不得去掉原创组标识/严禁转独占禁转限转）+
 // <100MB 禁/upscale 禁/RMVB 禁/硬盘版高压版游戏禁/RAR 禁/游戏上传员
 // 等级/dupe（断种 45 天·18 个月豁免）/候选制（导航栏有入口）。

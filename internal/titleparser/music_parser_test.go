@@ -64,13 +64,13 @@ func TestReassembleMusic_PlainEnglish(t *testing.T) {
 
 func TestReassembleMusic_WithBitDepthSampleRate(t *testing.T) {
 	p := TechProfile{
-		Artist:       "Adele",
-		Album:        "25",
-		Year:         "2015",
-		AudioCodec:   "FLAC",
+		Artist:        "Adele",
+		Album:         "25",
+		Year:          "2015",
+		AudioCodec:    "FLAC",
 		AudioBitDepth: "24",
-		SampleRate:   "96.0",
-		ReleaseGroup: "GRP",
+		SampleRate:    "96.0",
+		ReleaseGroup:  "GRP",
 	}
 	tf := TitleFormat{Separator: " "}
 	r := ReassembleFromTechProfile(p, tf)

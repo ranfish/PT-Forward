@@ -67,11 +67,11 @@ func TestSeedData_IsMeaningful(t *testing.T) {
 
 func TestSeedData_NormalizeWithFallback(t *testing.T) {
 	seed := SeedData{
-		Title:   "  电影  ",
+		Title:    "  电影  ",
 		Subtitle: "  ",
-		Intro:   IntroData{Body: "  正文  "},
-		Tags:    nil,
-		Flags:   nil,
+		Intro:    IntroData{Body: "  正文  "},
+		Tags:     nil,
+		Flags:    nil,
 	}
 	got := seed.NormalizeWithFallback("fallback title")
 

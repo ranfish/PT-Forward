@@ -54,7 +54,10 @@ func TestReassemble_PlatformMediumDedup(t *testing.T) {
 // （BTV Vortex/EBCTV Mr.Vampire "HDTV HDTV" 案）
 func TestReassemble_SourceSpecDedup(t *testing.T) {
 	tf := V105TitleFormat()
-	cases := []struct{ name string; p TechProfile }{
+	cases := []struct {
+		name string
+		p    TechProfile
+	}{
 		{"BTV", TechProfile{MainTitle: "Vortex", Year: "2019", Resolution: "1080p",
 			SourcePlatform: "BTV", SourceType: "HDTV", Specification: "HDTV",
 			VideoCodec: "H264", AudioCodec: "AAC"}},

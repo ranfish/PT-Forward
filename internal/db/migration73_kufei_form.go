@@ -14,6 +14,7 @@ import (
 //   - **Encode 值=18 非 17**（sites.json 抄错值——17 缺失跳号处错读；
 //     value 级错误比 label 更严重，提交值错误）
 //   - tags 15 濒危 实时新增（sites.json 13 项无）
+//
 // 槽位特化：
 //   - **无 url/imdb、无 technical_info 字段**（实时 HTML input 全集
 //     实证——文档 §7.1/7.2 正确）；有 pt_gen（4 源）+uplver
@@ -38,6 +39,7 @@ import (
 //     国语/中字/DIY/完结配键+HDR/动漫/音乐/书籍/应求/游戏/濒危
 //     label-only
 //   - 分叉族双键即防：404 纪录+406 MV
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(73, "kufei_publish_form_config", func(gormDB *gorm.DB) error {

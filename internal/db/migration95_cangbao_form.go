@@ -44,6 +44,7 @@ import (
 //   - 站规注记：剧集转载必须完结标签严禁分集（官组除外）+低于 1080p
 //     电影慎重+多季合集四统一（分辨率/格式/制作组/完整性）+音乐/
 //     书籍豁免质量字段——发布预览人工把关。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(95, "cangbao_publish_form_config", func(gormDB *gorm.DB) error {

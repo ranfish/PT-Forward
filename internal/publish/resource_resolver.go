@@ -16,10 +16,10 @@ import (
 
 // ResourceView 一个资源的完整数据视图。
 type ResourceView struct {
-	ClientUID uint    // §59.251: 资源键：下载器恒定 ID
-	SavePath string   // 资源键：目录（Clean 形态）
-	Name     string   // 资源键：下载器种子名
-	Hashes   []string // 该资源键下全部活跃（hidden=0）hash
+	ClientUID uint     // §59.251: 资源键：下载器恒定 ID
+	SavePath  string   // 资源键：目录（Clean 形态）
+	Name      string   // 资源键：下载器种子名
+	Hashes    []string // 该资源键下全部活跃（hidden=0）hash
 	// Meta 挂 metadata 的行经选行后的结果（selectSourceMeta 语义：制作组映射
 	// 源站优先，否则 updated_at 最新）。nil = 资源无元数据（真未获取）。
 	Meta *model.TorrentMetadata
@@ -42,9 +42,12 @@ func NewResourceResolver(db *gorm.DB) *ResourceResolver {
 // ResolveResource 按任意 hash 解析其所属资源的完整视图。
 //
 // 主路径：hash → 活跃快照行的 (client, path, name) → 圈该三元组全部活跃 hash
-//        → 挂 metadata 的行 → 选行。
+//
+//	→ 挂 metadata 的行 → 选行。
+//
 // 兜底（FromFallback）：hash 无活跃快照行（编辑期间种子被删，hidden）→
-//        hash 直查 metadata（"资源已消失但数据还在"语义，允许查看/保存）。
+//
+//	hash 直查 metadata（"资源已消失但数据还在"语义，允许查看/保存）。
 //
 // 返回 nil = 主路径与兜底都无数据（真未获取且不在下载器）。
 func (rr *ResourceResolver) ResolveResource(ctx context.Context, infoHash string) *ResourceView {
@@ -61,8 +64,8 @@ func (rr *ResourceResolver) ResolveResource(ctx context.Context, infoHash string
 	if err == nil && snap.Name != "" {
 		rv := &ResourceView{
 			ClientUID: snap.ClientUID,
-			SavePath: snap.SavePath,
-			Name:     snap.Name,
+			SavePath:  snap.SavePath,
+			Name:      snap.Name,
 		}
 		// 圈资源键下全部活跃 hash
 		rr.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).

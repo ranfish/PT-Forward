@@ -2,8 +2,8 @@ package reseed
 
 import (
 	"fmt"
-	"testing"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"testing"
 )
 
 func TestDebugConflictPath(t *testing.T) {

@@ -49,11 +49,14 @@ import (
 //     standard_sel/team_sel/small_descr/descr+url（IMDb——label
 //     "IMDb链接"实证）+uplver；**无 pt_gen/technical_info**（实证）
 //     +nfo 不配（13城先例）。
+//
 // 站规人工把关：**影视剧类全站禁止**（稀有/有价值例外）+FGT 小组
-//   黑名单+mp4ba 水印禁+合集优先有合集不发单集+CAM/TS/SCR/R5 低画质
-//   禁+RAR 分卷（Scene 影视须解压）+教育类简介开头必须一张图+视频类
-//   MI/截图二选一+英文 0day 主标题+中文副标题+首发组专用
-//   [TorrentCCF首发] 标记。
+//
+//	黑名单+mp4ba 水印禁+合集优先有合集不发单集+CAM/TS/SCR/R5 低画质
+//	禁+RAR 分卷（Scene 影视须解压）+教育类简介开头必须一张图+视频类
+//	MI/截图二选一+英文 0day 主标题+中文副标题+首发组专用
+//	[TorrentCCF首发] 标记。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(132, "et8_publish_form_config", func(gormDB *gorm.DB) error {

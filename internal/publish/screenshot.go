@@ -169,7 +169,7 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 			AvgFrameRate   string `json:"avg_frame_rate"`
 			ColorTransfer  string `json:"color_transfer"`
 			ColorPrimaries string `json:"color_primaries"`
-			SideDataList []struct {
+			SideDataList   []struct {
 				SideDataType string `json:"side_data_type"`
 				DVProfile    int    `json:"dv_profile"`
 			} `json:"side_data_list,omitempty"`

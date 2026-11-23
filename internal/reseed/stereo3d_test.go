@@ -19,9 +19,9 @@ func TestExtractStereo3D(t *testing.T) {
 		{"Movie.3D.2014.BluRay.1080p.H-OU.x264-GRP", "HOU"},
 		{"Movie.3D.2014.BluRay.1080p.Half.OU.x264-GRP", "HOU"},
 		{"Movie.3D.2014.BluRay.1080p.SBS.x264-GRP", "SBS"},
-		{"Movie.3D.2014.BluRay.1080p.FSBS.x264-GRP", ""}, // FSBS 不匹配（F 前缀无界）
-		{"Movie.3D.2014.BluRay.1080p.x264-GRP", ""},      // 无封装词
-		{"Movie.3D.2014.BluRay.1080p.x264-GRP", ""},      // "3D" 泛词不算
+		{"Movie.3D.2014.BluRay.1080p.FSBS.x264-GRP", ""},    // FSBS 不匹配（F 前缀无界）
+		{"Movie.3D.2014.BluRay.1080p.x264-GRP", ""},         // 无封装词
+		{"Movie.3D.2014.BluRay.1080p.x264-GRP", ""},         // "3D" 泛词不算
 		{"Miss.You.Already.2014.BluRay.1080p.x264-GRP", ""}, // You 尾词不误判 OU
 	}
 	for _, c := range cases {

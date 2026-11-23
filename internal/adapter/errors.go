@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	ErrAdapterNetwork         = 31001
-	ErrAdapterHTTP            = 31002
-	ErrAdapterParse           = 31003
-	ErrAdapterUpload          = 31004
-	ErrAdapterDownload        = 31005
-	ErrAdapterNotFound        = 31006
-	ErrAdapterConfig          = 31007
-	ErrAdapterAuth            = 31008
-	ErrAdapterRateLimit       = 31009
-	ErrAdapterSearch          = 31010
-	ErrAdapterWAFBlocked      = 31011
+	ErrAdapterNetwork           = 31001
+	ErrAdapterHTTP              = 31002
+	ErrAdapterParse             = 31003
+	ErrAdapterUpload            = 31004
+	ErrAdapterDownload          = 31005
+	ErrAdapterNotFound          = 31006
+	ErrAdapterConfig            = 31007
+	ErrAdapterAuth              = 31008
+	ErrAdapterRateLimit         = 31009
+	ErrAdapterSearch            = 31010
+	ErrAdapterWAFBlocked        = 31011
 	ErrAdapterCredentialExpired = 31012
 )
 

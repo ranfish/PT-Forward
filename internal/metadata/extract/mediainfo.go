@@ -42,7 +42,7 @@ var (
 var (
 	mediaInfoGeneralAnchor    = regexp.MustCompile("(?is)\\bGeneral\\s*(?:\\r?\\n|\\s{2,})\\s*Unique ID\\b")
 	mediaInfoSectionStartLine = regexp.MustCompile(`(?im)^\s*(General|Video|Audio|Text|Menu|Chapters)\s*$`)
-	bdInfoDiscAnchor           = regexp.MustCompile("(?is)\\bDISC INFO\\b")
+	bdInfoDiscAnchor          = regexp.MustCompile("(?is)\\bDISC INFO\\b")
 	bdInfoSectionStartLine    = regexp.MustCompile(`(?im)^\s*(DISC INFO|PLAYLIST REPORT|QUICK SUMMARY|FILES:|CHAPTERS:|DISC SIZE)\s*$`)
 	mediaInfoSectionHeader    = regexp.MustCompile(`(?im)^\s*(General|Video|Audio|Text|Menu|Chapters)(\s*#\d+)?\s*$`)
 	quoteContentRe            = regexp.MustCompile(`(?is)\[quote(?:=[^\]]*)?\](.*?)\[/quote\]`)
@@ -168,10 +168,11 @@ func isLikelyMediaInfoText(text string) bool {
 // §59.319 附四公共化：fetcher 归位路径判定 detail.MediaInfo 是否实为
 // BDInfo 文本（站方原盘常把 BDInfo 贴 mediainfo 字段/描述）。
 // §59.348 v2 三重门（水手服案——弱词单命中伪纳声明文本）：
-//  ① 专属字段锚必需：Disc Title/Disc Label（两形态统一）或大段头
-//     （DISC INFO/PLAYLIST REPORT/QUICK SUMMARY）——声明/简介不出现
-//  ② 字段行结构计数 ≥3（工具输出的标准字段序列）
-//  ③ 长度 ≥200B（物理下限）
+//
+//	① 专属字段锚必需：Disc Title/Disc Label（两形态统一）或大段头
+//	   （DISC INFO/PLAYLIST REPORT/QUICK SUMMARY）——声明/简介不出现
+//	② 字段行结构计数 ≥3（工具输出的标准字段序列）
+//	③ 长度 ≥200B（物理下限）
 //
 // 边界（§59.348 落盘记录）：Remux 种详情页贴源盘 BDInfo 片段（真文本）
 // 本判定无法拒（文本为真）——本地场景由 fetcher C 互斥门拦截

@@ -24,8 +24,8 @@ func TestRepushConverge(t *testing.T) {
 	}
 	seed := []model.PublishResultRecord{
 		{TargetSite: "好大", TorrentID: "449228", Status: "duplicate", Seeded: false}, // Caddo 案形态（同调用 tid）
-		{TargetSite: "好大", TorrentID: "449228", Status: "uploaded", Seeded: false}, // 漏种行形态
-		{TargetSite: "好大", TorrentID: "449228", Status: "duplicate", Seeded: true}, // 已收敛行（幂等）
+		{TargetSite: "好大", TorrentID: "449228", Status: "uploaded", Seeded: false},  // 漏种行形态
+		{TargetSite: "好大", TorrentID: "449228", Status: "duplicate", Seeded: true},  // 已收敛行（幂等）
 		{TargetSite: "瓷器", TorrentID: "449228", Status: "duplicate", Seeded: false}, // 异站同 tid 不动
 	}
 	for i := range seed {
@@ -45,7 +45,7 @@ func TestRepushConverge(t *testing.T) {
 		byID[r.ID] = r
 	}
 	// ① duplicate 行（tid=446950）：seeded 置位·status 保持 duplicate
-	r1 := byID[seed[0].ID]  // tid=449228 与调用一致
+	r1 := byID[seed[0].ID] // tid=449228 与调用一致
 	if r1.Status != "duplicate" || !r1.Seeded {
 		t.Errorf("duplicate 行: status=%q seeded=%v want duplicate/true", r1.Status, r1.Seeded)
 	}

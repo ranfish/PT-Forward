@@ -41,9 +41,9 @@ func MergeTags(existing, inferred []string) []string {
 }
 
 // ApplyTagRules 应用互斥/覆盖规则。
-//   1. 覆盖规则：hdr10_plus 存在时移除 hdr10
-//   2. 互斥规则：互斥组内仅保留首个命中的
-//   3. 去重去空
+//  1. 覆盖规则：hdr10_plus 存在时移除 hdr10
+//  2. 互斥规则：互斥组内仅保留首个命中的
+//  3. 去重去空
 func ApplyTagRules(tags []string) []string {
 	if len(tags) == 0 {
 		return nil

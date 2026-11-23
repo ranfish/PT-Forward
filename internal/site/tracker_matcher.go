@@ -13,7 +13,7 @@ import (
 // 移植自 PTNexus refreshSiteMatcher（refresh_sync.go:507）。
 // 匹配策略：
 //  1. 精确域名匹配（hostMap[完整域名] → 站点名）
-//   2. 核心域名匹配（uniqueCoreMap[核心域名] → 站点名，仅保留唯一映射）
+//  2. 核心域名匹配（uniqueCoreMap[核心域名] → 站点名，仅保留唯一映射）
 type TrackerMatcher struct {
 	hostMap       map[string]string
 	uniqueCoreMap map[string]string

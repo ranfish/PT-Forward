@@ -123,7 +123,7 @@ func TestMarkCrossSeeded(t *testing.T) {
 	s := &Scanner{db: db, logger: zap.NewNop()}
 
 	db.Create(&model.OrphanCrossSeedRecord{ClientUID: 1, OrphanPath: "/p/a", InfoHash: "h1", SeededPath: "/other/a"})
-	db.Create(&model.OrphanCrossSeedRecord{ClientUID: 9, OrphanPath: "/p/b", InfoHash: "h2", SeededPath: "/other/b"}) // client 未匹配
+	db.Create(&model.OrphanCrossSeedRecord{ClientUID: 9, OrphanPath: "/p/b", InfoHash: "h2", SeededPath: "/other/b"})    // client 未匹配
 	db.Create(&model.OrphanCrossSeedRecord{ClientUID: 1, OrphanPath: "/p/gone", InfoHash: "h3", SeededPath: "/other/c"}) // 数据已删
 
 	orphans := []Entry{

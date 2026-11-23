@@ -12,9 +12,9 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
-	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -1394,5 +1394,5 @@ func TestRetryBlockedStates(t *testing.T) {
 // testRetryConsumer §59.174 测试用最小 Consumer。
 type testRetryConsumer struct{ fn func(*pusher.PushedEvent) }
 
-func (c *testRetryConsumer) ID() string                                { return "test-retry" }
+func (c *testRetryConsumer) ID() string                                           { return "test-retry" }
 func (c *testRetryConsumer) OnPushed(ctx context.Context, ev *pusher.PushedEvent) { c.fn(ev) }

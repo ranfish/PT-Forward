@@ -1,13 +1,13 @@
 package ptgen
 
 import (
-	"regexp"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 

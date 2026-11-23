@@ -32,6 +32,7 @@ import (
 //     铁律+官方 label-only（雷区）
 //   - 字段：url（IMDb data-pt-gen）+pt_gen+nfo+technical_info+uplver
 //     全齐；price/pos_state/pos_state_until 促销字段不配（站方默认值）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(88, "gtk_publish_form_config", func(gormDB *gorm.DB) error {

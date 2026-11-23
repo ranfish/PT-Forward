@@ -396,7 +396,6 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 	return re, nil
 }
 
-
 // rssDiscountLineRe §59.456: PeerGo 系 feed 的优惠行（站方
 // promotionLabel 中文集：免费/2× 上传/2× 上传 / 免费/50% 下载/
 // 2× 上传 / 50% 下载/30% 下载——rss/service.go promotionLabel 权威）。

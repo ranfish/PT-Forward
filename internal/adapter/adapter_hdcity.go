@@ -18,14 +18,15 @@ import (
 // "先上传种子文件再填表单"站（NexusPHP 深度定制 ProCity 主题）。
 //
 // 流程（用户授权第一步实测 2026-11-02 解明）：
-//   ① GET /upload → 解析第一步表单（vf+日期动态字段/uid/domainname/
-//     跨域 action=接收器 URL 含 spm 参数）
-//   ② POST 种子文件到跨域接收器（hctres.leniter.org/upload_receiver.php）
-//     携带 vf/uid/domainname/citeid=0/name → 302 Location 携带
-//     tfu/tn/f/s/n/ih/citeid 参数（协议相对 //hdcity.city/upload?...）
-//   ③ POST 第二步表单到 /upload?tfu=...（action=当前 URL 含查询参数——
-//     无 file 字段，种子信息经 hidden infohash/listtype/ressize/
-//     filecount 传递；vf 字段沿用第一步值——表单页 GET 时同 session）
+//
+//	① GET /upload → 解析第一步表单（vf+日期动态字段/uid/domainname/
+//	  跨域 action=接收器 URL 含 spm 参数）
+//	② POST 种子文件到跨域接收器（hctres.leniter.org/upload_receiver.php）
+//	  携带 vf/uid/domainname/citeid=0/name → 302 Location 携带
+//	  tfu/tn/f/s/n/ih/citeid 参数（协议相对 //hdcity.city/upload?...）
+//	③ POST 第二步表单到 /upload?tfu=...（action=当前 URL 含查询参数——
+//	  无 file 字段，种子信息经 hidden infohash/listtype/ressize/
+//	  filecount 传递；vf 字段沿用第一步值——表单页 GET 时同 session）
 //
 // tfu 实效短（实测 ~10 分钟过期——过期后 GET 返回 ASCII art 彩蛋页
 // 无表单），第二步紧跟第一步即可。

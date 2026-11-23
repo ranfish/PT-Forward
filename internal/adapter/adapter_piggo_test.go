@@ -5,9 +5,9 @@ package adapter
 // （§59.1339 教训：验证样例必须真实数据源）。
 
 import (
-	"fmt"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -83,9 +83,9 @@ func TestPiggoPublishDedup(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"code": 422,
 			"data": map[string]any{
-				"message":     "种子已存在 #57218",
-				"errors":      map[string][]string{"file": {"种子已存在 #57218"}},
-				"torrent_id":  57218,
+				"message":    "种子已存在 #57218",
+				"errors":     map[string][]string{"file": {"种子已存在 #57218"}},
+				"torrent_id": 57218,
 			},
 		})
 	})
@@ -216,7 +216,7 @@ func TestPiggoPublishTaglistKey(t *testing.T) {
 	_, err := a.UploadTorrent(context.Background(), piggoCfg(srv.URL), &model.PublishRequest{
 		Title: "t", Subtitle: "s", Description: "d", MediaInfo: "mi",
 		TorrentData: []byte("xx"),
-		FormFields: map[string]string{"section_id": "1", "category_ids": "[3]"},
+		FormFields:  map[string]string{"section_id": "1", "category_ids": "[3]"},
 		// taglist 模式 applier 产出形态（executor 真相源——key="tagList"）
 		TagArrayFields: []model.TagKV{
 			{Key: "tagList", Value: "4"}, // 中字

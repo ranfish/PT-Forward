@@ -46,14 +46,14 @@ Title            : Commentary by James M
 // 行·canonical 身份层不动——26 行 off-spec 输出修复）。
 func TestReassembleDTSESTitleForm(t *testing.T) {
 	p := TechProfile{
-		MainTitle:    "Movie",
-		Year:         "2020",
-		Resolution:   "1080p",
-		SourceType:   "BluRay",
-		VideoCodec:   "x265",
-		AudioCodec:   "DTS-ES",
+		MainTitle:     "Movie",
+		Year:          "2020",
+		Resolution:    "1080p",
+		SourceType:    "BluRay",
+		VideoCodec:    "x265",
+		AudioCodec:    "DTS-ES",
 		AudioChannels: "6.1",
-		ReleaseGroup: "GRP",
+		ReleaseGroup:  "GRP",
 	}
 	rt := ReassembleFromTechProfile(p, V105TitleFormat())
 	if strings.Contains(rt, "DTS-ES") || strings.Contains(rt, "DTS ES") {

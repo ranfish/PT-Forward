@@ -1,13 +1,13 @@
 package adapter
 
 import (
-	"fmt"
-	"io"
-	"strings"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -102,12 +102,12 @@ func TestYemaptAdapter_UploadViaOpenAPI(t *testing.T) {
 	}
 	// 必填+映射
 	checks := map[string]string{
-		"showName": "Test Movie 2026 1080p BluRay x264-GRP",
-		"shortDesc": "测试电影", // ⑧ 副标题空→译名兜底
-		"categoryId":              "4", "uploadUserAnonymous": "y",
+		"showName":   "Test Movie 2026 1080p BluRay x264-GRP",
+		"shortDesc":  "测试电影", // ⑧ 副标题空→译名兜底
+		"categoryId": "4", "uploadUserAnonymous": "y",
 		"imdb": "0111161", "douban": "1292052", // ⑥ 去 tt/纯数字
 		"picture": "https://img.example/poster.jpg",
-		"medium": "2", "standard": "4", "codec": "1", "team": "7",
+		"medium":  "2", "standard": "4", "codec": "1", "team": "7",
 		"hrPunishEnable": "false",
 	}
 	for k, want := range checks {

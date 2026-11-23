@@ -1,8 +1,8 @@
 package metadata
 
 import (
-	"github.com/ranfish/pt-forward/internal/util"
 	"context"
+	"github.com/ranfish/pt-forward/internal/util"
 	"testing"
 
 	"go.uber.org/zap"
@@ -10,8 +10,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 func noFBDB(t *testing.T) *gorm.DB {
@@ -85,8 +85,8 @@ func TestIsSourceScreenshotExcluded(t *testing.T) {
 func TestBuildMetadata_BDInfoLocalDiscGate(t *testing.T) {
 	f := &Fetcher{logger: zap.NewNop()}
 	detail := &model.TorrentDetail{
-		Title:   "Some.Movie.2020.BluRay.1080p.x265-GROUP",
-		BDInfo:  "DISC INFO:\n\nDisc Title: MOVIE_BD\nDisc Label: MOVIE.2020.COMPLETE.BLURAY-GRP\nDisc Size: 25,000,000,000 bytes\nProtection: AACS\n\nPLAYLIST REPORT:\n\nName: 00000.MPLS\nLength: 1:26:21.217\n\nVIDEO:\n\nCodec: AVC\n\nAUDIO:\n\nCodec: DTS-HD\n\nFILES:\n01: M2TS 12345",
+		Title:  "Some.Movie.2020.BluRay.1080p.x265-GROUP",
+		BDInfo: "DISC INFO:\n\nDisc Title: MOVIE_BD\nDisc Label: MOVIE.2020.COMPLETE.BLURAY-GRP\nDisc Size: 25,000,000,000 bytes\nProtection: AACS\n\nPLAYLIST REPORT:\n\nName: 00000.MPLS\nLength: 1:26:21.217\n\nVIDEO:\n\nCodec: AVC\n\nAUDIO:\n\nCodec: DTS-HD\n\nFILES:\n01: M2TS 12345",
 	}
 	// localMI 空 → 照收
 	m := f.buildMetadata(context.Background(), "hash", "site", "123", detail, extract.Meta{}, "")
@@ -129,4 +129,3 @@ func TestNormalizeCategoryRousiSlugs(t *testing.T) {
 		t.Errorf("software 应 miss 空, got %q", got)
 	}
 }
-

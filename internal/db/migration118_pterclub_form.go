@@ -36,14 +36,19 @@ import (
 //     uplver+anonymous:true；referid（转载引用）/offer/
 //     has_allowed_offer（候选 hidden）不配；无 pt_gen/nfo/
 //     technical_info（简介粘贴 [hide=MediaInfo] 包裹）。
+//
 // 站方检查脚本交叉校验对齐（脚本逆向 §266）：分类判定顺序（纪录片>
-//     舞台演出>动画>综艺>电视剧>电影默认）与 canonical 映射同向；
-//     质量判定（标题 REMUX→Remux/Blu-ray+x264→Encode/WEB-DL+FRDS→
-//     Encode/WEBRip→Encode）与 §59.380 压制联动语义一致（IsEncode
-//     铁证联动/原生不联动）——**WEB-DL+FRDS→Encode 特殊规则与联动
-//     同构零冲突**。
+//
+//	舞台演出>动画>综艺>电视剧>电影默认）与 canonical 映射同向；
+//	质量判定（标题 REMUX→Remux/Blu-ray+x264→Encode/WEB-DL+FRDS→
+//	Encode/WEBRip→Encode）与 §59.380 压制联动语义一致（IsEncode
+//	铁证联动/原生不联动）——**WEB-DL+FRDS→Encode 特殊规则与联动
+//	同构零冲突**。
+//
 // 站规人工把关：0DAY 英文命名规范+副标题中文名+Dupe 同组同分辨率禁/
-//     死种重发 45 天+6 月+禁 SD 拉伸/CAM/RMVB/无 CUE 整盘/成人。
+//
+//	死种重发 45 天+6 月+禁 SD 拉伸/CAM/RMVB/无 CUE 整盘/成人。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(118, "pterclub_publish_form_config", func(gormDB *gorm.DB) error {

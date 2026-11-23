@@ -27,23 +27,23 @@ type TechProfile struct {
 	// §59.319 附三十二: 原始完整标题——重编码标记排除（x264/x265/Xvid）
 	// 扫这里而非 MainTitle（净化剧名不含编码词——雀起乡 Blu-ray.x265
 	// 误判原盘案第三层根因）。Mini profile 构造点必传（meta.Title）。
-	RawTitle       string `json:"raw_title,omitempty"`
-	Stereo3D       string `json:"stereo_3d"`       // 19. 3D 封装（HSBS/HOU/SBS/OU——§59.197 仅标题解析；双显异值=不同封装形态）
-	ChinesePrefix  string `json:"chinese_prefix"`  // 18. 中文名前缀 [中文名]
+	RawTitle      string `json:"raw_title,omitempty"`
+	Stereo3D      string `json:"stereo_3d"`      // 19. 3D 封装（HSBS/HOU/SBS/OU——§59.197 仅标题解析；双显异值=不同封装形态）
+	ChinesePrefix string `json:"chinese_prefix"` // 18. 中文名前缀 [中文名]
 
 	// === 技术参数字段（权威源：MediaInfo，8 字段）===
-	Resolution      string `json:"resolution"`       // 5. 分辨率（4320p/2160p/1080p/720p/480p/1440p）
-	HDR             string `json:"hdr"`
-	FrameRate       string `json:"frame_rate"` // §59.226 附二十一: 帧率（MI 原值优先/标题 60fps 兜底）              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）
-	BitDepth        string `json:"bit_depth"`        // 11. bit 信息（8bit/10bit）
-	MIEncoded       bool   `json:"-"`                // §59.151: MI Writing library 重编码铁证
-	MIHasVideo      bool   `json:"-"`                // §59.151: MI 存在 Video 层（判据可信前提）
-	MIWebVerdict    string `json:"-"`                // §59.517: WEB 族引擎裁决（official/civilian/空=不判定）
-	MIWebRule       string `json:"-"`                // §59.517: 引擎命中规则名（仲裁 note 透出）
-	FromBDInfo      bool   `json:"-"`                // §59.319 附十六: MI 输入为 BDInfo 报告（原盘铁证——报告仅原盘存在）
-	VideoCodec      string `json:"video_codec"`      // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
-	AudioCodec      string `json:"audio_codec"`      // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
-	AudioChannels   string `json:"audio_channels"`   // 14. 声道数（2.0/5.1/7.1）
+	Resolution    string `json:"resolution"` // 5. 分辨率（4320p/2160p/1080p/720p/480p/1440p）
+	HDR           string `json:"hdr"`
+	FrameRate     string `json:"frame_rate"`     // §59.226 附二十一: 帧率（MI 原值优先/标题 60fps 兜底）              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）
+	BitDepth      string `json:"bit_depth"`      // 11. bit 信息（8bit/10bit）
+	MIEncoded     bool   `json:"-"`              // §59.151: MI Writing library 重编码铁证
+	MIHasVideo    bool   `json:"-"`              // §59.151: MI 存在 Video 层（判据可信前提）
+	MIWebVerdict  string `json:"-"`              // §59.517: WEB 族引擎裁决（official/civilian/空=不判定）
+	MIWebRule     string `json:"-"`              // §59.517: 引擎命中规则名（仲裁 note 透出）
+	FromBDInfo    bool   `json:"-"`              // §59.319 附十六: MI 输入为 BDInfo 报告（原盘铁证——报告仅原盘存在）
+	VideoCodec    string `json:"video_codec"`    // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
+	AudioCodec    string `json:"audio_codec"`    // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
+	AudioChannels string `json:"audio_channels"` // 14. 声道数（2.0/5.1/7.1）
 	// §59.453: MI General 容器 Format（Matroska/MPEG-4/BDAV...）——
 	// 好学格式槽消费（文件格式语义）；标题解析无此维度（MI 唯一源）。
 	ContainerFormat string `json:"container_format,omitempty"`
@@ -59,11 +59,11 @@ type TechProfile struct {
 	Medium         string `json:"medium,omitempty"`          // 媒介（组合值），步骤 3 拆分到 SourceType + Specification
 
 	// === 音乐字段（§56.35 阶段 3，仅音乐类种子有值，视频类为空）===
-	Artist        string `json:"artist,omitempty"`         // 艺术家名
-	Album         string `json:"album,omitempty"`          // 专辑名
-	ChineseArtist string `json:"chinese_artist,omitempty"` // 中文艺术家名
-	ChineseAlbum  string `json:"chinese_album,omitempty"`  // 中文专辑名
-	SampleRate    string `json:"sample_rate,omitempty"`    // 采样率（如 "96.0"）
+	Artist        string `json:"artist,omitempty"`          // 艺术家名
+	Album         string `json:"album,omitempty"`           // 专辑名
+	ChineseArtist string `json:"chinese_artist,omitempty"`  // 中文艺术家名
+	ChineseAlbum  string `json:"chinese_album,omitempty"`   // 中文专辑名
+	SampleRate    string `json:"sample_rate,omitempty"`     // 采样率（如 "96.0"）
 	AudioBitDepth string `json:"audio_bit_depth,omitempty"` // 位深（如 "24"）
 }
 
@@ -205,20 +205,20 @@ func IsEncode(p TechProfile) bool {
 // AudioTechnology / AudioTracks 留待步骤 2（ParseTitle 增强）填充。
 func TechProfileFromTitle(c TitleComponents) TechProfile {
 	return TechProfile{
-		MainTitle:       c.MainTitle,
-		SeasonEpisode:   c.SeasonEpisode,
-		Year:            c.Year,
-		ReleaseVersion:  c.ReleaseVersion,
-		Resolution:      c.Resolution,
-		SourcePlatform:  c.SourcePlatform,
-		HDR:             c.HDRFormat,
-		VideoCodec:      c.VideoCodec,
-		BitDepth:        c.BitDepth,
-		AudioCodec:      c.AudioCodec,
-		ReleaseGroup:    c.ReleaseGroup,
+		MainTitle:        c.MainTitle,
+		SeasonEpisode:    c.SeasonEpisode,
+		Year:             c.Year,
+		ReleaseVersion:   c.ReleaseVersion,
+		Resolution:       c.Resolution,
+		SourcePlatform:   c.SourcePlatform,
+		HDR:              c.HDRFormat,
+		VideoCodec:       c.VideoCodec,
+		BitDepth:         c.BitDepth,
+		AudioCodec:       c.AudioCodec,
+		ReleaseGroup:     c.ReleaseGroup,
 		ReleaseGroupFull: c.ReleaseGroupFull,
-		ChinesePrefix:   c.ChinesePrefix,
-		Medium:          c.Medium,
+		ChinesePrefix:    c.ChinesePrefix,
+		Medium:           c.Medium,
 	}
 }
 
@@ -228,20 +228,20 @@ func TechProfileFromTitle(c TitleComponents) TechProfile {
 // 技术参数字段（Resolution/VideoCodec/AudioCodec/HDR/BitDepth）是 MediaInfo 合并后的值。
 func TechProfileToComponents(p TechProfile) TitleComponents {
 	return TitleComponents{
-		MainTitle:      p.MainTitle,
-		SeasonEpisode:  p.SeasonEpisode,
-		Year:           p.Year,
-		ReleaseVersion: p.ReleaseVersion,
-		Resolution:     p.Resolution,
-		SourcePlatform: p.SourcePlatform,
-		Medium:         p.Medium,
-		HDRFormat:      p.HDR,
-		VideoCodec:     p.VideoCodec,
-		BitDepth:       p.BitDepth,
-		AudioCodec:     p.AudioCodec,
-		ReleaseGroup:   p.ReleaseGroup,
+		MainTitle:        p.MainTitle,
+		SeasonEpisode:    p.SeasonEpisode,
+		Year:             p.Year,
+		ReleaseVersion:   p.ReleaseVersion,
+		Resolution:       p.Resolution,
+		SourcePlatform:   p.SourcePlatform,
+		Medium:           p.Medium,
+		HDRFormat:        p.HDR,
+		VideoCodec:       p.VideoCodec,
+		BitDepth:         p.BitDepth,
+		AudioCodec:       p.AudioCodec,
+		ReleaseGroup:     p.ReleaseGroup,
 		ReleaseGroupFull: p.ReleaseGroupFull,
-		ChinesePrefix:  p.ChinesePrefix,
+		ChinesePrefix:    p.ChinesePrefix,
 	}
 }
 

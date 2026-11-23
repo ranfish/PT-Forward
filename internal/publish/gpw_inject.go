@@ -2,9 +2,9 @@ package publish
 
 import (
 	"context"
-	"net/url"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -185,19 +185,19 @@ func gpwDiscSpec(size int64) string {
 var gpwEditionMap = map[string]string{
 	"director's cut": "director_s_cut",
 	"directors cut":  "director_s_cut",
-	"导演剪辑版":       "director_s_cut",
+	"导演剪辑版":          "director_s_cut",
 	"extended":       "extended_edition",
-	"加长版":          "extended_edition",
+	"加长版":            "extended_edition",
 	"uncut":          "uncut",
-	"未删减":          "uncut",
+	"未删减":            "uncut",
 	"unrated":        "unrated",
-	"未分级":          "unrated",
+	"未分级":            "unrated",
 	"remaster":       "remaster",
 	"4k remaster":    "4k_remaster",
-	"4k重制":          "4k_remaster",
+	"4k重制":           "4k_remaster",
 	"criterion":      "the_criterion_collection",
 	"cc":             "the_criterion_collection",
-	"标准收藏":         "the_criterion_collection",
+	"标准收藏":           "the_criterion_collection",
 }
 
 func gpwEditionKey(edition string) string {
@@ -278,13 +278,13 @@ func gpwParsePTGen(src string) gpwPTGenFields {
 		return f
 	}
 	var d struct {
-		ChineseTitle string   `json:"chinese_title"`
-		ForeignTitle string   `json:"foreign_title"`
-		Introduction string   `json:"introduction"`
-		IMDbURL      string   `json:"imdb_url"`
-		IMDbID       string   `json:"imdb_id"`
+		ChineseTitle string      `json:"chinese_title"`
+		ForeignTitle string      `json:"foreign_title"`
+		Introduction string      `json:"introduction"`
+		IMDbURL      string      `json:"imdb_url"`
+		IMDbID       string      `json:"imdb_id"`
 		Year         json.Number `json:"year"`
-		Genre        []string `json:"genre"`
+		Genre        []string    `json:"genre"`
 	}
 	if err := json.Unmarshal([]byte(src), &d); err != nil {
 		return f

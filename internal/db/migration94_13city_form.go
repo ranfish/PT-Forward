@@ -44,6 +44,7 @@ import (
 //   - 站规注记：≥1080p（1988 前例外）+电影≥1GB+完结必合集+禁转内容
 //     概不接收+短剧不收+H&R 手动勾选（考察期 240h）——发布预览人工
 //     把关。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(94, "city13_publish_form_config", func(gormDB *gorm.DB) error {

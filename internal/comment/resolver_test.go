@@ -5,14 +5,14 @@ import "testing"
 // hostResolver 测试桩: 已知域映射（真实解析器在 site 包，层选层接线）
 func stubResolver(host string) string {
 	table := map[string]string{
-		"pt.keepfrds.com":    "朋友",
-		"cspt.top":           "财神",
-		"hdcmct.org":         "不可说",
-		"pt.agsvpt.cn":       "末日",
-		"tracker.m-team.cc":  "馒头",
-		"pt.tjupt.org":       "不可羊",
-		"ourbits.club":       "我堡",
-		"piggo.me":           "二师兄",
+		"pt.keepfrds.com":   "朋友",
+		"cspt.top":          "财神",
+		"hdcmct.org":        "不可说",
+		"pt.agsvpt.cn":      "末日",
+		"tracker.m-team.cc": "馒头",
+		"pt.tjupt.org":      "不可羊",
+		"ourbits.club":      "我堡",
+		"piggo.me":          "二师兄",
 	}
 	if v, ok := table[host]; ok {
 		return v
@@ -66,11 +66,11 @@ func TestResolve_CompositeBothTargets(t *testing.T) {
 // 负样本（§59.60 ⑥签名型/纯文本——不得产生直达）
 func TestResolve_NegativeSamples(t *testing.T) {
 	neg := []string{
-		"南风知我意，吹梦到西洲。",                    // 朱雀诗句
-		"TorrenTGui.ORG",                        // 套套哥签名
-		"Never spread this torrent in public",   // 在脚下声明
-		"HDHx266295x1764420325x04f02edc",        // HDHx 合法形态（正样本, 排除串行干扰）
-		"1142992",                               // 纯数字但 tracker 非馒头（不命中）
+		"南风知我意，吹梦到西洲。",                        // 朱雀诗句
+		"TorrenTGui.ORG",                      // 套套哥签名
+		"Never spread this torrent in public", // 在脚下声明
+		"HDHx266295x1764420325x04f02edc",      // HDHx 合法形态（正样本, 排除串行干扰）
+		"1142992",                             // 纯数字但 tracker 非馒头（不命中）
 	}
 	got := Resolve(neg[0], stubResolver, "")
 	got2 := Resolve(neg[1], stubResolver, "")

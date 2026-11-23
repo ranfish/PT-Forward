@@ -1,11 +1,12 @@
 // Package description 副标题模板渲染（§56.20 Q3）。
 //
 // 5 变量简化版副标题模板引擎：
-//   {source_subtitle}      源站副标题（清理后）
-//   {ptgen.chinese_title}  PTGen 中文名
-//   {ptgen.foreign_title}  PTGen 外文名
-//   {ptgen.year}           年份
-//   {title.main}           主标题
+//
+//	{source_subtitle}      源站副标题（清理后）
+//	{ptgen.chinese_title}  PTGen 中文名
+//	{ptgen.foreign_title}  PTGen 外文名
+//	{ptgen.year}           年份
+//	{title.main}           主标题
 package description
 
 import "strings"
@@ -29,8 +30,9 @@ const (
 )
 
 // RenderSubtitle 按模板渲染副标题。
-//   template 为空时返回 SourceSubtitle（默认行为）。
-//   变量为空时替换为空字符串（可能导致分隔符残留，调用方需清理）。
+//
+//	template 为空时返回 SourceSubtitle（默认行为）。
+//	变量为空时替换为空字符串（可能导致分隔符残留，调用方需清理）。
 func RenderSubtitle(template string, data SubtitleData) string {
 	if template == "" {
 		return data.SourceSubtitle

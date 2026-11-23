@@ -89,7 +89,7 @@ func (e *Engine) consumeLoop(ctx context.Context) {
 
 func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent) {
 	type groupKey struct {
-		clientUID       uint
+		clientUID      uint
 		subscriptionID string
 	}
 	groups := make(map[groupKey][]*pendingCandidate)
@@ -392,15 +392,15 @@ func (e *Engine) parseSiteWeights(jsonStr string) map[string]float64 {
 
 func (e *Engine) buildPushRequest(ctx context.Context, clientUID uint, event *pusher.PushedEvent) *pusher.PushRequest {
 	req := &pusher.PushRequest{
-		ClientUID:   clientUID,
-		SiteName:    event.SiteName,
-		TorrentID:   event.TorrentID,
-		InfoHash:    event.InfoHash,
-		Title:       event.Title,
-		HasHR:       event.HasHR,
-		Discount:    event.Discount,
-		IsFree:      event.IsFree,
-		FreeEndAt:   event.FreeEndAt,
+		ClientUID: clientUID,
+		SiteName:  event.SiteName,
+		TorrentID: event.TorrentID,
+		InfoHash:  event.InfoHash,
+		Title:     event.Title,
+		HasHR:     event.HasHR,
+		Discount:  event.Discount,
+		IsFree:    event.IsFree,
+		FreeEndAt: event.FreeEndAt,
 	}
 
 	if event.SubscriptionID != "" {
@@ -418,15 +418,15 @@ func (e *Engine) buildPushRequest(ctx context.Context, clientUID uint, event *pu
 				}
 				req.Tags = tagsStr
 			}
-		req.AddPaused = sub.AddPaused
-		// 智能默认（§55.18）：配了 SavePath 强制 AutoTMM=false（保证 savepath 生效，
-		// 避免 qB 全局 TMM=true 覆盖 savepath）；没配 SavePath 保持用户配置（默认 false）。
-		if sub.SavePath != "" {
-			req.AutoTMM = false
-		} else {
-			req.AutoTMM = sub.AutoTMM
-		}
-		req.UploadLimitKB = sub.UploadLimitKB
+			req.AddPaused = sub.AddPaused
+			// 智能默认（§55.18）：配了 SavePath 强制 AutoTMM=false（保证 savepath 生效，
+			// 避免 qB 全局 TMM=true 覆盖 savepath）；没配 SavePath 保持用户配置（默认 false）。
+			if sub.SavePath != "" {
+				req.AutoTMM = false
+			} else {
+				req.AutoTMM = sub.AutoTMM
+			}
+			req.UploadLimitKB = sub.UploadLimitKB
 			req.DownloadLimitKB = sub.DownloadLimitKB
 		}
 	}
@@ -456,20 +456,20 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientUID uint, event
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientUID:         clientUID,
-		SiteName:          event.SiteName,
-		TorrentID:         event.TorrentID,
-		InfoHash:          infoHash,
-		HasHR:             event.HasHR,
-		Source:            "rss",
-		Status:            model.SeedingStatusSeeding,
-		IsFree:            event.IsFree,
-		FreeEndAt:         event.FreeEndAt,
-		TorrentSize:       event.Size,
-		SubscriptionID:    event.SubscriptionID,
-		AutoTransfer:      event.AutoTransfer,
+		ClientUID:          clientUID,
+		SiteName:           event.SiteName,
+		TorrentID:          event.TorrentID,
+		InfoHash:           infoHash,
+		HasHR:              event.HasHR,
+		Source:             "rss",
+		Status:             model.SeedingStatusSeeding,
+		IsFree:             event.IsFree,
+		FreeEndAt:          event.FreeEndAt,
+		TorrentSize:        event.Size,
+		SubscriptionID:     event.SubscriptionID,
+		AutoTransfer:       event.AutoTransfer,
 		TransferClientUIDs: event.TransferClientUIDs,
-		Role:              clientRole,
+		Role:               clientRole,
 	}
 	if event.Discount != "" {
 		record.Discount = event.Discount

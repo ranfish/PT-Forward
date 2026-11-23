@@ -13,7 +13,7 @@ import (
 
 func setupReconcileDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:reconcile_" + time.Now().Format("150405.000000000") + "?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file:reconcile_"+time.Now().Format("150405.000000000")+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

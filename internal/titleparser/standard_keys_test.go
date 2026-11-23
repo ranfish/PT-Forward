@@ -2,7 +2,6 @@ package titleparser
 
 import "testing"
 
-
 // §59.268: 标准键折叠——数据驱动（standard_keys.json fold_to），编码器实现归标准
 func TestFoldStandardKey(t *testing.T) {
 	cases := []struct{ category, in, want string }{

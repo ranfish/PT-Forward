@@ -6,15 +6,16 @@
 //  2. data/extended_standard_keys.json: 全局标准化键变体表（所有站共用）
 //
 // 用法：
-//   siteLabel := LookupSiteSourceKey("pterclub.net", "pterclub", "type")  // "类型"
-//   stdCode := LookupStandardKey("type", "电视剧")                        // "category.tv_series"
+//
+//	siteLabel := LookupSiteSourceKey("pterclub.net", "pterclub", "type")  // "类型"
+//	stdCode := LookupStandardKey("type", "电视剧")                        // "category.tv_series"
 package extract
 
 import (
-	"fmt"
-	"strconv"
 	"embed"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -96,10 +97,10 @@ type basicInfoDivLabelConfig struct {
 }
 
 var (
-	configLoadOnce sync.Once
-	sitesByDomain  map[string]siteConfigEntry // key = domain（小写）
-	sitesByCode    map[string]siteConfigEntry // key = site_code（小写，fallback）
-	standardKeys   map[string]map[string]string
+	configLoadOnce     sync.Once
+	sitesByDomain      map[string]siteConfigEntry // key = domain（小写）
+	sitesByCode        map[string]siteConfigEntry // key = site_code（小写，fallback）
+	standardKeys       map[string]map[string]string
 	standardKeyEntries map[string][]standardKeyEntry
 
 	defaultSourceKeys = map[string]string{

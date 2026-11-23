@@ -29,8 +29,8 @@ func TestResolutionEdition4KPhrase(t *testing.T) {
 		{"午夜凶铃.4K修复版.1998.简繁中字￡CMCT梦幻", ""},
 		{"浪人.4K修复版.1998", ""},
 		{"Movie.1998.4K.REMASTERED.BluRay.x264-CMCT", ""},
-		{"Movie.2023.4K.BluRay.x264-GRP", "4K"},                 // 裸 4K 无版式语境
-		{"Movie.1985.4K修复版.720p.x264-CMCT", "720p"},          // 像素形态优先（§59.196）
+		{"Movie.2023.4K.BluRay.x264-GRP", "4K"},     // 裸 4K 无版式语境
+		{"Movie.1985.4K修复版.720p.x264-CMCT", "720p"}, // 像素形态优先（§59.196）
 		{"Movie.1998.8K修复版", ""},
 	}
 	for _, c := range cases {
@@ -46,7 +46,7 @@ func TestReleaseVersionBeforeYear(t *testing.T) {
 		{"To.Live.REPACK.JPN.1994.BluRay.720p.x264.FLAC-CMCT", "REPACK"},
 		{"To.Live.REPACK.1994.BluRay.720p.x264.FLAC-CMCT", "REPACK"},
 		{"Movie.2020.REPACK.1080p.BluRay.x264-CMCT", "REPACK"}, // 年份后（回归）
-		{"Movie.2020.REPACK2.1080p-CMCT", "REPACK"}, // Contains 先命中（§59.96 顺序缺陷历史行为）
+		{"Movie.2020.REPACK2.1080p-CMCT", "REPACK"},            // Contains 先命中（§59.96 顺序缺陷历史行为）
 		{"Movie.2020.PROPER.JPN.1994.BluRay-CMCT", "PROPER"},
 		{"Movie.2020.1080p.BluRay.x264-CMCT", ""},
 	}

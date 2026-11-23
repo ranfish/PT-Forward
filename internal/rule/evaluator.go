@@ -15,43 +15,43 @@ import (
 )
 
 type Context struct {
-	InfoHash    string
-	Name        string
-	SavePath    string
-	TotalSize   int64
-	TrackerURL  string
-	Category    string
-	Tags        []string
-	Ratio       float64
-	Progress    float64
-	UploadSpeed int64
+	InfoHash      string
+	Name          string
+	SavePath      string
+	TotalSize     int64
+	TrackerURL    string
+	Category      string
+	Tags          []string
+	Ratio         float64
+	Progress      float64
+	UploadSpeed   int64
 	DownloadSpeed int64
-	Uploaded    int64
-	Downloaded  int64
-	SeedTime    int64
-	State       string
-	ErrorMsg    string
+	Uploaded      int64
+	Downloaded    int64
+	SeedTime      int64
+	State         string
+	ErrorMsg      string
 	NumComplete   int
 	NumIncomplete int
-	IsFinished  bool
-	IsPaused    bool
-	AddedAt     time.Time
+	IsFinished    bool
+	IsPaused      bool
+	AddedAt       time.Time
 
-	SiteName       string
-	ClientUID      uint
-	TorrentID      string
-	Status         string
-	Discount       string
-	FreeLevel      string
-	Source         string
-	LastActionBy   string
-	Unregistered   bool
+	SiteName        string
+	ClientUID       uint
+	TorrentID       string
+	Status          string
+	Discount        string
+	FreeLevel       string
+	Source          string
+	LastActionBy    string
+	Unregistered    bool
 	UnregisteredMsg string
-	SubscriptionID string
-	IsFree         bool
-	HasHR          bool
-	HRSeedTimeH    int
-	FreeEndAt      *time.Time
+	SubscriptionID  string
+	IsFree          bool
+	HasHR           bool
+	HRSeedTimeH     int
+	FreeEndAt       *time.Time
 
 	FreeSpace           int64
 	TotalSpace          int64
@@ -336,73 +336,73 @@ func matchRegExp(s, pattern string) bool {
 }
 
 type ExprEnv struct {
-	SiteName      string  `expr:"siteName"`
-	Status        string  `expr:"status"`
-	IsFree        bool    `expr:"isFree"`
-	HasHR         bool    `expr:"hasHR"`
-	HRSeedTimeH   int     `expr:"hrSeedTimeH"`
-	Discount      string  `expr:"discount"`
-	ClientUID     uint   `expr:"clientUID"`
-	Name          string  `expr:"name"`
-	Size          int64   `expr:"size"`
-	TotalSize     int64   `expr:"totalSize"`
-	Progress      float64 `expr:"progress"`
-	State         string  `expr:"state"`
-	Uploaded      int64   `expr:"uploaded"`
-	UploadSpeed   int64   `expr:"uploadSpeed"`
-	DownloadSpeed int64   `expr:"downloadSpeed"`
-	Ratio         float64 `expr:"ratio"`
-	SeedingTime   int64   `expr:"seedingTime"`
-	Category      string  `expr:"category"`
-	Tags          string  `expr:"tags"`
-	SavePath      string  `expr:"savePath"`
-	Seeder        int     `expr:"seeder"`
-	Leecher       int     `expr:"leecher"`
-	IsFinished    bool    `expr:"isFinished"`
-	AddedTime     float64 `expr:"addedTime"`
-	FreeRemainSec float64 `expr:"freeRemainSec"`
-	HRRemainSec   int64   `expr:"hrRemainSec"`
-	FreeSpace     int64   `expr:"freeSpace"`
-	TotalSpace    int64   `expr:"totalSpace"`
-	DiskUsedPct   float64 `expr:"diskUsedPct"`
-	Hour          int     `expr:"hour"`
+	SiteName            string  `expr:"siteName"`
+	Status              string  `expr:"status"`
+	IsFree              bool    `expr:"isFree"`
+	HasHR               bool    `expr:"hasHR"`
+	HRSeedTimeH         int     `expr:"hrSeedTimeH"`
+	Discount            string  `expr:"discount"`
+	ClientUID           uint    `expr:"clientUID"`
+	Name                string  `expr:"name"`
+	Size                int64   `expr:"size"`
+	TotalSize           int64   `expr:"totalSize"`
+	Progress            float64 `expr:"progress"`
+	State               string  `expr:"state"`
+	Uploaded            int64   `expr:"uploaded"`
+	UploadSpeed         int64   `expr:"uploadSpeed"`
+	DownloadSpeed       int64   `expr:"downloadSpeed"`
+	Ratio               float64 `expr:"ratio"`
+	SeedingTime         int64   `expr:"seedingTime"`
+	Category            string  `expr:"category"`
+	Tags                string  `expr:"tags"`
+	SavePath            string  `expr:"savePath"`
+	Seeder              int     `expr:"seeder"`
+	Leecher             int     `expr:"leecher"`
+	IsFinished          bool    `expr:"isFinished"`
+	AddedTime           float64 `expr:"addedTime"`
+	FreeRemainSec       float64 `expr:"freeRemainSec"`
+	HRRemainSec         int64   `expr:"hrRemainSec"`
+	FreeSpace           int64   `expr:"freeSpace"`
+	TotalSpace          int64   `expr:"totalSpace"`
+	DiskUsedPct         float64 `expr:"diskUsedPct"`
+	Hour                int     `expr:"hour"`
 	ActiveUploads       int     `expr:"activeUploads"`
 	ActiveDownloads     int     `expr:"activeDownloads"`
 	GlobalUploadSpeed   float64 `expr:"globalUploadSpeed"`
 	GlobalDownloadSpeed float64 `expr:"globalDownloadSpeed"`
-	ScoringScore  float64 `expr:"scoringScore"`
-	ScoringRank   int     `expr:"scoringRank"`
-	LowScoreCount int     `expr:"lowScoreCount"`
+	ScoringScore        float64 `expr:"scoringScore"`
+	ScoringRank         int     `expr:"scoringRank"`
+	LowScoreCount       int     `expr:"lowScoreCount"`
 }
 
 func buildExprEnv(c *Context) *ExprEnv {
 	env := &ExprEnv{
-		SiteName:      c.SiteName,
-		Status:        c.Status,
-		IsFree:        c.IsFree,
-		HasHR:         c.HasHR,
-		HRSeedTimeH:   c.HRSeedTimeH,
-		Discount:      c.Discount,
-		ClientUID:     c.ClientUID,
-		Name:          c.Name,
-		Size:          c.TotalSize,
-		TotalSize:     c.TotalSize,
-		Progress:      c.Progress,
-		State:         c.State,
-		Uploaded:      c.Uploaded,
-		UploadSpeed:   c.UploadSpeed,
-		DownloadSpeed: c.DownloadSpeed,
-		Ratio:         c.Ratio,
-		SeedingTime:   c.SeedTime,
-		Category:      c.Category,
-		Tags:          strings.Join(c.Tags, ","),
-		SavePath:      c.SavePath,
-		Seeder:        c.NumComplete,
-		Leecher:       c.NumIncomplete,
-		IsFinished:    c.IsFinished,
-		FreeSpace:     c.FreeSpace,
-		TotalSpace:    c.TotalSpace,
-		Hour:          c.Now.Hour(),
+		SiteName:            c.SiteName,
+		Status:              c.Status,
+		IsFree:              c.IsFree,
+		HasHR:               c.HasHR,
+		HRSeedTimeH:         c.HRSeedTimeH,
+		Discount:            c.Discount,
+		ClientUID:           c.ClientUID,
+		Name:                c.Name,
+		Size:                c.TotalSize,
+		TotalSize:           c.TotalSize,
+		Progress:            c.Progress,
+		State:               c.State,
+		Uploaded:            c.Uploaded,
+		UploadSpeed:         c.UploadSpeed,
+		DownloadSpeed:       c.DownloadSpeed,
+		Ratio:               c.Ratio,
+		SeedingTime:         c.SeedTime,
+		Category:            c.Category,
+		Tags:                strings.Join(c.Tags, ","),
+		SavePath:            c.SavePath,
+		Seeder:              c.NumComplete,
+		Leecher:             c.NumIncomplete,
+		IsFinished:          c.IsFinished,
+		FreeSpace:           c.FreeSpace,
+		TotalSpace:          c.TotalSpace,
+		Hour:                c.Now.Hour(),
 		ActiveUploads:       c.ActiveUploads,
 		ActiveDownloads:     c.ActiveDownloads,
 		GlobalUploadSpeed:   c.GlobalUploadSpeed,

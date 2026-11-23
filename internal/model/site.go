@@ -17,8 +17,8 @@ type Site struct {
 	AuthType  string `json:"auth_type" gorm:"size:20;not null;default:'cookie'"`
 	Enabled   bool   `json:"enabled" gorm:"default:true"`
 
-	Passkey     string `json:"passkey,omitempty" gorm:"size:200" encrypted:"true"`
-	Cookie      string `json:"cookie,omitempty" gorm:"type:text" encrypted:"true"`
+	Passkey string `json:"passkey,omitempty" gorm:"size:200" encrypted:"true"`
+	Cookie  string `json:"cookie,omitempty" gorm:"type:text" encrypted:"true"`
 	// §59.501: 临时上传 Basic Auth 凭证（好多油临时措施·"user:pass" 整体
 	// 加密存储·消费端确定性发送不探测·站点放开后用户清空即终）
 	UploadAuth  string `json:"upload_auth,omitempty" gorm:"size:200" encrypted:"true"`
@@ -49,8 +49,8 @@ type Site struct {
 	// DetailsURLTemplate: 详情页 URL 模板（如 /t-{id}），空则使用框架默认 /details.php?id={id}
 	DetailsURLTemplate string `json:"details_url_template" gorm:"size:512"`
 
-	FrameworkDetected bool   `json:"framework_detected" gorm:"default:false"`
-	FrameworkVerified bool   `json:"framework_verified" gorm:"default:false"`
+	FrameworkDetected bool `json:"framework_detected" gorm:"default:false"`
+	FrameworkVerified bool `json:"framework_verified" gorm:"default:false"`
 	// §59.333: TLS/H2 指纹伪装（"chrome"=azuretls；空=Go 原生）
 	TLSPretend string `json:"tlsPretend" gorm:"column:tls_pretend;size:20;default:''"`
 	// §59.336: 浏览器 fallback——详情页 HTTP 失败时用内置 Chromium 兜底
@@ -58,19 +58,19 @@ type Site struct {
 	BrowserFallback bool `json:"browserFallback" gorm:"column:browser_fallback;default:false"`
 	// §59.340 C: 站点级获取 RPS（0=全局默认 0.5；keepfrds 特调 0.0667=4/min
 	// ——流控探究五阶段定案：安全 2/min/惩罚带 4/min/封锁 8/min）
-	FetchRPS float64 `json:"fetchRps" gorm:"column:fetch_rps;default:0"`
-	DetectionDetail   string `json:"detection_detail,omitempty" gorm:"size:1024"`
+	FetchRPS        float64 `json:"fetchRps" gorm:"column:fetch_rps;default:0"`
+	DetectionDetail string  `json:"detection_detail,omitempty" gorm:"size:1024"`
 
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
 	CookieCloudDomain  string     `json:"cookie_cloud_domain,omitempty" gorm:"size:200"`
 	AlternativeDomains string     `json:"alternative_domains,omitempty" gorm:"type:text"`
 	LastSyncAt         *time.Time `json:"last_sync_at"`
 
-	IsSource               bool `json:"is_source" gorm:"default:false"`
-	IsTarget               bool `json:"is_target" gorm:"default:false"`
+	IsSource bool `json:"is_source" gorm:"default:false"`
+	IsTarget bool `json:"is_target" gorm:"default:false"`
 	// §59.318 语义拆分：is_target=发布目标（受 publish_supported 门槛，
 	// 与 form_config.enabled 同步）；is_reseed_target=辅种探测范围开关。
-	IsReseedTarget bool   `json:"is_reseed_target" gorm:"default:false"`
+	IsReseedTarget         bool `json:"is_reseed_target" gorm:"default:false"`
 	ParticipateAutoPublish bool `json:"participate_auto_publish" gorm:"default:true"`
 
 	// AssumeFree: 当 DetectDiscount 不可用时（如站点 cookie 被 WAF/异地登录拦截，
@@ -82,10 +82,10 @@ type Site struct {
 	OverrideSavePath string `json:"override_save_path,omitempty" gorm:"size:500"`
 	HRStrategy       string `json:"hr_strategy" gorm:"size:20;not null;default:'protect'"`
 
-	ProxyURL        string `json:"proxy_url,omitempty" gorm:"size:500"`
-	UseGlobalProxy  bool   `json:"use_global_proxy" gorm:"default:false"`
-	SkipSSLVerify   bool   `json:"skip_ssl_verify" gorm:"default:false"`
-	MaxConcurrent   int    `json:"max_concurrent" gorm:"default:2"`
+	ProxyURL       string `json:"proxy_url,omitempty" gorm:"size:500"`
+	UseGlobalProxy bool   `json:"use_global_proxy" gorm:"default:false"`
+	SkipSSLVerify  bool   `json:"skip_ssl_verify" gorm:"default:false"`
+	MaxConcurrent  int    `json:"max_concurrent" gorm:"default:2"`
 	// §59.183: 站点级 .torrent 下载限流（次/小时；0=不限，默认 95）——孤儿恢复/辅种
 	// 批量下载受此限制；优堡等实测无此严限制的站点可在 站点管理-详情-网络 调高。
 	DownloadHourlyLimit int `json:"download_hourly_limit" gorm:"default:95"`
@@ -104,11 +104,11 @@ type Site struct {
 	TitleFormat string `json:"title_format,omitempty" gorm:"type:text"`
 
 	// §56.17 决策 3: per-site 图床配置（发布时截图/海报转存策略）
-	ImageHostOverride string `json:"image_host_override,omitempty" gorm:"size:200;default:''"`    // 指定图床名（覆盖全局默认）
-	ImageBlacklist    string `json:"image_blacklist,omitempty" gorm:"type:text;default:''"`        // 黑名单图床域名列表（逗号分隔）
-	ImageWhitelist    string `json:"image_whitelist,omitempty" gorm:"type:text;default:''"`        // 白名单图床域名列表
-	ImageUploadMode   string `json:"image_upload_mode" gorm:"size:20;default:'url'"`               // 'url' / 'base64' / 'file' / 'official'
-	ImageOfficialHost string `json:"image_official_host,omitempty" gorm:"size:255;default:''"`     // 官方图床 URL（如 image.zmpt.cc）
+	ImageHostOverride string `json:"image_host_override,omitempty" gorm:"size:200;default:''"` // 指定图床名（覆盖全局默认）
+	ImageBlacklist    string `json:"image_blacklist,omitempty" gorm:"type:text;default:''"`    // 黑名单图床域名列表（逗号分隔）
+	ImageWhitelist    string `json:"image_whitelist,omitempty" gorm:"type:text;default:''"`    // 白名单图床域名列表
+	ImageUploadMode   string `json:"image_upload_mode" gorm:"size:20;default:'url'"`           // 'url' / 'base64' / 'file' / 'official'
+	ImageOfficialHost string `json:"image_official_host,omitempty" gorm:"size:255;default:''"` // 官方图床 URL（如 image.zmpt.cc）
 
 	// §56.22 决策 1: 站点 tag 配置（JSON 序列化 SiteTagConfig）
 	TagConfig string `json:"tag_config,omitempty" gorm:"type:text;default:''"`
@@ -165,14 +165,14 @@ func (SiteFieldMapping) TableName() string { return "site_field_mappings" }
 
 // §33.1.37 — SiteInfo: 站点运行时信息
 type SiteInfo struct {
-	Name        string `json:"name"`
-	BaseURL     string `json:"base_url"`
-	Framework   string `json:"framework"`
-	TLSPretend  string `json:"tls_pretend,omitempty"` // §59.333
+	Name       string `json:"name"`
+	BaseURL    string `json:"base_url"`
+	Framework  string `json:"framework"`
+	TLSPretend string `json:"tls_pretend,omitempty"` // §59.333
 	// §59.336: 浏览器 fallback（详情页 HTTP 失败时 Chromium 兜底）
 	BrowserFallback bool   `json:"browser_fallback,omitempty"`
-	Enabled     bool   `json:"enabled"`
-	ContentType string `json:"content_type,omitempty"`
+	Enabled         bool   `json:"enabled"`
+	ContentType     string `json:"content_type,omitempty"`
 
 	Passkey     string `json:"passkey,omitempty"`
 	Cookie      string `json:"cookie,omitempty"`
@@ -236,8 +236,8 @@ type SitePathsConfig struct {
 	SearchParam string `yaml:"search_param"`
 	Detail      string `yaml:"detail"`
 	Upload      string `yaml:"upload"`
-	TakeUpload string `yaml:"takeupload"`
-	RSS        string `yaml:"rss"`
+	TakeUpload  string `yaml:"takeupload"`
+	RSS         string `yaml:"rss"`
 }
 
 type SiteRSSConfig struct {

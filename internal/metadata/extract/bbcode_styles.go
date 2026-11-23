@@ -82,11 +82,11 @@ func parseInlineStyles(css string) map[string]string {
 }
 
 var (
-	rgbRe          = regexp.MustCompile(`(?i)^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$`)
-	hexShortRe     = regexp.MustCompile(`(?i)^#([0-9a-f])([0-9a-f])([0-9a-f])$`)
-	hexLongRe      = regexp.MustCompile(`(?i)^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$`)
-	fontSizePxRe   = regexp.MustCompile(`(?i)^(\d+(?:\.\d+)?)px$`)
-	fontSizePtRe   = regexp.MustCompile(`(?i)^(\d+(?:\.\d+)?)pt$`)
+	rgbRe        = regexp.MustCompile(`(?i)^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$`)
+	hexShortRe   = regexp.MustCompile(`(?i)^#([0-9a-f])([0-9a-f])([0-9a-f])$`)
+	hexLongRe    = regexp.MustCompile(`(?i)^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$`)
+	fontSizePxRe = regexp.MustCompile(`(?i)^(\d+(?:\.\d+)?)px$`)
+	fontSizePtRe = regexp.MustCompile(`(?i)^(\d+(?:\.\d+)?)pt$`)
 )
 
 // normalizeColorToHex 将 CSS 颜色值归一化为 #rrggbb 格式（§56.9 决策 3）。

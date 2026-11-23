@@ -2,11 +2,11 @@ package adapter
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -718,9 +718,9 @@ func TestNexusPHP_SearchByPiecesHash_APIDomainOverride(t *testing.T) {
 	doer := &HTTPDoer{Client: apiSrv.Client()}
 	a := NewNexusPHPAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{
-		Domain:   mainSrv.URL,
+		Domain:    mainSrv.URL,
 		APIDomain: apiSrv.URL,
-		Passkey:  "0123456789abcdef0123456789abcdef",
+		Passkey:   "0123456789abcdef0123456789abcdef",
 	}
 
 	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"abc"})
@@ -809,11 +809,11 @@ func TestBuildURL(t *testing.T) {
 
 func TestBuildDetailsURL(t *testing.T) {
 	tests := []struct {
-		name     string
-		domain   string
-		id       string
-		tpl      string
-		want     string
+		name   string
+		domain string
+		id     string
+		tpl    string
+		want   string
 	}{
 		{
 			name:   "empty template falls back to /details.php",
@@ -2067,10 +2067,10 @@ func TestHdwingShareRuleStates(t *testing.T) {
 // §59.510 255 态标注语词族——四形态正例（"禁转"子串全覆盖）+反例（纯内容副标）。
 func TestHdwingNoTransferWords(t *testing.T) {
 	positives := []string{
-		"初代奥特曼 赛文奥特曼 自购禁转",          // 837787 副标
+		"初代奥特曼 赛文奥特曼 自购禁转",              // 837787 副标
 		"环太平洋 4K 60FPS SVFI补帧 **未允禁转**", // 822791 副标
-		"康熙王朝 全46集 发布者授权转载，禁转",     // 601877 副标
-		"【禁转】有声小说 明朝那些事儿",           // 438018 副标
+		"康熙王朝 全46集 发布者授权转载，禁转",          // 601877 副标
+		"【禁转】有声小说 明朝那些事儿",               // 438018 副标
 	}
 	for _, p := range positives {
 		if !reHdwingNoTransferWords.MatchString(p) {

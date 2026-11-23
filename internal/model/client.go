@@ -8,22 +8,22 @@ import (
 
 // §33.1.41 — ClientConfig: 下载器配置（Sprint 78 DB-2）
 type ClientConfig struct {
-	ID             uint           `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name           string         `json:"name" gorm:"size:100;not null;uniqueIndex"`
-	Type           string         `json:"type" gorm:"size:50;not null"`
-	URL            string         `json:"url" gorm:"size:500;not null"`
-	Username       string         `json:"username" gorm:"size:100"`
-	Password       string         `json:"password" gorm:"size:100" encrypted:"true"`
-	Config         string         `json:"config" gorm:"type:text"`
-	Enabled        bool           `json:"enabled" gorm:"default:true"`
-	IsDefault      bool           `json:"is_default" gorm:"default:false"`
-	Role           string         `json:"role" gorm:"size:20;default:'seeding'"`
-	IsLocal        bool           `json:"is_local" gorm:"default:false"` // §59.21: 媒体文件是否在本机可访问（本地发布 vs 转种上盒）
-	TransferTargetUID uint         `json:"transfer_target_uid,omitempty" gorm:"column:reseed_target_uid"` // §59.251: 目标下载器恒定 ID（名字废弃）
-	LastPingAt     *time.Time     `json:"last_ping_at"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	ID                uint           `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name              string         `json:"name" gorm:"size:100;not null;uniqueIndex"`
+	Type              string         `json:"type" gorm:"size:50;not null"`
+	URL               string         `json:"url" gorm:"size:500;not null"`
+	Username          string         `json:"username" gorm:"size:100"`
+	Password          string         `json:"password" gorm:"size:100" encrypted:"true"`
+	Config            string         `json:"config" gorm:"type:text"`
+	Enabled           bool           `json:"enabled" gorm:"default:true"`
+	IsDefault         bool           `json:"is_default" gorm:"default:false"`
+	Role              string         `json:"role" gorm:"size:20;default:'seeding'"`
+	IsLocal           bool           `json:"is_local" gorm:"default:false"`                                 // §59.21: 媒体文件是否在本机可访问（本地发布 vs 转种上盒）
+	TransferTargetUID uint           `json:"transfer_target_uid,omitempty" gorm:"column:reseed_target_uid"` // §59.251: 目标下载器恒定 ID（名字废弃）
+	LastPingAt        *time.Time     `json:"last_ping_at"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 func (ClientConfig) TableName() string { return "clients" }
@@ -83,14 +83,14 @@ type TorrentInfo struct {
 	DownloadSpeed int64     `json:"download_speed"`
 	SeedTime      int64     `json:"seed_time"`
 	AddedAt       time.Time `json:"added_at"`
-	TrackerURL    string   `json:"tracker_url"`
+	TrackerURL    string    `json:"tracker_url"`
 	// v0.0.265: 所有 tracker URL（用于多站点匹配，transmission 填全量，qbittorrent 仅主 tracker）
-	TrackerURLs   []string `json:"tracker_urls"`
+	TrackerURLs []string `json:"tracker_urls"`
 	// §59.31: qb 5.2+ maindata 聚合 announce 信号（旧版 qb 无此字段，零值=走全量轮询档）。
 	// 仅作幽灵种子巡检的调度信号（圈怀疑池），永不直接参与判定。
-	HasTrackerError        bool `json:"has_tracker_error"`
-	HasTrackerWarning      bool `json:"has_tracker_warning"`
-	HasOtherAnnounceError  bool `json:"has_other_announce_error"`
+	HasTrackerError       bool `json:"has_tracker_error"`
+	HasTrackerWarning     bool `json:"has_tracker_warning"`
+	HasOtherAnnounceError bool `json:"has_other_announce_error"`
 
 	// §59.31: TR 轮询自带全部 tracker 消息（qb 为空——需逐个调 GetTrackerMessagesAll）。
 	// 幽灵种子巡检：TR 每轮全量关键词匹配零额外请求。
@@ -120,15 +120,15 @@ type AddResult struct {
 
 // §33.1.25 — Maindata: 下载器全局状态
 type Maindata struct {
-	Torrents       map[string]TorrentInfo `json:"torrents"`
-	ServerState    ServerState            `json:"server_state"`
-	CategoryMap    map[string]string      `json:"categories"`
-	Tags           []string               `json:"tags"`
-	FreeSpace      int64                  `json:"free_space,string"`
-	TotalDiskSpace int64                  `json:"total_disk_space,string"`
-	InflightBytes  int64                  `json:"inflight_bytes"`
-	FullUpdate      bool     `json:"full_update"`
-	TorrentsRemoved []string `json:"torrents_removed"`
+	Torrents        map[string]TorrentInfo `json:"torrents"`
+	ServerState     ServerState            `json:"server_state"`
+	CategoryMap     map[string]string      `json:"categories"`
+	Tags            []string               `json:"tags"`
+	FreeSpace       int64                  `json:"free_space,string"`
+	TotalDiskSpace  int64                  `json:"total_disk_space,string"`
+	InflightBytes   int64                  `json:"inflight_bytes"`
+	FullUpdate      bool                   `json:"full_update"`
+	TorrentsRemoved []string               `json:"torrents_removed"`
 }
 
 type ServerState struct {

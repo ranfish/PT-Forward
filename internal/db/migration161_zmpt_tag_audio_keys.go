@@ -12,19 +12,23 @@ import (
 //
 // 实时复拉 upload.php 全量对账（2026-11-14·登录态 57KB 逐字）：
 // ① tags 16 项值集零漂移·「杜比(14)/HDR(7)」词条在场但零键（适配期只配了
-//    6 键——杜比/HDR 被标「✅ 交叉验证」却漏接=站方校验标签与 MI 一致性·
-//    我们漏投必拒）
+//
+//	6 键——杜比/HDR 被标「✅ 交叉验证」却漏接=站方校验标签与 MI 一致性·
+//	我们漏投必拒）
+//
 // ② audiocodec_sel 站方实拉 10 项确认（无 DTS-HD MA/TrueHD/LPCM 词条——
-//    §59.466「DTS-HD MA→Other=音乐向站语义正确」定案作废：织梦是综合站
-//    （影视区）·审核脚本音频识别表含 DTS/TrueHD/LPCM/DDP=影视语义）
+//
+//	§59.466「DTS-HD MA→Other=音乐向站语义正确」定案作废：织梦是综合站
+//	（影视区）·审核脚本音频识别表含 DTS/TrueHD/LPCM/DDP=影视语义）
 //
 // 语义定案（用户确认 2026-11-14）：
-//   tags:     杜比(14) ← tag.dolby_vision·HDR(7) ← tag.hdr10
-//             （HDR10+/HLG 织梦无词条不配·miss 蒸发；无损/短剧/汉化/原创/
-//              驻站/纯享版零键保持——无对应键或不该自动投）
-//   audiocodec: DTS(3) 补 [dts_hd_ma, dts_hd_hr, dts_x]（DTS 家族归并·用户实证）
-//             ·WAV(10) 补 [lpcm]（无压缩语义精准·LPCM 2.0 同族预防）
-//   挂账：TrueHD/Atmos 归并方向（10 项无贴切·等重发后站方反馈）
+//
+//	tags:     杜比(14) ← tag.dolby_vision·HDR(7) ← tag.hdr10
+//	          （HDR10+/HLG 织梦无词条不配·miss 蒸发；无损/短剧/汉化/原创/
+//	           驻站/纯享版零键保持——无对应键或不该自动投）
+//	audiocodec: DTS(3) 补 [dts_hd_ma, dts_hd_hr, dts_x]（DTS 家族归并·用户实证）
+//	          ·WAV(10) 补 [lpcm]（无压缩语义精准·LPCM 2.0 同族预防）
+//	挂账：TrueHD/Atmos 归并方向（10 项无贴切·等重发后站方反馈）
 //
 // 幂等：条目已含目标键则跳过。全量 map 拉出改回（保 form_config 全字段）。
 func init() {

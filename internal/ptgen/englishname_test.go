@@ -12,15 +12,15 @@ func TestIsEnglishSegment(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{"Northeastern Bro Ⅲ", true},      // 罗马数字归一（东北恋歌案）
-		{"The Golden Age", true},           // 纯英文
-		{"L'Âge d'or", false},              // 重音=原语种（法语法）
-		{"C'è ancora domani", false},       // 重音=意语
-		{"东北恋歌：冬天里的一把火", false},        // CJK
-		{"Hawaii Five-0 Season 1", true},   // 数字合法
-		{"There’s Still Tomorrow", true},   // 弯引号（财神案）
+		{"Northeastern Bro Ⅲ", true},            // 罗马数字归一（东北恋歌案）
+		{"The Golden Age", true},                // 纯英文
+		{"L'Âge d'or", false},                   // 重音=原语种（法语法）
+		{"C'è ancora domani", false},            // 重音=意语
+		{"东北恋歌：冬天里的一把火", false},                 // CJK
+		{"Hawaii Five-0 Season 1", true},        // 数字合法
+		{"There’s Still Tomorrow", true},        // 弯引号（财神案）
 		{"The\u00a0Butcher's\u00a0Blade", true}, // NBSP（财神 aka 污染）
-		{"Александр Невский", false},       // 西里尔
+		{"Александр Невский", false},            // 西里尔
 		{"", false},
 	}
 	for _, c := range cases {
@@ -64,7 +64,7 @@ func TestExtractEnglishName_EndpointAware(t *testing.T) {
 	// 财神形态（foreign_title 英文优先——蓝霹雳案：aka 纯中文）
 	r2 := &model.PTGenResult{
 		ForeignTitle: "Blue Thunder",
-		AKA:         []string{"蓝色的雷", "蓝色霹雳号"},
+		AKA:          []string{"蓝色的雷", "蓝色霹雳号"},
 	}
 	if got := ExtractEnglishName(r2, "https://cspt.top"); got != "Blue Thunder" {
 		t.Errorf("财神 ft 优先: %q", got)
@@ -72,7 +72,7 @@ func TestExtractEnglishName_EndpointAware(t *testing.T) {
 	// 财神 foreign_title 中文（华语片）→aka 无英文→空（待 IMDb 通道）
 	r3 := &model.PTGenResult{
 		ForeignTitle: "九龍城寨·圍城",
-		AKA:         []string{"Marvel队长2(港)", "惊奇联盟"},
+		AKA:          []string{"Marvel队长2(港)", "惊奇联盟"},
 	}
 	if got := ExtractEnglishName(r3, "https://cspt.top"); got != "" {
 		t.Errorf("财神华语片应空: %q", got)

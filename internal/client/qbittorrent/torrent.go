@@ -219,12 +219,12 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 	categories := parseCategoriesJSON(raw.Categories)
 
 	return &model.Maindata{
-		Torrents:      torrents,
-		FreeSpace:     raw.ServerState.FreeSpaceOnDisk,
-		InflightBytes: inflightBytes,
-		CategoryMap:   categories,
-		Tags:          tags,
-		FullUpdate:     raw.FullUpdate,
+		Torrents:        torrents,
+		FreeSpace:       raw.ServerState.FreeSpaceOnDisk,
+		InflightBytes:   inflightBytes,
+		CategoryMap:     categories,
+		Tags:            tags,
+		FullUpdate:      raw.FullUpdate,
 		TorrentsRemoved: raw.TorrentsRemoved,
 	}, raw.Rid, nil
 }

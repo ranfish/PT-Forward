@@ -3,14 +3,13 @@ package model
 import "testing"
 import "time"
 
-
 // TestSortMetasAuthoritativeCompleteness §59.351: 完备度键（族③案——
 // 簇传播统一 bump updated_at 平手时，残行（壹吧/修道院站产物少）不该
 // 因 id 小恒赢全行（幸运/织梦行））。
 func TestSortMetasAuthoritativeCompleteness(t *testing.T) {
 	base := time.Date(2026, 10, 25, 14, 49, 17, 529081649, time.Local)
 	metas := []TorrentMetadata{
-		{ID: 1, FetchSource: "rss_detail", SiteName: "壹吧", Category: "", Poster: "", Screenshots: "", Description: "", MediaInfo: "mi", UpdatedAt: base}, // 残行（先插 id 小）
+		{ID: 1, FetchSource: "rss_detail", SiteName: "壹吧", Category: "", Poster: "", Screenshots: "", Description: "", MediaInfo: "mi", UpdatedAt: base},                      // 残行（先插 id 小）
 		{ID: 2, FetchSource: "rss_detail", SiteName: "幸运", Category: "category.movie", Poster: "p", Screenshots: `["a"]`, Description: "d", MediaInfo: "mi", UpdatedAt: base}, // 全行
 	}
 	SortMetasAuthoritative(metas)

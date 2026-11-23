@@ -2,8 +2,8 @@ package reseed
 
 import (
 	"fmt"
-	"testing"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"testing"
 )
 
 func TestConflictDetailForTarget(t *testing.T) {
@@ -40,7 +40,7 @@ func TestConflictDetailForTarget(t *testing.T) {
 	if src.AudioCodec != "" && cand.AudioCodec != "" && src.AudioCodec != cand.AudioCodec {
 		fmt.Printf("  → AudioCodec conflict: %q vs %q\n", src.AudioCodec, cand.AudioCodec)
 	}
-	
+
 	// 也测试 techProfileConflict 用剥后标题
 	conflictStripped := techProfileConflict(src, stripped)
 	fmt.Printf("\ntechProfileConflict(剥后标题) = %v\n", conflictStripped)

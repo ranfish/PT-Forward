@@ -134,13 +134,11 @@ func (c *mtorrentCore) searchViaAPI(ctx context.Context, config *model.SiteConfi
 	return all, nil
 }
 
-
 func (c *mtorrentCore) setAPIHeaders(req *http.Request, apiKey string) {
 	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("Accept", "application/json")
 }
-
 
 func (c *mtorrentCore) downloadViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 	tokenURL := resolveBaseURL(config) + "/api/torrent/genDlToken"
@@ -230,7 +228,6 @@ func (c *mtorrentCore) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	return data, nil
 }
 
-
 // mtorrentProfile §59.460 附五: profile 端点原始数据（core 只解析原始
 // 字段；Role→等级名的映射是站特有资产由宿主 adapter 完成）。
 type mtorrentProfile struct {
@@ -288,4 +285,3 @@ func (c *mtorrentCore) fetchProfile(ctx context.Context, config *model.SiteConfi
 	}
 	return prof, nil
 }
-

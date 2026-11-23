@@ -19,6 +19,7 @@ import (
 //     info/uplver；无 pt_gen（控件实证）；资料类种子（ebook/software
 //     等键在 [5] 区 type）发布时 type miss 落空预览人工（双区站
 //     固有限制——影视区专用表单）。
+//
 // 槽位映射（mode=4 影视区）：
 //   - type 10 项：409 Opera/戏曲 label-only+404 纪录双键+**406 MTV/
 //     演唱会/唱片三键第八站**+408 Playlet 短剧第十站+401/402/403/
@@ -42,6 +43,7 @@ import (
 //     日韩剧/火种(零魔)/长期保种/恐怖暴力/少儿不宜/欧美剧/国产剧/
 //     港奥台 9 项 label-only。
 //   - pos_state/pos_state_until 促销字段不配（GTK 同款）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(101, "mypt_publish_form_config", func(gormDB *gorm.DB) error {

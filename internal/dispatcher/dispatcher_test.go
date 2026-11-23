@@ -33,11 +33,11 @@ func setupTestDB(t *testing.T) *gorm.DB {
 func createSubscription(t *testing.T, db *gorm.DB, id uint, clientUID uint) {
 	t.Helper()
 	sub := &model.RSSSubscription{
-		Name:     fmt.Sprintf("sub-%d", clientUID),
-		Enabled:  true,
-		SiteName: "testsite",
+		Name:      fmt.Sprintf("sub-%d", clientUID),
+		Enabled:   true,
+		SiteName:  "testsite",
 		ClientUID: clientUID,
-		URLs:     []string{"http://example.com/rss"},
+		URLs:      []string{"http://example.com/rss"},
 	}
 	sub.ID = id
 	if err := db.Create(sub).Error; err != nil {
@@ -218,11 +218,11 @@ func TestDispatcher_SkipsMissingClient(t *testing.T) {
 func TestDispatcher_SkipsDisabledSubscription(t *testing.T) {
 	db := setupTestDB(t)
 	sub := &model.RSSSubscription{
-		Name:     "disabled-sub",
-		Enabled:  true,
-		SiteName: "testsite",
+		Name:      "disabled-sub",
+		Enabled:   true,
+		SiteName:  "testsite",
 		ClientUID: 1,
-		URLs:     []string{"http://example.com/rss"},
+		URLs:      []string{"http://example.com/rss"},
 	}
 	sub.ID = 1
 	db.Create(sub)
@@ -467,11 +467,11 @@ func TestDispatcher_ConcurrentRegister(t *testing.T) {
 func TestDispatcher_SoftDeletedSubscription(t *testing.T) {
 	db := setupTestDB(t)
 	sub := &model.RSSSubscription{
-		Name:     "deleted-sub",
-		Enabled:  true,
-		SiteName: "testsite",
+		Name:      "deleted-sub",
+		Enabled:   true,
+		SiteName:  "testsite",
 		ClientUID: 1,
-		URLs:     []string{"http://example.com/rss"},
+		URLs:      []string{"http://example.com/rss"},
 	}
 	sub.ID = 1
 	db.Create(sub)
@@ -507,7 +507,7 @@ func TestDispatcher_ClientSelectorIntegration(t *testing.T) {
 		Name:             "selector-sub",
 		Enabled:          true,
 		SiteName:         "testsite",
-		ClientUID:         1,
+		ClientUID:        1,
 		URLs:             []string{"http://example.com/rss"},
 		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionMostSpace,
@@ -574,7 +574,7 @@ func TestDispatcher_ClientSelectorFixedFallback(t *testing.T) {
 		Name:            "fixed-sub",
 		Enabled:         true,
 		SiteName:        "testsite",
-		ClientUID:        1,
+		ClientUID:       1,
 		URLs:            []string{"http://example.com/rss"},
 		ClientSelection: model.SelectionFixed,
 	}
@@ -624,7 +624,7 @@ func TestDispatcher_ClientSelectorAllUnhealthy(t *testing.T) {
 		Name:             "unhealthy-sub",
 		Enabled:          true,
 		SiteName:         "testsite",
-		ClientUID:         1,
+		ClientUID:        1,
 		URLs:             []string{"http://example.com/rss"},
 		CandidateClients: []uint{1, 3},
 		ClientSelection:  model.SelectionMostSpace,

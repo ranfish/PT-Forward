@@ -15,10 +15,10 @@ type SiteTagConfig struct {
 
 // Tag 模式常量。
 const (
-	TagModeTaglist           = "taglist"           // 标准 NP tagList[] 数组
-	TagModeCheckboxID        = "checkbox_id"       // PTer 类 checkbox（tag_gf/tag_jz/...）
-	TagModeCheckboxSpan      = "checkbox_span"     // BTSchool span[] 数组
-	TagModeIndependentField  = "independent_field" // HDRoute 独立 input name
+	TagModeTaglist          = "taglist"           // 标准 NP tagList[] 数组
+	TagModeCheckboxID       = "checkbox_id"       // PTer 类 checkbox（tag_gf/tag_jz/...）
+	TagModeCheckboxSpan     = "checkbox_span"     // BTSchool span[] 数组
+	TagModeIndependentField = "independent_field" // HDRoute 独立 input name
 )
 
 // ParseTagConfig 从 JSON 字符串解析 SiteTagConfig。

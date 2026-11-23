@@ -78,12 +78,12 @@ func TestRIAJDetection(t *testing.T) {
 		title string
 		want  string
 	}{
-		{"ABCD-1234 Some Album", "cd"},       // 3rd char 'C' = cd
-		{"MHCL-5001 Album", "cd"},            // 3rd char 'C' = cd
-		{"ABGD-001 Music", "sacd"},           // 3rd char 'G' = sacd
-		{"ABXD-001 Blu-ray", "bluray"},       // 3rd char 'X' = bluray
+		{"ABCD-1234 Some Album", "cd"}, // 3rd char 'C' = cd
+		{"MHCL-5001 Album", "cd"},      // 3rd char 'C' = cd
+		{"ABGD-001 Music", "sacd"},     // 3rd char 'G' = sacd
+		{"ABXD-001 Blu-ray", "bluray"}, // 3rd char 'X' = bluray
 		{"No Code Here", ""},
-		{"BBC-123 Too short", ""},            // 3 letters, reRIAJ needs 4
+		{"BBC-123 Too short", ""}, // 3 letters, reRIAJ needs 4
 	}
 	for _, tt := range tests {
 		got := detectRIAJMediaType(tt.title)
@@ -139,9 +139,9 @@ func TestXXXKeywordBenignE2E(t *testing.T) {
 func TestAdultExemptedSingleGuard(t *testing.T) {
 	c := &Checker{}
 	cases := []struct{ title, sub string }{
-		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""},               // A1 词边界形态
-		{"xXx Return of Xander Cage 2017 1080p BluRay x264-GRP", ""},                // A2 片名白名单
-		{"Some.Show.2020", "xXx 2002 极限特工"},                                       // 副标题通道
+		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""}, // A1 词边界形态
+		{"xXx Return of Xander Cage 2017 1080p BluRay x264-GRP", ""},   // A2 片名白名单
+		{"Some.Show.2020", "xXx 2002 极限特工"},                            // 副标题通道
 	}
 	for _, tc := range cases {
 		if r := c.checkFull(nil, tc.title, tc.sub, ScopeShare); r != nil && !r.Passed {
@@ -158,11 +158,11 @@ func TestAdultExemptedSingleGuard(t *testing.T) {
 func TestXXXChinesePrefix(t *testing.T) {
 	c := &Checker{}
 	cases := []struct{ name, sub string }{
-		{"[极限特工1].xXx.2002.JPN.Blu-ray.1080p.AVC.TrueHD.5.1-CMCT", ""},                    // 案 1
-		{"[极限特工2].xXx.State.of.the.Union.2005.Blu-ray.1080p.AVC.TrueHD5.1-CMCT", ""},       // 案 2（点分片名）
-		{"[极限特工3].xXx.Return.of.Xander.Cage.2017.2160p.BluRay.x264-GRP", ""},               // 续作点分
-		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""},                        // 无前缀回归
-		{"xXx State of the Union 2005 1080p BluRay x264-GRP", ""},                             // 空格形态
+		{"[极限特工1].xXx.2002.JPN.Blu-ray.1080p.AVC.TrueHD.5.1-CMCT", ""},               // 案 1
+		{"[极限特工2].xXx.State.of.the.Union.2005.Blu-ray.1080p.AVC.TrueHD5.1-CMCT", ""}, // 案 2（点分片名）
+		{"[极限特工3].xXx.Return.of.Xander.Cage.2017.2160p.BluRay.x264-GRP", ""},         // 续作点分
+		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""},               // 无前缀回归
+		{"xXx State of the Union 2005 1080p BluRay x264-GRP", ""},                    // 空格形态
 	}
 	for _, tc := range cases {
 		if r := c.checkFull(nil, tc.name, tc.sub, ScopeShare); r != nil && !r.Passed {

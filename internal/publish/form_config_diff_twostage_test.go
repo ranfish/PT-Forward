@@ -12,18 +12,18 @@ import (
 // 单键自动补 dict 侧双键。
 func TestMergeDraftTwoStageAlign(t *testing.T) {
 	current := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				{Label: "Animations/动漫", Value: "405", StandardKeys: []string{"category.animation"}},
 				{Label: "Music Videos/音乐MV", Value: "406", StandardKeys: []string{"category.mv"}},
 				{Label: "Opera/戏曲", Value: "410"}, // label-only 特化（无键）
-				{Label: "PTHOME", Value: "15"},      // 将被站方删除
+				{Label: "PTHOME", Value: "15"},    // 将被站方删除
 			},
 		},
 	}
 	draft := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				// label 微调 value 同 → renamed + keys 继承

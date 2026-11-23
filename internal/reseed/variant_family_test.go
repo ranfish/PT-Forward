@@ -54,8 +54,8 @@ func TestGroupVariantFamily(t *testing.T) {
 func TestNormalizeMixedKeyword(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"神秘友友IF 2024 1080P", "神秘友友 2024 1080P"}, // 粘连拆分+IF 剔除（用户实测词）
-		{"IF 2024 1080P", ""},           // 无中文锚 → 跳过（裸英文噪音防护）
-		{"Cinderella 1950 1080p", ""},     // 无混合词 → 跳过
+		{"IF 2024 1080P", ""},                         // 无中文锚 → 跳过（裸英文噪音防护）
+		{"Cinderella 1950 1080p", ""},                 // 无混合词 → 跳过
 		{"冰冻星球BBC 2011 1080p", "冰冻星球 BBC 2011 1080p"}, // BBC 3 字符保留
 	}
 	for _, c := range cases {
@@ -184,7 +184,7 @@ func TestKeywordTitlelessExtended(t *testing.T) {
 	// 端到端：守望者/月光光 关键词带片名
 	for name, want := range map[string]string{
 		"守望者.2009.GBR.终极剪辑版.1080p.中英字幕￡CMCT蒙太奇": "守望者",
-		"月光光心慌慌：杀戮.2021.加长版.720p.中英字幕￡CMCT梦回":  "月光光",
+		"月光光心慌慌：杀戮.2021.加长版.720p.中英字幕￡CMCT梦回":   "月光光",
 	} {
 		if kw := ExtractSearchKeyword(name); !strings.Contains(kw, want) {
 			t.Errorf("%s 关键词丢片名: %q", want, kw)
@@ -270,12 +270,12 @@ func TestQueenUHDSourceType(t *testing.T) {
 // §59.194: 中文关键词净化——六案变体形态。
 func TestPurifyChineseKeyword(t *testing.T) {
 	cases := []struct{ in, want string }{
-		{"午夜凶铃 4K修复版 1998", "午夜凶铃 1998"},               // 版式词 token 剥离（tid=270313 案）
-		{"宝贝计划加长版 2006", "宝贝计划 2006"},                  // 词内版式后缀（tid=5824 案）
+		{"午夜凶铃 4K修复版 1998", "午夜凶铃 1998"},          // 版式词 token 剥离（tid=270313 案）
+		{"宝贝计划加长版 2006", "宝贝计划 2006"},             // 词内版式后缀（tid=5824 案）
 		{"安娜·卡列尼娜 1997 720P", "安娜卡列尼娜 1997 720P"}, // 中点消解（tid=46343 案）
-		{"卡萨布兰卡 1942 1080p", ""},                    // 无装饰 → 跳过
-		{"修复版 1998", ""},                              // 剥空防护
-		{"Cinderella 1950 1080p", ""},                     // 无 CJK → 跳过
+		{"卡萨布兰卡 1942 1080p", ""},                  // 无装饰 → 跳过
+		{"修复版 1998", ""},                          // 剥空防护
+		{"Cinderella 1950 1080p", ""},             // 无 CJK → 跳过
 	}
 	for _, c := range cases {
 		if got := PurifyChineseKeyword(c.in); got != c.want {

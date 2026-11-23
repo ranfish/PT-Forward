@@ -16,6 +16,7 @@ import (
 //   - **prohibit_transfer 新字段**（禁转声明 checkbox——发布方主动
 //     勾选声明本种禁转；转发种不勾）→ 不配（发布链无此域，语义
 //     属于"声明禁转"非我们的转播场景）
+//
 // 有 url（IMDb）+**dburl（豆瓣独立字段——FieldDomainDoubanURL
 // §59.159 PTNexus/修道院同款）**+cite_site 引用功能。
 // 站规要点（适配记录注明——影响发布策略非表单）：
@@ -25,6 +26,7 @@ import (
 //     有 1080p 不收 720p）
 //   - 电影/纪录不执行 dupe（对多家重编码友好）
 //   - 码率下限：720p≥4000kbps/1080p≥8000kbps
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(75, "nanyangpt_publish_form_config", func(gormDB *gorm.DB) error {

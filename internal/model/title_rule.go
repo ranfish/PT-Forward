@@ -10,11 +10,11 @@ type TitleRule struct {
 	SiteCode     string    `json:"site_code" gorm:"size:50;uniqueIndex:idx_rule_unique"` // 站点代码（空=全局规则）
 	RuleType     string    `json:"rule_type" gorm:"size:20;uniqueIndex:idx_rule_unique"` // 8 种维度
 	Field        string    `json:"field" gorm:"size:50;uniqueIndex:idx_rule_unique"`     // title/year/resolution/hdr/codec/...
-	Pattern      string    `json:"pattern" gorm:"size:500;uniqueIndex:idx_rule_unique"` // §59.167 入唯一键（原三列键下同 field 多 pattern 规则必撞 UNIQUE——PT31 新装实证）
-	Replacement  string    `json:"replacement" gorm:"size:200"`                           // 自动修复替换文本
-	AutoFix      bool      `json:"auto_fix" gorm:"default:true"`                          // 是否自动修复
-	ErrorMessage string    `json:"error_message" gorm:"size:500"`                         // 不合规提示文案
-	Source       string    `json:"source" gorm:"size:20;default:'builtin'"`               // builtin / user
+	Pattern      string    `json:"pattern" gorm:"size:500;uniqueIndex:idx_rule_unique"`  // §59.167 入唯一键（原三列键下同 field 多 pattern 规则必撞 UNIQUE——PT31 新装实证）
+	Replacement  string    `json:"replacement" gorm:"size:200"`                          // 自动修复替换文本
+	AutoFix      bool      `json:"auto_fix" gorm:"default:true"`                         // 是否自动修复
+	ErrorMessage string    `json:"error_message" gorm:"size:500"`                        // 不合规提示文案
+	Source       string    `json:"source" gorm:"size:20;default:'builtin'"`              // builtin / user
 	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 

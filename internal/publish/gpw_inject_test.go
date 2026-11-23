@@ -17,7 +17,7 @@ func TestGpwPublishInject_PTGenFallback(t *testing.T) {
 		`"director":["艾尔文·拉考夫 Alvin Rakoff"],"cast":[{"name":"乔治·肯尼迪 George Kennedy"}]}`
 	meta := &model.TorrentMetadata{
 		// 派生列全空（DryRun 实证形态）——PTGen JSON 全在
-		Category:         "category.movie",
+		Category:        "category.movie",
 		PTGenSourceJSON: ptgenJSON,
 	}
 	tp := titleparser.ParseTitleTech("Death Ship 1980 2160p UHD Blu-ray HEVC DTS-HD MA 5.1-B0MBARDiERS")

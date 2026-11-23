@@ -38,6 +38,7 @@ import (
 //     ⛵方舟(52) label-only
 //   - 字段：url（IMDb 真字段——url×2 第二个是编辑器按钮）+pt_gen+
 //     technical_info+uplver
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(82, "agsvpt_publish_form_config", func(gormDB *gorm.DB) error {

@@ -6,28 +6,28 @@ const (
 	DownloadSourceRSS    = "rss"
 	DownloadSourceManual = "manual"
 
-	DownloadStatusPending    = "pending"
+	DownloadStatusPending     = "pending"
 	DownloadStatusDownloading = "downloading"
-	DownloadStatusPaused     = "paused"
-	DownloadStatusCompleted  = "completed"
-	DownloadStatusError      = "error"
-	DownloadStatusDeleted    = "deleted"
+	DownloadStatusPaused      = "paused"
+	DownloadStatusCompleted   = "completed"
+	DownloadStatusError       = "error"
+	DownloadStatusDeleted     = "deleted"
 
-	TransferStatusNone           = ""
-	TransferStatusPending        = "transfer_pending"
-	TransferStatusTransferring   = "transferring"
-	TransferStatusTransferred    = "transferred"
-	TransferStatusFailed         = "transfer_failed"
-	TransferStatusPartial        = "transfer_partial"
+	TransferStatusNone         = ""
+	TransferStatusPending      = "transfer_pending"
+	TransferStatusTransferring = "transferring"
+	TransferStatusTransferred  = "transferred"
+	TransferStatusFailed       = "transfer_failed"
+	TransferStatusPartial      = "transfer_partial"
 
 	DeleteActionWithCompanions = "with_companions"
 	DeleteActionSiteOnly       = "site_only"
 )
 
 type DownloadTask struct {
-	ID         uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	Source         string `json:"source" gorm:"size:20;not null;default:'rss'"`
 	SubscriptionID *uint  `json:"subscription_id" gorm:"index"`
@@ -40,23 +40,23 @@ type DownloadTask struct {
 	TotalSize   int64  `json:"total_size"`
 	SiteName    string `json:"site_name" gorm:"size:100;index"`
 
-	Status       string  `json:"status" gorm:"size:20;not null;default:'pending';index"`
-	Progress     float64 `json:"progress"`
-	UploadSpeed  int64   `json:"upload_speed"`
-	DownloadSpeed int64  `json:"download_speed"`
-	Ratio        float64 `json:"ratio"`
-	Uploaded     int64   `json:"uploaded"`
-	NumSeeds     int     `json:"num_seeds"`
-	NumPeers     int     `json:"num_peers"`
-	ErrorMessage string  `json:"error_message" gorm:"type:text"`
+	Status        string  `json:"status" gorm:"size:20;not null;default:'pending';index"`
+	Progress      float64 `json:"progress"`
+	UploadSpeed   int64   `json:"upload_speed"`
+	DownloadSpeed int64   `json:"download_speed"`
+	Ratio         float64 `json:"ratio"`
+	Uploaded      int64   `json:"uploaded"`
+	NumSeeds      int     `json:"num_seeds"`
+	NumPeers      int     `json:"num_peers"`
+	ErrorMessage  string  `json:"error_message" gorm:"type:text"`
 
-	TransferStatus   string     `json:"transfer_status" gorm:"size:20"`
-	TransferClientUID uint         `json:"transfer_client_uid"`
-	TransferHash     string     `json:"transfer_hash" gorm:"size:40"`
-	TransferredAt    *time.Time `json:"transferred_at"`
+	TransferStatus    string     `json:"transfer_status" gorm:"size:20"`
+	TransferClientUID uint       `json:"transfer_client_uid"`
+	TransferHash      string     `json:"transfer_hash" gorm:"size:40"`
+	TransferredAt     *time.Time `json:"transferred_at"`
 
-	FirstMatchedAt   *time.Time `json:"first_matched_at"`
-	CompletedAt      *time.Time `json:"completed_at"`
+	FirstMatchedAt *time.Time `json:"first_matched_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
 
 	DeletedAt    *time.Time `json:"deleted_at"`
 	DeleteAction string     `json:"delete_action" gorm:"size:20"`

@@ -7,9 +7,9 @@ import (
 // migration99 §59.415: 站名笔误刷正——"趟平"→"躺平"（www.tangpt.top）。
 // 收录时站名笔误（tangpt=躺平拼音——站名应为"躺平"）。
 // 修正三件套（§59.365 域名迁移先例变体——站名键非域名键）：
-//   1. 资产源头：supported_sites.json name_cn + sites.json name
-//   2. DB 站名键表存量 UPDATE（8 表）
-//   3. docs 三处勘误（00-站点域名/32-README/36-认证采集手册）
+//  1. 资产源头：supported_sites.json name_cn + sites.json name
+//  2. DB 站名键表存量 UPDATE（8 表）
+//  3. docs 三处勘误（00-站点域名/32-README/36-认证采集手册）
 //
 // v2 修复（v1 撞 UNIQUE crash loop 教训——§59.415 附记）：启动序列
 // seed 先于 migration——site_field_mappings 已被 seed 按"躺平"新键
@@ -23,6 +23,7 @@ import (
 //   - 不涉 site_name 四表（group_mappings 全局单列 group_name/
 //     seeding client+hash/flows+torrent_traffic 无 UNIQUE）：纯
 //     UPDATE 安全
+//
 // 零引用表（已审计）：publish_exclusions/rss_subscriptions/site_
 // config_overrides/scoring_logs/fetch_select_events/iyuu_site_
 // mappings/client_publish_targets/publish_group_members；代码零硬编码。

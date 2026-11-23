@@ -2,9 +2,9 @@
 package extract
 
 import (
-	"strings"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )

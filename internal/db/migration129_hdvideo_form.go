@@ -55,8 +55,11 @@ import (
 //     FieldDomainDoubanURL 先例复用）**+pt_gen+uplver；nfo 不配
 //     （13城先例）；**无 technical_info**（MI 塞简介）；search_
 //     mode（搜索 UI 字段发布链不处理）。
+//
 // 站规人工把关：上传规则（§6.4）+标题命名规范（§6.5 rules.php
-//   原文）+账号保留规则+金种/源码官方标记语义。
+//
+//	原文）+账号保留规则+金种/源码官方标记语义。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(129, "hdvideo_publish_form_config", func(gormDB *gorm.DB) error {

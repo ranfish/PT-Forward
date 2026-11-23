@@ -14,10 +14,10 @@ const (
 type EditRequest struct {
 	TorrentID  string            `json:"torrent_id"`
 	FormFields map[string]string `json:"form_fields"`
-	Cookie     string            `json:"-"`  // 站点 cookie（不序列化）
-	Referer    string            `json:"-"`  // Referer URL
-	BaseURL    string            `json:"-"`  // §56.23: 目标站 base URL
-	APIKey     string            `json:"-"`  // §56.23: API 站认证 key
+	Cookie     string            `json:"-"` // 站点 cookie（不序列化）
+	Referer    string            `json:"-"` // Referer URL
+	BaseURL    string            `json:"-"` // §56.23: 目标站 base URL
+	APIKey     string            `json:"-"` // §56.23: API 站认证 key
 
 	// ArrayFields §59.269: 同名多值字段回放（checkbox 数组——缺失即清空勾选，
 	// 编辑工具必须原样携带 GetEditForm 采集值）

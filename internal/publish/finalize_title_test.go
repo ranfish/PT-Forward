@@ -1,8 +1,8 @@
 package publish
 
 import (
-	"strings"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -35,8 +35,8 @@ func TestFinalizeTitleSinglePoint(t *testing.T) {
 func TestPreAuditTitleReadsColumn(t *testing.T) {
 	e := &PublishExecutor{}
 	meta := &model.TorrentMetadata{
-		Title:             "Some Raw Title",
-		ReassembledTitle:  "Column Title S01 2020 1080p BluRay x264-GRP",
+		Title:            "Some Raw Title",
+		ReassembledTitle: "Column Title S01 2020 1080p BluRay x264-GRP",
 	}
 	got, ok := e.preAuditTitle(meta)
 	if !ok || got != "Column Title S01 2020 1080p BluRay x264-GRP" {
@@ -49,7 +49,6 @@ func TestPreAuditTitleReadsColumn(t *testing.T) {
 		t.Errorf("列空降级现算: got=%q", got2)
 	}
 }
-
 
 // §59.514 附十 B: MI 证据层恒跑锚——torrentData 空（recompute 降级路径
 // ExportTorrent 失败）时 WEB-DL∧MIEncoded 仍须纠正 WEBRip（原被

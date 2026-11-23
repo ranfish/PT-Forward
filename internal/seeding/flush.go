@@ -33,15 +33,15 @@ func calcDiskMinBytes(cfg *model.SeedingClientConfig, totalSpace int64) int64 {
 }
 
 type flushContext struct {
-	subscriptionID   string
-	sub              *model.RSSSubscription
-	scoringCfg       model.SeedingScoringConfig
-	clientUID         uint
-	client           model.DownloaderClient
-	records          []model.SeedingTorrentRecord
-	freeSpace        int64
-	clientCfg        *model.SeedingClientConfig
-	assumeFreeSites  map[string]bool
+	subscriptionID  string
+	sub             *model.RSSSubscription
+	scoringCfg      model.SeedingScoringConfig
+	clientUID       uint
+	client          model.DownloaderClient
+	records         []model.SeedingTorrentRecord
+	freeSpace       int64
+	clientCfg       *model.SeedingClientConfig
+	assumeFreeSites map[string]bool
 }
 
 func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (*flushContext, error) {
@@ -156,7 +156,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		subscriptionID:  subscriptionID,
 		sub:             &sub,
 		scoringCfg:      scoringCfg,
-		clientUID:        clientUID,
+		clientUID:       clientUID,
 		client:          dlClient,
 		records:         records,
 		freeSpace:       freeSpace,
@@ -603,7 +603,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	rec := c.Record
 	candidate := &model.SeedingCandidate{
 		SubscriptionID: fc.subscriptionID,
-		ClientUID:       fc.clientUID,
+		ClientUID:      fc.clientUID,
 		CollectedAt:    time.Now(),
 	}
 
@@ -823,7 +823,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 		} else {
 			e.mu.Unlock()
 			newRecord := &model.SeedingTorrentRecord{
-				ClientUID:       fc.clientUID,
+				ClientUID:      fc.clientUID,
 				SiteName:       rec.SiteName,
 				TorrentID:      rec.TorrentID,
 				InfoHash:       addResult.InfoHash,

@@ -3,7 +3,6 @@ package publish
 import (
 	"strings"
 	"testing"
-
 )
 
 // §59.301 view-source 另存包装页自动兼容回归：真源码被转义包裹在

@@ -8,9 +8,9 @@ import (
 
 // §59.61 附3: 上传三层修复的单元锚定（uploadWithRetry 行为）
 type fakeUploader struct {
-	calls    int
-	failN    int // 前 N 次失败
-	failAll  bool
+	calls   int
+	failN   int // 前 N 次失败
+	failAll bool
 }
 
 func (f *fakeUploader) upload(ctx context.Context, data []byte, name string) (string, error) {

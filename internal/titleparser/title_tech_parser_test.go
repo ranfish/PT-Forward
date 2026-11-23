@@ -38,14 +38,14 @@ func TestExtractEditionInfo_ConsumeNoDup(t *testing.T) {
 
 func TestSplitMedium(t *testing.T) {
 	tests := []struct {
-		medium   string
-		srcType  string
-		spec     string
+		medium  string
+		srcType string
+		spec    string
 	}{
 		{"WEB-DL", "WEB", "WEB-DL"}, // §59.226 附六
 		{"WEBRip", "WEB", "WEBRip"}, // §59.226 附六
-		{"HDTV", "HDTV", "HDTV"},     // §59.226 附六
-		{"UHDTV", "UHDTV", "UHDTV"},  // §59.226 附六
+		{"HDTV", "HDTV", "HDTV"},    // §59.226 附六
+		{"UHDTV", "UHDTV", "UHDTV"}, // §59.226 附六
 		{"Blu-ray", "Blu-ray", ""},
 		{"UHD Blu-ray", "UHD Blu-ray", ""},
 		{"UHD Blu-ray Remux", "UHD Blu-ray", "Remux"},
@@ -130,13 +130,13 @@ func TestParseTitleTech_WEBDL(t *testing.T) {
 func TestMergeMediaInfoInto(t *testing.T) {
 	p := ParseTitleTech("Movie 2024 1080p WEB-DL x264 AAC")
 	mi := &MediaInfoTech{
-		Resolution:    "2160p",
-		VideoCodec:    "HEVC",
-		AudioCodec:    "DDP",
-		AudioChannels: "5.1",
-		HDR:           "DoVi",
-		BitDepth:      "10bit",
-		AudioTracks:   2,
+		Resolution:      "2160p",
+		VideoCodec:      "HEVC",
+		AudioCodec:      "DDP",
+		AudioChannels:   "5.1",
+		HDR:             "DoVi",
+		BitDepth:        "10bit",
+		AudioTracks:     2,
 		AudioTechnology: "Atmos",
 	}
 	MergeMediaInfoInto(&p, mi)
@@ -217,7 +217,7 @@ func TestAdjustCommentaryTracks(t *testing.T) {
 // §59.84: 媒介写法区分三缺口——3D 点分隔/HDDVDRip/DVD 原盘。
 func TestMediumThreeGaps(t *testing.T) {
 	cases := []struct {
-		title        string
+		title            string
 		wantST, wantSpec string
 	}{
 		// 1. 3D 点分隔: preferredBlurayToken 只认 "3D BLU"(空格)/"3DBLU"(无分隔), 点分隔 "3D.Blu-ray" 落入普通 BLU

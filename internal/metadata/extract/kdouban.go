@@ -157,4 +157,3 @@ func ExtractKDouban(doc *goquery.Document) KDoubanResult {
 	poster, _ := doc.Find("#kdouban .imdbwp__img").First().Attr("src")
 	return KDoubanResult{Body: body, Poster: poster}
 }
-

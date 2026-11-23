@@ -619,7 +619,9 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 
 	if resp.StatusCode != http.StatusOK {
 		snippet := string(body)
-		if len(snippet) > 200 { snippet = snippet[:200] }
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
@@ -648,7 +650,9 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 		for _, key := range []string{"list", "torrents", "rows", "records"} {
 			if raw, ok := dataMap[key]; ok {
 				results = parseYeMPTList(raw)
-				if len(results) > 0 { break }
+				if len(results) > 0 {
+					break
+				}
 			}
 		}
 	}
@@ -727,8 +731,8 @@ func (a *YemaptAdapter) SearchByPiecesHash(ctx context.Context, config *model.Si
 		_ = resp.Body.Close()
 
 		var result_struct struct {
-			Success      bool              `json:"success"`
-			ErrorMessage string            `json:"errorMessage"`
+			Success      bool                   `json:"success"`
+			ErrorMessage string                 `json:"errorMessage"`
 			Data         map[string]interface{} `json:"data"`
 		}
 		if err := json.Unmarshal(respBody, &result_struct); err != nil {

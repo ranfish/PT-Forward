@@ -12,19 +12,19 @@ import (
 // 手写规则只有「中英双语/国英双语」）。
 //
 // v3 结果：8 条残留→2 补 6 挂账：
-// - 补①13城「多语(10)」→ tag.bilingual_audio（真实漏网·自动规则抓到）
-// - 补②天空「Atmos(21)」→ tag.dolby_atmos（复合 promo 族中的纯单语义
-//   例外——词条语义=纯 Atmos·推理键 dolby_atmos 语义精确对应·无错配）
-// - 挂账 6 条维持：次世代国语/全景声国语/临境声国语（复合词错配——普通
-//   国语音轨命中「次世代国语」站方判次世代音轨会拒）/SL-HDR1（专有格式
-//   HDR10 单层变体·接 hdr10 有 DoVi-SDR 错配面）/DoVi+HDR/DIY纯净版（复合）
+//   - 补①13城「多语(10)」→ tag.bilingual_audio（真实漏网·自动规则抓到）
+//   - 补②天空「Atmos(21)」→ tag.dolby_atmos（复合 promo 族中的纯单语义
+//     例外——词条语义=纯 Atmos·推理键 dolby_atmos 语义精确对应·无错配）
+//   - 挂账 6 条维持：次世代国语/全景声国语/临境声国语（复合词错配——普通
+//     国语音轨命中「次世代国语」站方判次世代音轨会拒）/SL-HDR1（专有格式
+//     HDR10 单层变体·接 hdr10 有 DoVi-SDR 错配面）/DoVi+HDR/DIY纯净版（复合）
 //
 // 幂等：词条已含目标键跳过。全量 map 拉出改回（保全字段）。
 func init() {
 	RegisterMigration(166, "audit_v3_tail", func(gormDB *gorm.DB) error {
 		patches := map[string]map[string][]string{
-			"13city.org":   {"多语": {"tag.bilingual_audio"}},
-			"hdsky.me":     {"Atmos": {"tag.dolby_atmos"}},
+			"13city.org": {"多语": {"tag.bilingual_audio"}},
+			"hdsky.me":   {"Atmos": {"tag.dolby_atmos"}},
 		}
 		for domain, labelKeys := range patches {
 			var cfgStr string

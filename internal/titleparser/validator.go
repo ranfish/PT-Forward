@@ -1,7 +1,8 @@
 // Package titleparser 标题校验器（§56.19 Q2 修正决策）。
 //
 // 8 类校验维度 + 自动修复（差异化价值，竞品都不做）：
-//   required / regex / case / order / length / forbidden / whitespace / character
+//
+//	required / regex / case / order / length / forbidden / whitespace / character
 //
 // TitleValidator 是纯函数（不查 DB），规则通过参数传入。
 // 调用方（handler/pipeline）从 DB 加载 model.TitleRule 后转换为 titleparser.TitleRule。

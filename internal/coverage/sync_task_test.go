@@ -16,11 +16,11 @@ func TestCoverageWindow(t *testing.T) {
 		schedule string
 		want     time.Duration
 	}{
-		{"0 4 * * *", 24 * time.Hour},        // 每天 4 点=24h
-		{"0 */12 * * *", 12 * time.Hour},     // 每 12h
-		{"0 */6 * * *", 6 * time.Hour},       // 每 6h
-		{"", 24 * time.Hour},                 // 空=默认
-		{"not a cron", 24 * time.Hour},       // 非法=fallback
+		{"0 4 * * *", 24 * time.Hour},    // 每天 4 点=24h
+		{"0 */12 * * *", 12 * time.Hour}, // 每 12h
+		{"0 */6 * * *", 6 * time.Hour},   // 每 6h
+		{"", 24 * time.Hour},             // 空=默认
+		{"not a cron", 24 * time.Hour},   // 非法=fallback
 	}
 	for _, c := range cases {
 		got := model.CoverageWindow(c.schedule)

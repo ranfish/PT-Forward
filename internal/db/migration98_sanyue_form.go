@@ -26,6 +26,7 @@ import (
 //     双语字幕(18)**（无键 label-only）；保留 HDR 四细分（泛 HDR/
 //     HDR10/HDR10+/Dolby Vision）。
 //   - 无 IMG 真字段（文档有——实时仅编辑器按钮）。
+//
 // 槽位映射：
 //   - type：404 纪录双键+405 Animations=[animation]+406 Music Videos
 //     三键 [mv,music_video,concert]+408 HQ Audio=[music,lossless_
@@ -45,6 +46,7 @@ import (
 //     [dolby_vision] 第五站**/完结=[complete]；AV1/Ai双语字幕/
 //     动画/官字组 label-only；**无禁转/首发（站方已删）**。
 //   - 字段：url+pt_gen+technical_info+uplver；nfo/IMG 不配。
+//
 // 站规同垃圾堆系（<100MB 禁/upscale 禁/RMVB 禁/游戏候选制/Dupe
 // 媒介优先级+断种豁免）——发布预览人工把关。
 // 幂等：仅空值行写入。

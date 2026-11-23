@@ -342,10 +342,10 @@ type stubClient struct {
 
 func (s *stubClient) GetName() string                           { return s.name }
 func (s *stubClient) GetRole() string                           { return "download" }
-func (s *stubClient) GetTransferTargetUID() uint                 { return 0 }
+func (s *stubClient) GetTransferTargetUID() uint                { return 0 }
 func (s *stubClient) GetID() uint                               { return 0 }
 func (s *stubClient) GetSharedPaths() []model.SharedPathMapping { return nil }
-func (s *stubClient) GetTorrentDir() string                      { return "" }
+func (s *stubClient) GetTorrentDir() string                     { return "" }
 func (s *stubClient) GetTorrentByHash(_ context.Context, _ string) (*model.TorrentInfo, error) {
 	return nil, nil
 }

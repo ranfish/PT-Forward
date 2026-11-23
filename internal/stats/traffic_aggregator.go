@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type TrafficAggregator struct {
 	db     *gorm.DB
 	logger *zap.Logger
@@ -76,7 +75,7 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 		avgActive := agg.activeSum / agg.sampleCount
 
 		record := model.TrafficStatsHourly{
-			ClientUID:          key.ClientUID,
+			ClientUID:         key.ClientUID,
 			Hour:              prevHour,
 			UploadedDelta:     int64(avgUp * 3600),
 			DownloadedDelta:   int64(avgDown * 3600),

@@ -69,7 +69,7 @@ type hxptItem struct {
 	PiecesHash      string          `json:"pieces_hash"`
 	Poster          string          `json:"poster"`
 	IMDbID          string          `json:"imdb_id"`
-	Promotion       json.RawMessage `json:"promotion"`        // null=无促销；非 null 形态未实证（宽容透传）
+	Promotion       json.RawMessage `json:"promotion"`         // null=无促销；非 null 形态未实证（宽容透传）
 	PromotionEndsAt *time.Time      `json:"promotion_ends_at"` // RFC3339
 	HRPolicy        *hxptHRPolicy   `json:"hr_policy"`
 	OwnerName       string          `json:"owner_name"`
@@ -257,17 +257,17 @@ func (a *HxptAdapter) fetchMeta(ctx context.Context, config *model.SiteConfig, t
 
 // hxptDetail /detail 端点（内容面：descr/mediainfo/sections）。
 type hxptDetail struct {
-	ID         int64           `json:"id"`
-	Name       string          `json:"name"`
-	Size       int64           `json:"size"`
-	Seeders    int             `json:"seeders"`
-	Descr      string          `json:"descr"`
-	NumFiles   int             `json:"numfiles"`
-	MediaInfo  string          `json:"mediainfo"`
-	Sections   json.RawMessage `json:"sections"`
-	PosState   int             `json:"pos_state"`
-	PickType   int             `json:"pick_type"`
-	IsOwner    bool            `json:"is_owner"`
+	ID        int64           `json:"id"`
+	Name      string          `json:"name"`
+	Size      int64           `json:"size"`
+	Seeders   int             `json:"seeders"`
+	Descr     string          `json:"descr"`
+	NumFiles  int             `json:"numfiles"`
+	MediaInfo string          `json:"mediainfo"`
+	Sections  json.RawMessage `json:"sections"`
+	PosState  int             `json:"pos_state"`
+	PickType  int             `json:"pick_type"`
+	IsOwner   bool            `json:"is_owner"`
 }
 
 func (a *HxptAdapter) fetchDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*hxptDetail, error) {
@@ -286,13 +286,13 @@ func (a *HxptAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteCo
 		return nil, err
 	}
 	d := &model.TorrentDetail{
-		InfoHash:    meta.InfoHash,
-		Title:       meta.Name,
-		Subtitle:    meta.SmallDescr,
-		Category:    hxptCategoryNames[meta.CategoryID],
-		IMDbID:      meta.IMDbID,
-		PosterURL:   meta.Poster,
-		Size:        meta.Size,
+		InfoHash:     meta.InfoHash,
+		Title:        meta.Name,
+		Subtitle:     meta.SmallDescr,
+		Category:     hxptCategoryNames[meta.CategoryID],
+		IMDbID:       meta.IMDbID,
+		PosterURL:    meta.Poster,
+		Size:         meta.Size,
 		ReleaseGroup: hxptGroupOfName(meta.Name),
 	}
 	if t := hxptParseTime(meta.CreatedAt); !t.IsZero() {
@@ -417,24 +417,24 @@ func (a *HxptAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, to
 
 func (a *HxptAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
 	var me struct {
-		ID          int64  `json:"id"`
-		Username    string `json:"username"`
-		ClassName   string `json:"class_name"`
-		Uploaded    int64  `json:"uploaded"`
-		Downloaded  int64  `json:"downloaded"`
-		Seeding     int    `json:"seeding"`
-		Leeching    int    `json:"leeching"`
-		Uploads     int    `json:"uploads"`
+		ID         int64  `json:"id"`
+		Username   string `json:"username"`
+		ClassName  string `json:"class_name"`
+		Uploaded   int64  `json:"uploaded"`
+		Downloaded int64  `json:"downloaded"`
+		Seeding    int    `json:"seeding"`
+		Leeching   int    `json:"leeching"`
+		Uploads    int    `json:"uploads"`
 	}
 	if err := a.apiCall(ctx, config, http.MethodGet, a.base(config)+"/api/v1/me", nil, &me); err != nil {
 		return nil, err
 	}
 	res := &model.UserStatsResult{
-		Username:     me.Username,
-		UserClass:    me.ClassName,
-		UploadBytes:  me.Uploaded,
+		Username:      me.Username,
+		UserClass:     me.ClassName,
+		UploadBytes:   me.Uploaded,
 		DownloadBytes: me.Downloaded,
-		SeedingCount: me.Seeding,
+		SeedingCount:  me.Seeding,
 	}
 	if me.Downloaded > 0 {
 		res.Ratio = float64(me.Uploaded) / float64(me.Downloaded)
@@ -495,7 +495,7 @@ func (a *HxptAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteCo
 	}
 	return &model.SLData{
 		Seeders:   meta.Seeders,
-		Leechers: meta.Leechers,
+		Leechers:  meta.Leechers,
 		FreeEndAt: meta.PromotionEndsAt,
 	}, nil
 }

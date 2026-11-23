@@ -39,6 +39,7 @@ import (
 //   - 字段：url（IMDb 真字段 data-pt-gen——url×2 第二个是编辑器
 //     按钮，浦园/末日同款）+pt_gen+nfo+uplver；**无 technical_info**
 //     （MediaInfo 写简介——文档实证）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(83, "carpt_publish_form_config", func(gormDB *gorm.DB) error {

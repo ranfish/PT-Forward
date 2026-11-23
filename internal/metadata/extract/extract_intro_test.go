@@ -166,10 +166,10 @@ func TestSplitPosterAndScreenshots_Empty(t *testing.T) {
 func TestFilterUnwantedImages(t *testing.T) {
 	urls := []string{
 		"https://example.com/poster.jpg",
-		"https://example.com/logo.png",    // 黑名单
-		"https://example.com/icon.png",    // 黑名单
+		"https://example.com/logo.png", // 黑名单
+		"https://example.com/icon.png", // 黑名单
 		"https://example.com/shot1.jpg",
-		"https://example.com/banner.gif",  // 黑名单
+		"https://example.com/banner.gif", // 黑名单
 	}
 	valid := make([]string, 0, len(urls))
 	for _, u := range urls {

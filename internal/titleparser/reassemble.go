@@ -8,13 +8,13 @@ import (
 // §56.19 决策 4: 加 MaxTitleLength + ReplacePatterns
 // §56.35 阶段 1: 加 func_overrides 字段
 type TitleFormat struct {
-	Separator      string           `json:"separator"`                   // 分隔符: "." 或 " "
-	Order          []string         `json:"order"`                       // 字段顺序
-	GroupConnector string           `json:"group_connector"`             // 制作组连接符: "-" (默认) / "." (SpringSunday)
-	StripChinese   bool             `json:"strip_chinese"`               // 是否去除中文
-	Forbidden      []string         `json:"forbidden"`                   // 禁止内容
-	ChinesePrefix  bool             `json:"chinese_prefix"`              // 是否加 [中文名] 前缀
-	MaxTitleLength int              `json:"max_title_length,omitempty"`  // 标题截断（如 M-Team 255）
+	Separator       string           `json:"separator"`                  // 分隔符: "." 或 " "
+	Order           []string         `json:"order"`                      // 字段顺序
+	GroupConnector  string           `json:"group_connector"`            // 制作组连接符: "-" (默认) / "." (SpringSunday)
+	StripChinese    bool             `json:"strip_chinese"`              // 是否去除中文
+	Forbidden       []string         `json:"forbidden"`                  // 禁止内容
+	ChinesePrefix   bool             `json:"chinese_prefix"`             // 是否加 [中文名] 前缀
+	MaxTitleLength  int              `json:"max_title_length,omitempty"` // 标题截断（如 M-Team 255）
 	ReplacePatterns []ReplacePattern `json:"replace_patterns,omitempty"` // 字段值替换（如 1080p→FHD）
 
 	// §56.35 func_overrides（站点级格式化覆盖）
@@ -23,15 +23,15 @@ type TitleFormat struct {
 	AudioCountSuffix string `json:"audio_count_suffix,omitempty"` // "s"(默认 4Audios) / "none"(HDArea 4Audio)
 
 	// §56.35 阶段 2：范式 + 后处理
-	Paradigm           string `json:"paradigm,omitempty"`            // "dot"/"space"/"chinese_prefixed"（为空时用显式 separator）
-	BracketsForbidden  bool   `json:"brackets_forbidden,omitempty"`  // 禁止 []（PTLGS）
-	ParensForbidden    bool   `json:"parens_forbidden,omitempty"`    // 禁止 ()（PTerClub）
+	Paradigm           string `json:"paradigm,omitempty"`             // "dot"/"space"/"chinese_prefixed"（为空时用显式 separator）
+	BracketsForbidden  bool   `json:"brackets_forbidden,omitempty"`   // 禁止 []（PTLGS）
+	ParensForbidden    bool   `json:"parens_forbidden,omitempty"`     // 禁止 ()（PTerClub）
 	RemoveSourcePrefix bool   `json:"remove_source_prefix,omitempty"` // 移除 [站名] 前缀
 
 	// §56.35 阶段 3：按分类切换范式 + 特殊标记
-	Paradigms    map[string]string `json:"paradigms,omitempty"` // 按分类覆盖 paradigm（如 {category.movie: "dot"}）
-	Category     string            `json:"-"`                  // 运行时设置（不从 JSON 解析），用于 Paradigms 查找
-	SkipReassemble bool            `json:"skip_reassemble,omitempty"` // 跳过重组（U2/TTG/HDRoute 等特殊站保留原标题）
+	Paradigms      map[string]string `json:"paradigms,omitempty"`       // 按分类覆盖 paradigm（如 {category.movie: "dot"}）
+	Category       string            `json:"-"`                         // 运行时设置（不从 JSON 解析），用于 Paradigms 查找
+	SkipReassemble bool              `json:"skip_reassemble,omitempty"` // 跳过重组（U2/TTG/HDRoute 等特殊站保留原标题）
 }
 
 // ReplacePattern §56.19 决策 4: 字段值替换规则。
@@ -73,10 +73,10 @@ func cleanSeparators(s, sep string) string {
 // DefaultTitleFormat 返回一个通用的标题模板（空格分隔）
 func DefaultTitleFormat() TitleFormat {
 	return TitleFormat{
-		Separator: " ",
-		Order: []string{"title", "year", "season", "resolution", "medium", "audio_codec", "video_codec", "group"},
+		Separator:      " ",
+		Order:          []string{"title", "year", "season", "resolution", "medium", "audio_codec", "video_codec", "group"},
 		GroupConnector: "-",
-		StripChinese: true,
-		Forbidden: []string{"BDMV", "BDISO", "BDBOX", "DVDISO", ".mkv", ".mp4", ".iso"},
+		StripChinese:   true,
+		Forbidden:      []string{"BDMV", "BDISO", "BDBOX", "DVDISO", ".mkv", ".mp4", ".iso"},
 	}
 }

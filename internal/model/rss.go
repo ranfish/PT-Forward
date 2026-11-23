@@ -43,8 +43,8 @@ type TorrentEvent struct {
 
 	// §55.19 根本修复：detect 阶段顺便提取的 SL（不入库，只在内存 event 流通）。
 	// 评分时优先用这俩字段，避免评分阶段再次抓详情页。
-	Seeders   int   `json:"seeders" gorm:"-"`
-	Leechers  int   `json:"leechers" gorm:"-"`
+	Seeders  int `json:"seeders" gorm:"-"`
+	Leechers int `json:"leechers" gorm:"-"`
 }
 
 func (TorrentEvent) TableName() string { return "torrent_events" }
@@ -120,7 +120,7 @@ type RSSSubscription struct {
 	RegexStr       string `json:"regex_str" gorm:"size:256"`
 	ReplaceStr     string `json:"replace_str" gorm:"size:256"`
 
-	AutoTransfer      bool     `json:"auto_transfer" gorm:"column:auto_transfer;default:false"`
+	AutoTransfer       bool   `json:"auto_transfer" gorm:"column:auto_transfer;default:false"`
 	TransferClientUIDs []uint `json:"transfer_client_uids" gorm:"column:transfer_client_uids;type:json;serializer:json"`
 
 	PublishEnabled bool     `json:"publish_enabled" gorm:"default:false"`
@@ -150,7 +150,7 @@ type RSSSubscription struct {
 	DiskBudgetEnabled bool    `json:"disk_budget_enabled" gorm:"default:false"`
 	DiskBudgetMinGB   float64 `json:"disk_budget_min_gb" gorm:"default:10"`
 
-	CandidateClients  []uint            `json:"candidate_clients" gorm:"type:json;serializer:json"`
+	CandidateClients []uint              `json:"candidate_clients" gorm:"type:json;serializer:json"`
 	ClientSelection  ClientSelectionMode `json:"client_selection" gorm:"size:20;default:'fixed'"`
 
 	ScoringConfig SeedingScoringConfig `json:"scoring_config" gorm:"embedded"`
@@ -196,7 +196,7 @@ type PendingScoringEntry struct {
 // v2: reserved — 待实现时激活
 type ScoredCandidate struct {
 	SubscriptionID    string        `json:"subscription_id"`
-	ClientUID          uint             `json:"client_uid"`
+	ClientUID         uint          `json:"client_uid"`
 	Event             *TorrentEvent `json:"event"`
 	Seeders           int           `json:"seeders"`
 	Leechers          int           `json:"leechers"`
@@ -236,13 +236,13 @@ type RSSTorrentSeen struct {
 func (RSSTorrentSeen) TableName() string { return "rss_torrent_seen" }
 
 type RSSFetchLog struct {
-	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	SubscriptionID string    `json:"subscription_id" gorm:"size:100;not null;index:idx_fetch_log_sub"`
-	Total          int       `json:"total" gorm:"default:0"`
-	NewCount       int       `json:"new_count" gorm:"default:0"`
-	Dispatched     int       `json:"dispatched" gorm:"default:0"`
-	Status         string    `json:"status" gorm:"size:20;not null;default:'ok'"`
-	ErrorMsg       string    `json:"error_msg" gorm:"size:500"`
+	ID             uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	SubscriptionID string `json:"subscription_id" gorm:"size:100;not null;index:idx_fetch_log_sub"`
+	Total          int    `json:"total" gorm:"default:0"`
+	NewCount       int    `json:"new_count" gorm:"default:0"`
+	Dispatched     int    `json:"dispatched" gorm:"default:0"`
+	Status         string `json:"status" gorm:"size:20;not null;default:'ok'"`
+	ErrorMsg       string `json:"error_msg" gorm:"size:500"`
 	// §59.368: detect 停摆可观测——本轮 detect 尝试数（API 模式=0）与失败数；
 	// 失败轮判定= status=error OR (ok AND detect_count>0 AND 全败)。
 	DetectCount    int       `json:"detect_count" gorm:"default:0"`

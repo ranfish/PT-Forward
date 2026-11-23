@@ -14,10 +14,10 @@ import (
 
 // fakeSharedIYUU §59.535: 共享查询层测试桩——计数问询次数+可注入结果/错误。
 type fakeSharedIYUU struct {
-	calls    int
-	lastArg  []string
-	hits     map[string][]model.CoverageHit
-	err      error
+	calls   int
+	lastArg []string
+	hits    map[string][]model.CoverageHit
+	err     error
 }
 
 func (f *fakeSharedIYUU) GetSeededSites(ctx context.Context, infoHash string) ([]string, error) {

@@ -53,11 +53,11 @@ func (i *IntroData) SetScreenshotURLs(urls []string) {
 
 // SeedData 详情页提取器输出。
 type SeedData struct {
-	Title    string `json:"title"`
-	Subtitle string `json:"subtitle"`
-	Intro    IntroData `json:"intro"`
-	MediaInfo string `json:"mediainfo"`
-	BDInfo    string `json:"bdinfo"`
+	Title     string    `json:"title"`
+	Subtitle  string    `json:"subtitle"`
+	Intro     IntroData `json:"intro"`
+	MediaInfo string    `json:"mediainfo"`
+	BDInfo    string    `json:"bdinfo"`
 
 	// 结构化字段（对齐 TorrentDetail，便于双向转换）
 	Type         string   `json:"type"`          // 电影/电视剧/动漫/...
@@ -139,13 +139,13 @@ type Meta struct {
 
 // Input 提取器执行上下文。
 type Input struct {
-	SiteCode      string `json:"site_code"`      // "ssd" / "pterclub"（fallback key）
-	Domain        string `json:"domain"`         // "pterclub.net"（主键，v0.0.253）
-	SiteNickname  string `json:"site_nickname"`  // "不可说" / "猫站"
+	SiteCode      string `json:"site_code"`     // "ssd" / "pterclub"（fallback key）
+	Domain        string `json:"domain"`        // "pterclub.net"（主键，v0.0.253）
+	SiteNickname  string `json:"site_nickname"` // "不可说" / "猫站"
 	BaseURL       string `json:"base_url"`
-	Cookie        string `json:"-"`              // 不序列化（敏感）
+	Cookie        string `json:"-"` // 不序列化（敏感）
 	TorrentID     string `json:"torrent_id"`
-	PageHTML      string `json:"-"`              // 不序列化（体积大）
+	PageHTML      string `json:"-"` // 不序列化（体积大）
 	FallbackTitle string `json:"fallback_title"`
 }
 

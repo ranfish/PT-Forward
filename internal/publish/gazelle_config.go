@@ -1,8 +1,9 @@
 // Package publish Gazelle 音乐站配置（§56.28）。
 //
 // 数据来源：
-//   海豚（dicmusic.com）真实采集（2026-07-19）— 通过 PT-Forward DB cookie 解密访问 upload.php
-//   海豹（greatposterwall.com）可能不同，需单独验证（TODO）
+//
+//	海豚（dicmusic.com）真实采集（2026-07-19）— 通过 PT-Forward DB cookie 解密访问 upload.php
+//	海豹（greatposterwall.com）可能不同，需单独验证（TODO）
 //
 // 与 Gazelle 源码（examples/Gazelle/）的差异：
 //   - releasetype 用中文名称 + 自定义 ID（17/18/19 海豚新增）
@@ -36,9 +37,9 @@ var DicmusicReleaseTypes = map[int]string{
 var DicmusicReleaseTypeByName = map[string]int{
 	"专辑": 1, "Album": 1,
 	"原声": 3, "Soundtrack": 3,
-	"EP": 5,
-	"精选": 6,
-	"合辑": 7,
+	"EP":   5,
+	"精选":   6,
+	"合辑":   7,
 	"单曲专辑": 9, "Single": 9,
 	"现场专辑": 11, "Live album": 11,
 	"重混音": 13, "Remix": 13,
@@ -47,8 +48,8 @@ var DicmusicReleaseTypeByName = map[string]int{
 	"私制合辑": 16, "Mixtape": 16,
 	"录音样带": 17, "Sampler": 17,
 	"音乐会录音": 18,
-	"DJ混音": 19,
-	"未知": 21, "Unknown": 21,
+	"DJ混音":  19,
+	"未知":    21, "Unknown": 21,
 }
 
 // DicmusicFormats 海豚音频格式（6 种）。
@@ -117,17 +118,17 @@ var DicmusicUploadFields = map[string]string{
 	"image":          "image",
 	"desc":           "desc",
 	// § 海豚特有字段
-	"subtitle":       "subtitle",       // 副标题
-	"genre_tags":     "genre_tags",     // 曲风标签下拉
-	"sample_rate":    "sample_rate",    // 采样率
-	"tags":           "tags",           // 自由标签
-	"diy":            "diy",            // DIY 标记
-	"jinzhuan":       "jinzhuan",       // 金砖标记
-	"buy":            "buy",            // 购买链接
-	"logfiles":       "logfiles[]",     // log 文件数组
-	"remaster":       "remaster",       // 重发行标记
-	"vbr":            "vbr",
-	"unknown":        "unknown",
+	"subtitle":    "subtitle",    // 副标题
+	"genre_tags":  "genre_tags",  // 曲风标签下拉
+	"sample_rate": "sample_rate", // 采样率
+	"tags":        "tags",        // 自由标签
+	"diy":         "diy",         // DIY 标记
+	"jinzhuan":    "jinzhuan",    // 金砖标记
+	"buy":         "buy",         // 购买链接
+	"logfiles":    "logfiles[]",  // log 文件数组
+	"remaster":    "remaster",    // 重发行标记
+	"vbr":         "vbr",
+	"unknown":     "unknown",
 }
 
 // ===== 向后兼容别名（原 Gazelle 源码版本，保留供海豹站使用）=====

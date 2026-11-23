@@ -22,6 +22,7 @@ import (
 //   - **无 medium/codec/audiocodec/tags/url/pt_gen/nfo/technical_info/
 //     uplver**（极简站历史最少之一——南洋式扩展；**无匿名字段**——
 //     anonymous 无承载点不消费）。
+//
 // 站规人工把关：候选制+游戏上传员等级+<100MB 禁（软件/文档/单曲豁免）+
 // upscale/RMVB/硬盘版游戏禁+dupe 媒介优先级（断种 45 日·18 个月豁免）+
 // 促销 90% 50%+体育不得泄露比赛结果+电影/剧集简介必须含 IMDb 链接。

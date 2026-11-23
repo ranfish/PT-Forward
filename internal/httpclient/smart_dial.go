@@ -22,8 +22,8 @@ import (
 
 // healthyEntry §59.334: 健康缓存条目
 type healthyEntry struct {
-	ip     string
-	at     time.Time
+	ip string
+	at time.Time
 }
 
 var (
@@ -152,7 +152,9 @@ func rememberHealthy(host, ip string) {
 
 // errAllFailed / errRaceTimeout 自定义错误
 type errAllFailed struct{ host string }
+
 func (e errAllFailed) Error() string { return "all addresses failed for " + e.host }
 
 type errRaceTimeout struct{ host string }
+
 func (e errRaceTimeout) Error() string { return "race timeout for " + e.host }

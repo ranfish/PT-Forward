@@ -69,7 +69,7 @@ func TestWatcher_SubmitCandidate(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "torrent1",
 		InfoHash:        "abc123",
-		ClientUID:        1,
+		ClientUID:       1,
 		TorrentName:     "Test Torrent",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
@@ -144,7 +144,7 @@ func TestWatcher_PollDetectsCompletion(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "t1",
 		InfoHash:        "hash1",
-		ClientUID:        1,
+		ClientUID:       1,
 		PublishStatus:   model.CandidatePending,
 	}
 	db.Create(&candidate)
@@ -174,7 +174,7 @@ func TestWatcher_PollOrphanDetection(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "t1",
 		InfoHash:        "hash1",
-		ClientUID:        1,
+		ClientUID:       1,
 		PublishStatus:   model.CandidatePending,
 	}
 	db.Create(&candidate)

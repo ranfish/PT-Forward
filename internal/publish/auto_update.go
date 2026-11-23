@@ -1,9 +1,10 @@
 // Package publish AutoUpdate 编排（§56.23 决策 5）。
 //
 // IsExisting=true 后按 ExistingStrategy 分支:
-//   skip: 记录跳过
-//   update: CheckEditPermission + GetEditForm + MergeEditFields + SubmitEdit
-//   force: 直接标记成功
+//
+//	skip: 记录跳过
+//	update: CheckEditPermission + GetEditForm + MergeEditFields + SubmitEdit
+//	force: 直接标记成功
 package publish
 
 import (
@@ -23,20 +24,21 @@ type EditPublisher interface {
 
 // AutoUpdateResult 自动更新结果。
 type AutoUpdateResult struct {
-	TorrentID string           `json:"torrent_id"`
+	TorrentID string                 `json:"torrent_id"`
 	Strategy  model.ExistingStrategy `json:"strategy"`
-	Skipped   bool             `json:"skipped"`
-	Edited    bool             `json:"edited"`
-	Reason    string           `json:"reason"`
+	Skipped   bool                   `json:"skipped"`
+	Edited    bool                   `json:"edited"`
+	Reason    string                 `json:"reason"`
 }
 
 // AutoUpdate 自动更新已存在的种子。
-//   publisher: 已实现 EditPublisher 的 adapter
-//   detailHTML: 详情页 HTML（权限校验用）
-//   torrentID: 目标种子 ID
-//   newValues: 新表单字段（描述/MediaInfo 等）
-//   strategy: 处理策略
-//   siteFramework: 站点框架（权限校验路由）
+//
+//	publisher: 已实现 EditPublisher 的 adapter
+//	detailHTML: 详情页 HTML（权限校验用）
+//	torrentID: 目标种子 ID
+//	newValues: 新表单字段（描述/MediaInfo 等）
+//	strategy: 处理策略
+//	siteFramework: 站点框架（权限校验路由）
 func AutoUpdate(
 	ctx context.Context,
 	publisher EditPublisher,

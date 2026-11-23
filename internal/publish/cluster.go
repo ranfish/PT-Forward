@@ -14,8 +14,8 @@ import (
 
 // ClusterMember 簇内副本（同 client_id+save_path+name 的互辅种子群一员）。
 type ClusterMember struct {
-	Hash    string
-	Comment string
+	Hash          string
+	Comment       string
 	TrackerDomain string // §59.296: 下载来源站首域（纯数字/相对路径方言站点上下文）
 }
 

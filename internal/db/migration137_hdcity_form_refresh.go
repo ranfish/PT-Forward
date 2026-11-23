@@ -7,12 +7,12 @@ import (
 // migration137 §59.454 附: 城市站发布配置终态刷正（回归审核两修——
 // migration136 已随 v0.0.1309 分发不可重跑，本 migration 幂等重写收敛）：
 //
-//   ① form_fields 补 technical_info→mediainfo（城市独立 mediainfo
-//     textarea——非标准字段名；首版漏配致 MI/BDInfo 不投递独立字段，
-//     executor :308 TechTextOf 装配链因域缺失空转）
-//   ② Encode 键扩 [encode,webdl,webrip]（t-68193 实态——城市无
-//     WEB-DL 媒介项，站方用户实选 Encode；v0.0.1309 时 29 手动刷正
-//     其它环境未收敛，本 migration 全环境统一终态）
+//	① form_fields 补 technical_info→mediainfo（城市独立 mediainfo
+//	  textarea——非标准字段名；首版漏配致 MI/BDInfo 不投递独立字段，
+//	  executor :308 TechTextOf 装配链因域缺失空转）
+//	② Encode 键扩 [encode,webdl,webrip]（t-68193 实态——城市无
+//	  WEB-DL 媒介项，站方用户实选 Encode；v0.0.1309 时 29 手动刷正
+//	  其它环境未收敛，本 migration 全环境统一终态）
 //
 // 幂等：无条件重写（内容即终态——§59.381 财神 migration68 同款）。
 func init() {

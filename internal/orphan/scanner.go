@@ -13,11 +13,11 @@ import (
 )
 
 type Scanner struct {
-	provider      model.DownloaderProvider
-	db            *gorm.DB
-	logger        *zap.Logger
-	ignoredPaths  map[string]bool
-	scanConfigs   []model.OrphanScanConfig
+	provider     model.DownloaderProvider
+	db           *gorm.DB
+	logger       *zap.Logger
+	ignoredPaths map[string]bool
+	scanConfigs  []model.OrphanScanConfig
 }
 
 func NewScanner(provider model.DownloaderProvider, db *gorm.DB, logger *zap.Logger) *Scanner {
@@ -213,11 +213,11 @@ func containsUint(list []uint, v uint) bool {
 
 var skipSuffixes = []string{".!qb", ".parts", ".tmp"}
 var skipNames = map[string]bool{
-	".DS_Store":          true,
-	"Thumbs.db":          true,
-	"desktop.ini":        true,
-	".thumbnails":        true,
-	"__pycache__":        true,
+	".DS_Store":   true,
+	"Thumbs.db":   true,
+	"desktop.ini": true,
+	".thumbnails": true,
+	"__pycache__": true,
 }
 
 func shouldSkip(name string) bool {
@@ -315,7 +315,7 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 			Name:       name,
 			Size:       size,
 			IsDir:      entry.IsDir(),
-			ClientUIDs:  clientUIDs,
+			ClientUIDs: clientUIDs,
 			SavePath:   savePath,
 			DetectedAt: now,
 		})

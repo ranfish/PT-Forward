@@ -7,7 +7,7 @@ import "time"
 type FetchSelectEvent struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	InfoHash  string    `gorm:"size:40;index;not null" json:"info_hash"`
-	Layer     string    `gorm:"size:40;not null" json:"layer"`      // ①组映射+comment_tid 等
+	Layer     string    `gorm:"size:40;not null" json:"layer"` // ①组映射+comment_tid 等
 	GroupName string    `gorm:"size:50" json:"group_name"`
 	SiteName  string    `gorm:"size:50" json:"site_name"`
 	TorrentID string    `gorm:"size:50" json:"torrent_id"`

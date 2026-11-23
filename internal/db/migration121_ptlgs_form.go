@@ -43,10 +43,13 @@ import (
 //     dburl 文档 §197 实证）+cover+screenshots+technical_info（必填
 //     三件——发布链截图链产出）+uplver+anonymous:true；pos_state/
 //     pos_state_until/hr[4]（促销持久字段）不配；无 nfo。
+//
 // 站规人工把关：**候选制（10 次候选通过后直发）**+审核脚本标签
-//   交叉验证（中字=MI 字幕区/国语=MI 音频/DoVi/HDR=MI format/原盘=
-//   副标题"版原盘"/完结=副标题"合集/集全/期全"——站方检测在审核侧
-//   非提交侧+发布预览对齐）+非官组禁选官方组+H&R 规则+标题规范。
+//
+//	交叉验证（中字=MI 字幕区/国语=MI 音频/DoVi/HDR=MI format/原盘=
+//	副标题"版原盘"/完结=副标题"合集/集全/期全"——站方检测在审核侧
+//	非提交侧+发布预览对齐）+非官组禁选官方组+H&R 规则+标题规范。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(121, "ptlgs_publish_form_config", func(gormDB *gorm.DB) error {

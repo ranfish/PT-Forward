@@ -17,9 +17,10 @@ import (
 //   - 开放值域（category./medium./source./team./tag./...）不校验
 //
 // 待治理清单（发布页重构时 Layer 2 统一）：
-//   audio.ac3(75站, Layer1=audio.dd) / audio.dtsx(38站, Layer1=audio.dts_x) /
-//   audio.truehd_atmos(30站, Atmos 是独立字段) / *.other(站点兜底) /
-//   audio.ogg / audio.m4a / audio.dts_hd / video.mpeg4 / video.prores 等
+//
+//	audio.ac3(75站, Layer1=audio.dd) / audio.dtsx(38站, Layer1=audio.dts_x) /
+//	audio.truehd_atmos(30站, Atmos 是独立字段) / *.other(站点兜底) /
+//	audio.ogg / audio.m4a / audio.dts_hd / video.mpeg4 / video.prores 等
 func TestLayer2ClosedDomainReport(t *testing.T) {
 	// Layer 1 key 集
 	layer1 := map[string]bool{}

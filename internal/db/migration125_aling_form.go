@@ -35,9 +35,12 @@ import (
 //   - 字段：**pt_gen 四来源最广（IMDb/豆瓣/Bangumi/indienova）**+
 //     technical_info+**uplver 默认勾选（checked——anonymous:true
 //     对齐站方默认）**+small_descr/descr；无 url/nfo。
+//
 // 站规人工把关：Dupe 规则（媒介优先级+同媒介分辨率组优先级+动漫
-//   HDTV/DVD 同级特例 §5.1）+资源打包规则+促销规则+认领规则+
-//   站点特殊政策（topicid=1）。
+//
+//	HDTV/DVD 同级特例 §5.1）+资源打包规则+促销规则+认领规则+
+//	站点特殊政策（topicid=1）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(125, "aling_publish_form_config", func(gormDB *gorm.DB) error {

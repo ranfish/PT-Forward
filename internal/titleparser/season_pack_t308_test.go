@@ -5,10 +5,10 @@ import "testing"
 // §59.308 完结季包季集归一——海的开始案（S01E01-S01E10 区间形态幸运种审判单集拒）
 func Test308_NormalizeSeasonPack(t *testing.T) {
 	cases := []struct {
-		se           string
-		complete     bool
-		ptgenEps     int
-		want         string
+		se       string
+		complete bool
+		ptgenEps int
+		want     string
 	}{
 		// A 通道：tags complete → 全季区间归一 S01
 		{"S01E01-S01E10", true, 0, "S01"},

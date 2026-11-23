@@ -284,8 +284,8 @@ func TestRender_PosterDedupeWithPTGenBody(t *testing.T) {
 	r := NewRenderer("")
 	poster := "https://doubaninfo.com/dbposter/x.jpg"
 	out, err := r.Render(&model.DescriptionData{
-		PosterURL: poster,
-		PTGenBody: "[img]" + poster + "[/img]\n◎简　介　剧情",
+		PosterURL:  poster,
+		PTGenBody:  "[img]" + poster + "[/img]\n◎简　介　剧情",
 		SourceSite: "",
 	}, model.SiteDescConfig{})
 	if err != nil {

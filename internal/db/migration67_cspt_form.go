@@ -25,6 +25,7 @@ import (
 //     恒非官种，配键恐自动勾触雷）+禁转/国语/中字/粤语/DIY/完结配键
 //     （完结=tag.complete——财神完结资源优先 Dupe 规则正向）
 //   - 隐含规则：简介含 IMDb 时 url 必填（发布链恒填 url ✓ 天然满足）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(67, "cspt_publish_form_config", func(gormDB *gorm.DB) error {

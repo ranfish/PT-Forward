@@ -1,12 +1,12 @@
 package ptgen
 
 import (
-	"go.uber.org/zap"
 	"context"
+	"go.uber.org/zap"
 
 	"net/http"
-	"os"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 )
@@ -27,5 +27,5 @@ func TestQueryIMDbForEnglish_Live(t *testing.T) {
 	if name != "Twilight of the Warriors: Walled In" || kind != "movie" {
 		t.Fatalf("got name=%q kind=%q", name, kind)
 	}
-	
+
 }

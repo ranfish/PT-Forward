@@ -64,29 +64,29 @@ type TorrentMetadata struct {
 	// §59.162: 限时禁转让渡截止（keepfrds 24h 窗——added+24h+30m 余量；
 	// 零值=无窗口[永久禁转或可转]；now<until 拦截，过期自动放行）
 	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
-	Statement string `json:"statement" gorm:"type:text"` // §59.20: 源站官组声明（仅"获取数据"时写入）
-	BDInfo    string `json:"bdinfo" gorm:"type:text"`     // §59.20: 蓝光原盘 BDInfo（BDMV/M2TS）
+	Statement       string     `json:"statement" gorm:"type:text"` // §59.20: 源站官组声明（仅"获取数据"时写入）
+	BDInfo          string     `json:"bdinfo" gorm:"type:text"`    // §59.20: 蓝光原盘 BDInfo（BDMV/M2TS）
 	// §59.361 A: 扫描失败记录——onDone 失败写（簇级）/成功清/重扫入队清；
 	// 列表三态判定（扫描中/失败/未扫）防"扫描中"永转蓝圈骗用户
 	BDScanFailedAt *time.Time `json:"bd_scan_failed_at,omitempty"`
 	BDScanError    string     `json:"bd_scan_error" gorm:"type:text"`
 
 	// §59.19 TechProfile 平铺字段（从 MergedJSON 提取，种子配置页展示/筛选用）
-	Category      string `json:"category" gorm:"size:20;default:''"`       // movie/tv_series/music/animation/...
-	Form          string `json:"form" gorm:"size:20;default:''"`           // season_pack/partial_pack/single_episode/unknown
-	Resolution    string `json:"resolution" gorm:"size:20;default:''"`     // 2160p/1080p/720p
-	VideoCodec    string `json:"video_codec" gorm:"size:20;default:''"`    // x264/x265/H265
-	AudioCodec    string `json:"audio_codec" gorm:"size:20;default:''"`    // DTS/TrueHD/AAC
-	AudioChannels string `json:"audio_channels" gorm:"size:20;default:''"`  // 5.1/7.1/2.0
-	AudioTech     string `json:"audio_tech" gorm:"size:20;default:''"`     // Atmos/Auro3D
-	AudioTracks   int    `json:"audio_tracks" gorm:"default:0"`             // §59.76: 音轨数（v1.05 #16，Encode 类强制）
-	HDR           string `json:"hdr" gorm:"size:30;default:''"`            // DV/HDR/HDR10+
-	BitDepth      string `json:"bit_depth" gorm:"size:10;default:''"`      // 8bit/10bit
-	SourceType    string `json:"source_type" gorm:"size:30;default:''"`    // UHD Blu-ray/BluRay
-	Specification string `json:"specification" gorm:"size:20;default:''"`  // Remux/WEB-DL
+	Category       string `json:"category" gorm:"size:20;default:''"`        // movie/tv_series/music/animation/...
+	Form           string `json:"form" gorm:"size:20;default:''"`            // season_pack/partial_pack/single_episode/unknown
+	Resolution     string `json:"resolution" gorm:"size:20;default:''"`      // 2160p/1080p/720p
+	VideoCodec     string `json:"video_codec" gorm:"size:20;default:''"`     // x264/x265/H265
+	AudioCodec     string `json:"audio_codec" gorm:"size:20;default:''"`     // DTS/TrueHD/AAC
+	AudioChannels  string `json:"audio_channels" gorm:"size:20;default:''"`  // 5.1/7.1/2.0
+	AudioTech      string `json:"audio_tech" gorm:"size:20;default:''"`      // Atmos/Auro3D
+	AudioTracks    int    `json:"audio_tracks" gorm:"default:0"`             // §59.76: 音轨数（v1.05 #16，Encode 类强制）
+	HDR            string `json:"hdr" gorm:"size:30;default:''"`             // DV/HDR/HDR10+
+	BitDepth       string `json:"bit_depth" gorm:"size:10;default:''"`       // 8bit/10bit
+	SourceType     string `json:"source_type" gorm:"size:30;default:''"`     // UHD Blu-ray/BluRay
+	Specification  string `json:"specification" gorm:"size:20;default:''"`   // Remux/WEB-DL
 	SourcePlatform string `json:"source_platform" gorm:"size:30;default:''"` // NF/AMZN/DSNP
-	EditionInfo   string `json:"edition_info" gorm:"size:30;default:''"`   // REPACK/REMUX
-	RegionCode    string `json:"region_code" gorm:"size:10;default:''"`    // USA/JPN/ITA
+	EditionInfo    string `json:"edition_info" gorm:"size:30;default:''"`    // REPACK/REMUX
+	RegionCode     string `json:"region_code" gorm:"size:10;default:''"`     // USA/JPN/ITA
 }
 
 func (TorrentMetadata) TableName() string { return "torrent_metadata" }

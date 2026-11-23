@@ -8,16 +8,16 @@ import (
 )
 
 type searchDefaults struct {
-	Browse  string
-	Param   string
-	Extra   string
+	Browse string
+	Param  string
+	Extra  string
 }
 
 var siteSearchDefaults = map[string]searchDefaults{
 	"totheglory.im":  {Browse: "/browse.php", Param: "search_field"},
 	"hdroute.org":    {Browse: "/browse.php", Param: "s", Extra: "dp=0&add=0&action=s&or=1&imdb="},
 	"star-space.net": {Browse: "/p_torrent/video_list_g.php", Param: "search", Extra: "area=name"},
-	"hdcity.city":     {Browse: "/pt", Param: "iwannaseethis"},
+	"hdcity.city":    {Browse: "/pt", Param: "iwannaseethis"},
 }
 
 func getSiteSearchDefaults(domain string) (searchDefaults, bool) {

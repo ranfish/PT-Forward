@@ -129,19 +129,19 @@ func TestMITitleCanonicalAlignment(t *testing.T) {
 		wantTech  string // 对象信息（非空才断言——:71356 表 Atmos 标记形态）
 	}{
 		// :71356 十三形态全量（1-13 序对齐设计表）
-		{"AC-3", "", "Movie.DD.5.1", "DD", ""},                                          // 1
-		{"E-AC-3", "", "Movie.DDP5.1", "DDP", ""},                                      // 2
-		{"E-AC-3 JOC", "", "Movie.DDP5.1.Atmos", "DDP", "Atmos"},                       // 3 JOC 标记
-		{"DTS XLL", "", "Movie.DTS-HD.MA.5.1", "DTS-HD MA", ""},                        // 4
-		{"DTS ES XLL", "", "Movie.DTS-HD.MA.7.1", "DTS-HD MA", ""},                     // 5 §59.514 附十 A 修正
-		{"DTS XLL X", "", "Movie.DTS", "DTS", ""},                                      // 6 ⚠️ 偏离记录：:71356 说 DTS:X·实现落 DTS·243 全库 0 行零实证·按需生长（DTS:X 内容出现时对齐）
+		{"AC-3", "", "Movie.DD.5.1", "DD", ""},                                                          // 1
+		{"E-AC-3", "", "Movie.DDP5.1", "DDP", ""},                                                       // 2
+		{"E-AC-3 JOC", "", "Movie.DDP5.1.Atmos", "DDP", "Atmos"},                                        // 3 JOC 标记
+		{"DTS XLL", "", "Movie.DTS-HD.MA.5.1", "DTS-HD MA", ""},                                         // 4
+		{"DTS ES XLL", "", "Movie.DTS-HD.MA.7.1", "DTS-HD MA", ""},                                      // 5 §59.514 附十 A 修正
+		{"DTS XLL X", "", "Movie.DTS", "DTS", ""},                                                       // 6 ⚠️ 偏离记录：:71356 说 DTS:X·实现落 DTS·243 全库 0 行零实证·按需生长（DTS:X 内容出现时对齐）
 		{"MLP FBA 16-ch", "Dolby TrueHD with Dolby Atmos", "Movie.TrueHD.7.1.Atmos", "TrueHD", "Atmos"}, // 7 16-ch=Atmos 嵌入形态（真实 MI 配 Commercial name）
-		{"MLP FBA", "", "Movie.TrueHD.5.1", "TrueHD", ""},                              // 8
-		{"FLAC", "", "Movie.FLAC.1.0", "FLAC", ""},                                     // 9
-		{"AAC LC", "", "Movie.AAC.2.0", "AAC", ""},                                     // 10
-		{"AAC LC SBR", "", "Movie.AAC.2.0", "AAC", ""},                                 // 11 SBR 形态
-		{"PCM", "", "Movie.LPCM", "LPCM", ""},                                          // 12
-		{"DTS", "", "Movie.DTS", "DTS", ""},                                            // 13 直映
+		{"MLP FBA", "", "Movie.TrueHD.5.1", "TrueHD", ""},                                               // 8
+		{"FLAC", "", "Movie.FLAC.1.0", "FLAC", ""},                                                      // 9
+		{"AAC LC", "", "Movie.AAC.2.0", "AAC", ""},                                                      // 10
+		{"AAC LC SBR", "", "Movie.AAC.2.0", "AAC", ""},                                                  // 11 SBR 形态
+		{"PCM", "", "Movie.LPCM", "LPCM", ""},                                                           // 12
+		{"DTS", "", "Movie.DTS", "DTS", ""},                                                             // 13 直映
 		// 表外补充形态（:64626 搜索侧映射·保持）
 		{"TrueHD", "", "Movie TrueHD", "TrueHD", ""},
 		{"DTS LBR", "", "Movie.DTS-HD.HR", "DTS-HD HR", ""},

@@ -23,7 +23,7 @@ var (
 	}
 
 	SiteCategoryBlacklist = map[string][]string{
-		"馒头":  {"adult"},
+		"馒头":   {"adult"},
 		"我的PT": {"410"},
 	}
 )

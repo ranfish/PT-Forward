@@ -13,9 +13,10 @@ import (
 // §59.284 raw-token 模型），重组产出规范单名。
 //
 // 选段策略（常见词计分 + 拼音形态强扣分）：
-//   欧陆片 "ItalianName AKA The Hunt"——原名 0 分、英文名 the/hunt 命中 → 取后段
-//   华语片 "The.Piano.in.a.Factory.AKA.Gang.de.qin"——拼音全小写强扣 → 取前段
-//   双零分（Amaran aka SK21 / Andhra King Taluka aka RaPo 22）→ 平分取前段（正名）
+//
+//	欧陆片 "ItalianName AKA The Hunt"——原名 0 分、英文名 the/hunt 命中 → 取后段
+//	华语片 "The.Piano.in.a.Factory.AKA.Gang.de.qin"——拼音全小写强扣 → 取前段
+//	双零分（Amaran aka SK21 / Andhra King Taluka aka RaPo 22）→ 平分取前段（正名）
 var reAKASplit = regexp.MustCompile(`(?i)(?:\s|\.)\s*(?:AKA)\s*(?:\s|\.)`)
 
 var reNonWord = regexp.MustCompile(`[^\p{L}\p{N}']+`)

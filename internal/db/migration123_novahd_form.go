@@ -48,9 +48,12 @@ import (
 //     standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
 //     technical_info+url+pt_gen+uplver+anonymous:true；nfo 不配
 //     （13城先例域表无此域）。
+//
 // 站规人工把关：§6.4 上传规则（H&R+上传者资格）+§6.5 标题命名规范+
-//   §6.6 无盒子规则；60/120Fps 高帧率种+10Bit 种预览人工核对
-//   （§4.1/§4.2 站方规则）。
+//
+//	§6.6 无盒子规则；60/120Fps 高帧率种+10Bit 种预览人工核对
+//	（§4.1/§4.2 站方规则）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(123, "novahd_publish_form_config", func(gormDB *gorm.DB) error {

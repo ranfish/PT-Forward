@@ -10,8 +10,9 @@ import (
 // 数据操作不随二进制分发，OTA 实例缺同步；用户定案：migration 随版本带走）。
 // ① 传道院（pt.cdy.skin）关站下线：enabled=0/is_target=0（幂等）。
 // ② 修道院（xdypt.vip）建站骨架 upsert：含 form_config 基线（站方表单结构
-//    非敏感可代码化——243 快照 2026-09-03）；凭证不带（敏感不进代码——OTA 实例
-//    用户填 passkey 或 CookieCloud 自动同步）。
+//
+//	非敏感可代码化——243 快照 2026-09-03）；凭证不带（敏感不进代码——OTA 实例
+//	用户填 passkey 或 CookieCloud 自动同步）。
 func syncXdyAndCdySites(gormDB *gorm.DB) error {
 	// ① 传道院下线
 	if err := gormDB.Exec("UPDATE sites SET enabled = 0, is_target = 0, updated_at = CURRENT_TIMESTAMP WHERE domain = ? AND enabled = 1", "pt.cdy.skin").Error; err != nil {
@@ -30,7 +31,7 @@ func syncXdyAndCdySites(gormDB *gorm.DB) error {
 			CookieCloudSync: true, CookieCloudDomain: "xdypt.vip",
 			HRStrategy: "protect", DownloadMode: "template",
 			DownloadURLTemplate: "download.php?id={id}&passkey={passkey}",
-			HashStrategy: "guid", SizeStrategy: "enclosure",
+			HashStrategy:        "guid", SizeStrategy: "enclosure",
 			IDStrategy: "query_param", IDPattern: "id",
 		}
 		site.PublishFormConfig = xdyFormConfigBaseline

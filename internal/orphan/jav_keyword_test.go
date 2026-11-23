@@ -7,14 +7,14 @@ import (
 // §59.225 JAV 番号专用路径——关键词提取。
 func TestExtractJAVKeyword(t *testing.T) {
 	cases := []struct {
-		in     string
-		kw     string
-		isJAV  bool
+		in    string
+		kw    string
+		isJAV bool
 	}{
 		{"MDVR-400.8K", "MDVR-400", true},
 		{"SVVRT-079_4K", "SVVRT-079", true},
 		{"savr-1007", "SAVR-1007", true},
-		
+
 		{"ajvr-306", "AJVR-306", true},
 		{"MDVR-413", "MDVR-413", true},
 		// 非成人形态不触发

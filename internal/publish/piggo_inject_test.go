@@ -48,7 +48,7 @@ func TestPiggoSectionOverride(t *testing.T) {
 	}
 	for _, c := range cases {
 		meta := &model.TorrentMetadata{
-			Category:         "category.animation",
+			Category:        "category.animation",
 			PTGenSourceJSON: c.ptgenJSON,
 		}
 		form := map[string]string{"section_id": "7"}
@@ -62,7 +62,7 @@ func TestPiggoSectionOverride(t *testing.T) {
 // 非动画类型不覆写（电影 1 保持——type 值映射结果不动）。
 func TestPiggoSectionOverride_NonAnimation(t *testing.T) {
 	meta := &model.TorrentMetadata{
-		Category:         "category.movie",
+		Category:        "category.movie",
 		PTGenSourceJSON: `{"genre":["家庭"],"region":["美国"]}`,
 	}
 	form := map[string]string{"section_id": "1"}
@@ -106,7 +106,7 @@ func TestPiggoCategoryIds(t *testing.T) {
 // §59.541: category_ids JSON 串形态注入 form（PiggoAdapter 消费形态）。
 func TestPiggoPublishInject_CategoryJSON(t *testing.T) {
 	meta := &model.TorrentMetadata{
-		Category:         "category.movie",
+		Category:        "category.movie",
 		PTGenSourceJSON: `{"genre":["动作","惊悚"],"region":["美国"]}`,
 	}
 	form := map[string]string{"section_id": "1"}

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"go.uber.org/zap"
 )
 
 // TestSyncMatchCoverage §59.535 刀2: 辅种匹配落库即同步覆盖表——三态锚。
@@ -131,7 +131,6 @@ func TestPreloadIYUUMarkQueried(t *testing.T) {
 		t.Errorf("停用应 false")
 	}
 }
-
 
 // fakeCovTaskConfig: iyuuCoverageWindow 接口断言的最小实现（读 db 的 iyuu_configs）。
 type fakeCovTaskConfig struct {

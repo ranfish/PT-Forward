@@ -141,7 +141,7 @@ func TestParseBBCodeFormat_ColonSeparator(t *testing.T) {
 
 func TestParseBBCodeFormat_RatingFormats(t *testing.T) {
 	cases := []struct {
-		in        string
+		in           string
 		wantR, wantV string
 	}{
 		{"8.5/10 from 100,000 users", "8.5", "100000"},

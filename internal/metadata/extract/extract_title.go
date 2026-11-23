@@ -23,15 +23,15 @@ var (
 
 	// titleQuotedContentRe §59.487: <title> 引号内真标题提取（NP 形态
 	// "站名 :: 种子详情 \"真标题\""——后缀清理只剥尾剩站名·引号优先）。
-	titleQuotedContentRe = regexp.MustCompile(`"([^"]{4,200})"` )
+	titleQuotedContentRe = regexp.MustCompile(`"([^"]{4,200})"`)
 )
 
 // extractTitle 从详情页提取标题。
 // 多 selector 回退（PT-Plugin-Plus 风格）：
-//   1. <h1 id="top"> 标题
-//   2. <h2> / <h3> 标题
-//   3. <title> 标签（带后缀清理）
-//   4. Fallback: 输入参数 fallbackTitle
+//  1. <h1 id="top"> 标题
+//  2. <h2> / <h3> 标题
+//  3. <title> 标签（带后缀清理）
+//  4. Fallback: 输入参数 fallbackTitle
 func (p *PublicExtractor) extractTitle(doc *goquery.Document, fallbackTitle string) string {
 	selectors := []string{
 		`#top`,

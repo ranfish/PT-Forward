@@ -7,7 +7,10 @@ import (
 
 // §59.303 3D 封装技术段约束——主标题区拼音词不得误提取
 func Test303_Stereo3D_MainTitleZone(t *testing.T) {
-	cases := []struct{ title string; want string }{
+	cases := []struct {
+		title string
+		want  string
+	}{
 		// 丁丁战猴王案："Zhan Hou Wang" 的 Hou 在年份前=主标题区 → 不提取
 		{"Ding Ding Zhan Hou Wang 1980 BluRay 1080p x265 10bit FLAC MNHD-FRDS", ""},
 		// 技术段内的 HOU/HSBS 正常提取

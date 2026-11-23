@@ -40,6 +40,7 @@ import (
 //   - 字段：url+technical_info+uplver；**nfo 不配**（13城教训）+
 //     无 pt_gen（站方真无）；候选制走 offers.php 独立页（表单无
 //     asoffer 控件）。
+//
 // 站规人工把关（垃圾堆系同款）：<100MB 禁+upscale 禁+RMVB 禁+游戏
 // 候选制（上传员级）+RAR 禁+Dupe 媒介优先级+断种豁免（45 日/18 月）+
 // <5.1 有损音频禁（国粤 2.0 例外）。

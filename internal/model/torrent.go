@@ -29,7 +29,7 @@ type MusicMeta struct {
 	// R7 判定锚：VH∨scene → 拦（原创作品/Scene 发布）；双 false → 转载可转
 	// （海豚规则：禁转标记仅原创资源可用——转载种无权禁转）。
 	IsVanityHouse bool `json:"is_vanity_house,omitempty"` // 原创作品（自己/授权代表发布）
-	IsScene        bool `json:"is_scene,omitempty"`        // Scene 发布
+	IsScene       bool `json:"is_scene,omitempty"`        // Scene 发布
 }
 
 type TorrentDetail struct {
@@ -39,14 +39,14 @@ type TorrentDetail struct {
 	GroupID string `json:"group_id,omitempty"`
 	// §59.162 keepfrds 禁转两态采集：列表页行原始文本（含 [禁转]/[ 限时禁转 ] 标记）
 	// 与详情页发布时间原文（"由 xx 发布于20时46分前"——相对时间，天档以上=超 24h 窗）
-	RawListRow  string     `json:"raw_list_row,omitempty"`
-	AddedAtText string     `json:"added_at_text,omitempty"`
+	RawListRow  string `json:"raw_list_row,omitempty"`
+	AddedAtText string `json:"added_at_text,omitempty"`
 	// §59.162: 限时禁转让渡截止（判定收口 fetcher——buildMetadata 传递落库）
 	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
 	// §59.369 附二: 详情页发布时间（绝对）——NP 新版 details-inline-time 的
 	// title 属性（"发布于<span title='2026-10-29 19:35:30'>4时6分钟前</span>"，
 	// 深度站实证）；限转 72h 窗等站规判定消费。
-	PublishedAt *time.Time `json:"published_at,omitempty"`
+	PublishedAt  *time.Time `json:"published_at,omitempty"`
 	Subtitle     string     `json:"subtitle"`
 	Description  string     `json:"description"`
 	Category     string     `json:"category"`
@@ -74,8 +74,8 @@ type TorrentDetail struct {
 	FileTree     []FileInfo `json:"file_tree"`
 	InfoHash     string     `json:"info_hash"`
 	// §59.466: 音乐结构化元数据（音乐种非 nil——获取链 L3 产出）
-	Music        *MusicMeta `json:"music,omitempty"`
-	UploadTime   time.Time  `json:"upload_time"`
+	Music      *MusicMeta `json:"music,omitempty"`
+	UploadTime time.Time  `json:"upload_time"`
 
 	// RawHTML 原始详情页 HTML（§56.13 接线：暴露给 Engine + PublicExtractor）。
 	// 仅 NexusPHP/Unit3D 等 HTML 框架的 adapter 填充，MTeam API 模式留空。
@@ -150,40 +150,40 @@ type SearchOptions struct {
 // §33.1.74 — PTGenResult: PTGen 查询结果
 // §56.16 决策 9: 加 Playdate 字段（◎上映日期）
 type PTGenResult struct {
-	ChineseTitle string       `json:"chinese_title"`
+	ChineseTitle string `json:"chinese_title"`
 	// ForeignTitle §59.237 弃用：端点（doubaninfo）foreign_title 实测恒=chinese_title
 	// （148 行历史实证+fnos 三样本）——语义陷阱字段（名承诺 foreign 实为中文别名）。
 	// 保留仅对接端点字段名，禁止一切消费——译名真数据用 TranslatedTitles。
 	ForeignTitle string `json:"foreign_title"`
 	// TranslatedTitles §59.237: ◎译名行完整内容（多语言串——豆瓣又名 aka 同源，
 	// 从 bbcode 提取——端点结构化字段无此数据）。
-	TranslatedTitles string `json:"translated_titles"`
-	Year         string       `json:"year"`
-	Region       []string     `json:"region"`
-	Genre        []string     `json:"genre"`
-	Language     []string     `json:"language"`
-	Episodes     string       `json:"episodes"`
-	Season       string       `json:"season"` // §59.226: ◎季数（裸数字季号消歧门）
-	Duration     string       `json:"duration"`
-	Playdate     string       `json:"playdate"` // §56.16 决策 9: ◎上映日期
-	Director     []string     `json:"director"`
-	Cast         []PersonInfo `json:"cast"`
-	Writer       []string     `json:"writer"`
-	Introduction string       `json:"introduction"`
-	PosterURL    string       `json:"poster_url"`
-	DoubanRating string       `json:"douban_rating"`
-	DoubanVotes  string       `json:"douban_votes"`
-	DoubanURL    string       `json:"douban_url"`
-	IMDBRating   string       `json:"imdb_rating"`
-	IMDBVotes    string       `json:"imdb_votes"`
-	IMDBID       string       `json:"imdb_id"`
-	IMDBURL      string       `json:"imdb_url"`
-	TMDbURL      string       `json:"tmdb_url"`
-	Awards       []string     `json:"awards"`
-	AKA          []string     `json:"aka"`
-	RawBBCode    string       `json:"raw_bbcode"`
-	Source       string       `json:"source"`
-	Cached       bool         `json:"cached"`
+	TranslatedTitles string       `json:"translated_titles"`
+	Year             string       `json:"year"`
+	Region           []string     `json:"region"`
+	Genre            []string     `json:"genre"`
+	Language         []string     `json:"language"`
+	Episodes         string       `json:"episodes"`
+	Season           string       `json:"season"` // §59.226: ◎季数（裸数字季号消歧门）
+	Duration         string       `json:"duration"`
+	Playdate         string       `json:"playdate"` // §56.16 决策 9: ◎上映日期
+	Director         []string     `json:"director"`
+	Cast             []PersonInfo `json:"cast"`
+	Writer           []string     `json:"writer"`
+	Introduction     string       `json:"introduction"`
+	PosterURL        string       `json:"poster_url"`
+	DoubanRating     string       `json:"douban_rating"`
+	DoubanVotes      string       `json:"douban_votes"`
+	DoubanURL        string       `json:"douban_url"`
+	IMDBRating       string       `json:"imdb_rating"`
+	IMDBVotes        string       `json:"imdb_votes"`
+	IMDBID           string       `json:"imdb_id"`
+	IMDBURL          string       `json:"imdb_url"`
+	TMDbURL          string       `json:"tmdb_url"`
+	Awards           []string     `json:"awards"`
+	AKA              []string     `json:"aka"`
+	RawBBCode        string       `json:"raw_bbcode"`
+	Source           string       `json:"source"`
+	Cached           bool         `json:"cached"`
 }
 
 type PersonInfo struct {
@@ -195,15 +195,15 @@ type PersonInfo struct {
 // §33.1.75 — DescriptionData: 描述渲染输入
 // §56.16 决策 5: 加 PTGen 结构化字段（替代 PTGenBody 单字段，PTGenBody 保留向后兼容）
 type DescriptionData struct {
-	Statement     string        `json:"statement"`
-	PosterURL     string        `json:"poster_url"`
-	PTGenBody     string        `json:"ptgen_body"`        // deprecated: 用 PTGen 替代，保留兼容
-	PTGen         *PTGenResult  `json:"ptgen,omitempty"`   // §56.16: 完整结构化 PTGen
-	MediaInfoText string        `json:"mediainfo_text"`
-	BDInfoText    string        `json:"bdinfo_text"`
-	Screenshots   []string      `json:"screenshots"`
-	SourceSite    string        `json:"source_site"`
-	Title         string        `json:"title"`             // §59.20: 种子标题（用于提取制作组名生成致谢）
+	Statement     string       `json:"statement"`
+	PosterURL     string       `json:"poster_url"`
+	PTGenBody     string       `json:"ptgen_body"`      // deprecated: 用 PTGen 替代，保留兼容
+	PTGen         *PTGenResult `json:"ptgen,omitempty"` // §56.16: 完整结构化 PTGen
+	MediaInfoText string       `json:"mediainfo_text"`
+	BDInfoText    string       `json:"bdinfo_text"`
+	Screenshots   []string     `json:"screenshots"`
+	SourceSite    string       `json:"source_site"`
+	Title         string       `json:"title"` // §59.20: 种子标题（用于提取制作组名生成致谢）
 }
 
 // §33.1.28 — PublishStepResult: 21 步中间产物容器

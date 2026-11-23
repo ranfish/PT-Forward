@@ -307,13 +307,13 @@ func TestParsePublishFormHTMLSpanTagsCurrentHint(t *testing.T) {
 func TestMergeDraftInheritsBoolSwitches(t *testing.T) {
 	current := &model.PublishFormConfig{
 		Enabled: true, Anonymous: true, Offer: true,
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}}},
 		},
 	}
 	draft := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {{Label: "电影", Value: "401"}},
 		},

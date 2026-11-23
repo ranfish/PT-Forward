@@ -1,7 +1,6 @@
 package adapter
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -91,14 +91,14 @@ func TestRousiAdapter_GetTorrentDetail_OK(t *testing.T) {
 		resp := map[string]interface{}{
 			"code": 0,
 			"data": map[string]interface{}{
-				"uuid":      "abc-123",
-				"title":     "Test Torrent",
-				"subtitle":  "Sub",
-				"size":      1024,
-				"info_hash": "AABBCCDD11223344AABBCCDD11223344AABBCCDD",
-				"category":  "movie",
-				"seeders":   5,
-				"leechers":  2,
+				"uuid":        "abc-123",
+				"title":       "Test Torrent",
+				"subtitle":    "Sub",
+				"size":        1024,
+				"info_hash":   "AABBCCDD11223344AABBCCDD11223344AABBCCDD",
+				"category":    "movie",
+				"seeders":     5,
+				"leechers":    2,
 				"description": "Desc content",
 			},
 		}

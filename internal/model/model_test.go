@@ -206,8 +206,6 @@ func TestAppError_Unwrap(t *testing.T) {
 	}
 }
 
-
-
 func TestTorrentEvent_TableName(t *testing.T) {
 	var e TorrentEvent
 	if e.TableName() != "torrent_events" {

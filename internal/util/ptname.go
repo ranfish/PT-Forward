@@ -2,8 +2,8 @@ package util
 
 import (
 	"regexp"
-	"sync/atomic"
 	"strings"
+	"sync/atomic"
 )
 
 // ExtractGroupName 从标题末尾提取制作组名。

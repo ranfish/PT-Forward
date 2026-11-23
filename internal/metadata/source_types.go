@@ -43,8 +43,8 @@ type PTGenSourceJSON struct {
 
 // LocalSourceJSON 本地产物原始结果。
 type LocalSourceJSON struct {
-	MediaInfo   string   `json:"mediainfo"`
-	BDInfo      string   `json:"bdinfo"`
-	Screenshots []string `json:"screenshots"`
+	MediaInfo   string    `json:"mediainfo"`
+	BDInfo      string    `json:"bdinfo"`
+	Screenshots []string  `json:"screenshots"`
 	GeneratedAt time.Time `json:"generated_at"`
 }

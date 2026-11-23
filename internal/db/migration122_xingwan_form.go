@@ -53,8 +53,11 @@ import (
 //     （13城先例——域表无 nfo 域配了必 formdiff 假差异；GTK 澄清实未配）；
 //     **无 uplver（文档漂移）+无 url/pt_gen/dburl/douban_id+无
 //     audiocodec 槽（第五站）**——质量信息仅靠选择器+标题传达。
+//
 // 站规人工把关：随机促销+自动免费（>20GB/原盘/每季首集）+YIFY/
-//   YTS 低码率"不建议收藏"+上传者资格。9KG🈲 标签=成人区镜像禁发。
+//
+//	YTS 低码率"不建议收藏"+上传者资格。9KG🈲 标签=成人区镜像禁发。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(122, "xingwan_publish_form_config", func(gormDB *gorm.DB) error {

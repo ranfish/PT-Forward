@@ -1,21 +1,22 @@
 // Package ptgen ◎字段 BBCode 解析器（§56.16 决策 1 + §10.11）。
 //
 // PTGen（豆影/财神）返回的 BBCode 格式（◎风格）：
-//   [img]海报URL[/img]
 //
-//   ◎译　名 xxx / yyy
-//   ◎片　名 Original Title
-//   ◎年　代 2024
-//   ◎产　地 中国大陆
-//   ◎类　型 剧情 / 动作
-//   ◎上映日期 2024-01-01
-//   ◎IMDb评分 8.5/10 from 100,000 users
-//   ◎豆瓣评分 8.2 12345/54321
-//   ◎片　长 120分钟
-//   ◎导　演 张三
-//   ◎主　演 李四 / 王五
-//   ◎简　介 剧情简介...
-//   ◎获奖情况 ...
+//	[img]海报URL[/img]
+//
+//	◎译　名 xxx / yyy
+//	◎片　名 Original Title
+//	◎年　代 2024
+//	◎产　地 中国大陆
+//	◎类　型 剧情 / 动作
+//	◎上映日期 2024-01-01
+//	◎IMDb评分 8.5/10 from 100,000 users
+//	◎豆瓣评分 8.2 12345/54321
+//	◎片　长 120分钟
+//	◎导　演 张三
+//	◎主　演 李四 / 王五
+//	◎简　介 剧情简介...
+//	◎获奖情况 ...
 //
 // 解析失败时不阻塞主流程（决策 15）：返回部分填充结果，RawBBCode 完整。
 package ptgen
@@ -28,10 +29,10 @@ import (
 )
 
 var (
-	bbcodeImgRe  = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
-	doubanURLRe  = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/\d+`)
-	imdbURLRe    = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(tt\d+)`)
-	tmdbURLRe    = regexp.MustCompile(`https?://(?:www\.)?themoviedb\.org/(?:movie|tv)/\d+`)
+	bbcodeImgRe   = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
+	doubanURLRe   = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/\d+`)
+	imdbURLRe     = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(tt\d+)`)
+	tmdbURLRe     = regexp.MustCompile(`https?://(?:www\.)?themoviedb\.org/(?:movie|tv)/\d+`)
 	ratingSlashRe = regexp.MustCompile(`([\d.]+)\s*/\s*10\s*(?:from\s*)?([\d,]+)\s*(?:users)?`)
 	ratingSpaceRe = regexp.MustCompile(`([\d.]+)\s+(\d+)/(\d+)`)
 )
@@ -41,30 +42,30 @@ type fieldMapper func(result *model.PTGenResult, value string)
 
 // fieldMappers ◎字段名（去全角空格后）→ 映射函数。
 var fieldMappers = map[string]fieldMapper{
-	"译名":    mapChineseTitle,
-	"又名":    mapAKA,
-	"片名":    mapForeignTitle,
-	"年代":    mapYear,
-	"产地":    mapRegion,
-	"地区":    mapRegion,
-	"类型":    mapGenre,
-	"类别":    mapGenre,
-	"语言":    mapLanguage,
-	"上映日期": mapPlaydate,
-	"首映":    mapPlaydate,
+	"译名":     mapChineseTitle,
+	"又名":     mapAKA,
+	"片名":     mapForeignTitle,
+	"年代":     mapYear,
+	"产地":     mapRegion,
+	"地区":     mapRegion,
+	"类型":     mapGenre,
+	"类别":     mapGenre,
+	"语言":     mapLanguage,
+	"上映日期":   mapPlaydate,
+	"首映":     mapPlaydate,
 	"IMDb评分": mapIMDbRating,
 	"IMDB评分": mapIMDbRating,
-	"豆瓣评分": mapDoubanRating,
-	"片长":    mapDuration,
+	"豆瓣评分":   mapDoubanRating,
+	"片长":     mapDuration,
 	// §59.226: ◎季数/◎集数映射（曾无映射被丢弃——InferCategory ④级
 	// ptgenEpisodes 输入激活+裸数字季号消歧门）
-	"季数": mapSeason,
-	"集数": mapEpisodes,
-	"导演":    mapDirector,
-	"编剧":    mapWriter,
-	"主演":    mapCast,
-	"简介":    mapIntroduction,
-	"获奖":    mapAwards,
+	"季数":   mapSeason,
+	"集数":   mapEpisodes,
+	"导演":   mapDirector,
+	"编剧":   mapWriter,
+	"主演":   mapCast,
+	"简介":   mapIntroduction,
+	"获奖":   mapAwards,
 	"获奖情况": mapAwards,
 }
 
@@ -72,15 +73,15 @@ var fieldMappers = map[string]fieldMapper{
 // 解析失败时不阻塞，返回部分填充的结果（RawBBCode 完整）。
 func ParseBBCodeFormat(bbcode string) *model.PTGenResult {
 	result := &model.PTGenResult{
-		RawBBCode:   bbcode,
-		Region:      []string{},
-		Genre:       []string{},
-		Language:    []string{},
-		Director:    []string{},
-		Cast:        []model.PersonInfo{},
-		Writer:      []string{},
-		Awards:      []string{},
-		AKA:         []string{},
+		RawBBCode: bbcode,
+		Region:    []string{},
+		Genre:     []string{},
+		Language:  []string{},
+		Director:  []string{},
+		Cast:      []model.PersonInfo{},
+		Writer:    []string{},
+		Awards:    []string{},
+		AKA:       []string{},
 	}
 
 	if strings.TrimSpace(bbcode) == "" {
@@ -273,8 +274,9 @@ func splitBySlash(s string) []string {
 }
 
 // parseRating 解析评分。支持两种格式：
-//   "8.5/10 from 100,000 users" → rating="8.5", votes="100,000"
-//   "8.2 12345/54321"            → rating="8.2", votes="12345"（豆影特殊格式）
+//
+//	"8.5/10 from 100,000 users" → rating="8.5", votes="100,000"
+//	"8.2 12345/54321"            → rating="8.2", votes="12345"（豆影特殊格式）
 func parseRating(s string) (rating, votes string) {
 	s = strings.TrimSpace(s)
 	if m := ratingSlashRe.FindStringSubmatch(s); len(m) > 2 {

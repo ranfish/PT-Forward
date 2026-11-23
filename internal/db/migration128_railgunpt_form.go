@@ -39,8 +39,11 @@ import (
 //     audiocodec_sel[4]/tags[4][]/small_descr/descr+url（IMDb）+
 //     pt_gen+uplver+anonymous:true；**无 technical_info**（文档
 //     §1.2 实证——MI 塞简介）；nfo 不配（13城先例）。
+//
 // 站规人工把关：特殊区 413-418 六项成人全局禁止（§30.3 用户指令）
-//   +下架视频备份(420) 版权敏感性预览人工核对。
+//
+//	+下架视频备份(420) 版权敏感性预览人工核对。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(128, "railgunpt_publish_form_config", func(gormDB *gorm.DB) error {

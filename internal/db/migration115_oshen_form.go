@@ -31,6 +31,7 @@ import (
 //     HDR 四键泛家族（16 站）。
 //   - 字段：url（data-pt-gen 真字段——文档漂移实时仲裁）+uplver+
 //     anonymous:true；无 pt_gen/technical_info（实时实证）；nfo 不配。
+//
 // 站规人工把关：Dupe 标准 HD 规则（媒介优先级 Blu-ray>HD DVD>HDTV>DVD
 // +同媒介同分辨率一组优先）+游戏 5 题候选+RAR 禁+总量≥400MB（音乐
 // 豁免）+促销自动 2xFree+吸血封号+H&R 无强制。

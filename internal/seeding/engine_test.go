@@ -89,10 +89,10 @@ func (m *mockDownloaderClient) GetMainDataIncremental(_ context.Context, _ int) 
 }
 func (m *mockDownloaderClient) GetName() string                           { return "mock" }
 func (m *mockDownloaderClient) GetRole() string                           { return "" }
-func (m *mockDownloaderClient) GetTransferTargetUID() uint                 { return 0 }
+func (m *mockDownloaderClient) GetTransferTargetUID() uint                { return 0 }
 func (m *mockDownloaderClient) GetID() uint                               { return 0 }
 func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
-func (m *mockDownloaderClient) GetTorrentDir() string                      { return "" }
+func (m *mockDownloaderClient) GetTorrentDir() string                     { return "" }
 func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
@@ -105,8 +105,8 @@ func (m *mockDownloaderClient) GetTrackers(_ context.Context, _ string) ([]strin
 }
 
 type mockDownloaderProvider struct {
-	clients     map[uint]*mockDownloaderClient
-	list     []uint
+	clients map[uint]*mockDownloaderClient
+	list    []uint
 }
 
 func (p *mockDownloaderProvider) Get(id uint) (model.DownloaderClient, error) {
@@ -149,7 +149,7 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "abc123",
 		SiteName:  "site1",
 		TorrentID: "42",
@@ -257,14 +257,14 @@ func TestEngine_StartWithRecords(t *testing.T) {
 	ctx := context.Background()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "hash1",
 		SiteName:  "site1",
 		TorrentID: "100",
 		Status:    model.SeedingStatusSeeding,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  2,
+		ClientUID: 2,
 		InfoHash:  "hash2",
 		SiteName:  "site2",
 		TorrentID: "200",
@@ -340,7 +340,7 @@ func TestEngine_CleanupStale_DeletesOld(t *testing.T) {
 	ctx := context.Background()
 
 	rec := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "s",
 		TorrentID: "1",
@@ -350,7 +350,7 @@ func TestEngine_CleanupStale_DeletesOld(t *testing.T) {
 	db.Model(rec).Update("updated_at", time.Now().AddDate(0, 0, -31))
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h2",
 		SiteName:  "s",
 		TorrentID: "2",
@@ -383,7 +383,7 @@ func TestEngine_CleanupStale_PausesFreeExpired(t *testing.T) {
 
 	past := time.Now().Add(-1 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "s",
 		TorrentID: "1",
@@ -605,7 +605,7 @@ func TestEngine_ListConfigs(t *testing.T) {
 
 	db.Create(&model.SeedingClientConfig{
 		ClientUID: 1,
-		Enabled:  true,
+		Enabled:   true,
 	})
 	db.Exec("INSERT INTO seeding_client_configs (client_uid, enabled, created_at, updated_at) VALUES (?, false, datetime('now'), datetime('now'))", 2)
 
@@ -779,7 +779,7 @@ func TestEngine_ApplyConfig(t *testing.T) {
 
 	t.Run("valid weights", func(t *testing.T) {
 		cfg := &model.SeedingClientConfig{
-   Role: "seeding",
+			Role:                "seeding",
 			CleanupScoreWeights: `{"seed_hours":0.5,"upload_speed":0.3,"ratio":0.1,"disk_usage":0.1}`,
 		}
 		_, _, weights := e.applyConfig(cfg, 0.3, 48.0, DefaultCleanupWeights())
@@ -844,7 +844,7 @@ func TestEngine_CollectTrafficStats(t *testing.T) {
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -911,7 +911,7 @@ func TestEngine_CollectSiteTrafficDaily_Update(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -1084,7 +1084,7 @@ func TestEngine_Evaluate_ClientNotFound(t *testing.T) {
 
 	e.SetClientProvider(&mockDownloaderProvider{
 		clients: map[uint]*mockDownloaderClient{},
-		list:    []uint{},	})
+		list:    []uint{}})
 
 	_, err := e.Evaluate(ctx, 999, nil)
 	if err == nil {
@@ -1122,7 +1122,7 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "hash1",
 		SiteName:  "s1",
 		TorrentID: "1",
@@ -1144,7 +1144,7 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
- Role: "seeding",
+		Role:               "seeding",
 	}
 	result, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
@@ -1168,7 +1168,7 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:     1,
+		ClientUID:    1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1190,7 +1190,7 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
- Role: "seeding",
+		Role:               "seeding",
 	}
 	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
@@ -1217,7 +1217,7 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:     1,
+		ClientUID:    1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1238,7 +1238,7 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
- Role: "seeding",
+		Role:               "seeding",
 	}
 	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
@@ -1259,7 +1259,7 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:     1,
+		ClientUID:    1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1283,7 +1283,7 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
- Role: "seeding",
+		Role:               "seeding",
 	}
 	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
@@ -1305,7 +1305,7 @@ func TestEngine_Evaluate_DeleteTorrent(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "hash1",
 		SiteName:  "s1",
 		TorrentID: "1",
@@ -1477,13 +1477,13 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientUID:             1,
+		ClientUID:            1,
 		Enabled:              true,
 		ReannounceBefore:     true,
 		ReannounceRetries:    2,
 		ReannounceIntervalMs: 100,
 		ReannounceWaitMs:     100,
- Role: "seeding",
+		Role:                 "seeding",
 	}
 
 	result, err := e.Evaluate(ctx, 1, cfg)
@@ -1525,10 +1525,10 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientUID:         1,
+		ClientUID:        1,
 		Enabled:          true,
 		ReannounceBefore: false,
- Role: "seeding",
+		Role:             "seeding",
 	}
 
 	result, err := e.Evaluate(ctx, 1, cfg)
@@ -1573,13 +1573,13 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientUID:             1,
+		ClientUID:            1,
 		Enabled:              true,
 		ReannounceBefore:     true,
 		ReannounceRetries:    2,
 		ReannounceIntervalMs: 50,
 		ReannounceWaitMs:     50,
- Role: "seeding",
+		Role:                 "seeding",
 	}
 
 	result, err := e.Evaluate(ctx, 1, cfg)

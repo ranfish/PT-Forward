@@ -4,15 +4,15 @@ import "gorm.io/gorm"
 
 // migration157 §59.511: 瓷器（hdwing.org）发布适配开闸。
 // 依据：docs/32-站点适配器设计/hdwing.md §5（2026-11-10 摸底+四点定案）
-//  - 官组修正：删 KiSHD（站规未点名=非官组·首版误配）+补 OpenMV/HDC
-//    （用户确认 6+站规点名 LU9998/iHD=8 官组）
-//  - form_config：type/medium/codec/audiocodec/standard/team 六域映射 +
-//    固定字段（share_rule 恒3欢迎转载·board 恒1普通区·is3d/cover/dburl）
-//  - team 值集排除官组三槽（HDC=22/LU9998=21/iHD=12——规则⑥选站层
-//    拦截+表单防御双保险）
-//  - type 直映射类配 standard_keys（animation14/纪录5/体育15/综艺401/
-//    演唱402/MV406/音乐408）；路由类（4K大桶/电影分桶/剧集产区轴）由
-//    executor hdwingCategoryValue label 查（值集仍需在场）
+//   - 官组修正：删 KiSHD（站规未点名=非官组·首版误配）+补 OpenMV/HDC
+//     （用户确认 6+站规点名 LU9998/iHD=8 官组）
+//   - form_config：type/medium/codec/audiocodec/standard/team 六域映射 +
+//     固定字段（share_rule 恒3欢迎转载·board 恒1普通区·is3d/cover/dburl）
+//   - team 值集排除官组三槽（HDC=22/LU9998=21/iHD=12——规则⑥选站层
+//     拦截+表单防御双保险）
+//   - type 直映射类配 standard_keys（animation14/纪录5/体育15/综艺401/
+//     演唱402/MV406/音乐408）；路由类（4K大桶/电影分桶/剧集产区轴）由
+//     executor hdwingCategoryValue label 查（值集仍需在场）
 func init() {
 	RegisterMigration(157, "hdwing_publish", func(gormDB *gorm.DB) error {
 		// ① 官组修正（mappings：删 KiSHD·补 OpenMV/HDC）

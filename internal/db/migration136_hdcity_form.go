@@ -37,8 +37,11 @@ import (
 //     （无域常量+值形态特殊——字符串 value 下拉/独立 checkbox）
 //   - IMDb 必填（站方规则：电影/剧集必须填）——form_fields 配
 //     imdb_url 域
+//
 // 站规人工把关：Dupe 规则（§2.5）/RMVB·CAM 禁/无 CUE 的 CD 映像
-//   禁/体育节目禁泄结果/简介必含海报+文件详情。
+//
+//	禁/体育节目禁泄结果/简介必含海报+文件详情。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(136, "hdcity_publish_form_config", func(gormDB *gorm.DB) error {

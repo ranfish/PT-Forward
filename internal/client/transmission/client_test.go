@@ -1,12 +1,12 @@
 package transmission
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"

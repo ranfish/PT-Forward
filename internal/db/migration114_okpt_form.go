@@ -49,6 +49,7 @@ import (
 //     投递域历史定案持续；预览人工）。
 //   - 字段：url（data-pt-gen IMDb 真字段）+technical_info（MediaInfo
 //     独立字段）+无 pt_gen/nfo/dburl（文档实证）。
+//
 // 站规人工把关：无重复判定（多小组共存）+H&R 全站强制+吸血降级
 // Peasant+简介严格顺序+转载出处按制作组源站+黑名单组禁转。
 // 幂等：仅空值行写入。

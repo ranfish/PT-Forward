@@ -16,7 +16,7 @@ func TestNormalizeColorToHex(t *testing.T) {
 		{"#aabbcc", "#aabbcc"},
 		{"rgb(255,0,0)", "#ff0000"},
 		{"rgb( 0 , 128 , 255 )", "#0080ff"},
-		{"RGB(100%,100%,100%)", ""},   // 百分比暂不支持
+		{"RGB(100%,100%,100%)", ""}, // 百分比暂不支持
 		{"unknown_color", ""},
 		{"", ""},
 	}
@@ -42,7 +42,7 @@ func TestMapPixelSizeToBBCodeSize(t *testing.T) {
 		{"48px", "7"},
 		{"100px", "7"},
 		{"10px", "1"},
-		{"12pt", "2"},  // 12pt * 96/72 = 16px → 3？让我验算: 12*96/72 = 16，size=3
+		{"12pt", "2"}, // 12pt * 96/72 = 16px → 3？让我验算: 12*96/72 = 16，size=3
 		{"invalid", ""},
 		{"", ""},
 	}
@@ -63,13 +63,13 @@ func TestMapPixelSizeToBBCodeSize(t *testing.T) {
 
 func TestIsBoldFontWeight(t *testing.T) {
 	cases := map[string]bool{
-		"bold": true,
-		"BOLD": true,
-		"600":  true,
-		"700":  true,
-		"500":  false,
+		"bold":   true,
+		"BOLD":   true,
+		"600":    true,
+		"700":    true,
+		"500":    false,
 		"normal": false,
-		"abc":  false,
+		"abc":    false,
 	}
 	for in, want := range cases {
 		if got := isBoldFontWeight(in); got != want {

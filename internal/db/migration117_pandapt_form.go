@@ -41,6 +41,7 @@ import (
 //     真字段**（data-pt-gen="pt_gen" 带获取按钮）+technical_info+
 //     uplver+anonymous:true；approval（候选发布勾选——默认不勾直发，
 //     不配同 offers 定案）；nfo 不配。
+//
 // 站规人工把关：标题规范（电影/剧集/音乐类命名）+简介格式（影视类
 // 引用 PTGen）+站免池+复活区+官方组导航（DIY/Encode/REMUX/WEB-DL/
 // HDTV/Upscale 按媒介筛选）+CatEDU 部分禁转。

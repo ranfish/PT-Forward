@@ -168,7 +168,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	subID := fmt.Sprintf("%d", sub.ID)
 
 	record := &model.SeedingTorrentRecord{
-		ClientUID:       1,
+		ClientUID:      1,
 		TorrentID:      "free-001",
 		InfoHash:       "aa111bb222cc333dd444ee555ff666aa777bb88",
 		SiteName:       "f4-site",
@@ -271,7 +271,7 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 	require.NoError(t, db.Create(sub).Error)
 
 	nonFreeRecord := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		TorrentID: "nonfree-001",
 		InfoHash:  "bb111bb222cc333dd444ee555ff666aa777bb99",
 		SiteName:  "f4skip-site",
@@ -326,7 +326,7 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	require.NoError(t, db.Create(reseedClient).Error)
 
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		TorrentID: "src-001",
 		InfoHash:  "aa111bb222cc333dd444ee555ff666aa777bb88",
 		SiteName:  "f7-source",
@@ -453,7 +453,7 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	require.NoError(t, db.Create(nomatchClient).Error)
 
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		TorrentID: "src-nm-001",
 		InfoHash:  "cc111bb222cc333dd444ee555ff666aa777bb00",
 		SiteName:  "f7nomatch-src",

@@ -20,8 +20,8 @@ type Server struct {
 	db          *gorm.DB
 	logger      *zap.Logger
 
-	store       sync.Map
-	debounceMu  sync.Mutex
+	store         sync.Map
+	debounceMu    sync.Mutex
 	debounceTimer *time.Timer
 }
 

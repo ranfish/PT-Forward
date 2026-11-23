@@ -7,7 +7,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-
 // §59.510 hdwing（瓷器）：site-key 优先层——"格式"显式配置 resolution
 // 压过 default medium（SSD/碟粉语义不破坏）。
 func TestMatchFieldWithLabels_SiteKeyPriority(t *testing.T) {

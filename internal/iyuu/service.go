@@ -44,7 +44,6 @@ func NewService(db *gorm.DB, logger *zap.Logger) *Service {
 	}
 }
 
-
 func effectiveBaseURL(cfg *model.IYUUConfig) string {
 	if cfg.IsVIP && cfg.BaseURL != "" {
 		// VIP 已开启：如果用户手动填了 BaseURL 就用手填的，否则用 VIP 域名
@@ -695,10 +694,10 @@ type iyuuSitesData struct {
 }
 
 type iyuuReseedTarget struct {
-	Sid       int            `json:"sid"`
-	TorrentID json.Number    `json:"torrent_id"`
-	InfoHash  string         `json:"info_hash"`
-	Group     int            `json:"group"`
+	Sid       int         `json:"sid"`
+	TorrentID json.Number `json:"torrent_id"`
+	InfoHash  string      `json:"info_hash"`
+	Group     int         `json:"group"`
 }
 
 type iyuuReseedDataWrapper struct {

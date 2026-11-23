@@ -23,11 +23,11 @@ type SEForm struct {
 
 // Form 枚举（A/B 链共用词表——A 链 TorrentType.Form 值域对齐）。
 const (
-	FormSeasonPack    = "season_pack"     // 单季合集（S01 / E01 起区间）
-	FormPartialPack   = "partial_pack"    // 部分合集（E05 起区间）
-	FormSingleEpisode = "single_episode"  // 单集（S01E03 / 裸 E03）
-	FormCrossSeason   = "cross_season"    // 跨季合集（S01-S02）
-	FormUnknown       = "unknown"         // 无 S/E 信号
+	FormSeasonPack    = "season_pack"    // 单季合集（S01 / E01 起区间）
+	FormPartialPack   = "partial_pack"   // 部分合集（E05 起区间）
+	FormSingleEpisode = "single_episode" // 单集（S01E03 / 裸 E03）
+	FormCrossSeason   = "cross_season"   // 跨季合集（S01-S02）
+	FormUnknown       = "unknown"        // 无 S/E 信号
 )
 
 var (

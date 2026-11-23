@@ -19,9 +19,9 @@ func (s *hdareaCheckShelf) RoundTrip(req *http.Request) (*http.Response, error) 
 	body := s.response
 	return &http.Response{
 		StatusCode: 200, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(body)),
-		Request:    req,
+		Header:  http.Header{"Content-Type": []string{"application/json"}},
+		Body:    io.NopCloser(strings.NewReader(body)),
+		Request: req,
 	}, nil
 }
 

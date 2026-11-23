@@ -48,9 +48,12 @@ import (
 //     music_medium_sel 七/music_publish_sel 八——完全独立结构非标准
 //     NP；发布链走综合页，音乐类 type 408 命中综合区——独立页字段
 //     不配预览人工）。
+//
 // 站规人工把关：**黑名单制作组**（文档 §3.2——FGT/RARBG 系公网组）
-//   +H&R 360 天/144h+上传者资格（Power User 及以上+考核）+Dupe 组内
-//   同分辨率禁+禁转种转载前获许可+盒子备案+游戏区规则。
+//
+//	+H&R 360 天/144h+上传者资格（Power User 及以上+考核）+Dupe 组内
+//	同分辨率禁+禁转种转载前获许可+盒子备案+游戏区规则。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(120, "pthome_publish_form_config", func(gormDB *gorm.DB) error {

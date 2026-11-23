@@ -20,11 +20,11 @@ type Service struct {
 	logger *zap.Logger
 	client *http.Client
 
-	mu         sync.RWMutex
-	config     *model.CloudFPConfig
-	breaker    *circuitBreaker
-	stopCh     chan struct{}
-	stopped    bool
+	mu      sync.RWMutex
+	config  *model.CloudFPConfig
+	breaker *circuitBreaker
+	stopCh  chan struct{}
+	stopped bool
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) *Service {

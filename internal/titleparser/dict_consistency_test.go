@@ -114,7 +114,7 @@ func TestDictForwardAnchors(t *testing.T) {
 		{"audio_codec", "AC3", "audio.dd"},
 		{"source", "欧美", "source.western"},
 		{"hdr", "DoVi HDR10+", "hdr.dv_hdr10plus"},
-		{"medium", "UNK0", ""},  // 垃圾值 → 空（§59.34 MergeDOMInto 防御依赖）
+		{"medium", "UNK0", ""}, // 垃圾值 → 空（§59.34 MergeDOMInto 防御依赖）
 		{"medium", "UNK11", ""},
 	}
 	for _, a := range anchors {
@@ -132,12 +132,12 @@ func TestDictLookupEdges(t *testing.T) {
 		{"type", "movies", "category.movie"},
 		{"type", "TV SERIES", "category.tv_series"},
 		{"medium", "web-dl", "medium.webdl"},
-		{"medium", "uhd bluray", "medium.uhd_bluray"}, // CI 命中 "UHD BluRay"（旧 lookupStandard 同）
+		{"medium", "uhd bluray", "medium.uhd_bluray"},     // CI 命中 "UHD BluRay"（旧 lookupStandard 同）
 		{"type", "电视剧 (TV Series)", "category.tv_series"}, // contains 最长匹配
 		{"medium", "UHD Blu-ray Remux", "medium.uhd_remux"},
 		{"medium", "Blu-ray Remux", "medium.remux"},
-		{"type", "电视", ""},    // 短输入不含长变体（与旧一致）
-		{"medium", "UNK0", ""},  // 垃圾值（§59.34 防御依赖）
+		{"type", "电视", ""},     // 短输入不含长变体（与旧一致）
+		{"medium", "UNK0", ""}, // 垃圾值（§59.34 防御依赖）
 		{"video_codec", "UNK11", ""},
 		{"hdr", "unknown", ""},
 		{"type", "  ", ""},

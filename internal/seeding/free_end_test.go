@@ -35,7 +35,7 @@ func TestFreeEndMonitor_Schedule_PausedWhenDownloading(t *testing.T) {
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -69,7 +69,7 @@ func TestFreeEndMonitor_Schedule_KeepsSeedingWhenComplete(t *testing.T) {
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -98,7 +98,7 @@ func TestFreeEndMonitor_Cancel(t *testing.T) {
 
 	freeEnd := time.Now().Add(10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  2,
+		ClientUID: 2,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -125,9 +125,9 @@ func TestFreeEndMonitor_SkipNonFree(t *testing.T) {
 
 	record := &model.SeedingTorrentRecord{
 		ClientUID: 2,
-		InfoHash: "abc123",
-		IsFree:   false,
-		Status:   model.SeedingStatusSeeding,
+		InfoHash:  "abc123",
+		IsFree:    false,
+		Status:    model.SeedingStatusSeeding,
 	}
 
 	mon.Schedule(record)
@@ -142,9 +142,9 @@ func TestFreeEndMonitor_SkipNoFreeEndAt(t *testing.T) {
 
 	record := &model.SeedingTorrentRecord{
 		ClientUID: 2,
-		InfoHash: "abc123",
-		IsFree:   true,
-		Status:   model.SeedingStatusSeeding,
+		InfoHash:  "abc123",
+		IsFree:    true,
+		Status:    model.SeedingStatusSeeding,
 	}
 
 	mon.Schedule(record)
@@ -160,7 +160,7 @@ func TestFreeEndMonitor_StopAll(t *testing.T) {
 	freeEnd := time.Now().Add(1 * time.Hour)
 	for i := 0; i < 3; i++ {
 		record := &model.SeedingTorrentRecord{
-			ClientUID:  2,
+			ClientUID: 2,
 			InfoHash:  string(rune('a' + i)),
 			IsFree:    true,
 			FreeEndAt: &freeEnd,
@@ -191,7 +191,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 	future := time.Now().Add(1 * time.Hour)
 
 	expired := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "expired",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -200,7 +200,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 	db.Create(expired)
 
 	upcoming := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "upcoming",
 		IsFree:    true,
 		FreeEndAt: &future,
@@ -238,7 +238,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Completed(t *testing.T) {
 	past := time.Now().Add(-1 * time.Hour)
 
 	expired := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "expired",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -272,7 +272,7 @@ func TestFreeEndMonitor_AlreadyPaused(t *testing.T) {
 
 	past := time.Now().Add(-1 * time.Hour)
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  3,
+		ClientUID: 3,
 		InfoHash:  "already_paused",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -296,7 +296,7 @@ func TestFreeEndMonitor_NoDownloader_PausedAsDefault(t *testing.T) {
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientUID:  2,
+		ClientUID: 2,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",

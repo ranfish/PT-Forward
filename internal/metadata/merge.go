@@ -55,7 +55,7 @@ func reverseLookupOrRaw(v string) string {
 type MergeMode string
 
 const (
-	MergeModePTGenFirst  MergeMode = "ptgen_first"  // 默认
+	MergeModePTGenFirst  MergeMode = "ptgen_first" // 默认
 	MergeModeDetailFirst MergeMode = "detail_first"
 )
 

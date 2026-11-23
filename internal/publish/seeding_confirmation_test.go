@@ -50,7 +50,7 @@ func TestSeedingConfirmation_ConfirmUploaded(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -87,7 +87,7 @@ func TestSeedingConfirmation_NotYetSeeding(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}

@@ -20,7 +20,7 @@ func (m *mockDownloader) DownloadTorrent(_ context.Context, _, _ string) ([]byte
 
 // mockPusher 测试用推种器。
 type mockPusher struct {
-	err error
+	err    error
 	called bool
 }
 

@@ -180,11 +180,11 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	var result struct {
 		Code int `json:"code"`
 		Data struct {
-			UUID      string `json:"uuid"`
-			Title     string `json:"title"`
-			Subtitle  string `json:"subtitle"`
-			Size      int64  `json:"size"`
-			InfoHash  string `json:"info_hash"`
+			UUID        string `json:"uuid"`
+			Title       string `json:"title"`
+			Subtitle    string `json:"subtitle"`
+			Size        int64  `json:"size"`
+			InfoHash    string `json:"info_hash"`
 			Category    string `json:"category"`
 			Seeders     int    `json:"seeders"`
 			Leechers    int    `json:"leechers"`

@@ -131,7 +131,7 @@ func buildUtopiaMusicMeta(rawHTML, h1Title string) *model.MusicMeta {
 		if strings.Contains(sub, "Cue") || strings.Contains(sub, "CUE") {
 			mm.HasCue = true
 		}
-	}	// ⑥ Origin：转载自 URL（最强链——直达源种页面）+&amp; unescape
+	} // ⑥ Origin：转载自 URL（最强链——直达源种页面）+&amp; unescape
 	if m := reUtopiaOriginURL.FindStringSubmatch(rawHTML); len(m) > 1 {
 		mm.Origin = html.UnescapeString(m[1])
 	}

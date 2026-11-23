@@ -31,7 +31,7 @@ var (
 	//   新版面（plugin_details）：<div class="cover"><img src='外域图床'/>
 	//   老版面（details）：无 div.cover·封面=kdescr 简介首图
 	//     （onclick Previewurl 指原图·src 为 .thumb.jpg 缩略——原图优先）
-	reOpenCDCoverImg = regexp.MustCompile(`<div class="cover"[^>]*>\s*<img[^>]*src=['"]([^'"]+)['"]`)
+	reOpenCDCoverImg    = regexp.MustCompile(`<div class="cover"[^>]*>\s*<img[^>]*src=['"]([^'"]+)['"]`)
 	reOpenCDOldCoverURL = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*onclick=['"]Previewurl\('([^']+)'\)['"]`)
 	reOpenCDOldCoverSrc = regexp.MustCompile(`(?s)<div id=['"]kdescr['"]>\s*<img[^>]*src=['"]([^'"]+)['"]`)
 	// §59.488: 全文内容首图（第三层回退）——老种 div.cover 空+kdescr 无·

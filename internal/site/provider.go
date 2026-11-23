@@ -431,7 +431,7 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		DownloadPagePattern: s.DownloadPagePattern,
 		ProxyURL:            s.ProxyURL,
 		SkipSSLVerify:       s.SkipSSLVerify,
-		TLSPretend:          s.TLSPretend, // §59.333
+		TLSPretend:          s.TLSPretend,      // §59.333
 		BrowserFallback:     s.BrowserFallback, // §59.336
 		AssumeFree:          s.AssumeFree,
 	}
@@ -489,11 +489,11 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		RSSKey:      s.RSSKey,
 		BearerToken: s.BearerToken,
 
-		ProxyURL:      s.ProxyURL,
-		SkipSSLVerify: s.SkipSSLVerify,
-		TLSPretend:    s.TLSPretend, // §59.333
+		ProxyURL:        s.ProxyURL,
+		SkipSSLVerify:   s.SkipSSLVerify,
+		TLSPretend:      s.TLSPretend,      // §59.333
 		BrowserFallback: s.BrowserFallback, // §59.336
-		HRStrategy:    s.HRStrategy,
+		HRStrategy:      s.HRStrategy,
 
 		DownloadHourlyLimit:   s.DownloadHourlyLimit,
 		DownloadURLTemplate:   s.DownloadURLTemplate,

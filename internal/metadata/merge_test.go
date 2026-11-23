@@ -25,15 +25,15 @@ func makeDetail(title, body string) *DetailSourceJSON {
 func makePTGen(title, body string) *PTGenSourceJSON {
 	return &PTGenSourceJSON{
 		PTGenResult: model.PTGenResult{
-			ChineseTitle:  title,
-			ForeignTitle:  "ptgen-foreign",
-			Introduction:  body,
-			PosterURL:     "ptgen-poster",
-			DoubanURL:     "https://douban.com/ptgen",
-			IMDBURL:       "https://imdb.com/ptgen",
-			Genre:         []string{"动作"},
-			Cast:          []model.PersonInfo{{Name: "演员"}},
-			RawBBCode:     "[ptgen]",
+			ChineseTitle: title,
+			ForeignTitle: "ptgen-foreign",
+			Introduction: body,
+			PosterURL:    "ptgen-poster",
+			DoubanURL:    "https://douban.com/ptgen",
+			IMDBURL:      "https://imdb.com/ptgen",
+			Genre:        []string{"动作"},
+			Cast:         []model.PersonInfo{{Name: "演员"}},
+			RawBBCode:    "[ptgen]",
 		},
 		FetchedAt: time.Now(),
 	}
@@ -134,7 +134,7 @@ func TestMerge_Screenshots_LocalOverDetail(t *testing.T) {
 		t.Errorf("Screenshots should come from Local, got %v", urls)
 	}
 	if m.SourceOf["screenshots"] != SourceLocal {
-		t.Errorf("screenshots source should be local", )
+		t.Errorf("screenshots source should be local")
 	}
 }
 
@@ -174,7 +174,7 @@ func TestMerge_PTGenOnly_FallsBackToDetail(t *testing.T) {
 		t.Errorf("Title should fallback to detail, got %q", m.Title)
 	}
 	if m.SourceOf["title"] != SourceDetail {
-		t.Errorf("title source should be detail", )
+		t.Errorf("title source should be detail")
 	}
 }
 

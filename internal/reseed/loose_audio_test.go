@@ -18,9 +18,11 @@ func parseTech(s string) titleparser.TechProfile {
 // §59.36 元数据获取宽松轮音频豁免（FRDS 挽救计划案例）。
 //
 // 站点数据实证（keepfrds id=2782301，2026-08-17）：
-//   下载器种子名/文件名: ...DV.HDR10plus.DTS-HD.MA.5.1.mUHD-FRDS（发布者命名错误）
-//   站内列表标题:       ...DV.HDR10plus.TrueHD7.1.Atmos.mUHD-FRDS（与内容物一致）
-//   .torrent info.name 与下载器逐字一致；MediaInfo 实际音轨 TrueHD Atmos + 国配 AC-3
+//
+//	下载器种子名/文件名: ...DV.HDR10plus.DTS-HD.MA.5.1.mUHD-FRDS（发布者命名错误）
+//	站内列表标题:       ...DV.HDR10plus.TrueHD7.1.Atmos.mUHD-FRDS（与内容物一致）
+//	.torrent info.name 与下载器逐字一致；MediaInfo 实际音轨 TrueHD Atmos + 国配 AC-3
+//
 // → 音频冲突是站点文件名/标题标注不一致的虚假信号，非不同资源。
 func TestLoosePickAudioExemption(t *testing.T) {
 	source := "挽救计划.Project.Hail.Mary.2026.UHD.BluRay.2160p.x265.DV.HDR10plus.DTS-HD.MA.5.1.mUHD-FRDS"

@@ -3,9 +3,9 @@ package ptgen
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 

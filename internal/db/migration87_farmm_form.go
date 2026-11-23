@@ -39,6 +39,7 @@ import (
 //   - 字段：url（IMDb data-pt-gen）+pt_gen+technical_info+nfo+
 //     uplver——字段最全站之一；无 doubanid/imdbid（编号形态
 //     不涉及）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(87, "farmm_publish_form_config", func(gormDB *gorm.DB) error {

@@ -8,7 +8,7 @@ type SeedingTorrentRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	ClientUID uint `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_client_hash"`
+	ClientUID uint   `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_client_hash"`
 	InfoHash  string `json:"info_hash" gorm:"size:40;not null;uniqueIndex:idx_client_hash"`
 	SiteName  string `json:"site_name" gorm:"size:50;not null;index"`
 	TorrentID string `json:"torrent_id" gorm:"size:50;not null"`
@@ -31,8 +31,8 @@ type SeedingTorrentRecord struct {
 	FinalDownloaded int64      `json:"final_downloaded" gorm:"default:0"`
 	TorrentSize     int64      `json:"torrent_size" gorm:"default:0"`
 
-	Unregistered    bool       `json:"unregistered" gorm:"default:false"`
-	UnregisteredAt  *time.Time `json:"unregistered_at"`
+	Unregistered   bool       `json:"unregistered" gorm:"default:false"`
+	UnregisteredAt *time.Time `json:"unregistered_at"`
 
 	// §59.152: 最新累计上传/下载（Vertex torrents 表模式——每轮 UPSERT，
 	// 历史总量零成本直读列；traffic 明细表降为当日增量原料）
@@ -41,15 +41,15 @@ type SeedingTorrentRecord struct {
 
 	// §59.153: 最新评分（每轮评分后 UPSERT——rule_evaluator preload 零查询直读列，
 	// 293 万行 MAX(id) GROUP BY 1.8s→毫秒）
-	LastScore     float64   `json:"last_score" gorm:"default:0"`
-	LastCycleID   string    `json:"last_cycle_id" gorm:"size:30;default:''"`
-	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
+	LastScore       float64 `json:"last_score" gorm:"default:0"`
+	LastCycleID     string  `json:"last_cycle_id" gorm:"size:30;default:''"`
+	UnregisteredMsg string  `json:"unregistered_msg" gorm:"size:200"`
 	// §59.31: 命中关键词的 tracker 域名（诊断展示用，非规则条件键）
-	UnregisteredTracker string    `json:"unregistered_tracker" gorm:"size:200"`
+	UnregisteredTracker string `json:"unregistered_tracker" gorm:"size:200"`
 
-	AutoTransfer       bool     `json:"auto_transfer" gorm:"default:false"`
-	TransferClientUIDs  []uint `json:"transfer_client_uids" gorm:"type:json;serializer:json"`
-	TransferRetries    int      `json:"transfer_retries" gorm:"default:0"`
+	AutoTransfer       bool   `json:"auto_transfer" gorm:"default:false"`
+	TransferClientUIDs []uint `json:"transfer_client_uids" gorm:"type:json;serializer:json"`
+	TransferRetries    int    `json:"transfer_retries" gorm:"default:0"`
 
 	// §55.14 阶段2：下载器角色（seeding/download/source/reseed），consumeLoop 据此决定是否评分
 	Role string `json:"role" gorm:"size:20;default:''"`
@@ -60,7 +60,7 @@ func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records
 // §33.1.6 — SeedingClientConfig: 刷流下载器配置（34 字段）
 type SeedingClientConfig struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientUID uint    `json:"client_uid" gorm:"uniqueIndex;not null;default:0"`
+	ClientUID uint      `json:"client_uid" gorm:"uniqueIndex;not null;default:0"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Enabled   bool      `json:"enabled" gorm:"default:true"`
@@ -97,7 +97,7 @@ type SeedingClientConfig struct {
 	CleanupScoreWeights string `json:"cleanup_score_weights" gorm:"type:text"`
 	// §59.122: 评分清理阈值配置化（原硬编码 0.3/48h 无 DB 列——刷流用户调不了低分线）
 	// 零值 = 用引擎默认（0.3/48h）——兼容存量配置行
-	CleanupMinScore   float64 `json:"cleanup_min_score" gorm:"default:0"`
+	CleanupMinScore    float64 `json:"cleanup_min_score" gorm:"default:0"`
 	CleanupMinAgeHours float64 `json:"cleanup_min_age_hours" gorm:"default:0"`
 
 	ArchiveGranularity string `json:"archive_granularity" gorm:"size:20;default:'daily'"`
@@ -119,7 +119,7 @@ func (SeedingClientConfig) TableName() string { return "seeding_client_configs" 
 // §33.1.84 — SeedingClientState: 刷流下载器持久化状态
 type SeedingClientState struct {
 	ID               uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClientUID        uint          `gorm:"uniqueIndex;not null;default:0" json:"client_uid"`
+	ClientUID        uint      `gorm:"uniqueIndex;not null;default:0" json:"client_uid"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	AvgUploadSpeed   float64   `json:"avg_upload_speed"`
 	AvgDownloadSpeed float64   `json:"avg_download_speed"`
@@ -138,7 +138,7 @@ func (SeedingClientState) TableName() string { return "seeding_client_states" }
 // v2: reserved — 待实现时激活
 type SeedingCandidate struct {
 	SubscriptionID string        `json:"subscription_id"`
-	ClientUID      uint           `json:"client_uid"`
+	ClientUID      uint          `json:"client_uid"`
 	Event          *TorrentEvent `json:"event"`
 	CollectedAt    time.Time     `json:"collected_at"`
 }
@@ -197,7 +197,7 @@ func (DeleteRule) TableName() string { return "delete_rules" }
 // §14 — TorrentTraffic: 种子级流量快照
 type TorrentTraffic struct {
 	ID            uint      `gorm:"primaryKey;autoIncrement"`
-	ClientUID     uint     `gorm:"index:idx_traffic_time"`
+	ClientUID     uint      `gorm:"index:idx_traffic_time"`
 	InfoHash      string    `gorm:"index:idx_traffic_time"`
 	SiteName      string    `gorm:"index"`
 	Uploaded      int64     `gorm:""`
@@ -213,7 +213,7 @@ func (TorrentTraffic) TableName() string { return "torrent_traffic" }
 // §14 — DownloaderSpeedSnapshot: 下载器级速度快照
 type DownloaderSpeedSnapshot struct {
 	ID             uint      `gorm:"primaryKey;autoIncrement"`
-	ClientUID      uint         `gorm:"index"`
+	ClientUID      uint      `gorm:"index"`
 	UploadSpeed    int64     `gorm:""`
 	DownloadSpeed  int64     `gorm:""`
 	FreeSpaceBytes int64     `gorm:""`
@@ -239,7 +239,7 @@ func (SiteTrafficDaily) TableName() string { return "site_traffic_daily" }
 // §47 — TrafficStatsHourly: 下载器级小时流量聚合
 type TrafficStatsHourly struct {
 	ID                uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientUID         uint           `json:"client_uid" gorm:"uniqueIndex:idx_client_hour"`
+	ClientUID         uint      `json:"client_uid" gorm:"uniqueIndex:idx_client_hour"`
 	Hour              time.Time `json:"hour" gorm:"uniqueIndex:idx_client_hour"`
 	UploadedDelta     int64     `json:"uploaded_delta" gorm:"default:0"`
 	DownloadedDelta   int64     `json:"downloaded_delta" gorm:"default:0"`
@@ -315,11 +315,12 @@ type CleanupScoreWeights struct {
 // ScoreType 字段（v0.0.226 新增）区分：
 //   - "cleanup"（默认）: CalculateCleanupScore 写入，判断是否删种（engine.go evaluateForCleanup）
 //   - "push"           : CalculateScore 写入，判断是否推送（consumer.go scoreCandidatesFull）
+//
 // 历史数据无 ScoreType 字段值时按 "cleanup" 处理（兼容）。
 type ScoringLog struct {
 	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CycleID     string    `json:"cycle_id" gorm:"size:30;index;not null"`
-	ClientUID   uint     `json:"client_uid" gorm:"index;not null;default:0"`
+	ClientUID   uint      `json:"client_uid" gorm:"index;not null;default:0"`
 	InfoHash    string    `json:"info_hash" gorm:"size:40;index;not null"`
 	SiteName    string    `json:"site_name" gorm:"size:100"`
 	TorrentID   string    `json:"torrent_id" gorm:"size:50"`
@@ -343,12 +344,12 @@ func (ScoringLog) TableName() string { return "scoring_logs" }
 // §59.152 — SiteTrafficFlow: 站点流量增量聚合（Vertex tracker_flow 模式——
 // 写时聚合：采集轮内内存算增量落库，查询永不扫全量明细；7 天保留）。
 type SiteTrafficFlow struct {
-	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	CreatedAt   time.Time `json:"created_at"`
-	SiteName    string    `json:"site_name" gorm:"size:100;index:idx_site_flow_time"`
-	UploadDelta int64     `json:"upload_delta"`
-	DownloadDelta int64   `json:"download_delta"`
-	RecordedAt  time.Time `json:"recorded_at" gorm:"index:idx_site_flow_time"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt     time.Time `json:"created_at"`
+	SiteName      string    `json:"site_name" gorm:"size:100;index:idx_site_flow_time"`
+	UploadDelta   int64     `json:"upload_delta"`
+	DownloadDelta int64     `json:"download_delta"`
+	RecordedAt    time.Time `json:"recorded_at" gorm:"index:idx_site_flow_time"`
 }
 
 func (SiteTrafficFlow) TableName() string { return "site_traffic_flows" }

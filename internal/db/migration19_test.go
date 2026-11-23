@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"go.uber.org/zap"
 	"gorm.io/gorm/logger"
 )
 

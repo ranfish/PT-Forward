@@ -28,6 +28,7 @@ import (
 //     原生原盘(11)/Remux(15)/杜比视界(12)/HDR10+(13)/HDR(7) label-only
 //   - 字段：url（IMDb——url×2 第二个是编辑器按钮）+pt_gen（五来源）+
 //     technical_info+uplver；无独立 douban 字段（用 pt_gen）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(78, "qingwapt_publish_form_config", func(gormDB *gorm.DB) error {

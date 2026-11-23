@@ -32,6 +32,7 @@ import (
 //     家族第五站**
 //   - url IMDb 真字段（url×2 按钮同款）+technical_info；price 促销
 //     字段不配
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(92, "hdclone_publish_form_config", func(gormDB *gorm.DB) error {

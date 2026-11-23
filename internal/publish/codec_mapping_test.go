@@ -28,12 +28,12 @@ func TestCodecMappingOf_Fallback(t *testing.T) {
 	e := &PublishExecutor{}
 	cfg := xdyCodecCfg()
 	cases := []struct{ codec, wantLabel string }{
-		{"x264", "H.264"},   // 编码器实现归标准（×216 案）
-		{"x265", "H.265"},   // ×6 案
-		{"AV1", "Other"},    // 新编码无选项 → Other（×2 案）
-		{"H264", "H.264"},   // 原命中不回归
-		{"HEVC", "H.265"},   // 原命中不回归
-		{"VC-1", "VC-1"},    // 原命中不回归
+		{"x264", "H.264"}, // 编码器实现归标准（×216 案）
+		{"x265", "H.265"}, // ×6 案
+		{"AV1", "Other"},  // 新编码无选项 → Other（×2 案）
+		{"H264", "H.264"}, // 原命中不回归
+		{"HEVC", "H.265"}, // 原命中不回归
+		{"VC-1", "VC-1"},  // 原命中不回归
 	}
 	for _, tc := range cases {
 		// §59.380 签名改 TechProfile——原盘形态（无 encode 信号）保持旧行为语义

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-
 // §59.332: keepfrds 新版（2026-10-05 tailwind 改版）统计提取——
 // 首页实录样本锚：做种数 title 形态 + 新版 span 上传量。
 func TestKeepfrdsNewFrontendStats(t *testing.T) {

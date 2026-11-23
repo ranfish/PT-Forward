@@ -30,11 +30,11 @@ func stripQuoteLayoutImages(bbcode string) string {
 
 // quoteBlock BBCode 中的 quote 块（含位置信息）。
 type quoteBlock struct {
-	Start int    // 在 BBCode 中的起始位置（含 [quote] 标签）
-	End   int    // 结束位置（含 [/quote] 标签）
-	Full  string // 完整 [quote]...[/quote] 文本（剥图后——声明区消费）
+	Start    int    // 在 BBCode 中的起始位置（含 [quote] 标签）
+	End      int    // 结束位置（含 [/quote] 标签）
+	Full     string // 完整 [quote]...[/quote] 文本（剥图后——声明区消费）
 	OrigFull string // 原始未剥图文本（Body 移除消费——ReplaceAll 需与原文精确匹配）
-	Inner string // quote 内部文本（剥图后——分类判定消费）
+	Inner    string // quote 内部文本（剥图后——分类判定消费）
 }
 
 // splitIntroSections 简介分段主入口。
@@ -149,11 +149,11 @@ func extractQuoteBlocks(bbcode string) []quoteBlock {
 			openTag := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			blocks = append(blocks, quoteBlock{
-				Start: openTag.pos,
-				End:   tok.end,
-				Full:  bbcode[openTag.pos:tok.end],
+				Start:    openTag.pos,
+				End:      tok.end,
+				Full:     bbcode[openTag.pos:tok.end],
 				OrigFull: bbcode[openTag.pos:tok.end],
-				Inner: bbcode[openTag.end:tok.pos],
+				Inner:    bbcode[openTag.end:tok.pos],
 			})
 		}
 	}
@@ -292,7 +292,6 @@ func compactBlankLines(s string) string {
 // tid=7025 实证 18 例）。内容限单行内（引用是行内短句，跨行的是正文/分隔线）。
 // 内容首字符排除分隔符本身——纯分隔线（全 dash）无内容不匹配（单测实证）。
 
-
 // kfHeadAnchor §59.172 附三/附六: 头区锚——首个影片详情标记位置（三形态取先到）：
 // ◎（PTGen 格式）/ 【（老式【原 片 名】格式，tid=4186 等 34 种）/
 // 导演[：:]（冒号格式豆瓣老模板，tid=5979 实证）。均无返回 -1（kdouban 框架页回退不动）。
@@ -310,8 +309,10 @@ func kfHeadAnchor(bbcode string) int {
 // 使分类器可见。域纪律：仅头区（首个影片详情标记前）；无标记不动（回退）。
 // 诚实透传语义：内容原样（含 ---- 分隔符本身）不增不删。
 // 两种形态（§59.172 附，tid=7025 实证补充）：
-//  ① 双侧分隔：----文字---- / ——文字——（kfHeadDashQuoteRe）
-//  ② 行首单侧：[b]——文字[/b]——分隔符只在行首（7025 全角破折号变体实为单侧）
+//
+//	① 双侧分隔：----文字---- / ——文字——（kfHeadDashQuoteRe）
+//	② 行首单侧：[b]——文字[/b]——分隔符只在行首（7025 全角破折号变体实为单侧）
+//
 // normalizeKFHeadDashQuotes §59.172 附八: keepfrds 头区 dash 族引用归一——
 // 合并采集（用户定案：多行引用内容包裹为同一个引用块，剥离源站 ----/—— 引用
 // 符号——[quote] 本身承载引用语义，分隔符是源站的无 BBCode 化排版痕迹）。
@@ -377,7 +378,10 @@ func normalizeKFHeadDashQuotes(bbcode string) string {
 	head = maskQuote(head)
 
 	// 逐行统一收集：行首有 dash 族分隔符 + 剥壳后非空 → 引用行
-	type seg struct{ start, end int; text string }
+	type seg struct {
+		start, end int
+		text       string
+	}
 	var segs []seg
 	lineBase := 0
 	for _, ln := range strings.Split(head, "\n") {

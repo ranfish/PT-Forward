@@ -50,7 +50,7 @@ func createTestMember(t *testing.T, db *gorm.DB, groupID uint, role string, seed
 		PublishGroupID: groupID,
 		Role:           role,
 		SiteName:       siteName,
-		ClientUID:       2,
+		ClientUID:      2,
 		InfoHash:       "abc123",
 		Status:         status,
 		Seeders:        seeders,
@@ -192,7 +192,7 @@ func TestLifecycleManager_SubscriptionOverride(t *testing.T) {
 		Name:                  "test-sub",
 		Enabled:               true,
 		SiteName:              "testsite",
-		ClientUID:              2,
+		ClientUID:             2,
 		URLs:                  []string{"http://example.com/rss"},
 		LifecyclePauseSeeders: 20,
 	}

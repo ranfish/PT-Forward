@@ -86,7 +86,6 @@ var siteTimeTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*(?:剩余时间|优�
 
 var tailAnnotSegRe = regexp.MustCompile(`(?:[\s\x{00a0}]*(?:[\[（(【][^\]\)）】]*[\]\)）】]|(?:剩余时间|优惠剩余|免费剩余)[：:\s]*[0-9０-９月天日时小分秒钟:：/]+))+$`)
 
-
 // stripGroupAnnotatedTail §59.248 族四: 组名锚尾段剥除（用户定案——官组名后
 // 站方标注内容均应剥除）。两遍法：①剥尾部纯标注段（形态判据——任意括号段/
 // 时间尾，不查词表=新造词免疫）得 clean2；②clean2 尾部恰为组名（ExtractGroupName

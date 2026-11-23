@@ -11,12 +11,12 @@ type FreeWaitEntry struct {
 	InfoHash       string `gorm:"size:40"`
 	Title          string `gorm:"size:500"`
 	Size           int64
-	ClientUID      uint    `gorm:"not null;default:0"`
+	ClientUID      uint   `gorm:"not null;default:0"`
 	SubscriptionID string `gorm:"size:50;not null"`
 	HasHR          bool
 	HRSeedTimeH    int
 	CheckBefore    *time.Time
-	CheckCount     int `gorm:"default:0"`
-	RecheckSec     int `gorm:"default:600"`
+	CheckCount     int        `gorm:"default:0"`
+	RecheckSec     int        `gorm:"default:600"`
 	LastCheckAt    *time.Time `gorm:"index"`
 }

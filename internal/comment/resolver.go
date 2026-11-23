@@ -21,8 +21,8 @@ import (
 
 // DirectTarget 直达候选：站点名 + tid。
 type DirectTarget struct {
-	SiteName   string
-	TorrentID  string
+	SiteName  string
+	TorrentID string
 }
 
 var (

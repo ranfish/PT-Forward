@@ -191,9 +191,9 @@ func containsStr(s, substr string) bool {
 
 func TestCodecStyle(t *testing.T) {
 	tests := []struct {
-		codec   string
-		medium  string
-		want    string
+		codec  string
+		medium string
+		want   string
 	}{
 		// 原盘/Remux → AVC/HEVC
 		{"HEVC", "UHD Blu-ray", "HEVC"},
@@ -259,12 +259,12 @@ func TestAudioCountWord(t *testing.T) {
 
 func TestReassembleFromTechProfile_FuncOverrides(t *testing.T) {
 	p := TechProfile{
-		MainTitle:    "Test",
-		Resolution:   "1080p",
-		VideoCodec:   "HEVC",
+		MainTitle:     "Test",
+		Resolution:    "1080p",
+		VideoCodec:    "HEVC",
 		Specification: "WEB-DL",
-		AudioCodec:   "DDP",
-		ReleaseGroup: "GRP",
+		AudioCodec:    "DDP",
+		ReleaseGroup:  "GRP",
 	}
 	// 默认 func_overrides
 	tf1 := TitleFormat{
@@ -295,7 +295,7 @@ func TestApplyParadigm(t *testing.T) {
 		{"dot", "", "."},
 		{"space", "", " "},
 		{"chinese_prefixed", "", " "},
-		{"", "", ""},   // 无 paradigm 不改变
+		{"", "", ""},      // 无 paradigm 不改变
 		{"dot", " ", " "}, // 显式 separator 不覆盖
 	}
 	for _, tt := range tests {
@@ -339,8 +339,8 @@ func TestReassembleFromTechProfile_BracketsForbidden(t *testing.T) {
 		ReleaseGroup:  "GRP",
 	}
 	tf := TitleFormat{
-		Separator:        " ",
-		Order:            []string{"title", "group"},
+		Separator:         " ",
+		Order:             []string{"title", "group"},
 		BracketsForbidden: true,
 	}
 	r := ReassembleFromTechProfile(p, tf)
@@ -371,9 +371,9 @@ func TestReassembleFromTechProfile_RemoveSourcePrefix(t *testing.T) {
 		ReleaseGroup: "GRP",
 	}
 	tf := TitleFormat{
-		Separator:           " ",
-		Order:               []string{"title", "group"},
-		RemoveSourcePrefix:  true,
+		Separator:          " ",
+		Order:              []string{"title", "group"},
+		RemoveSourcePrefix: true,
 	}
 	r := ReassembleFromTechProfile(p, tf)
 	if contains(r, "[") {

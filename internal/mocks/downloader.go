@@ -7,11 +7,11 @@ import (
 )
 
 type DownloaderClient struct {
-	Name           string
-	Role           string
+	Name              string
+	Role              string
 	TransferTargetUID uint
-	ID             uint
-	FreeSpaceVal   int64
+	ID                uint
+	FreeSpaceVal      int64
 
 	GetTorrentByHashFn       func(ctx context.Context, hash string) (*model.TorrentInfo, error)
 	GetSeedingTorrentsFn     func(ctx context.Context) ([]*model.TorrentInfo, error)
@@ -41,10 +41,10 @@ type DownloaderClient struct {
 
 func (m *DownloaderClient) GetName() string                           { return m.Name }
 func (m *DownloaderClient) GetRole() string                           { return m.Role }
-func (m *DownloaderClient) GetTransferTargetUID() uint                 { return m.TransferTargetUID }
+func (m *DownloaderClient) GetTransferTargetUID() uint                { return m.TransferTargetUID }
 func (m *DownloaderClient) GetID() uint                               { return m.ID }
 func (m *DownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
-func (m *DownloaderClient) GetTorrentDir() string                      { return "" }
+func (m *DownloaderClient) GetTorrentDir() string                     { return "" }
 
 func (m *DownloaderClient) GetTorrentByHash(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 	if m.GetTorrentByHashFn != nil {

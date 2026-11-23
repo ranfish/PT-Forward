@@ -28,30 +28,30 @@ var dictFS embed.FS
 
 // TokenDef 单个技术词条定义（v2）。
 type TokenDef struct {
-	Category       string   `json:"-"`                          // 词条域（加载时填充）：video_codec/audio_codec/hdr/medium/resolution/type/source/platform
-	Canonical      string   `json:"canonical"`                  // 内部规范值（解析产物/比较值）
-	TitleForm      string   `json:"title_form,omitempty"`       // 重组标题点分隔形式，空 = Canonical
-	Pattern        string   `json:"pattern,omitempty"`          // 标题变体匹配正则（空 = 不参与标题解析，仅 DOM 归一化）
-	StandardKey    string   `json:"standard_key,omitempty"`     // 桥接 standard key（如 medium.webdl），全局唯一
-	EquivGroup     string   `json:"equivalence_group,omitempty"` // 等价组名（如 hevc_impl = {x265, HEVC}），仅比较视图使用
-	Display        string   `json:"display,omitempty"`          // 逆向显示名（空 = Canonical）；正逆向不对称时用（AVC→video.h264 但 video.h264→H.264）
-	Requires       string   `json:"requires,omitempty"`         // 启用条件："web" = 仅 WEB 上下文（2 字符 platform 缩写专用，§59.35 决策 2）
-	Variants       []string `json:"variants,omitempty"`         // DOM 显示名变体（forward map 数据源）
-	FullName       string   `json:"full_name,omitempty"`        // 厂商全名（platform 域，展示/审计用）
-	CaseSensitive  bool     `json:"case_sensitive,omitempty"`   // pattern 大小写敏感（iP/iT/Baha 等 wiki 明确写法）
-	Origin         string   `json:"origin,omitempty"`           // 词条来源："wiki"（v1.05 附件）/"legacy"（本站历史行为保留）——空默认 wiki
-	Note           string   `json:"note,omitempty"`             // 词条备注（legacy 词条说明保留原因）
+	Category      string   `json:"-"`                           // 词条域（加载时填充）：video_codec/audio_codec/hdr/medium/resolution/type/source/platform
+	Canonical     string   `json:"canonical"`                   // 内部规范值（解析产物/比较值）
+	TitleForm     string   `json:"title_form,omitempty"`        // 重组标题点分隔形式，空 = Canonical
+	Pattern       string   `json:"pattern,omitempty"`           // 标题变体匹配正则（空 = 不参与标题解析，仅 DOM 归一化）
+	StandardKey   string   `json:"standard_key,omitempty"`      // 桥接 standard key（如 medium.webdl），全局唯一
+	EquivGroup    string   `json:"equivalence_group,omitempty"` // 等价组名（如 hevc_impl = {x265, HEVC}），仅比较视图使用
+	Display       string   `json:"display,omitempty"`           // 逆向显示名（空 = Canonical）；正逆向不对称时用（AVC→video.h264 但 video.h264→H.264）
+	Requires      string   `json:"requires,omitempty"`          // 启用条件："web" = 仅 WEB 上下文（2 字符 platform 缩写专用，§59.35 决策 2）
+	Variants      []string `json:"variants,omitempty"`          // DOM 显示名变体（forward map 数据源）
+	FullName      string   `json:"full_name,omitempty"`         // 厂商全名（platform 域，展示/审计用）
+	CaseSensitive bool     `json:"case_sensitive,omitempty"`    // pattern 大小写敏感（iP/iT/Baha 等 wiki 明确写法）
+	Origin        string   `json:"origin,omitempty"`            // 词条来源："wiki"（v1.05 附件）/"legacy"（本站历史行为保留）——空默认 wiki
+	Note          string   `json:"note,omitempty"`              // 词条备注（legacy 词条说明保留原因）
 
 	// === tag 域专用（§59.35 P4，label/aliases/group 是展示结构，infer_* 是推断规则）===
-	Label          string   `json:"label,omitempty"`            // 显示名（tag 域，空 = Canonical）
-	Aliases        string   `json:"aliases,omitempty"`          // 别名提示（tag 域 UI）
-	Group          string   `json:"group,omitempty"`            // 分组（tag 域领域结构，TagSelector 派生）
-	InferPattern   string   `json:"infer_pattern,omitempty"`    // 推断正则（tag_inferer 查表化数据源）
-	InferPattern2  string   `json:"infer_pattern2,omitempty"`   // 推断正则第二源（如 PTGen 简介行）
-	InferPatternNeg string  `json:"infer_pattern_neg,omitempty"` // 推断负向排除（命中则不提取）
-	InferScope     string   `json:"infer_scope,omitempty"`      // 匹配范围: all/all_raw/all_mi/title/title_raw/subtitle_raw/desc_raw
-	InferScope2    string   `json:"infer_scope2,omitempty"`     // 第二源范围
-	InferExclude   string   `json:"infer_exclude,omitempty"`    // 命中文本含此词则排除（"国家" 误匹配防御）
+	Label           string `json:"label,omitempty"`             // 显示名（tag 域，空 = Canonical）
+	Aliases         string `json:"aliases,omitempty"`           // 别名提示（tag 域 UI）
+	Group           string `json:"group,omitempty"`             // 分组（tag 域领域结构，TagSelector 派生）
+	InferPattern    string `json:"infer_pattern,omitempty"`     // 推断正则（tag_inferer 查表化数据源）
+	InferPattern2   string `json:"infer_pattern2,omitempty"`    // 推断正则第二源（如 PTGen 简介行）
+	InferPatternNeg string `json:"infer_pattern_neg,omitempty"` // 推断负向排除（命中则不提取）
+	InferScope      string `json:"infer_scope,omitempty"`       // 匹配范围: all/all_raw/all_mi/title/title_raw/subtitle_raw/desc_raw
+	InferScope2     string `json:"infer_scope2,omitempty"`      // 第二源范围
+	InferExclude    string `json:"infer_exclude,omitempty"`     // 命中文本含此词则排除（"国家" 误匹配防御）
 }
 
 // re 返回编译缓存的正则。CaseSensitive 词条不加 (?i)（iP/iT/Baha 等 wiki 明确写法，
@@ -106,7 +106,7 @@ func (t TokenDef) display() string {
 
 // dictState 加载后的字典状态（不可变，进程生命周期复用）。
 type dictState struct {
-	tokens     map[string][]TokenDef       // domain → tokens
+	tokens     map[string][]TokenDef        // domain → tokens
 	forward    map[string]map[string]string // domain → variant（原样） → standard key
 	forwardCI  map[string]map[string]string // domain → variant（lowercase） → standard key
 	reverse    map[string]string            // standard key → display
@@ -314,8 +314,8 @@ func (t TokenDef) tagLabel() string {
 // TagGroups 返回 tag 域分组结构（组名 → 词条列表，保持 dict 文件顺序）。
 // TagSelector / codegen 数据源（§59.35 P4）。
 func TagGroups() []struct {
-	Name  string
-	Tags  []TokenDef
+	Name string
+	Tags []TokenDef
 } {
 	var out []struct {
 		Name string
@@ -342,12 +342,12 @@ func TagGroups() []struct {
 
 // TagInferInput tag 推断输入（§59.35 P4，tag_inferer 查表化）。
 type TagInferInput struct {
-	Subtitle     string
-	Title        string
-	Description  string
-	MediaInfo    string
-	NFO          string
-	Statement    string // §59.73: 引用/声明区（源站简介 quote 块——发布者声明，PTGen 不覆盖）
+	Subtitle    string
+	Title       string
+	Description string
+	MediaInfo   string
+	NFO         string
+	Statement   string // §59.73: 引用/声明区（源站简介 quote 块——发布者声明，PTGen 不覆盖）
 }
 
 // TagInferMatches 按词条 infer_* 规则对输入文本做匹配，返回命中的 canonical 列表（dict 顺序）。

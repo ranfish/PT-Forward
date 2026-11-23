@@ -62,8 +62,8 @@ func seedLuckPublishFormConfig(gormDB *gorm.DB) error {
 	autoFalse := map[string]bool{"英语": true, "首发": true, "原创": true, "禁转": true}
 
 	cfg := model.PublishFormConfig{
-		Enabled:    true,
-		Framework:  "np",
+		Enabled:     true,
+		Framework:   "np",
 		PreAuditURL: "/api/auto-audit/pre-audit",
 		FormFields: map[string]string{
 			// 幸运 HTML 实测字段名（§59.149：data-mode='4' 下拉后缀 + checkbox_span）

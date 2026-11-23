@@ -32,6 +32,7 @@ import (
 //   - custom_fields[4][1..3]=歌手/专辑/年份（音乐类专用——发布链
 //     无此域不配；文档只载 [1] 歌手——[2][3] 实时新增）
 //   - 有 pt_gen（站方自建 PTGen 端点）+uplver；无 url/technical_info
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(81, "zmpt_publish_form_config", func(gormDB *gorm.DB) error {

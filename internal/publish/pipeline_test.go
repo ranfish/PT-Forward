@@ -179,8 +179,6 @@ func TestPipeline_CheckEligibility_HR(t *testing.T) {
 	}
 }
 
-
-
 func TestPipeline_DeleteCandidate(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
@@ -381,9 +379,6 @@ func TestPipeline_ListResults_Empty(t *testing.T) {
 	}
 }
 
-
-
-
 func TestPipeline_SetSiteProvider(t *testing.T) {
 	db := setupPipelineTestDBWithGroups(t)
 	p := NewPipeline(db, zap.NewNop())
@@ -519,4 +514,3 @@ func TestPipeline_Update(t *testing.T) {
 		t.Errorf("expected completed, got %s", got.Status)
 	}
 }
-

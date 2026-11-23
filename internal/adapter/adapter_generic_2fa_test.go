@@ -3,8 +3,8 @@ package adapter
 import (
 	"context"
 	"net/http"
-	"strings"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -54,14 +54,16 @@ func TestGetTorrentDetail_EmptyParseGuard(t *testing.T) {
 	}
 }
 
-func contains(s, sub string) bool { return len(s) >= len(sub) && (func() bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (func() bool {
+		for i := 0; i+len(sub) <= len(s); i++ {
+			if s[i:i+len(sub)] == sub {
+				return true
+			}
 		}
-	}
-	return false
-})() }
+		return false
+	})()
+}
 
 // §59.264: 结构真空守卫——异地登录提醒页（200 直出、<title> 有值、无结构字段）
 func TestGetTorrentDetail_InterstitialTitleOnly(t *testing.T) {

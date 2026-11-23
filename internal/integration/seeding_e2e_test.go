@@ -52,12 +52,12 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	require.NoError(t, db.Create(site).Error)
 
 	sub := &model.RSSSubscription{
-		Name:     "e2e-sub",
-		Enabled:  true,
-		SiteName: "testsite",
+		Name:      "e2e-sub",
+		Enabled:   true,
+		SiteName:  "testsite",
 		ClientUID: 1,
-		URLs:     []string{"https://testsite.cc/rss"},
-		Cron:     "*/5 * * * *",
+		URLs:      []string{"https://testsite.cc/rss"},
+		Cron:      "*/5 * * * *",
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
 			MaxCandidates:    50,
@@ -72,7 +72,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 
 	seedCfg := &model.SeedingClientConfig{
 		ClientUID: 1,
-		Enabled:  true,
+		Enabled:   true,
 	}
 	require.NoError(t, db.Create(seedCfg).Error)
 

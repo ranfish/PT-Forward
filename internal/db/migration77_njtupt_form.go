@@ -21,6 +21,7 @@ import (
 //     AV1(6) 配键
 //   - tags 8 项：首发(2)/官方(3)（财神官种案同款防触雷）/自购(8)/
 //     应求(11)/保种(10) label-only；禁转/国语/中字配键
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(77, "njtupt_publish_form_config", func(gormDB *gorm.DB) error {

@@ -6,22 +6,23 @@
 // 跑生产解析器）。
 //
 // 三模式（-domain 必填）：
-//   凭证解密（bash 管道消费·不落盘不回显）：
-//     go run ./tools/siteprobe -domain hdarea.club -cred cookie
-//     go run ./tools/siteprobe -domain hdarea.club -cred passkey
-//   页面抓取（curl 子进程·cookie 经 stdin 配置不进 argv/磁盘·存
-//   /tmp/opencode/siteprobe/<domain>/）：
-//     go run ./tools/siteprobe -domain hdarea.club -fetch "torrents.php,detail.php?id=123,upload.php"
-//     （路径中字面量 PASSKEY 会被解密 passkey 替换——download/RSS 直链用）
-//   离线验证（货架 HTML → 生产 adapter+Engine 全链解析·零网络）：
-//     go run ./tools/siteprobe -domain hdarea.club -verify -kw Dune -tid 123
-//     （需先 -fetch 存下 torrents.html/search.html/detail.html——search 页
-//      抓法：torrents.php?search=KEYWORD&search_mode=0）
+//
+//	凭证解密（bash 管道消费·不落盘不回显）：
+//	  go run ./tools/siteprobe -domain hdarea.club -cred cookie
+//	  go run ./tools/siteprobe -domain hdarea.club -cred passkey
+//	页面抓取（curl 子进程·cookie 经 stdin 配置不进 argv/磁盘·存
+//	/tmp/opencode/siteprobe/<domain>/）：
+//	  go run ./tools/siteprobe -domain hdarea.club -fetch "torrents.php,detail.php?id=123,upload.php"
+//	  （路径中字面量 PASSKEY 会被解密 passkey 替换——download/RSS 直链用）
+//	离线验证（货架 HTML → 生产 adapter+Engine 全链解析·零网络）：
+//	  go run ./tools/siteprobe -domain hdarea.club -verify -kw Dune -tid 123
+//	  （需先 -fetch 存下 torrents.html/search.html/detail.html——search 页
+//	   抓法：torrents.php?search=KEYWORD&search_mode=0）
 package main
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -245,9 +246,9 @@ func (s *shelf) RoundTrip(req *http.Request) (*http.Response, error) {
 	s.hits[file]++
 	return &http.Response{
 		StatusCode: 200, Status: "200 OK", Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header:     http.Header{"Content-Type": []string{"text/html; charset=utf-8"}},
-		Body:       io.NopCloser(strings.NewReader(string(body))),
-		Request:    req,
+		Header:  http.Header{"Content-Type": []string{"text/html; charset=utf-8"}},
+		Body:    io.NopCloser(strings.NewReader(string(body))),
+		Request: req,
 	}, nil
 }
 
@@ -258,12 +259,12 @@ func (s *shelf) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // metaDomain 站方 metadata 域 → 我方 value_mappings 标准键。
 var metaDomain = map[string]string{
-	"categories":   "type",
-	"media":        "medium",
-	"codecs":       "codec",
-	"audiocodecs":  "audiocodec",
-	"standards":    "standard",
-	"teams":        "team",
+	"categories":  "type",
+	"media":       "medium",
+	"codecs":      "codec",
+	"audiocodecs": "audiocodec",
+	"standards":   "standard",
+	"teams":       "team",
 	// sources→source_sel / processings→processing_sel：刀2 D3 定案不配置
 	// （全站实测恒 0·观察项挂账）——不对账。subtitle_languages/sp_states
 	// 非发布表单域。
@@ -294,7 +295,7 @@ func doMetadata(s *model.Site, base string) {
 		os.Exit(2)
 	}
 	var env struct {
-		Code int `json:"code"`
+		Code int                   `json:"code"`
 		Data map[string][]metaItem `json:"data"`
 	}
 	if err := json.Unmarshal(body, &env); err != nil || env.Code != 0 {

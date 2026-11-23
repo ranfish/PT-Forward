@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 // §59.473: 海胆式 200 直渲组详情页成功页锚——h1 发布成功门+download 尾取
 // （多版本组升序末位=新种）。
 func TestClassifyHaidanSuccessRender(t *testing.T) {

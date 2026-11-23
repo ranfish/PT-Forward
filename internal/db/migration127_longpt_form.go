@@ -11,9 +11,11 @@ import (
 // （资产 16 项——官方绝不配+零魔 label-only 麒麟站方标记同款）+
 // standard label 实时扩充 i 形态（4K/2160p→4K/2160p/2160i 三元
 // 合并）+medium 顺序漂移；**type 409/411 双"其他"同 label 双 value
-//     重复项**（label 重复新形态——历史 FRDS 是同 value 双 label；
-//     draft 解析器同 label 去重保 HTML 首见 409，配置对齐 draft
-//     单行口径删 411——formdiff 抓出 changed 即修）。
+//
+//	重复项**（label 重复新形态——历史 FRDS 是同 value 双 label；
+//	draft 解析器同 label 去重保 HTML 首见 409，配置对齐 draft
+//	单行口径删 411——formdiff 抓出 changed 即修）。
+//
 // 槽位映射：
 //   - type 11：410 有声书+408 音频=[music,lossless_music] 双键+
 //     406 音乐视频=[mv,music_video] 双键+404 双键（409=[other]
@@ -55,8 +57,11 @@ import (
 //     （13城先例）；**无 pt_gen**；action/nonce/mode/redirect/
 //     amount（魔改 UI 字段发布链不处理）+pos_state/pos_state_until
 //     促销字段不配。
+//
 // 站规人工把关：上传者资格+Dupe 媒介优先级（§4.1）+同媒介同分辨率
-//   重编码+豁免条款+资源打包规则（试行）+例外规则。
+//
+//	重编码+豁免条款+资源打包规则（试行）+例外规则。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(127, "longpt_publish_form_config", func(gormDB *gorm.DB) error {

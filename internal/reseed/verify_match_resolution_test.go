@@ -8,9 +8,10 @@ import (
 
 // §59.59 时空奇旅错配案 seam 回归：分辨率冲突必须全路径拦截。
 // 事实来源（243 审计实测，非代码推导）：
-//   本地 0c4b57645d = 时空奇旅 Arco 2025 UHD 2160p DTS-HD MA 22.8GB
-//   错配结果 = 朋友站 2782081 Arco 1080p DDP7.1 REPACK2 10.6GB
-//   同版本存在 = 2782033（22.8GB 完全同规格）
+//
+//	本地 0c4b57645d = 时空奇旅 Arco 2025 UHD 2160p DTS-HD MA 22.8GB
+//	错配结果 = 朋友站 2782081 Arco 1080p DDP7.1 REPACK2 10.6GB
+//	同版本存在 = 2782033（22.8GB 完全同规格）
 func searchResults(withExact bool) []*model.SeedingSearchResult {
 	base := []*model.SeedingSearchResult{
 		{TorrentID: "2782031", Title: "时空奇旅.Arco.2025.BluRay.1080p.x265.10bit.DDP7.1.MNHD-FRDS", Size: 10600000000},

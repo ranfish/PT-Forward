@@ -37,6 +37,7 @@ import (
 //   - 字段：url+**pt_gen 真字段**+technical_info+**无 uplver**（实时
 //     实证——控件全列无匿名字段，anonymous 无承载点）；nfo 不配；
 //     qch_bt_rainbow_enable（站点插件）不配。
+//
 // 站规人工把关：标题命名规范+鼓励保种+吸血处罚+转载注明来源+9KG 区
 // 禁止（全局）+教育类内容健康要求。
 // 幂等：仅空值行写入。

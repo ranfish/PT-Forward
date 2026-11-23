@@ -1,9 +1,9 @@
 package adapter
 
 import (
-	"encoding/base64"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -67,54 +67,54 @@ type hdareaPagination struct {
 }
 
 type hdareaItem struct {
-	ID                    int64  `json:"id"`
-	Name                  string `json:"name"`
-	SmallDescr            string `json:"small_descr"`
-	CategoryID            int    `json:"category_id"`
-	CategoryName          string `json:"category_name"`
-	SourceID              int    `json:"source_id"`
-	SourceName            string `json:"source_name"`
-	MediumID              int    `json:"medium_id"`
-	MediumName            string `json:"medium_name"`
-	CodecID               int    `json:"codec_id"`
-	CodecName             string `json:"codec_name"`
-	AudioCodecID          int    `json:"audiocodec_id"`
-	AudioCodecName        string `json:"audiocodec_name"`
-	StandardID            int    `json:"standard_id"`
-	StandardName          string `json:"standard_name"`
-	ProcessingID          int    `json:"processing_id"`
-	ProcessingName        string `json:"processing_name"`
-	TeamID                int    `json:"team_id"`
-	TeamName              string `json:"team_name"`
-	Size                  int64  `json:"size"`
-	Seeders               int    `json:"seeders"`
-	Leechers              int    `json:"leechers"`
-	Added                 string `json:"added"`
-	AddedTs               int64  `json:"added_ts"`
-	SpState               int    `json:"sp_state"`
-	SpStateName           string `json:"sp_state_name"`
-	DownloadVolumeFactor  float64 `json:"download_volume_factor"`
-	UploadVolumeFactor    float64 `json:"upload_volume_factor"`
-	IsFree                bool   `json:"is_free"`
-	PromotionUntil        string `json:"promotion_until"`
-	IMDbID                string `json:"imdb_id"`
-	IMDbURL               string `json:"imdb_url"`
-	DoubanID              string `json:"douban_id"`
-	DoubanURL             string `json:"douban_url"`
-	PosterURL             string `json:"poster_url"`
-	InfoHash              string `json:"info_hash"`
-	DetailURL             string `json:"detail_url"`
-	DownloadURL           string `json:"download_url"`
-	ForbidTransfer        bool   `json:"forbid_transfer"`
-	Anonymous             bool   `json:"anonymous"`
-	UploaderName          string `json:"uploader_name"`
+	ID                   int64   `json:"id"`
+	Name                 string  `json:"name"`
+	SmallDescr           string  `json:"small_descr"`
+	CategoryID           int     `json:"category_id"`
+	CategoryName         string  `json:"category_name"`
+	SourceID             int     `json:"source_id"`
+	SourceName           string  `json:"source_name"`
+	MediumID             int     `json:"medium_id"`
+	MediumName           string  `json:"medium_name"`
+	CodecID              int     `json:"codec_id"`
+	CodecName            string  `json:"codec_name"`
+	AudioCodecID         int     `json:"audiocodec_id"`
+	AudioCodecName       string  `json:"audiocodec_name"`
+	StandardID           int     `json:"standard_id"`
+	StandardName         string  `json:"standard_name"`
+	ProcessingID         int     `json:"processing_id"`
+	ProcessingName       string  `json:"processing_name"`
+	TeamID               int     `json:"team_id"`
+	TeamName             string  `json:"team_name"`
+	Size                 int64   `json:"size"`
+	Seeders              int     `json:"seeders"`
+	Leechers             int     `json:"leechers"`
+	Added                string  `json:"added"`
+	AddedTs              int64   `json:"added_ts"`
+	SpState              int     `json:"sp_state"`
+	SpStateName          string  `json:"sp_state_name"`
+	DownloadVolumeFactor float64 `json:"download_volume_factor"`
+	UploadVolumeFactor   float64 `json:"upload_volume_factor"`
+	IsFree               bool    `json:"is_free"`
+	PromotionUntil       string  `json:"promotion_until"`
+	IMDbID               string  `json:"imdb_id"`
+	IMDbURL              string  `json:"imdb_url"`
+	DoubanID             string  `json:"douban_id"`
+	DoubanURL            string  `json:"douban_url"`
+	PosterURL            string  `json:"poster_url"`
+	InfoHash             string  `json:"info_hash"`
+	DetailURL            string  `json:"detail_url"`
+	DownloadURL          string  `json:"download_url"`
+	ForbidTransfer       bool    `json:"forbid_transfer"`
+	Anonymous            bool    `json:"anonymous"`
+	UploaderName         string  `json:"uploader_name"`
 	// detail 独有
-	SaveAs        string          `json:"save_as"`
-	DescrBBCode   string          `json:"descr_bbcode"`
-	DescrHTML     string          `json:"descr_html"`
-	NFO           string          `json:"nfo"`
-	Files         json.RawMessage `json:"files"`
-	OtherCopies   json.RawMessage `json:"other_copies"`
+	SaveAs      string          `json:"save_as"`
+	DescrBBCode string          `json:"descr_bbcode"`
+	DescrHTML   string          `json:"descr_html"`
+	NFO         string          `json:"nfo"`
+	Files       json.RawMessage `json:"files"`
+	OtherCopies json.RawMessage `json:"other_copies"`
 }
 
 // ── 内部请求骨架 ──
@@ -189,7 +189,7 @@ func (a *HDAreaAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 	url := fmt.Sprintf("%s/api/v1/torrents?search=%s&pageNumber=%d&pageSize=%d",
 		a.base(config), urlQueryEscape(keyword), page, pageSize)
 	var payload struct {
-		Items      []hdareaItem   `json:"items"`
+		Items      []hdareaItem     `json:"items"`
 		Pagination hdareaPagination `json:"pagination"`
 	}
 	if err := a.apiCall(ctx, config, http.MethodGet, url, nil, &payload); err != nil {
@@ -595,11 +595,11 @@ func (a *HDAreaAdapter) CheckBeforeUpload(ctx context.Context, config *model.Sit
 		return nil, parseError("check data 解析失败: "+err.Error(), err)
 	}
 	result := &PreCheckResult{
-		CanUpload:       data.CanUpload,
-		Status:          data.Status,
-		Reason:          data.Reason,
-		NormalizedHash:  data.NormalizedHash,
-		IsBanned:        strings.Contains(data.Status, "banned") || strings.Contains(data.Reason, "banned"),
+		CanUpload:      data.CanUpload,
+		Status:         data.Status,
+		Reason:         data.Reason,
+		NormalizedHash: data.NormalizedHash,
+		IsBanned:       strings.Contains(data.Status, "banned") || strings.Contains(data.Reason, "banned"),
 	}
 	if data.ExistingTorrent != nil {
 		result.ExistingID = strconv.Itoa(data.ExistingTorrent.ID)

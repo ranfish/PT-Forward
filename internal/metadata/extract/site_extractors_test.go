@@ -21,9 +21,9 @@ func TestSiteExtractors_PTer(t *testing.T) {
 
 	p := NewPublicExtractor("pterclub", "")
 	seed, err := p.Extract(Input{
-		Domain:       "pterclub.net",
-		SiteCode:     "pterclub",
-		PageHTML:     string(htmlBytes),
+		Domain:        "pterclub.net",
+		SiteCode:      "pterclub",
+		PageHTML:      string(htmlBytes),
 		FallbackTitle: "fallback",
 	})
 	if err != nil {
@@ -59,9 +59,9 @@ func TestSiteExtractors_HHanClub(t *testing.T) {
 
 	p := NewPublicExtractor("hhanclub", "")
 	seed, err := p.Extract(Input{
-		Domain:       "hhanclub.net",
-		SiteCode:     "hhanclub",
-		PageHTML:     string(htmlBytes),
+		Domain:        "hhanclub.net",
+		SiteCode:      "hhanclub",
+		PageHTML:      string(htmlBytes),
 		FallbackTitle: "fallback",
 	})
 	if err != nil {
@@ -126,9 +126,9 @@ func TestSiteExtractors_HHanClub_LongSubtitle(t *testing.T) {
 
 	p := NewPublicExtractor("hhanclub", "")
 	seed, err := p.Extract(Input{
-		Domain:       "hhanclub.net",
-		SiteCode:     "hhanclub",
-		PageHTML:     string(htmlBytes),
+		Domain:        "hhanclub.net",
+		SiteCode:      "hhanclub",
+		PageHTML:      string(htmlBytes),
 		FallbackTitle: "fallback",
 	})
 	if err != nil {

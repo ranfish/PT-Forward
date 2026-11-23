@@ -22,9 +22,9 @@ func mmFixture() *model.MusicMeta {
 
 func metaFixture() *model.TorrentMetadata {
 	return &model.TorrentMetadata{
-		SiteName:  "皇后",
-		Title:     "Thelonious Monk - Misterioso 1965-FLAC 分轨-Rosebudx@OpenCD",
-		Poster:    "https://img3.pixhost.to/images/6996/x.jpg",
+		SiteName:          "皇后",
+		Title:             "Thelonious Monk - Misterioso 1965-FLAC 分轨-Rosebudx@OpenCD",
+		Poster:            "https://img3.pixhost.to/images/6996/x.jpg",
 		SourceDescription: "[img]attachments/201303/a.jpg[/img]\n专辑介绍正文。\n曲目：\n01. Well, You Needn't\n\n******************** Score : 100 ********************\nExact Audio Copy V1.6 from 23. October 2020\nEAC extraction logfile",
 	}
 }
@@ -291,9 +291,9 @@ func TestUtopiaMusicFormValues_Mirror(t *testing.T) {
 	m := &model.TorrentMetadata{Title: "Mirror Case"}
 	mm := &model.MusicMeta{Format: "镜像(Mirror)", Media: "CD"}
 	flacTor := bencTorrent([]string{"CD1/a.flac", "CD1/a.cue", "CD1/a.log", "CD2/b.flac", "CD2/b.log"})
-	wavTor := bencTorrent([]string{"a.wav", "b.wav", "a.log"})  // 站内 3588 形态
-	dsdTor := bencTorrent([]string{"a.iso", "b.dsf", "a.log"})  // RCA/SACD ISO 形态
-	noAudio := bencTorrent([]string{"scan.jpg", "a.log"})       // 零音频文件
+	wavTor := bencTorrent([]string{"a.wav", "b.wav", "a.log"}) // 站内 3588 形态
+	dsdTor := bencTorrent([]string{"a.iso", "b.dsf", "a.log"}) // RCA/SACD ISO 形态
+	noAudio := bencTorrent([]string{"scan.jpg", "a.log"})      // 零音频文件
 
 	flac := utopiaMusicFormValues(m, mm, flacTor) // 12 素材 Bach 案：镜像+CD+FLAC → 1
 	if flac["audiocodec_sel[4]"] != "1" {

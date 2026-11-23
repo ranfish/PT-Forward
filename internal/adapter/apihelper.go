@@ -22,8 +22,10 @@ func setXAPIKey(req *http.Request, apiKey string) {
 
 // shortTokenDownload 短效凭证下载流程骨架（参数化——好大 genDlToken 与
 // mt 同语义但请求/响应形态各方言自定）：
-//   tokenReq  签发请求（调用方构造——方言层定端点/方法/body）
-//   parseURL  从签发响应体解析出带签名的下载直链（方言层定字段）
+//
+//	tokenReq  签发请求（调用方构造——方言层定端点/方法/body）
+//	parseURL  从签发响应体解析出带签名的下载直链（方言层定字段）
+//
 // 流程：签发 → GET 直链（不带 API Key——URL 自含凭证）→ 403 过期重签
 // 一次（1800s 短效凭证的标准失效路径·站方文档 §9）。
 func shortTokenDownload(client *http.Client, tokenReq *http.Request, parseURL func([]byte) (string, error)) ([]byte, error) {

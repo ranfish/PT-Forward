@@ -10,43 +10,43 @@ import (
 // 数据来源：internal/site/supported_sites.json（go:embed 只读 seed）。
 // 用户在 UI 添加站点时，必须从该列表选择，禁止自由输入 domain。
 type SupportedSite struct {
-	Domain              string            `json:"domain"`
-	NameCN              string            `json:"name_cn"`
-	Framework           string            `json:"framework"`
-	AuthType            string            `json:"auth_type"`
-	CookiecloudDomain   string            `json:"cookiecloud_domain"`
-	DownloadURLTemplate string            `json:"download_url_template"`
+	Domain              string `json:"domain"`
+	NameCN              string `json:"name_cn"`
+	Framework           string `json:"framework"`
+	AuthType            string `json:"auth_type"`
+	CookiecloudDomain   string `json:"cookiecloud_domain"`
+	DownloadURLTemplate string `json:"download_url_template"`
 	// §59.478: 详情页 URL 模板（空=框架默认 /details.php?id={id}·
 	// 皇后 plugin_details.php 老种新版面案）
 	DetailsURLTemplate string            `json:"details_url_template,omitempty"`
 	PasskeyLabel       string            `json:"passkey_label,omitempty"`
-	PasskeyHint         string            `json:"passkey_hint,omitempty"`
-	APIKeyLabel         string            `json:"api_key_label,omitempty"`
-	APIKeyHint          string            `json:"api_key_hint,omitempty"`
-	RSSKeyLabel         string            `json:"rss_key_label,omitempty"`
-	RSSKeyHint          string            `json:"rss_key_hint,omitempty"`
-	ShowCookie          *bool             `json:"show_cookie,omitempty"`
-	ShowPasskey         *bool             `json:"show_passkey,omitempty"`
-	ShowAPIKey          *bool             `json:"show_apikey,omitempty"`
-	ShowRSSKey          *bool             `json:"show_rsskey,omitempty"`
-	ShowBearerToken     *bool             `json:"show_bearer_token,omitempty"`
-	ShowAuthKey         *bool             `json:"show_authkey,omitempty"`
-	ShowAuthHash        *bool             `json:"show_authhash,omitempty"`
-	ShowUserID          *bool             `json:"show_userid,omitempty"`
-	PublishFormFields   map[string]string `json:"publish_form_fields,omitempty"`
-	Paths               map[string]string `json:"paths,omitempty"`
-	VerificationStatus  string            `json:"verification_status"`
-	SpecialNotes        string            `json:"special_notes,omitempty"`
+	PasskeyHint        string            `json:"passkey_hint,omitempty"`
+	APIKeyLabel        string            `json:"api_key_label,omitempty"`
+	APIKeyHint         string            `json:"api_key_hint,omitempty"`
+	RSSKeyLabel        string            `json:"rss_key_label,omitempty"`
+	RSSKeyHint         string            `json:"rss_key_hint,omitempty"`
+	ShowCookie         *bool             `json:"show_cookie,omitempty"`
+	ShowPasskey        *bool             `json:"show_passkey,omitempty"`
+	ShowAPIKey         *bool             `json:"show_apikey,omitempty"`
+	ShowRSSKey         *bool             `json:"show_rsskey,omitempty"`
+	ShowBearerToken    *bool             `json:"show_bearer_token,omitempty"`
+	ShowAuthKey        *bool             `json:"show_authkey,omitempty"`
+	ShowAuthHash       *bool             `json:"show_authhash,omitempty"`
+	ShowUserID         *bool             `json:"show_userid,omitempty"`
+	PublishFormFields  map[string]string `json:"publish_form_fields,omitempty"`
+	Paths              map[string]string `json:"paths,omitempty"`
+	VerificationStatus string            `json:"verification_status"`
+	SpecialNotes       string            `json:"special_notes,omitempty"`
 	// §59.318: 发布适配支持（开发者权威位——逐站适配完成随版本置 true；
 	// 用户侧 is_target(发布开关) 的门槛。当前：修道院/幸运）。
 	PublishSupported bool `json:"publish_supported,omitempty"`
 }
 
 var (
-	supportedSitesOnce  sync.Once
-	supportedSitesMap   map[string]*SupportedSite
-	supportedSitesList  []*SupportedSite
-	supportedSitesErr   error
+	supportedSitesOnce sync.Once
+	supportedSitesMap  map[string]*SupportedSite
+	supportedSitesList []*SupportedSite
+	supportedSitesErr  error
 )
 
 // loadSupportedSites 单次解析 embedded JSON 到内存索引。

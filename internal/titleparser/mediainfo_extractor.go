@@ -29,9 +29,9 @@ type MediaInfoTech struct {
 	// 拒案：fetch 时态标题 HDR 词×本地 MI 无 HDR 行→DB hdr=HDR10→
 	// 站方按 MI 判 SDR 拒收）。false=MI 无 Video 段（数据缺失），标题回退。
 	HasVideo bool
-	HDR             string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
-	BitDepth        string // 8bit/10bit
-	Encoded         bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
+	HDR      string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
+	BitDepth string // 8bit/10bit
+	Encoded  bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
 	// §59.453: General 层容器 Format 透出（Matroska/MPEG-4/BDAV...）——
 	// 此前局部变量 BDAV 门用完即弃；好学格式槽（文件格式语义）消费，
 	// 通用投资（未来容器维度判定站自动受益）。
@@ -161,7 +161,7 @@ func generalReencoderDetected(general map[string]string) bool {
 	}
 	return false
 }
-//
+
 // 段标题是不含 ":" 的独立行（Video / Audio #1 / Audio #2 / General / Text / Menu）。
 // 只保留 video 和 audio 段（其他段忽略）。
 // MISections §59.117: MI 五层结构化（General/Video/Audio/Text/Menu）——

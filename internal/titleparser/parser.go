@@ -3,11 +3,11 @@ package titleparser
 import (
 	"embed"
 	"encoding/json"
-	"sync"
 	"fmt"
+	"github.com/ranfish/pt-forward/internal/util"
 	"regexp"
 	"strings"
-	"github.com/ranfish/pt-forward/internal/util"
+	"sync"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 	// §59.514 刀1: 裸 Exx 锚（无 S 前缀集号——站方改坏/组惯例标记形态：
 	// Quacks E01 案合集被标分集）。中文集数锚同族第三通道；捕获组=纯
 	// token；词边界+E 后紧邻 1-2 位数字防误伤（Eden/Elysium 词不匹配）。
-	reBareEpisode = regexp.MustCompile(`(?i)(?:^|[\s.\-_])(E\d{1,2}(?:[-~]E?\d{1,3})?)(?:[\s.\-_]|$)`)
+	reBareEpisode   = regexp.MustCompile(`(?i)(?:^|[\s.\-_])(E\d{1,2}(?:[-~]E?\d{1,3})?)(?:[\s.\-_]|$)`)
 	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1440p|1080p|1080i|720p|480p)\b`)
 	reBDRipToken    = regexp.MustCompile(`(?i)\bBD[-\s]?RIP\b`)
 	reTVRipToken    = regexp.MustCompile(`(?i)\bTV[-\s]?RIP\b`)
@@ -29,13 +29,13 @@ var (
 	reDVDDiscToken  = regexp.MustCompile(`(?i)\bDVD(?:5|9)\b`)
 	reHDRTitleToken = regexp.MustCompile(`(?i)Dolby Vision|DoVi|HDR10\+|HDRVivid|HDR10|HLG|HDR|SDR|EDR|DV|Vivid`)
 	reChinesePrefix = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*`)
-// §59.226 附十四: 视频位深合法域仅 8|10|12（16/24 是音频位深——FLAC 24BIT
-// 音乐标题曾污染视频位深字段）；捕获数字归一 "Nbit"（"10 BIT"→"10bit"）。
-reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12)[._\-\s]?BIT\b`)
-	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
-	reAudioTracksCleanup = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
-	reSiteTagSuffix = regexp.MustCompile(`(?:\s*(?:\[[^\]]*\]|\([^)]*\)))+\s*$`)
-	reHDRToken = regexp.MustCompile(`(?i)\b(Dolby[-\s]?Vision|DoVi|DV|HDR[-\s]?Vivid|HDRVivid|HDR10[-\s]?Plus|HDR10\+|HDR10|PQ10|HLG|HDR|SDR)\b`)
+	// §59.226 附十四: 视频位深合法域仅 8|10|12（16/24 是音频位深——FLAC 24BIT
+	// 音乐标题曾污染视频位深字段）；捕获数字归一 "Nbit"（"10 BIT"→"10bit"）。
+	reBitDepth               = regexp.MustCompile(`(?i)\b(8|10|12)[._\-\s]?BIT\b`)
+	reFrameRate              = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
+	reAudioTracksCleanup     = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
+	reSiteTagSuffix          = regexp.MustCompile(`(?:\s*(?:\[[^\]]*\]|\([^)]*\)))+\s*$`)
+	reHDRToken               = regexp.MustCompile(`(?i)\b(Dolby[-\s]?Vision|DoVi|DV|HDR[-\s]?Vivid|HDRVivid|HDR10[-\s]?Plus|HDR10\+|HDR10|PQ10|HLG|HDR|SDR)\b`)
 	reChinesePrefixNoBracket = regexp.MustCompile(`^([\p{Han}][\p{Han}0-9：，、:（）\(\)]*)\.`)
 )
 
@@ -638,6 +638,7 @@ func hasMediaDIY(title string) bool {
 
 // groupQualifierList §59.303 组名源限定前缀词表（group_qualifier.json，
 // 朋友站观察——MNHD=BD 源/mUHD=UHD 源，数据化可扩展）。
+//
 //go:embed group_qualifier.json
 var groupQualifierFS embed.FS
 
@@ -687,7 +688,6 @@ func extractGroupFull(title, group string) string {
 	}
 	return group
 }
-
 
 // stripFileExtension 剥离常见视频/容器文件扩展名。
 // 部分站点（如憨憨）的种子标题用文件名，导致 .mp4/.mkv 后缀混入 release_group。

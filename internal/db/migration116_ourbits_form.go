@@ -38,6 +38,7 @@ import (
 //   - 字段：url（IMDb 必填）+**dburl（豆瓣必填——FieldDomainDoubanURL
 //     §59.159 域南洋/葡萄先例）**+uplver+anonymous:true；picture/offer
 //     （候选关联）不配；无 pt_gen/nfo/technical_info（文档实证）。
+//
 // 站规人工把关：编码矩阵（FHD Blu-ray×H.264=720p/1080p、UHD Blu-ray
 // ×H.264=×、HEVC 含 HDR 信息）+官方组优先 Dupe+黑名单组（文档 §38）
 // +电视剧必须整季包+标题中文副标题规范+候选制。

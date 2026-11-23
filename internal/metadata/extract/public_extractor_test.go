@@ -181,15 +181,15 @@ func TestExtractFlags_Default(t *testing.T) {
 
 func TestMatchBasicInfoLabel(t *testing.T) {
 	cases := map[string]string{
-		"类型":     "type",
-		"類型":     "type",
-		"类型：":    "type",
-		"大小":     "", // 不在默认 7 类
-		"媒介":     "medium",
-		"分辨率":    "resolution",
-		"制作组：":   "team",
+		"类型":      "type",
+		"類型":      "type",
+		"类型：":     "type",
+		"大小":      "", // 不在默认 7 类
+		"媒介":      "medium",
+		"分辨率":     "resolution",
+		"制作组：":    "team",
 		"unknown": "",
-		"":       "",
+		"":        "",
 	}
 	for in, want := range cases {
 		got := matchBasicInfoLabel(in)

@@ -101,7 +101,7 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 			// 时折叠。v1.05 语法中相邻同 token 永不合法（跨槽重复族三次复发：
 			// WEB×WEB-DL §59.257 / platform×medium §59.273 / ST×SPEC §59.273
 			// 附——逐对修不可持续，终态护栏兜未知组合）。组名除外（group 走
-				// 连接符分支不经此）。
+			// 连接符分支不经此）。
 			if len(parts) > 0 && strings.EqualFold(parts[len(parts)-1], val) {
 				continue
 			}

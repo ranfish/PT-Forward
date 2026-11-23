@@ -46,6 +46,7 @@ import (
 //   - 字段：url（IMDb）+url_douban（域键=dburl FieldDomainDoubanURL——海胆 §59.404 同款坑即防仍重犯（域键必须对域常量非字段名直译）——完整链接
 //     形态）+uplver（anonymous:true §59.422 附二全系统默认开启定案）；
 //     nfo 不配（实时无）；无 pt_gen/technical_info。
+//
 // 站规发布预览人工把关：**禁转发 REMUX 电影/剧集**（站方明文——
 // REMUX 种发天空必被拒）+官组 Dupe 特权（已有官组 HDS/HDSPad 资源
 // 不允许再上传其他小组重编码/iPad 资源）+剧集分集仅官方发布员+

@@ -24,7 +24,6 @@ var defaultBasicInfoLabels = map[string][]string{
 	"subtitle": {"副标题", "副標題", "subtitle"},
 }
 
-
 // maxFieldRunes §59.323: 字段值 rune 上限——短规格字段（类型/媒介/编码等）
 // 80 防吞"基本信息"整块文本；subtitle 是长文本字段（译名列表+导演主演
 // 简介，憨憨神奇动物2 205 rune 误杀案）放宽至 500（用户定案——实录

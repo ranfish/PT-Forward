@@ -32,16 +32,16 @@ type SiteFormConfig struct {
 }
 
 type SiteSeedData struct {
-	Domain                string         `json:"domain"`
-	Name                  string         `json:"name"`
-	BaseURL               string         `json:"base_url"`
-	Framework             string         `json:"framework"`
-	AuthType              string         `json:"auth_type"`
-	DownloadMode          string         `json:"download_mode"`
-	IsSource              bool           `json:"is_source"`
-	IsTarget              bool           `json:"is_target"`
+	Domain       string `json:"domain"`
+	Name         string `json:"name"`
+	BaseURL      string `json:"base_url"`
+	Framework    string `json:"framework"`
+	AuthType     string `json:"auth_type"`
+	DownloadMode string `json:"download_mode"`
+	IsSource     bool   `json:"is_source"`
+	IsTarget     bool   `json:"is_target"`
 	// §59.318: 辅种探测范围开关（种子继承历史 is_target 语义——行为零变化）
-	IsReseedTarget bool `json:"is_reseed_target"`
+	IsReseedTarget        bool           `json:"is_reseed_target"`
 	CookieCloudDomain     string         `json:"cookiecloud_domain"`
 	AlternativeDomains    string         `json:"alternative_domains"`
 	SupportsPiecesHashAPI *bool          `json:"supports_pieces_hash_api,omitempty"`
@@ -51,7 +51,7 @@ type SiteSeedData struct {
 	// v0.0.266: tracker 域名列表（数据源 docs/00-站点域名.md，matcher 优先用此精确匹配）
 	TrackerDomains []string `json:"tracker_domains,omitempty"`
 	// ContentType 标识站点内容类型：music=纯音乐站, video=纯视频站, 空=综合站
-	ContentType   string   `json:"content_type,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
 type seedData struct {
@@ -116,36 +116,36 @@ func SeedSites(db *gorm.DB) error {
 
 		var existing model.Site
 		err := db.Where("domain = ?", s.Domain).First(&existing).Error
-	if err == nil {
-		// 站点已存在：更新内置数据（不覆盖用户改的其他字段）
-		if existing.TrackerDomains != trackerDomainsJSON {
-			if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
-				return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
-			}
-		}
-		// v0.0.271: 同步 title_format（仅 DB 为空时填充，不覆盖用户自定义）
-		if existing.TitleFormat == "" && s.TitleFormat != "" {
-			if err := db.Model(&existing).Update("title_format", s.TitleFormat).Error; err != nil {
-				return siteError(ErrSiteSeed, fmt.Sprintf("update title_format %s", s.Domain), err)
-			}
-		}
-		// v0.0.368: 同步 supports_pieces_hash_api（OTA 自动修正）
-		if s.SupportsPiecesHashAPI != nil && existing.SupportsPiecesHashAPI != *s.SupportsPiecesHashAPI {
-			if err := db.Model(&existing).Update("supports_pieces_hash_api", *s.SupportsPiecesHashAPI).Error; err != nil {
-				return siteError(ErrSiteSeed, fmt.Sprintf("update supports_pieces_hash_api %s", s.Domain), err)
-			}
-		}
-		// §59.478: 同步 details_url_template（仅 DB 为空时填充·不覆盖用户
-		// 自定义——v0.0.271 title_format 同款自愈；皇后老种详情页案）
-		if existing.DetailsURLTemplate == "" {
-			if supp, ok := GetSupportedSite(s.Domain); ok && supp.DetailsURLTemplate != "" {
-				if err := db.Model(&existing).Update("details_url_template", supp.DetailsURLTemplate).Error; err != nil {
-					return siteError(ErrSiteSeed, fmt.Sprintf("update details_url_template %s", s.Domain), err)
+		if err == nil {
+			// 站点已存在：更新内置数据（不覆盖用户改的其他字段）
+			if existing.TrackerDomains != trackerDomainsJSON {
+				if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
 				}
 			}
+			// v0.0.271: 同步 title_format（仅 DB 为空时填充，不覆盖用户自定义）
+			if existing.TitleFormat == "" && s.TitleFormat != "" {
+				if err := db.Model(&existing).Update("title_format", s.TitleFormat).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update title_format %s", s.Domain), err)
+				}
+			}
+			// v0.0.368: 同步 supports_pieces_hash_api（OTA 自动修正）
+			if s.SupportsPiecesHashAPI != nil && existing.SupportsPiecesHashAPI != *s.SupportsPiecesHashAPI {
+				if err := db.Model(&existing).Update("supports_pieces_hash_api", *s.SupportsPiecesHashAPI).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update supports_pieces_hash_api %s", s.Domain), err)
+				}
+			}
+			// §59.478: 同步 details_url_template（仅 DB 为空时填充·不覆盖用户
+			// 自定义——v0.0.271 title_format 同款自愈；皇后老种详情页案）
+			if existing.DetailsURLTemplate == "" {
+				if supp, ok := GetSupportedSite(s.Domain); ok && supp.DetailsURLTemplate != "" {
+					if err := db.Model(&existing).Update("details_url_template", supp.DetailsURLTemplate).Error; err != nil {
+						return siteError(ErrSiteSeed, fmt.Sprintf("update details_url_template %s", s.Domain), err)
+					}
+				}
+			}
+			continue
 		}
-		continue
-	}
 
 		defs, ok := adapter.FrameworkDefaults[s.Framework]
 		if !ok {

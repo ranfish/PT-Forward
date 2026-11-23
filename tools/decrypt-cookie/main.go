@@ -1,12 +1,14 @@
 // decrypt-cookie: 从 PT-Forward SQLite DB 解密站点 cookie。
 //
 // 用法：
-//   ./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com
-//   ./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com | xargs -I{} curl -b '{}' ...
-//   ./decrypt-cookie -cc > /tmp/cc.env && source /tmp/cc.env   （输出 CC 三个环境变量）
+//
+//	./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com
+//	./decrypt-cookie -db /path/to/pt-forward.db -domain pt.keepfrds.com | xargs -I{} curl -b '{}' ...
+//	./decrypt-cookie -cc > /tmp/cc.env && source /tmp/cc.env   （输出 CC 三个环境变量）
 //
 // 环境变量：
-//   DB_PATH       — 默认 DB 路径（替代 -db 参数）
+//
+//	DB_PATH       — 默认 DB 路径（替代 -db 参数）
 package main
 
 import (

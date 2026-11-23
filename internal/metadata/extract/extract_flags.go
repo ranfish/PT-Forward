@@ -21,7 +21,6 @@ var siteForbiddenMarkers = []string{
 	"[限转资源]", "【限转资源】",
 }
 
-
 // directedNoTransferSuffixes 定向禁转后缀："禁转"+目标站名（禁转PTT/禁转BT）。
 // 是发种者/致谢模板对特定站点的定向声明，非全站禁转。
 var directedNoTransferSites = []string{"PTT", "BT", "PTT "}

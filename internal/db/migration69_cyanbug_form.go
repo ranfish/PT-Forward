@@ -24,6 +24,7 @@ import (
 //   - **标题禁止中文**（§4.1 站规）——发布链重组 v1.05 英文标题天然合规
 //   - type 408 音轨→category.lossless_music（无音乐类——音轨即无损音乐）
 //   - 分叉族双键即防：404 纪录片+406 MV
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(69, "cyanbug_publish_form_config", func(gormDB *gorm.DB) error {

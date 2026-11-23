@@ -11,7 +11,7 @@ func TestClassifyEPRange(t *testing.T) {
 		{"Obi-Wan.Kenobi.2022.S01.EP01-E06.BluRay.1080p.x265.10bit.DTS-HDMA.5.1-UBits", "season_pack"},
 		{"Show.2020.S01.E01-E12.1080p.WEB-DL.x264-GRP", "season_pack"},
 		{"Show.2020.S02.EP03-E06.1080p.WEB-DL.x264-GRP", "partial_pack"}, // 起始非 1
-		{"Show.2020.S01.EP01-E06.COMPLETE.1080p-GRP", "season_pack"},   // COMPLETE 原路径不回归
+		{"Show.2020.S01.EP01-E06.COMPLETE.1080p-GRP", "season_pack"},     // COMPLETE 原路径不回归
 		{"Show.2020.S01.1080p.WEB-DL.x264-GRP", "season_pack"},           // §59.514: v1.05 语义 S01=单季合集声明（原 unknown 保守判定退役·文件树修正层兜底半季）
 	}
 	for _, c := range cases {

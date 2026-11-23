@@ -49,6 +49,7 @@ import (
 //   - 字段：url+**douban_id**（豆瓣 ID/链接双形态——配 DoubanID 编号域（draft 域启发一致+站方收编号）
 //     域投递）+uplver；**offers 候选制不勾**（优堡铁律——Crazy User
 //     以下候选流程人工）；nfo 不配（13城教训）；无 pt_gen/technical_info。
+//
 // 站规人工把关：≥1080i 硬要求（§5.2 分辨率未达 1080i 不允许——特化
 // 路由保留 720p/SD 分支映射正确性、站规预览把关）+<100MB 禁+upscale
 // 禁+RMVB 禁+杂项概不接受+H&R 标志种 60 天/336h 考核+候选制+Dupe

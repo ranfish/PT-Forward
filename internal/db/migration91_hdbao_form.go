@@ -30,6 +30,7 @@ import (
 //     WiKi/HDC/CMCT/HDSky/HHClub/HD4FANS）+Other（外站组复利链）
 //   - tags 6 项：HDR→四键泛家族第四站（财神/农场/GTK 后）+首发
 //     label-only 铁律+禁转/国语/中字/DIY 配键
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(91, "hdbao_publish_form_config", func(gormDB *gorm.DB) error {

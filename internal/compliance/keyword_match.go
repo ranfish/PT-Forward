@@ -21,8 +21,8 @@ import (
 //   - 中文误报排除（设计已定未实现，本次补齐）：成人+教育/高考/大学/学院 放行
 
 var (
-	kwMu    sync.RWMutex
-	kwRe    = map[string]*regexp.Regexp{}
+	kwMu sync.RWMutex
+	kwRe = map[string]*regexp.Regexp{}
 )
 
 // chineseFalsePositivePatterns §56.2x 设计稿：中文关键词误报排除对。

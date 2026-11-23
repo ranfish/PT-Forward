@@ -335,22 +335,22 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 			discount = model.DiscountFree
 		}
 		e.eventBus.Publish(&pusher.PushedEvent{
-			ClientUID:      sub.ClientUID,
-			SiteName:       ev.SiteName,
-			TorrentID:      ev.TorrentID,
-			InfoHash:       ev.InfoHash,
-			Title:          ev.Title,
-			Size:           ev.Size,
-			Discount:       discount,
-			HasHR:          ev.HasHR,
-			IsFree:         true,
-			FreeEndAt:      ev.FreeEndAt,
-			SubscriptionID: subID,
-			AutoTransfer:   sub.AutoTransfer,
+			ClientUID:          sub.ClientUID,
+			SiteName:           ev.SiteName,
+			TorrentID:          ev.TorrentID,
+			InfoHash:           ev.InfoHash,
+			Title:              ev.Title,
+			Size:               ev.Size,
+			Discount:           discount,
+			HasHR:              ev.HasHR,
+			IsFree:             true,
+			FreeEndAt:          ev.FreeEndAt,
+			SubscriptionID:     subID,
+			AutoTransfer:       sub.AutoTransfer,
 			TransferClientUIDs: sub.TransferClientUIDs,
-			PushedAt:       time.Now(),
-			Seeders:        ev.Seeders,
-			Leechers:       ev.Leechers,
+			PushedAt:           time.Now(),
+			Seeders:            ev.Seeders,
+			Leechers:           ev.Leechers,
 		})
 		republished++
 	}
@@ -1050,23 +1050,23 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				isFree := ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree || ev.Discount == model.DiscountAssumeFree
 				if e.eventBus != nil {
 					e.eventBus.Publish(&pusher.PushedEvent{
-						ClientUID:        sub.ClientUID,
-						SiteName:        ev.SiteName,
-						TorrentID:       ev.TorrentID,
-						InfoHash:        ev.InfoHash,
-						Title:           ev.Title,
-						Size:            ev.Size,
-						Discount:        ev.Discount,
-						HasHR:           ev.HasHR,
-						IsFree:          isFree,
-						FreeEndAt:       ev.FreeEndAt,
-					SubscriptionID:  uintToString(sub.ID),
-					AutoTransfer:    sub.AutoTransfer,
-					TransferClientUIDs: sub.TransferClientUIDs,
-					PushedAt:        time.Now(),
-					Seeders:         ev.Seeders,
-					Leechers:        ev.Leechers,
-				})
+						ClientUID:          sub.ClientUID,
+						SiteName:           ev.SiteName,
+						TorrentID:          ev.TorrentID,
+						InfoHash:           ev.InfoHash,
+						Title:              ev.Title,
+						Size:               ev.Size,
+						Discount:           ev.Discount,
+						HasHR:              ev.HasHR,
+						IsFree:             isFree,
+						FreeEndAt:          ev.FreeEndAt,
+						SubscriptionID:     uintToString(sub.ID),
+						AutoTransfer:       sub.AutoTransfer,
+						TransferClientUIDs: sub.TransferClientUIDs,
+						PushedAt:           time.Now(),
+						Seeders:            ev.Seeders,
+						Leechers:           ev.Leechers,
+					})
 				}
 				// §59.120: 订阅隔离打勾（sub 上下文——原跨订阅污染 B seen 行）
 				e.repo.MarkStatus(ctx, uintToString(sub.ID), ev.SiteName, ev.TorrentID, "seen")

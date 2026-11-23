@@ -77,9 +77,9 @@ func defaultPosterAlive(ctx context.Context, posterURL string) bool {
 
 // PosterFallbackResult 海报替换链产物（溯源三态）。
 type PosterFallbackResult struct {
-	Poster        string // 最终值（可信原图 / PTGen 海报 / 保留原值）
-	Source        string // site / ptgen_doubaninfo / ptgen_cspt / ptgen_dead
-	Original      string // 站点采集原值（回溯线索）
+	Poster   string // 最终值（可信原图 / PTGen 海报 / 保留原值）
+	Source   string // site / ptgen_doubaninfo / ptgen_cspt / ptgen_dead
+	Original string // 站点采集原值（回溯线索）
 }
 
 // PTGenQuerier PTGen 查询抽象（Provider 多 endpoint 轮询整体作为一个 querier；

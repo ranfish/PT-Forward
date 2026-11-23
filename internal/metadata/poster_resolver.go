@@ -1,8 +1,9 @@
 // Package metadata 海报 fallback 解析器（§56.18 决策 3）。
 //
 // 2 级自动 fallback（按 toggle 模式）：
-//   ptgen_first（默认）: PTGen.PosterURL > detail_source.poster
-//   detail_first:        detail_source.poster > PTGen.PosterURL
+//
+//	ptgen_first（默认）: PTGen.PosterURL > detail_source.poster
+//	detail_first:        detail_source.poster > PTGen.PosterURL
 //
 // 用户 URL 覆盖走 UserOverrides（pipeline.go 已有机制），不在此处理。
 // rehost（图床转存）由 pipeline.rehostPoster 处理，PosterResolver 只做选择。
@@ -29,8 +30,10 @@ func NewPosterResolver() *PosterResolver {
 }
 
 // Resolve 按 toggle 模式解析海报 URL。
-//   ptgen_first（默认）: PTGen > detail
-//   detail_first:        detail > PTGen
+//
+//	ptgen_first（默认）: PTGen > detail
+//	detail_first:        detail > PTGen
+//
 // 失败返回空 PosterSource（用户可在 UI 手动填写 URL）。
 func (r *PosterResolver) Resolve(
 	_ context.Context,

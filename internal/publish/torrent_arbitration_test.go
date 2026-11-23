@@ -166,5 +166,3 @@ func TestBareE01GateAndNormalize(t *testing.T) {
 		t.Errorf("BBC 单剧归一=%q want E01（不归一）", got)
 	}
 }
-
-

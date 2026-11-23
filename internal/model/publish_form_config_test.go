@@ -16,7 +16,7 @@ func TestPublishFormConfigRoundtrip(t *testing.T) {
 		FormFields:  map[string]string{FieldDomainMedium: "medium_sel[4]", FieldDomainTags: "tags[4][]"},
 		ValueMappings: map[string][]FormValueMapping{
 			FieldDomainTags: {
-				{Label: "英语", Value: "22", Auto: &no},              // 条件标签 §59.150
+				{Label: "英语", Value: "22", Auto: &no}, // 条件标签 §59.150
 				{Label: "Dolby Vision", Value: "20", StandardKeys: []string{"tag.dolby_vision"}},
 			},
 		},

@@ -39,6 +39,7 @@ import (
 //     label-only
 //   - 字段：url（IMDb 真字段——控件排除清单误滤复核教训）+
 //     technical_info+uplver；**无 pt_gen/dburl**（实时实证）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(79, "crabpt_publish_form_config", func(gormDB *gorm.DB) error {

@@ -21,6 +21,7 @@ import (
 //   - tags 首发(2) 存在——label-only 不配键（转存发布禁勾首发铁律）
 //   - 分叉族双键即防：413 纪录片 [documentary, documentaries]（§59.376）+
 //     415 MV [mv, music_video]（§59.378 第二对）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(66, "hitpt_publish_form_config", func(gormDB *gorm.DB) error {

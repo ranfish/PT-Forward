@@ -37,22 +37,22 @@ func TestMigration43SemanticSplit(t *testing.T) {
 	gdb.Exec("UPDATE sites SET target_types = '[\"publish\"]' WHERE domain = 'a.com'")
 
 	var m43 *Migration
-		for _, m := range registeredMigrations {
-			if m.Version == 43 {
-				m43 = &m
-				break
-			}
+	for _, m := range registeredMigrations {
+		if m.Version == 43 {
+			m43 = &m
+			break
 		}
-		if m43 == nil {
-			t.Fatal("migration43 未注册")
-		}
-		if err := m43.Up(gdb); err != nil {
-			t.Fatalf("migration43: %v", err)
-		}
+	}
+	if m43 == nil {
+		t.Fatal("migration43 未注册")
+	}
+	if err := m43.Up(gdb); err != nil {
+		t.Fatalf("migration43: %v", err)
+	}
 	type row struct {
-		Domain          string
-		IsTarget        int
-		IsReseedTarget  int
+		Domain         string
+		IsTarget       int
+		IsReseedTarget int
 	}
 	var rows []row
 	gdb.Raw("SELECT domain, is_target, is_reseed_target FROM sites ORDER BY domain").Scan(&rows)
@@ -91,18 +91,18 @@ func TestMigration44CdyPurge(t *testing.T) {
 	gdb.Create(&model.Site{Name: "传道院", Domain: "pt.cdy.skin", Enabled: false})
 	gdb.Create(&model.Site{Name: "修道院", Domain: "xdypt.vip"})
 	var m44 *Migration
-		for _, m := range registeredMigrations {
-			if m.Version == 44 {
-				m44 = &m
-				break
-			}
+	for _, m := range registeredMigrations {
+		if m.Version == 44 {
+			m44 = &m
+			break
 		}
-		if m44 == nil {
-			t.Fatal("migration44 未注册")
-		}
-		if err := m44.Up(gdb); err != nil {
-			t.Fatalf("migration44: %v", err)
-		}
+	}
+	if m44 == nil {
+		t.Fatal("migration44 未注册")
+	}
+	if err := m44.Up(gdb); err != nil {
+		t.Fatalf("migration44: %v", err)
+	}
 	var n int64
 	gdb.Model(&model.Site{}).Where("domain = 'pt.cdy.skin'").Count(&n)
 	if n != 0 {

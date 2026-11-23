@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
-	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -54,7 +54,7 @@ func TestDirectedNoTransferConsumption(t *testing.T) {
 	future := time.Now().Add(48 * time.Hour)
 	past := time.Now().Add(-2 * time.Hour)
 	seedMetaFlags(t, db, "hash1", "深度", []string{"限转"}, &future)
-	seedMetaFlags(t, db, "hash2", "深度", []string{"限转"}, &past)   // 窗外
+	seedMetaFlags(t, db, "hash2", "深度", []string{"限转"}, &past) // 窗外
 	seedMetaFlags(t, db, "hash3", "深度", []string{"限转"}, nil)   // until 缺失
 	seedMetaFlags(t, db, "hash4", "深度", []string{"官方"}, nil)   // 非限转
 
@@ -210,12 +210,12 @@ func TestPreflightNoTransfer(t *testing.T) {
 
 	future := time.Now().Add(48 * time.Hour)
 	past := time.Now().Add(-2 * time.Hour)
-	seedMetaFlags(t, db, "pf1", "朋友", []string{"禁转"}, nil)          // 绝对禁转
-	seedMetaFlags(t, db, "pf2", "朋友", []string{"限时禁转"}, &future)   // 窗内
-	seedMetaFlags(t, db, "pf3", "朋友", []string{"限时禁转"}, &past)     // 窗外
-	seedMetaFlags(t, db, "pf4", "优堡", nil, nil)                       // 官种载体（flags 空）
-	seedMetaFlags(t, db, "pf5", "优堡", nil, nil)                       // 非官种载体
-	seedMetaFlags(t, db, "pf6", "朋友", nil, nil)                       // 排除规则载体
+	seedMetaFlags(t, db, "pf1", "朋友", []string{"禁转"}, nil)       // 绝对禁转
+	seedMetaFlags(t, db, "pf2", "朋友", []string{"限时禁转"}, &future) // 窗内
+	seedMetaFlags(t, db, "pf3", "朋友", []string{"限时禁转"}, &past)   // 窗外
+	seedMetaFlags(t, db, "pf4", "优堡", nil, nil)                  // 官种载体（flags 空）
+	seedMetaFlags(t, db, "pf5", "优堡", nil, nil)                  // 非官种载体
+	seedMetaFlags(t, db, "pf6", "朋友", nil, nil)                  // 排除规则载体
 
 	var m1, m2, m3, m4, m5, m6 model.TorrentMetadata
 	for h, m := range map[string]*model.TorrentMetadata{
@@ -544,7 +544,7 @@ func TestHdhomeCategoryValue(t *testing.T) {
 		{"体育 8K（单数 Sport）", "category.sports", "encode", "", "4320p", "", "511"},
 	}
 	for _, c := range cases {
-	tp := titleparser.TechProfile{Specification: c.medium, SourceType: c.source, Resolution: c.resolution, AudioCodec: c.audio}
+		tp := titleparser.TechProfile{Specification: c.medium, SourceType: c.source, Resolution: c.resolution, AudioCodec: c.audio}
 		meta := &model.TorrentMetadata{Category: c.category}
 		v := hdhomeCategoryValue(cfg, "家园", meta, tp)
 		if v == nil || v.Value != c.want {
@@ -569,8 +569,8 @@ func TestOfferInjection(t *testing.T) {
 	_ = e
 	// 直接验证 form 构造逻辑的关键路径：模拟 executor 注入段
 	cfg := &model.PublishFormConfig{
-		Offer:       true,
-		FormFields:  map[string]string{model.FieldDomainOffer: "offers"},
+		Offer:      true,
+		FormFields: map[string]string{model.FieldDomainOffer: "offers"},
 	}
 	form := map[string]string{}
 	if cfg.Offer {
@@ -608,7 +608,7 @@ func TestOfferInjection(t *testing.T) {
 // §59.423: 天空分集/合集×国产/海外双维路由（恒合集+产区路由——用户定案）。
 func TestHdskyCategoryDualRoute(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				{Label: "TV Series/剧集(合集）", Value: "411"},
@@ -711,7 +711,7 @@ func TestEpisodeReleaseBlocked(t *testing.T) {
 // §59.425: 碟粉电影产区细分路由+站点级双检查（五年规则/禁欧美）。
 func TestDiscfanCategoryAndPreflight(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				{Label: "电影 - 中国大陆", Value: "401"}, {Label: "电影 - 中国香港", Value: "404"},
@@ -775,7 +775,7 @@ func TestDiscfanCategoryAndPreflight(t *testing.T) {
 // §59.426: 时光原盘形态路由（424 独立分类——媒介维度 typeMappingOf 第七站）。
 func TestHdtimeDiscCategoryRoute(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}},
@@ -813,11 +813,10 @@ func TestHdtimeDiscCategoryRoute(t *testing.T) {
 	}
 }
 
-
 // §59.427: 好多油 TV 双轨分发（剧集→TV 后缀媒介项）。
 func TestHduptTVMediumRoute(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"medium": "medium_sel"},
+		FormFields: map[string]string{"medium": "medium_sel"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"medium": {
 				{Label: "Blu-ray", Value: "1", StandardKeys: []string{"medium.bluray"}},
@@ -863,7 +862,7 @@ func TestHduptTVMediumRoute(t *testing.T) {
 // §59.428: 分享站原盘独立分类路由（414——discCategoryRoute 公共首复用）。
 func TestItzmxDiscCategoryRoute(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"type": "type"},
+		FormFields: map[string]string{"type": "type"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"type": {
 				{Label: "电影", Value: "401", StandardKeys: []string{"category.movie"}},
@@ -888,7 +887,7 @@ func TestItzmxDiscCategoryRoute(t *testing.T) {
 // §59.436: 原盘编码分维特化（PTFans——原盘→Bluray 项/压制走通用）。
 func TestBlurayCodecOption(t *testing.T) {
 	cfg := &model.PublishFormConfig{
-		FormFields:   map[string]string{"codec": "codec_sel[4]"},
+		FormFields: map[string]string{"codec": "codec_sel[4]"},
 		ValueMappings: map[string][]model.FormValueMapping{
 			"codec": {
 				{Label: "H.264(x264/AVC)", Value: "1", StandardKeys: []string{"video.h264"}},

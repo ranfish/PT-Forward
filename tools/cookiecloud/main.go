@@ -32,14 +32,14 @@ type cookieCloudBody struct {
 }
 
 type cookieData struct {
-	Name     string `json:"name"`
-	Value    string `json:"value"`
-	Domain   string `json:"domain"`
-	Path     string `json:"path"`
+	Name     string  `json:"name"`
+	Value    string  `json:"value"`
+	Domain   string  `json:"domain"`
+	Path     string  `json:"path"`
 	Expires  float64 `json:"expirationDate"`
-	HTTPOnly bool   `json:"httpOnly"`
-	Secure   bool   `json:"secure"`
-	SameSite string `json:"sameSite"`
+	HTTPOnly bool    `json:"httpOnly"`
+	Secure   bool    `json:"secure"`
+	SameSite string  `json:"sameSite"`
 }
 
 func md5String(inputs ...string) string {
@@ -139,7 +139,7 @@ func decryptCookies(uuid, password, encrypted string) (map[string][]cookieData, 
 	}
 	var result struct {
 		CookieData   map[string][]cookieData `json:"cookie_data"`
-		LocalStorage map[string]interface{}   `json:"local_storage_data"`
+		LocalStorage map[string]interface{}  `json:"local_storage_data"`
 	}
 	if err := json.Unmarshal(decrypted, &result); err != nil {
 		return nil, fmt.Errorf("parse decrypted json: %w", err)

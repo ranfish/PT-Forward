@@ -12,10 +12,10 @@ import (
 // 把所有字段聚合在一个 td.rowfollow 内，用 <b>类型:</b>值 <b>媒介:</b>值 ... 水平排列。
 func TestPublicExtractor_InlineBLabel(t *testing.T) {
 	tests := []struct {
-		name        string
-		htmlFile    string
-		siteCode    string // PublicExtractor 的 siteCode（用于加载 site-specific source_key）
-		wantFields  []string // 期望非空的字段
+		name       string
+		htmlFile   string
+		siteCode   string   // PublicExtractor 的 siteCode（用于加载 site-specific source_key）
+		wantFields []string // 期望非空的字段
 	}{
 		{"CarPT_车站", "inline_b_carpt.html", "", []string{"medium", "video_codec", "audio_codec", "resolution"}},
 		{"HDFans_红豆饭", "inline_b_hdfans.html", "", []string{"medium", "video_codec", "audio_codec", "resolution", "source"}},

@@ -9,7 +9,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
-
 // §59.69: 高码/高帧推导（用户五判据定案）
 // 高码: ①文案 标题+副标题(高码率|高码|高比特率) ②MI ≥4K && Overall ≥15Mb/s ③MI <4K && Overall ≥9Mb/s
 // 高帧: ④文案 标题+副标题(高帧率|高帧|60FPS|120FPS) ⑤MI Frame rate ≥60（59.940 不算，NTSC 不算）
@@ -45,7 +44,14 @@ func TestInferHighBitrate(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := NewMediaTagInferer().InferFull(c.in)
-		has := func(k string) bool { for _, g := range got { if g == k { return true } }; return false }
+		has := func(k string) bool {
+			for _, g := range got {
+				if g == k {
+					return true
+				}
+			}
+			return false
+		}
 		if has("high_bitrate") != c.hasHB || has("high_frame_rate") != c.hasHF {
 			t.Errorf("%s: high_bitrate=%v(want %v) high_frame_rate=%v(want %v) got=%v",
 				c.name, has("high_bitrate"), c.hasHB, has("high_frame_rate"), c.hasHF, got)
@@ -107,7 +113,14 @@ func TestInferEpisodeSplitCollectionComplete(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := NewMediaTagInferer().InferFull(TagInput{Title: c.title, Subtitle: c.sub})
-		has := func(k string) bool { for _, g := range got { if g == k { return true } }; return false }
+		has := func(k string) bool {
+			for _, g := range got {
+				if g == k {
+					return true
+				}
+			}
+			return false
+		}
 		if has("episode_split") != c.wantSplit || has("collection") != c.wantColl || has("complete") != c.wantComplete {
 			t.Errorf("%s: split=%v coll=%v complete=%v got=%v", c.name, has("episode_split"), has("collection"), has("complete"), got)
 		}
@@ -136,7 +149,14 @@ func TestInferOngoingAndBigPack(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := NewMediaTagInferer().InferFull(TagInput{Title: c.title, Size: c.size})
-		has := func(k string) bool { for _, g := range got { if g == k { return true } }; return false }
+		has := func(k string) bool {
+			for _, g := range got {
+				if g == k {
+					return true
+				}
+			}
+			return false
+		}
 		if has("ongoing") != c.wantOngoing || has("big_pack") != c.wantBigPack || has("complete") != c.wantComplete {
 			t.Errorf("%s: ongoing=%v big_pack=%v complete=%v got=%v", c.name, has("ongoing"), has("big_pack"), has("complete"), got)
 		}
@@ -175,9 +195,9 @@ func TestInferSpecialEffectsSubs(t *testing.T) {
 // §59.74: 直采+推断合并单点——跨源冲突在合并结果上仲裁(发布时不再出现互斥并存)。
 func TestMergeTags(t *testing.T) {
 	cases := []struct {
-		name             string
-		existing, in     []string
-		want             []string
+		name         string
+		existing, in []string
+		want         []string
 	}{
 		{"同语义去重(直采显示名归一)", []string{"特效", "国语"}, []string{"special_effects_subs", "chinese_audio"}, []string{"special_effects_subs", "chinese_audio"}},
 		{"跨源互斥直采赢(完结vs分集)", []string{"complete"}, []string{"episode_split"}, []string{"complete"}},
@@ -204,8 +224,8 @@ func TestMergeTags(t *testing.T) {
 // §59.85: A类缺口 9 词条——文案判据 + 4K/8K 数值判据。
 func TestInferGapTags(t *testing.T) {
 	cases := []struct {
-		name string
-		in   TagInput
+		name  string
+		in    TagInput
 		wants []string
 	}{
 		{"原盘文案", TagInput{Title: "Movie.2024.BD原盘"}, []string{"original_disc"}},
@@ -221,12 +241,20 @@ func TestInferGapTags(t *testing.T) {
 		got := NewMediaTagInferer().InferFull(c.in)
 		for _, w := range c.wants {
 			found := false
-			for _, g := range got { if g == w { found = true } }
-			if !found { t.Errorf("%s: 缺 %q got=%v", c.name, w, got) }
+			for _, g := range got {
+				if g == w {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("%s: 缺 %q got=%v", c.name, w, got)
+			}
 		}
 		if c.wants == nil {
 			for _, g := range got {
-				if g == "resolution_4k" || g == "resolution_8k" { t.Errorf("%s: 不应命中 %q", c.name, g) }
+				if g == "resolution_4k" || g == "resolution_8k" {
+					t.Errorf("%s: 不应命中 %q", c.name, g)
+				}
 			}
 		}
 	}
@@ -247,7 +275,11 @@ func TestInferLanguageGapTags(t *testing.T) {
 	for _, c := range cases {
 		got := NewMediaTagInferer().InferFull(c.in)
 		found := false
-		for _, g := range got { if g == c.want { found = true } }
+		for _, g := range got {
+			if g == c.want {
+				found = true
+			}
+		}
 		if found != (c.want != "") {
 			t.Errorf("%s: %q found=%v", c.name, c.want, found)
 		}
@@ -271,7 +303,11 @@ func TestInferLangAudioCompletion(t *testing.T) {
 	for _, c := range cases {
 		got := NewMediaTagInferer().InferFull(c.in)
 		found := false
-		for _, g := range got { if g == c.want { found = true } }
+		for _, g := range got {
+			if g == c.want {
+				found = true
+			}
+		}
 		if found != (c.want != "") {
 			t.Errorf("%s: want %q found=%v got=%v", c.name, c.want, found, got)
 		}
@@ -437,7 +473,9 @@ func TestInferBDInfoLanguageHDR(t *testing.T) {
 	})
 	assertHas := func(tags []string, want string) {
 		for _, tg := range tags {
-			if tg == want { return }
+			if tg == want {
+				return
+			}
 		}
 		t.Errorf("缺少 %s, got %v", want, tags)
 	}
@@ -454,9 +492,9 @@ func TestInferBDInfoLanguageHDR(t *testing.T) {
 	// 对照：MI 有证据时 BDInfo 不覆盖（miSec 已有 Text）
 	mi := "Text #1\nLanguage : English"
 	tags2 := inf.InferFull(TagInput{
-		Title:      "Some 2020 Disc",
-		MediaInfo:  mi,
-		NFO:        nfo, // BDInfo 也有，但 MI 优先
+		Title:     "Some 2020 Disc",
+		MediaInfo: mi,
+		NFO:       nfo, // BDInfo 也有，但 MI 优先
 	})
 	assertHas(tags2, "english_subtitle") // 来自 MI Text
 	// chinese_subtitle 应该也产出（BDInfo 有但 MI 无中文 Text）
@@ -667,8 +705,8 @@ func TestInferFullVersionTypeMIVeto(t *testing.T) {
 	miEncoded := "General\nComplete name : x.mkv\nVideo\nFormat : HEVC\nWriting library : x265 - 3.4"
 	// 副标题"原盘压制"（本案形态）+ 编码痕迹 → original_disc 不产出
 	got := NewMediaTagInferer().InferFull(TagInput{
-		Title: "Black Snow 1990 1080p BluRay x265 FLAC 1.0 2Audios-FRDS",
-		Subtitle: "【本命年】10bit HEVC版本 国语 带评论 简繁英字幕 *WCL原盘压制",
+		Title:     "Black Snow 1990 1080p BluRay x265 FLAC 1.0 2Audios-FRDS",
+		Subtitle:  "【本命年】10bit HEVC版本 国语 带评论 简繁英字幕 *WCL原盘压制",
 		MediaInfo: miEncoded,
 	})
 	for _, tg := range got {

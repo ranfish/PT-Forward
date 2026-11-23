@@ -19,18 +19,18 @@ type FreeWaitMonitor struct {
 }
 
 type freeWaitEntry struct {
-	SiteName       string
-	TorrentID      string
-	InfoHash       string
-	Title          string
-	Size           int64
-	ClientUID      uint
-	SubscriptionID string
-	HasHR          bool
-	HRSeedTimeH    int
-	AddedAt        time.Time
-	CheckBefore    *time.Time
-	CheckCount     int
+	SiteName        string
+	TorrentID       string
+	InfoHash        string
+	Title           string
+	Size            int64
+	ClientUID       uint
+	SubscriptionID  string
+	HasHR           bool
+	HRSeedTimeH     int
+	AddedAt         time.Time
+	CheckBefore     *time.Time
+	CheckCount      int
 	RecheckInterval time.Duration
 	LastCheckAt     time.Time
 	MinRemainMin    int
@@ -63,7 +63,7 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 			InfoHash:        dbEntry.InfoHash,
 			Title:           dbEntry.Title,
 			Size:            dbEntry.Size,
-			ClientUID:        dbEntry.ClientUID,
+			ClientUID:       dbEntry.ClientUID,
 			SubscriptionID:  dbEntry.SubscriptionID,
 			HasHR:           dbEntry.HasHR,
 			HRSeedTimeH:     dbEntry.HRSeedTimeH,
@@ -107,7 +107,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		InfoHash:        infoHash,
 		Title:           title,
 		Size:            size,
-		ClientUID:        clientUID,
+		ClientUID:       clientUID,
 		SubscriptionID:  subscriptionID,
 		HasHR:           hasHR,
 		HRSeedTimeH:     hrSeedTimeH,
@@ -126,7 +126,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		InfoHash:       infoHash,
 		Title:          title,
 		Size:           size,
-		ClientUID:       clientUID,
+		ClientUID:      clientUID,
 		SubscriptionID: subscriptionID,
 		HasHR:          hasHR,
 		HRSeedTimeH:    hrSeedTimeH,
@@ -242,20 +242,20 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 				zap.String("title", e.Title),
 				zap.String("discount", string(discount)),
 			)
-	} else {
-		m.mu.Lock()
-		if entry, ok := m.pending[e.SiteName+"|"+e.TorrentID]; ok {
-			entry.CheckCount++
-			entry.LastCheckAt = now
-			m.db.Model(&model.FreeWaitEntry{}).
-				Where("site_name = ? AND torrent_id = ?", e.SiteName, e.TorrentID).
-				Updates(map[string]interface{}{
-					"check_count":   entry.CheckCount,
-					"last_check_at": now,
-				})
+		} else {
+			m.mu.Lock()
+			if entry, ok := m.pending[e.SiteName+"|"+e.TorrentID]; ok {
+				entry.CheckCount++
+				entry.LastCheckAt = now
+				m.db.Model(&model.FreeWaitEntry{}).
+					Where("site_name = ? AND torrent_id = ?", e.SiteName, e.TorrentID).
+					Updates(map[string]interface{}{
+						"check_count":   entry.CheckCount,
+						"last_check_at": now,
+					})
+			}
+			m.mu.Unlock()
 		}
-		m.mu.Unlock()
-	}
 	}
 
 	return processed
@@ -268,18 +268,18 @@ func (m *FreeWaitMonitor) PendingCount() int {
 }
 
 type FreeWaitEntryInfo struct {
-	SiteName       string    `json:"siteName"`
-	TorrentID      string    `json:"torrentID"`
-	Title          string    `json:"title"`
-	Size           int64     `json:"size"`
-	ClientUID      uint      `json:"clientUid"`
-	SubscriptionID string    `json:"subscriptionID"`
-	AddedAt        time.Time `json:"addedAt"`
+	SiteName       string     `json:"siteName"`
+	TorrentID      string     `json:"torrentID"`
+	Title          string     `json:"title"`
+	Size           int64      `json:"size"`
+	ClientUID      uint       `json:"clientUid"`
+	SubscriptionID string     `json:"subscriptionID"`
+	AddedAt        time.Time  `json:"addedAt"`
 	CheckBefore    *time.Time `json:"checkBefore,omitempty"`
-	CheckCount     int       `json:"checkCount"`
-	RecheckSec     int       `json:"recheckSec"`
-	LastCheckAt    time.Time `json:"lastCheckAt"`
-	MinRemainMin   int       `json:"minRemainMin"`
+	CheckCount     int        `json:"checkCount"`
+	RecheckSec     int        `json:"recheckSec"`
+	LastCheckAt    time.Time  `json:"lastCheckAt"`
+	MinRemainMin   int        `json:"minRemainMin"`
 }
 
 func (m *FreeWaitMonitor) ListPending() []FreeWaitEntryInfo {
@@ -292,7 +292,7 @@ func (m *FreeWaitMonitor) ListPending() []FreeWaitEntryInfo {
 			TorrentID:      e.TorrentID,
 			Title:          e.Title,
 			Size:           e.Size,
-			ClientUID:       e.ClientUID,
+			ClientUID:      e.ClientUID,
 			SubscriptionID: e.SubscriptionID,
 			AddedAt:        e.AddedAt,
 			CheckBefore:    e.CheckBefore,

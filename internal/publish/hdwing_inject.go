@@ -33,13 +33,15 @@ var reHdwingMultiSeason = regexp.MustCompile(`(?i)S\d{1,2}\s*-\s*S\d{1,2}|第[�
 
 // hdwingCategoryValue §59.511: 瓷器 type 混维路由（typeMappingOf 第十一站）。
 // 站内惯例实证（docs/32/hdwing.md §5.2 抽样）：
-//   ① 4K 大桶：r2160p/r4320p 一律 410（任意媒介/类型·分辨率优先）
-//   ② 电影层（非4K）：原盘→20；Remux/Encode/WEB-DL→17（同桶）；
-//      1080i→16；720p/SD→9
-//   ③ 剧集层：产区轴（PTGen Region 首值优先·缺失兜底欧美 13）·
-//      多季合集→包桶 21/22/23
-//   ④ 类型直映射：animation 14/documentary 5/sports 15/tv_shows 401/
-//      concert 402/mv 406/music 408（走通用 standard_keys 链）
+//
+//	① 4K 大桶：r2160p/r4320p 一律 410（任意媒介/类型·分辨率优先）
+//	② 电影层（非4K）：原盘→20；Remux/Encode/WEB-DL→17（同桶）；
+//	   1080i→16；720p/SD→9
+//	③ 剧集层：产区轴（PTGen Region 首值优先·缺失兜底欧美 13）·
+//	   多季合集→包桶 21/22/23
+//	④ 类型直映射：animation 14/documentary 5/sports 15/tv_shows 401/
+//	   concert 402/mv 406/music 408（走通用 standard_keys 链）
+//
 // 分辨率判定源：tp.Resolution 优先+tags 推理资产兜底（§59.500 完整才
 // 推理单点产物——用户定案"按我们的标签消费"）。
 func (e *PublishExecutor) hdwingCategoryValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tp titleparser.TechProfile) *model.FormValueMapping {
@@ -147,6 +149,7 @@ func resolutionTagOfMeta(meta *model.TorrentMetadata) string {
 //     文本声明两层各表）
 //   - board 恒 1「普通区」（官组专区需站方授权身份·转载者恒普通区）
 //   - is3d：TechProfile.Stereo3D 非空勾 yes（3D 封装·§59.197 字段）
+//
 // 未配置对应 form_fields 键的站零动作（防御——配置缺失不注入）。
 func hdwingPublishInject(form map[string]string, cfg *model.PublishFormConfig, meta *model.TorrentMetadata, tp titleparser.TechProfile) {
 	if cfg == nil {

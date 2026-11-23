@@ -32,6 +32,7 @@ import (
 //     完结(8)→tag.complete 配键+HDR/杜比/HLG/特效/原创/应求
 //     label-only
 //   - 有 url/pt_gen/uplver（表单实证齐全——比库非全）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(74, "soulvoice_publish_form_config", func(gormDB *gorm.DB) error {

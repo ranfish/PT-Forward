@@ -193,8 +193,8 @@ func TestLifecycleManager_RemoveHRTag_NoClientProvider(t *testing.T) {
 
 	mem := &model.PublishGroupMember{
 		ClientUID: 1,
-		InfoHash: "abc123",
-		HRSite:   "site-a",
+		InfoHash:  "abc123",
+		HRSite:    "site-a",
 	}
 	m.removeHRTag(context.Background(), mem)
 }
@@ -207,9 +207,9 @@ func TestLifecycleManager_RemoveHRTag_EmptySite(t *testing.T) {
 
 	mem := &model.PublishGroupMember{
 		ClientUID: 1,
-		InfoHash: "abc123",
-		HRSite:   "",
-		SiteName: "",
+		InfoHash:  "abc123",
+		HRSite:    "",
+		SiteName:  "",
 	}
 	m.removeHRTag(context.Background(), mem)
 
@@ -226,9 +226,9 @@ func TestLifecycleManager_RemoveHRTag_UsesSiteName(t *testing.T) {
 
 	mem := &model.PublishGroupMember{
 		ClientUID: 1,
-		InfoHash: "abc123",
-		HRSite:   "",
-		SiteName: "fallback-site",
+		InfoHash:  "abc123",
+		HRSite:    "",
+		SiteName:  "fallback-site",
 	}
 	m.removeHRTag(context.Background(), mem)
 
@@ -249,7 +249,7 @@ func TestLifecycleManager_PauseMember_WithClient(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientUID:       2,
+		ClientUID:      2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        60,
 	}
@@ -286,7 +286,7 @@ func TestLifecycleManager_PauseMember_PauseFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientUID:       2,
+		ClientUID:      2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        60,
 	}
@@ -317,7 +317,7 @@ func TestLifecycleManager_DeleteGroup_WithClientProvider(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientUID:       0,
+		ClientUID:      0,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -325,7 +325,7 @@ func TestLifecycleManager_DeleteGroup_WithClientProvider(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "def456",
 		SiteName:       "site-b",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -356,7 +356,7 @@ func TestLifecycleManager_DeleteGroup_DeleteFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientUID:       2,
+		ClientUID:      2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -499,7 +499,7 @@ func TestSeedingConfirmation_ConfirmMember_NoClientID(t *testing.T) {
 	sc := NewSeedingConfirmation(db, nil)
 
 	confirmed, err := sc.confirmMember(context.Background(), &mockDownloaderChecker{}, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 0,
 	})
 	if err != nil {
@@ -515,7 +515,7 @@ func TestSeedingConfirmation_ConfirmMember_ClientConfigNotFound(t *testing.T) {
 	sc := NewSeedingConfirmation(db, nil)
 
 	confirmed, err := sc.confirmMember(context.Background(), &mockDownloaderChecker{}, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err == nil {
@@ -538,7 +538,7 @@ func TestSeedingConfirmation_ConfirmMember_CheckerError(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err == nil {
@@ -561,7 +561,7 @@ func TestSeedingConfirmation_ConfirmMember_NilInfo(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err != nil {
@@ -587,7 +587,7 @@ func TestSeedingConfirmation_ConfirmMember_StalledUP(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err != nil {
@@ -613,7 +613,7 @@ func TestSeedingConfirmation_ConfirmMember_ForcedUP(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err != nil {
@@ -640,7 +640,7 @@ func TestSeedingConfirmation_ConfirmMember_IsFinished(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
 	})
 	if err != nil {
@@ -662,7 +662,7 @@ func TestSeedingConfirmation_CheckOnce_CancelledContext(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -694,7 +694,7 @@ func TestSeedingConfirmation_CheckOnce_ConfirmFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -730,7 +730,7 @@ func TestSeedingConfirmation_CheckOnce_WithLogger(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientUID:       1,
+		ClientUID:      1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -769,9 +769,9 @@ func TestSeedingConfirmation_ConfirmMember_InjectedStatus(t *testing.T) {
 	}
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
-		InfoHash: "abc123",
+		InfoHash:  "abc123",
 		ClientUID: 1,
-		Status:   model.MemberStatusInjected,
+		Status:    model.MemberStatusInjected,
 	})
 	if err != nil {
 		t.Fatal(err)

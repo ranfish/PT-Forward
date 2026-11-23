@@ -47,7 +47,7 @@ func TestPixhostRegex_NoMatch(t *testing.T) {
 		`<img src="https://example.com/image.jpg">`,
 		`<img src="https://img2.pixhost.org/images/test.jpg">`, // .org not matched
 		`<img src="https://pixhost.to/images/test.gif">`,       // .gif not matched (only jpg/jpeg/png)
-		`<img src="https://img2.pixhost.to/icons/test.png">`,  // /icons/ not /images/
+		`<img src="https://img2.pixhost.to/icons/test.png">`,   // /icons/ not /images/
 	}
 	for _, html := range nonMatching {
 		if match := rePixhostDirect.FindString(html); match != "" {

@@ -16,9 +16,9 @@ func TestUserWordsFullCoverage(t *testing.T) {
 	}
 	// 防误伤回归
 	safe := []struct{ in, want string }{
-		{"火车梦.2025-CMCT 铁路梦影(港)", "火车梦.2025-CMCT 铁路梦影(港)"},       // (港) 内容
-		{"Movie.2023.1080p-CMCT  (已审)", "Movie.2023.1080p-CMCT"},              // 状态
-		{"M.1080p-FRDS [50%] [禁转]", "M.1080p-FRDS"}, // §59.284: 禁转全剥（flags 通道单责——§59.136 保留折中由架构模型取代）
+		{"火车梦.2025-CMCT 铁路梦影(港)", "火车梦.2025-CMCT 铁路梦影(港)"},                         // (港) 内容
+		{"Movie.2023.1080p-CMCT  (已审)", "Movie.2023.1080p-CMCT"},                   // 状态
+		{"M.1080p-FRDS [50%] [禁转]", "M.1080p-FRDS"},                                // §59.284: 禁转全剥（flags 通道单责——§59.136 保留折中由架构模型取代）
 		{"Movie.2023.1080p.BluRay.x264-CMCT", "Movie.2023.1080p.BluRay.x264-CMCT"}, // 无标注
 	}
 	for _, c := range safe {

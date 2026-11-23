@@ -1,12 +1,12 @@
 package adapter
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -119,9 +119,9 @@ func TestGazelle_GetTorrentDetail_API(t *testing.T) {
 				"fileName":   "movie.mkv",
 			},
 			"group": map[string]interface{}{
-				"name":        "Movie 2024",
-				"subName":     "测试影片",
-				"year":        2024,
+				"name":         "Movie 2024",
+				"subName":      "测试影片",
+				"year":         2024,
 				"categoryName": "Movies",
 			},
 		},
@@ -605,9 +605,9 @@ func TestGazelle_GetTorrentDetail_GroupFlags(t *testing.T) {
 		"status": "success",
 		"response": map[string]interface{}{
 			"group": map[string]interface{}{
-				"id":     151775,
-				"name":   "Test Album",
-				"year":   2024,
+				"id":        151775,
+				"name":      "Test Album",
+				"year":      2024,
 				"wikiImage": "https://pic.example/cover.jpg",
 				"musicInfo": map[string]interface{}{
 					"artists": []map[string]interface{}{{"id": 1, "name": "Artist"}},
@@ -674,15 +674,15 @@ func TestGazelle_GetTorrentDetail_GroupFlagsTransfer(t *testing.T) {
 		"status": "success",
 		"response": map[string]interface{}{
 			"group": map[string]interface{}{
-				"id":         200,
-				"name":       "Transfer Album",
-				"musicInfo":  map[string]interface{}{"artists": []map[string]interface{}{{"id": 1, "name": "A"}}},
+				"id":        200,
+				"name":      "Transfer Album",
+				"musicInfo": map[string]interface{}{"artists": []map[string]interface{}{{"id": 1, "name": "A"}}},
 			},
 			"torrent": map[string]interface{}{"format": "FLAC"},
 		},
 	}
 	tgResp := map[string]interface{}{
-		"status":   "success",
+		"status": "success",
 		"response": map[string]interface{}{
 			"group":    map[string]interface{}{"vanityHouse": false},
 			"torrents": []map[string]interface{}{{"id": 300, "scene": false}},

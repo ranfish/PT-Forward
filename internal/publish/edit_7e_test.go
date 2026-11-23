@@ -12,10 +12,10 @@ import (
 
 func TestParseExistingStrategy(t *testing.T) {
 	cases := map[string]model.ExistingStrategy{
-		"skip":   model.ExistingSkip,
-		"update": model.ExistingUpdate,
-		"force":  model.ExistingForce,
-		"":       model.ExistingSkip,
+		"skip":    model.ExistingSkip,
+		"update":  model.ExistingUpdate,
+		"force":   model.ExistingForce,
+		"":        model.ExistingSkip,
 		"invalid": model.ExistingSkip,
 	}
 	for in, want := range cases {
@@ -114,7 +114,7 @@ func TestMergeEditFields_NilExisting(t *testing.T) {
 
 // mockEditPublisher 测试用 mock。
 type mockEditPublisher struct {
-	editForm *model.EditForm
+	editForm  *model.EditForm
 	submitErr error
 	submitted bool
 }

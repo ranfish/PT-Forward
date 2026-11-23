@@ -32,6 +32,7 @@ import (
 //   - **无 tags 槽**（实时资产双 None）；**无 url/pt_gen/technical_info**
 //     （实时实证——简介-only 形态，海的宝同款）；nfo 不配；uplver+
 //     anonymous:true。
+//
 // 站规人工把关：**Dupe 严格**（已有 BluRay Encode 禁发 WEB-DL/HDTV 同
 // 分辨率单份例外 264/265×HDR/SDR 各一/每季完结后禁发单集——§59.424
 // 系统分集拦截上游已拦 ✓/官方小组优先一切）+禁二次编码 BR/HR-HDTV+

@@ -14,10 +14,10 @@ import (
 // 但模板用 cuhash={passkey}，旧门只判 mode 导致同步链路空转）。
 func TestCuhashEnabled(t *testing.T) {
 	cases := []struct {
-		name   string
-		mode   string
-		tpl    string
-		want   bool
+		name string
+		mode string
+		tpl  string
+		want bool
 	}{
 		{"城市形态：template + cuhash 模板", "template", "download?id={id}&cuhash={passkey}", true},
 		{"显式 cuhash mode", "cuhash", "", true},

@@ -201,9 +201,9 @@ func TestLeadingCJKSegment(t *testing.T) {
 		{"冰冻星球.BBC.Frozen.Planet.S02.2160p.WEB-DL.H.264-HDSWEB", "冰冻星球"},
 		{"忍者神龟：变种时代.BluRay.1080p-GRP", "忍者神龟：变种时代"},
 		{"[热门]正义的慈悲.2019.1080p-GRP", "正义的慈悲"},
-		{"BBC.Frozen.Planet.2011", ""},          // 前导 ASCII → 无 B1 前缀
+		{"BBC.Frozen.Planet.2011", ""},        // 前导 ASCII → 无 B1 前缀
 		{"全程战课示威者中字超帅4k杜比视界版", "全程战课示威者中字超帅"}, // 4k ASCII 截断
-		{"三国演义.全95集.2010", "三国演义.全"}, // 全 是 CJK，段延续（搜索子串仍有效）
+		{"三国演义.全95集.2010", "三国演义.全"},          // 全 是 CJK，段延续（搜索子串仍有效）
 	}
 	for _, c := range cases {
 		if got := leadingCJKSegment(c.in); got != c.want {

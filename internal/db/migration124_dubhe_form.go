@@ -35,8 +35,11 @@ import (
 //   - 字段：url（IMDb 链接 data-pt-gen 标记）+technical_info+uplver+
 //     anonymous:true；nfo 不配（13城先例域表无此域）；**price 促销
 //     字段不配**；**无 pt_gen**。
+//
 // 站规人工把关：上传者资格+H&R+Dupe 规则（无 wiki 文档实时未采集——
-//   首颗发布前人工核验站方规则页）。
+//
+//	首颗发布前人工核验站方规则页）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(124, "dubhe_publish_form_config", func(gormDB *gorm.DB) error {

@@ -43,8 +43,11 @@ import (
 //     standard_sel[4]/team_sel[4]/tags[4][]/small_descr/descr/
 //     technical_info+url+pt_gen+uplver+anonymous:true；nfo 不配
 //     （13城先例域表无此域）。
+//
 // 站规人工把关：Dupe 规则（标准 HD 站规则）+资源打包规则+促销规则+
-//   账号保留规则；成人(23) 标签绝不投递。
+//
+//	账号保留规则；成人(23) 标签绝不投递。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(126, "baozi_publish_form_config", func(gormDB *gorm.DB) error {

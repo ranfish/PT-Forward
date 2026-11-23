@@ -12,6 +12,7 @@ import (
 //     键 miss 落空（配键 13 非文档口径的 15）。
 //   - **实时无 uplver**（文档称有"匿名发布 uplver"——控件实证无，
 //     不配）。
+//
 // 槽位映射：
 //   - type 10 项倒序：406 MV 三键第九站 [mv,music_video,concert]+
 //     408 音频=[music,lossless_music] 双键+410 短剧第十一站+404
@@ -47,6 +48,7 @@ import (
 //     二义）8 项 label-only。
 //   - 字段：url+pt_gen+technical_info；nfo 不配（13城教训）+无
 //     uplver（实时漂移）。
+//
 // 站规人工把关（躺平系同款）：<100MB 禁+upscale 禁+RMVB 禁+游戏
 // 候选制（上传员级）+RAR 禁+Dupe 媒介优先级+断种豁免（45 日/18 月）+
 // <5.1 有损音频禁。

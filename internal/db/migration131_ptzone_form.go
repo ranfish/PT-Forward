@@ -23,6 +23,7 @@ import (
 //     键均归 11——一键多值防线）。
 //   - tags 资产 None→实时 8 项（青蛙/学校/海的宝同款资产缺口实时补全）。
 //   - codec/standard/team 三槽实时=资产一致（零漂移）。
+//
 // 槽位映射：
 //   - type 11（配置侧删 409）：404 双键+406 Music=[music,lossless_music]
 //     双键（克隆先例——无 HQ Audio 分立）+403=[tv_shows]+407=[sports]+
@@ -54,10 +55,13 @@ import (
 //     technical_info+url（IMDb——data-pt-gen 真字段）+pt_gen+uplver；
 //     **nfo 不配**（13城先例——发布链不投递）；无 douban 字段（豆瓣
 //     走 pt_gen）；url×2 第二个是编辑器按钮（浦园/青蛙同款）。
+//
 // 站规人工把关：§3.3 上传者资格+§3.5 不允许的资源+§3.6 Dupe 判定
-//   （同媒介+同分辨率+更高/同优先级组——动漫 HDTV/DVD 同级例外）+
-//   §3.7 资源打包+§3.8 标题格式规范（电影/电视剧/音轨/游戏分模板）+
-//   §4.5 无损音轨只保留一版本（分轨 FLAC 优先）。
+//
+//	（同媒介+同分辨率+更高/同优先级组——动漫 HDTV/DVD 同级例外）+
+//	§3.7 资源打包+§3.8 标题格式规范（电影/电视剧/音轨/游戏分模板）+
+//	§4.5 无损音轨只保留一版本（分轨 FLAC 优先）。
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(131, "ptzone_publish_form_config", func(gormDB *gorm.DB) error {

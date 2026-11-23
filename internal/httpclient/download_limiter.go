@@ -7,10 +7,10 @@ import (
 )
 
 type DownloadRateLimiter struct {
-	mu           sync.Mutex
-	entries      map[string]*downloadRateEntry
-	minInterval  time.Duration
-	hourlyLimit  int
+	mu          sync.Mutex
+	entries     map[string]*downloadRateEntry
+	minInterval time.Duration
+	hourlyLimit int
 }
 
 type downloadRateEntry struct {

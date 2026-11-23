@@ -91,7 +91,7 @@ func TestPreviewBuilder_Nil(t *testing.T) {
 
 func TestPreviewBuilder_UserOverride(t *testing.T) {
 	merged := &MergedMetadata{
-		Title:  "自动标题",
+		Title:    "自动标题",
 		SourceOf: map[string]string{"title": "ptgen"},
 	}
 	builder := NewPreviewBuilder()

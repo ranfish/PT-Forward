@@ -65,42 +65,42 @@ var (
 // webdlEvidence §59.517 提取层产物（内部——按引擎消费维度组织）。
 type webdlEvidence struct {
 	// General
-	genReenc  bool // 铁证① 民用转码器黑名单（复用 generalReencoderDetected 词表）
-	cdnVid    bool // 交叉: CDN 资产 ID
-	oldMuxer  bool // 尾部: 古董混流器（mkvmerge v≤20）
+	genReenc bool // 铁证① 民用转码器黑名单（复用 generalReencoderDetected 词表）
+	cdnVid   bool // 交叉: CDN 资产 ID
+	oldMuxer bool // 尾部: 古董混流器（mkvmerge v≤20）
 	// Video
-	fmtUpper    string // HEVC/AVC/AV1/VP9...
-	vidWL       string // Video Writing library（小写）
-	vidES       string // Video Encoding settings（归一空白）
-	hwEncoder   bool   // 铁证①-GPU 显卡/硬件编码器
-	x264, x265  bool
-	x265Linux   bool
-	x265Win     bool
-	bd10, bd8   bool
-	colorFull   bool // cp/tc/mc 三件套齐全
-	crFull      bool // Color range: Full（DoVi 母带指纹）
-	dvP5        bool
-	dv81HDR10   bool
-	p81Full     bool
-	hdrVivid    bool
-	vQuicktime  bool
-	eia         bool
-	sc, st      string // scenecut / stitchable
-	ki, kim     int    // keyint / keyint-min
-	integerSec  bool   // 整数秒 keyint（排除 x264 默认 GOP 250/25）
-	gopLock     bool   // GOP 锁定（ki==kim）
-	crfDecimal  bool   // crf 非零小数（".0" 不算——NF 官方 16.0）
-	tightVBV    bool
-	crudeParams bool
+	fmtUpper     string // HEVC/AVC/AV1/VP9...
+	vidWL        string // Video Writing library（小写）
+	vidES        string // Video Encoding settings（归一空白）
+	hwEncoder    bool   // 铁证①-GPU 显卡/硬件编码器
+	x264, x265   bool
+	x265Linux    bool
+	x265Win      bool
+	bd10, bd8    bool
+	colorFull    bool // cp/tc/mc 三件套齐全
+	crFull       bool // Color range: Full（DoVi 母带指纹）
+	dvP5         bool
+	dv81HDR10    bool
+	p81Full      bool
+	hdrVivid     bool
+	vQuicktime   bool
+	eia          bool
+	sc, st       string // scenecut / stitchable
+	ki, kim      int    // keyint / keyint-min
+	integerSec   bool   // 整数秒 keyint（排除 x264 默认 GOP 250/25）
+	gopLock      bool   // GOP 锁定（ki==kim）
+	crfDecimal   bool   // crf 非零小数（".0" 不算——NF 官方 16.0）
+	tightVBV     bool
+	crudeParams  bool
 	bitrateRound bool
-	cropped     bool // 仅作 x264 组合腿（单独信号已被证伪——§59.517 墓园）
-	hasFS       bool // Format settings 行在场（AVC 平台封装）
-	sourceDecl  bool
-	fps         float64
+	cropped      bool // 仅作 x264 组合腿（单独信号已被证伪——§59.517 墓园）
+	hasFS        bool // Format settings 行在场（AVC 平台封装）
+	sourceDecl   bool
+	fps          float64
 	// Text
-	aiSub bool
-	webvtt bool
-	sdh    bool
+	aiSub    bool
+	webvtt   bool
+	sdh      bool
 	textMany bool
 	// Audio
 	multiTrackUniform bool

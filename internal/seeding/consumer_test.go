@@ -36,7 +36,7 @@ func TestCreateRecordFromPush_MarksRSSTorrentSeenPushed(t *testing.T) {
 
 	// 调用 createRecordFromPush（模拟推送成功路径）
 	e.createRecordFromPush(context.Background(), 1, &pusher.PushedEvent{
-		ClientUID:       1,
+		ClientUID:      1,
 		SiteName:       "site1",
 		TorrentID:      "t100",
 		SubscriptionID: "1",
@@ -78,9 +78,9 @@ func TestLoadScoringConfig_ReadsEmbeddedScoringConfig(t *testing.T) {
 
 	// 创建订阅，评分启用 + 自定义参数（模拟前端 PUT scoring-config 保存的结果）
 	sub := &model.RSSSubscription{
-		Name:     "test-scoring-sub",
-		Enabled:  true,
-		SiteName: "site1",
+		Name:      "test-scoring-sub",
+		Enabled:   true,
+		SiteName:  "site1",
 		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:       true,
@@ -136,7 +136,7 @@ func TestLoadActiveClientConfig(t *testing.T) {
 	t.Run("download role config hit", func(t *testing.T) {
 		db := setupConfigTestDB(t)
 		db.Create(&model.SeedingClientConfig{
-			ClientUID:           1,
+			ClientUID:          1,
 			Enabled:            true,
 			Role:               "download",
 			MaxActiveSeeding:   5,

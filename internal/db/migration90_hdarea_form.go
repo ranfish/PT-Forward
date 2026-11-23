@@ -33,6 +33,7 @@ import (
 //     WiKi/TTG/MTeam/HDApad/CHD/HDAccess/HDATV/cXcY/CMCT——车站/
 //     学校/GTK 外站组复利链）；cXcY@FRDS 种子提取 FRDS→miss→other(6)
 //   - url IMDb 真字段（url×2 按钮同款）
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(90, "hdarea_publish_form_config", func(gormDB *gorm.DB) error {

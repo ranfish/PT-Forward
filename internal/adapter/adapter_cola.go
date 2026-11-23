@@ -169,7 +169,6 @@ func (a *ColaAdapter) discountViaWebPromotion(ctx context.Context, config *model
 	}
 }
 
-
 // detailViaWebJSON §59.460 附五: Web 面详情端点直连——GET
 // https://<domain>/api/v1/torrents/{id}（cookie 通道；可乐实测 12KB/45+
 // 字段完整覆盖 detail 需求：release_name/subtitle/size_bytes 字符串数字/
@@ -322,4 +321,3 @@ func (a *ColaAdapter) seedingViaUserTorrentList(ctx context.Context, config *mod
 	}
 	return total, sizeSum
 }
-

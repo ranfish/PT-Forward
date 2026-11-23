@@ -12,6 +12,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 )
+
 type BDInfoScanner struct {
 	logger *zap.Logger
 }
@@ -178,4 +179,3 @@ func (s *BDInfoScanner) Scan(ctx context.Context, path string, progressCB func(p
 	// END FORUMS 行）——本地生成与源站提取（fetch 归位）同函数统一形态
 	return titleparser.FormatBDInfoReport(result.Report), nil
 }
-

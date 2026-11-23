@@ -8,10 +8,12 @@ import (
 // 依据：站方 upload.php 实时 HTML（52.1KB 直连抓取）+ docs/32/ubits.md
 // 381 行读全（候选制/转载互斥/黑名单组/标签规范 topicid=1495/促销）。
 // **实时 HTML vs 4 月资产三处真改版**：
-//   ① type 新增 415 有声书（9→10 项）
-//   ② team_sel 新增 8 驻站（4→5 项）
-//   ③ tags 官方(3) 站方已移除（18→17 项——财神官种案雷区标签站方
-//     主动下线；资产该值实时为准不配）
+//
+//	① type 新增 415 有声书（9→10 项）
+//	② team_sel 新增 8 驻站（4→5 项）
+//	③ tags 官方(3) 站方已移除（18→17 项——财神官种案雷区标签站方
+//	  主动下线；资产该值实时为准不配）
+//
 // **`_token` CSRF 控件首见**（历史 25 站无）——发布链 UploadTorrent
 // 不处理（挂账：首颗真实发布验证站方是否校验；若校验需表单页
 // 预取 token 通用增强另案）。
@@ -47,6 +49,7 @@ import (
 //     发布预览人工确认
 //   - 字段：url（IMDb 必填）+pt_gen（豆瓣必填）+technical_info
 //     （2025.04.11 后必填）+uplver；url×2 第二个是编辑器按钮
+//
 // 幂等：仅空值行写入。
 func init() {
 	RegisterMigration(93, "ubits_publish_form_config", func(gormDB *gorm.DB) error {
