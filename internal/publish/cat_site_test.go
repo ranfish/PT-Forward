@@ -81,11 +81,34 @@ func TestCatTagCheckboxFields(t *testing.T) {
 		t.Errorf("副标「简繁英字幕」含英字信号应勾 ensub: %v", got)
 	}
 
-	// canonical 键通道
-	meta2 := &model.TorrentMetadata{Subtitle: ""}
-	kvs2 := catTagCheckboxFields(meta2, []string{"chinese_audio", "chinese_subtitle"})
-	got2 := map[string]string{}
+	// §59.561 圣克莱尔案：中德双语字幕≠英字——「双语」宽词探撤除
+	meta1 := &model.TorrentMetadata{
+		Subtitle: "【圣克莱尔】10bit HEVC版本 英语 简繁德双语字幕",
+	}
+	kvs1 := catTagCheckboxFields(meta1, nil)
+	for _, kv := range kvs1 {
+		if kv.Key == "ensub" {
+			t.Errorf("中德双语字幕不应勾 ensub（双语≠英字）: %v", kvs1)
+		}
+	}
+
+	// canonical 通道（§59.561 ensub 重构主通道）：english_subtitle → ensub
+	kvs2 := catTagCheckboxFields(&model.TorrentMetadata{Subtitle: "英语原声"}, []string{"english_subtitle"})
+	foundEn := false
 	for _, kv := range kvs2 {
+		if kv.Key == "ensub" {
+			foundEn = true
+		}
+	}
+	if !foundEn {
+		t.Errorf("canonical english_subtitle 应勾 ensub: %v", kvs2)
+	}
+
+	// canonical 键通道（中字）
+	meta2 := &model.TorrentMetadata{Subtitle: ""}
+	kvs3 := catTagCheckboxFields(meta2, []string{"chinese_audio", "chinese_subtitle"})
+	got2 := map[string]string{}
+	for _, kv := range kvs3 {
 		got2[kv.Key] = kv.Value
 	}
 	if got2["guoyu"] != "yes" || got2["zhongzi"] != "yes" {
@@ -94,15 +117,15 @@ func TestCatTagCheckboxFields(t *testing.T) {
 
 	// 粤语
 	meta3 := &model.TorrentMetadata{Subtitle: "粤语版"}
-	kvs3 := catTagCheckboxFields(meta3, nil)
+	kvs4 := catTagCheckboxFields(meta3, nil)
 	found := false
-	for _, kv := range kvs3 {
+	for _, kv := range kvs4 {
 		if kv.Key == "yueyu" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("副标「粤语」应勾 yueyu: %v", kvs3)
+		t.Errorf("副标「粤语」应勾 yueyu: %v", kvs4)
 	}
 }
 

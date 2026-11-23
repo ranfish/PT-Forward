@@ -141,8 +141,14 @@ func catTagCheckboxFields(meta *model.TorrentMetadata, applied []string) []model
 		strings.Contains(sub, "简繁") || strings.Contains(sub, "简体") || strings.Contains(sub, "繁体") {
 		out = append(out, model.TagKV{Key: "zhongzi", Value: "yes"})
 	}
-	// 英字：副标含「英文字幕/双语」（非必填·有信号就勾）
-	if strings.Contains(sub, "英文字幕") || strings.Contains(sub, "英字幕") || strings.Contains(sub, "双语") || strings.Contains(sub, "中英") || strings.Contains(sub, "简繁英") {
+	// 英字 §59.561 重构：canonical english_subtitle 优先（dict 推断层单源）
+	// + 紧词形兜底（英文字幕/英字幕/简繁英——英与字幕直接相邻的形态）。
+	// ⚠ 撤「双语」「中英」宽词探：双语是语言无关词（中德双语≠英字——
+	// 圣克莱尔案：「英语 简繁德双语字幕」误投 ensub·站方审核脚本按
+	// 「MI 无英字轨且无外挂英字但标签有英字」规则质询）；中英有合拍片
+	// 伪面（中英合作…字幕）。canonical 已覆盖中英字幕词形（{0,2} 窗）。
+	if has("english_subtitle") || strings.Contains(sub, "英文字幕") ||
+		strings.Contains(sub, "英字幕") || strings.Contains(sub, "简繁英") {
 		out = append(out, model.TagKV{Key: "ensub", Value: "yes"})
 	}
 	// DIY原盘 §59.560 追记：资源属性标签（碟是自制的就是自制——转载者有权

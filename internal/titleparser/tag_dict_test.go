@@ -20,6 +20,11 @@ func TestTagInferAnchors(t *testing.T) {
 		{"complete S01 无 E", TagInferInput{Title: "Show S01 Complete"}, []string{"complete"}},
 		{"complete 全N集副标题", TagInferInput{Title: "Show", Subtitle: "全12集"}, []string{"complete"}},
 		{"S01E01 不判 complete(分集命中)", TagInferInput{Title: "Show S01E01"}, []string{"episode_split"}},
+		// §59.561: 英字副标词形窗口收紧 {0,12}→{0,2}——圣克莱尔案
+		// 「英语 简繁德双语字幕」跨词伪命中（英属音频·字幕属中德）
+		{"英字跨词伪命中出局(§59.561 圣克莱尔)", TagInferInput{Title: "Saint Clare 2024 1080p BluRay x265 DDP 5.1-MNHD-FRDS", Subtitle: "【圣克莱尔】10bit HEVC版本 英语 简繁德双语字幕"}, []string{"10_bit", "chinese_subtitle", "bilingual_subtitle"}},
+		{"简繁英双语字幕命中(2 字符窗)", TagInferInput{Title: "Movie 2020", Subtitle: "mUHD作品 简繁英双语字幕"}, []string{"chinese_subtitle", "english_subtitle", "bilingual_subtitle"}},
+		{"中英字幕命中(1 字符窗)", TagInferInput{Title: "灼热.2020.1080p.中英字幕", Subtitle: ""}, []string{"chinese_subtitle", "english_subtitle"}},
 	}
 	for _, c := range cases {
 		got := TagInferMatches(c.in)

@@ -231,7 +231,7 @@
       "label": "英文字幕",
       "aliases": "ENG",
       "group": "字幕",
-      "infer_pattern": "(英.{0,12}字幕|英.{0,3}字|内封.{0,3}英.{0,3}字|(Text[^\\n]*English)|(subtitles?[^\\n]*eng)|(subtitle[^\\n]*english)|(Graphics[^\\n]*English))",
+      "infer_pattern": "(英.{0,2}字幕|英.{0,3}字|内封.{0,3}英.{0,3}字|(Text[^\\n]*English)|(subtitles?[^\\n]*eng)|(subtitle[^\\n]*english)|(Graphics[^\\n]*English))",
       "infer_scope": "all_raw",
       "standard_key": "tag.english_subtitle",
       "variants": [
