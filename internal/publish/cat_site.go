@@ -146,8 +146,9 @@ func catTagCheckboxFields(meta *model.TorrentMetadata, applied []string) []model
 		out = append(out, model.TagKV{Key: "ensub", Value: "yes"})
 	}
 	// DIY原盘 §59.560 追记：资源属性标签（碟是自制的就是自制——转载者有权
-	// 也有义务勾·与 jinzhuan 权利声明本质不同——用户权威定义 2026-11-23：
-	// 禁转=官组原始发布专属·普通用户无权；diy=客观资源属性）。
+	// 也有义务勾·与 jinzhuan 权利声明本质不同——系统级铁律 2026-11-23：
+	// 禁转=站点/原发布者专属权力声明·转载者在任何目标站无权勾选·见 AGENTS.md
+	// 行为铁律+docs/31 §59.560 追记二；diy=客观资源属性）。
 	// 双门防误报：门1 关键词（标题/副标含 DIY/自制）·门2 碟形态源
 	// （SourceType 含 blu/dvd——拦截组名含 DIY 词形碰撞与非碟 DIY 字样）。
 	if strings.Contains(strings.ToLower(meta.Title), "diy") ||
