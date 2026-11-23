@@ -1510,6 +1510,13 @@ U2: [机动战士高达0080：口袋里的战争][Mobile Suit Gundam 0080 War In
   独立 name jinzhuan/guoyu/zhongzi 等，发布链 tags 域数组投递机制
   不适用——全标签预览人工；guanfang 官方 disabled 仅管理员（绝不配
   双保险）+pr 原创/bim 自购/jinzhuan 禁转官方专属本就不配。
+  §59.560 追记（2026-11-23 用户权威定义）：**jinzhuan 禁转=官组原始
+  发布者专属权利·普通用户无权选择**（权利声明非资源属性——真禁转种
+  源侧禁转必检就该拦住·到得了发布这步的种就不该勾）；**diy DIY原盘
+  =资源属性（客观事实）·转载者有权有义务勾**——catTagCheckboxFields
+  补 diy 块（双门：标题/副标 DIY/自制关键词 + SourceType 含 blu/dvd
+  碟形态）·guoyu/yueyu/zhongzi/ensub/diy 五键自动投递；yingqiu 应求/
+  mp MV母盘无自动判据（零案例按需生长不预实施）。
 - 字段：url（IMDb text input）+**douban 独立豆瓣字段（dburl 域第五站）**
   +uplver+anonymous:true；referid（转载引用）/offer/has_allowed_offer
   （候选 hidden）不配；无 pt_gen/nfo/technical_info（简介粘贴

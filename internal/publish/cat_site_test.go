@@ -106,6 +106,81 @@ func TestCatTagCheckboxFields(t *testing.T) {
 	}
 }
 
+// §59.560 追记：diy 三态锚——资源属性标签（双门：关键词+碟形态源）。
+func TestCatTagDIY(t *testing.T) {
+	// ① 命中：副标「DIY原盘」+ BluRay 源 → diy=yes
+	meta := &model.TorrentMetadata{
+		Subtitle:   "国配DIY原盘 简繁英字幕",
+		SourceType: "BluRay",
+	}
+	kvs := catTagCheckboxFields(meta, nil)
+	got := false
+	for _, kv := range kvs {
+		if kv.Key == "diy" && kv.Value == "yes" {
+			got = true
+		}
+	}
+	if !got {
+		t.Errorf("副标「DIY原盘」+BluRay 应勾 diy: %v", kvs)
+	}
+
+	// ② 非碟拦截：标题含 DIY 但 WEB 源 → 不投（组名/DIY 字样碰撞防护）
+	meta2 := &model.TorrentMetadata{
+		Title:      "Movie 2020 1080p WEB-DL DDP5.1 H265-DIYFans",
+		SourceType: "WEB",
+	}
+	kvs2 := catTagCheckboxFields(meta2, nil)
+	for _, kv := range kvs2 {
+		if kv.Key == "diy" {
+			t.Errorf("WEB 源含 DIY 词形不应投 diy（非碟门拦截）: %v", kvs2)
+		}
+	}
+
+	// ③ 无信号：碟形态但无 DIY 关键词 → 不投
+	meta3 := &model.TorrentMetadata{
+		Subtitle:   "国语 简繁英字幕",
+		SourceType: "UHD BluRay",
+	}
+	kvs3 := catTagCheckboxFields(meta3, nil)
+	for _, kv := range kvs3 {
+		if kv.Key == "diy" {
+			t.Errorf("无 DIY 信号不应投 diy: %v", kvs3)
+		}
+	}
+
+	// ④ 标题通道+自制词形：标题 DIY 词 + 「自制」副标均命中（UHD Blu-ray 词形）
+	meta4 := &model.TorrentMetadata{
+		Title:      "Movie 2160p UHD BluRay DIY Atmos-GRP",
+		SourceType: "UHD Blu-ray",
+	}
+	kvs4 := catTagCheckboxFields(meta4, nil)
+	got4 := false
+	for _, kv := range kvs4 {
+		if kv.Key == "diy" {
+			got4 = true
+		}
+	}
+	if !got4 {
+		t.Errorf("标题 DIY+UHD Blu-ray 应勾 diy: %v", kvs4)
+	}
+
+	// ⑤ 「自制」词形：副标含「自制」+ DVD 源 → diy=yes
+	meta5 := &model.TorrentMetadata{
+		Subtitle:   "自制原盘收藏版",
+		SourceType: "DVD",
+	}
+	kvs5 := catTagCheckboxFields(meta5, nil)
+	got5 := false
+	for _, kv := range kvs5 {
+		if kv.Key == "diy" {
+			got5 = true
+		}
+	}
+	if !got5 {
+		t.Errorf("副标「自制」+DVD 应勾 diy: %v", kvs5)
+	}
+}
+
 func TestCatIsTeamRegionField(t *testing.T) {
 	cfg := &model.PublishFormConfig{
 		ValueMappings: map[string][]model.FormValueMapping{
