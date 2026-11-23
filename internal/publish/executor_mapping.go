@@ -425,6 +425,11 @@ func (e *PublishExecutor) mediumMapping(cfg *model.PublishFormConfig, meta *mode
 
 // teamMapping 组域（R3-6 待做——label 直配制作组名）。
 func (e *PublishExecutor) teamMapping(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
+	// §59.560: 猫站形态——team 域值集是地区选项（非制作组）。
+	// 动态检测（值集含「大陆/Mainland」特征）→ 走产区映射（PTGen region）。
+	if catIsTeamRegionField(cfg) {
+		return catTeamRegionMapping(cfg, meta)
+	}
 	group := util.ExtractGroupName(meta.Title)
 	if group == "" {
 		return nil

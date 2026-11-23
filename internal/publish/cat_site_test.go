@@ -1,0 +1,132 @@
+package publish
+
+import (
+	"testing"
+
+	"github.com/ranfish/pt-forward/internal/model"
+)
+
+// §59.560 锚：猫站 team 域产区化 + 标签 checkbox 投递。
+// 数据源：pterclub.md §7/§8 + 发布页源码实证。
+func TestCatRegionToTeamSel(t *testing.T) {
+	cases := []struct{ region, want string }{
+		{"中国大陆", "1"},
+		{"中国香港", "2"},
+		{"中国台湾", "3"},
+		{"美国", "4"},
+		{"韩国", "5"},
+		{"日本", "6"},
+		{"印度", "7"},
+		{"法国", "4"},
+		{"未知地区", "8"},
+	}
+	for _, c := range cases {
+		if got := catRegionToTeamSel(c.region); got != c.want {
+			t.Errorf("catRegionToTeamSel(%q) = %q, want %q", c.region, got, c.want)
+		}
+	}
+}
+
+func TestCatTeamRegionMapping(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTeam: {
+				{Label: "大陆 (Mainland,CHN)", Value: "1"},
+				{Label: "香港 (HKG,CHN)", Value: "2"},
+				{Label: "其它 (Other)", Value: "8"},
+			},
+		},
+	}
+	// PTGen region 中国大陆 → team_sel=1
+	meta := &model.TorrentMetadata{
+		PTGenSourceJSON: `{"region":["中国大陆"]}`,
+		Title:           "Movie 2020 1080p-GRP", // 无关组名
+	}
+	m := catTeamRegionMapping(cfg, meta)
+	if m == nil || m.Value != "1" {
+		t.Fatalf("PTGen region 中国大陆应映射 team_sel=1: %+v", m)
+	}
+	// 副标词探（无 PTGen）
+	meta2 := &model.TorrentMetadata{Subtitle: "国产 喜剧"}
+	m2 := catTeamRegionMapping(cfg, meta2)
+	if m2 == nil || m2.Value != "1" {
+		t.Fatalf("副标「国产」应映射 team_sel=1: %+v", m2)
+	}
+	// 兜底 Other
+	meta3 := &model.TorrentMetadata{}
+	m3 := catTeamRegionMapping(cfg, meta3)
+	if m3 == nil || m3.Value != "8" {
+		t.Fatalf("无信号应兜底 Other=8: %+v", m3)
+	}
+}
+
+func TestCatTagCheckboxFields(t *testing.T) {
+	// 副标含「国语 简繁英字幕」→ guoyu+zhongzi+ensub
+	meta := &model.TorrentMetadata{
+		Subtitle: "【站直啰，别趴下】10bit HEVC版本 国语 简繁英字幕",
+	}
+	applied := []string{} // assembleTags canonical 键（本场景无 tags 域→空）
+	kvs := catTagCheckboxFields(meta, applied)
+	got := map[string]string{}
+	for _, kv := range kvs {
+		got[kv.Key] = kv.Value
+	}
+	if got["guoyu"] != "yes" {
+		t.Errorf("副标「国语」应勾 guoyu: %v", got)
+	}
+	if got["zhongzi"] != "yes" {
+		t.Errorf("副标「简繁英字幕」应勾 zhongzi: %v", got)
+	}
+	if got["ensub"] != "yes" {
+		t.Errorf("副标「简繁英字幕」含英字信号应勾 ensub: %v", got)
+	}
+
+	// canonical 键通道
+	meta2 := &model.TorrentMetadata{Subtitle: ""}
+	kvs2 := catTagCheckboxFields(meta2, []string{"chinese_audio", "chinese_subtitle"})
+	got2 := map[string]string{}
+	for _, kv := range kvs2 {
+		got2[kv.Key] = kv.Value
+	}
+	if got2["guoyu"] != "yes" || got2["zhongzi"] != "yes" {
+		t.Errorf("canonical 键应映射 checkbox: %v", got2)
+	}
+
+	// 粤语
+	meta3 := &model.TorrentMetadata{Subtitle: "粤语版"}
+	kvs3 := catTagCheckboxFields(meta3, nil)
+	found := false
+	for _, kv := range kvs3 {
+		if kv.Key == "yueyu" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("副标「粤语」应勾 yueyu: %v", kvs3)
+	}
+}
+
+func TestCatIsTeamRegionField(t *testing.T) {
+	cfg := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTeam: {
+				{Label: "大陆 (Mainland,CHN)", Value: "1"},
+			},
+		},
+	}
+	if !catIsTeamRegionField(cfg) {
+		t.Error("值集含「大陆」应 true")
+	}
+	// 普通制作组站
+	cfg2 := &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTeam: {
+				{Label: "FRDS", Value: "1"},
+				{Label: "Other", Value: "99"},
+			},
+		},
+	}
+	if catIsTeamRegionField(cfg2) {
+		t.Error("制作组站应 false")
+	}
+}

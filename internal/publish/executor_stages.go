@@ -300,6 +300,12 @@ func (e *PublishExecutor) buildExecuteForm(ctx context.Context, in ExecuteInput,
 	// §59.531: 段提取为 AssembleTagArrayForSite——发布链与修复工具（tools/fix-site-tags）
 	// 同源消费（单源防双链分叉）；行为零变化（§59.309/§59.529 全链随迁）。
 	tags, tagArrayFields, applied := e.AssembleTagArrayForSite(meta, cfg, in.TargetSite, tp.HDR, in.TagOverrides)
+	// §59.560: 猫站标签 checkbox 注入——站方标签是独立 checkbox（非 tags[]
+	// 数组），TagArrayFields 通道空（form_fields 无 tags 域→AssembleTagArrayForSite
+	// 产出 nil）——判据走 catTagCheckboxFields（canonical 键+副标词探双通道）。
+	if catTagCheckboxSite(cfg) {
+		tagArrayFields = append(tagArrayFields, catTagCheckboxFields(meta, applied)...)
+	}
 	// §59.454: 城市站标签依赖注入（chnize 消费 meta.Tags 的
 	// chinese_subtitle——不经 assembleTags 过滤：城市站无 tags 域配置
 	// → allowed 空 → 全部标签被滤（首版传 tags 变量恒空实测抓出）；
