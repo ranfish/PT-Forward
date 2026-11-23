@@ -1,6 +1,7 @@
 // searchprobe 诊断工具：生产同款 adapter 链路单发搜索。
 // 用法: searchprobe -cookie '...' -kw '关键词' [-domain springsunday.net]
-//       searchprobe -apikey '...' -kw '关键词' -mteam
+//
+//	searchprobe -apikey '...' -kw '关键词' -mteam
 package main
 
 import (

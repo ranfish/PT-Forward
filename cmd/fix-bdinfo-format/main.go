@@ -1,7 +1,9 @@
 // cmd/fix-bdinfo-format §59.319 附四：BDInfo 存量刷正（fix* 临时工具，用后即删）。
 // ①bd_info 列全量过 FormatBDInfoReport（幂等——已格式化文本无变化）
 // ②source_media_info 实为 BDInfo 文本且 bd_info 空（fetch 落库缺口时代数据）
-//   → 迁入 bd_info 列 + 清 source_media_info（归位语义）
+//
+//	→ 迁入 bd_info 列 + 清 source_media_info（归位语义）
+//
 // 用法：fix-bdinfo-format <db-path> [--dry]
 package main
 

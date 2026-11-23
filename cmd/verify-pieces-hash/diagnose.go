@@ -70,61 +70,61 @@ func main() {
 			Transport: transport,
 		}
 
-	for _, s := range sites {
-		if !targetIDs[s.ID] {
-			continue
-		}
-
-		apiBase := "https://" + s.Domain
-		if s.APIDomain != "" {
-			apiBase = "https://" + s.APIDomain
-		}
-
-		hasPasskey := s.Passkey != "" && len(s.Passkey) == 32
-		hasCookie := s.Cookie != ""
-
-		fmt.Printf("=== [%d] %s (%s) ===\n", s.ID, s.Name, s.Domain)
-		fmt.Printf("  api_base=%s  proxy=%s  has_pk=%v(%d)  has_ck=%v(%d)\n", apiBase, s.ProxyURL, hasPasskey, len(s.Passkey), hasCookie, len(s.Cookie))
-
-		paths := []string{"/api/pieces-hash", "/api/torrents/pieces-hash"}
-		for _, path := range paths {
-			bodyMap := map[string]interface{}{
-				"pieces_hash": []string{"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"},
-			}
-			if hasPasskey {
-				bodyMap["passkey"] = s.Passkey
-			}
-			bodyBytes, _ := json.Marshal(bodyMap)
-
-			req, _ := http.NewRequestWithContext(context.Background(), "POST", apiBase+path, bytes.NewReader(bodyBytes))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
-			if hasCookie {
-				req.Header.Set("Cookie", s.Cookie)
-			}
-
-			resp, err := client.Do(req)
-			if err != nil {
-				fmt.Printf("  %s => ERROR: %v\n", path, err)
+		for _, s := range sites {
+			if !targetIDs[s.ID] {
 				continue
 			}
 
-			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-
-			fmt.Printf("  %s => HTTP %d (%d bytes)\n", path, resp.StatusCode, len(body))
-			preview := string(body)
-			if len(preview) > 300 {
-				preview = preview[:300] + "..."
+			apiBase := "https://" + s.Domain
+			if s.APIDomain != "" {
+				apiBase = "https://" + s.APIDomain
 			}
-			fmt.Printf("  %s\n\n", preview)
 
-			if resp.StatusCode == 200 || resp.StatusCode == 401 || resp.StatusCode == 403 {
-				break
+			hasPasskey := s.Passkey != "" && len(s.Passkey) == 32
+			hasCookie := s.Cookie != ""
+
+			fmt.Printf("=== [%d] %s (%s) ===\n", s.ID, s.Name, s.Domain)
+			fmt.Printf("  api_base=%s  proxy=%s  has_pk=%v(%d)  has_ck=%v(%d)\n", apiBase, s.ProxyURL, hasPasskey, len(s.Passkey), hasCookie, len(s.Cookie))
+
+			paths := []string{"/api/pieces-hash", "/api/torrents/pieces-hash"}
+			for _, path := range paths {
+				bodyMap := map[string]interface{}{
+					"pieces_hash": []string{"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"},
+				}
+				if hasPasskey {
+					bodyMap["passkey"] = s.Passkey
+				}
+				bodyBytes, _ := json.Marshal(bodyMap)
+
+				req, _ := http.NewRequestWithContext(context.Background(), "POST", apiBase+path, bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+				if hasCookie {
+					req.Header.Set("Cookie", s.Cookie)
+				}
+
+				resp, err := client.Do(req)
+				if err != nil {
+					fmt.Printf("  %s => ERROR: %v\n", path, err)
+					continue
+				}
+
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+
+				fmt.Printf("  %s => HTTP %d (%d bytes)\n", path, resp.StatusCode, len(body))
+				preview := string(body)
+				if len(preview) > 300 {
+					preview = preview[:300] + "..."
+				}
+				fmt.Printf("  %s\n\n", preview)
+
+				if resp.StatusCode == 200 || resp.StatusCode == 401 || resp.StatusCode == 403 {
+					break
+				}
 			}
+			fmt.Println()
 		}
-		fmt.Println()
-	}
 	}
 }

@@ -4,13 +4,14 @@
 // TagConfig 缺失标签全丢——修复本体后，存量已发种子经编辑页补齐。
 //
 // 用法：
-//   xdy-codec-fix -url https://xdypt.vip -cookie-file /tmp/xdy.cookie \
-//                 -list /tmp/xdy.txt -tags-map /tmp/xdy.tags.json [-apply] [-sleep 1.5s]
 //
-//   -list      种子链接列表（details.php?id=N 每行一条）
-//   -tags-map  tid → 推断标签 JSON（{"2810":["chinese_audio",...]}，来自
-//              publish_result_records × torrent_metadata.tags 预生成）
-//   -apply     缺省 dry-run（只打印计划不提交）
+//	xdy-codec-fix -url https://xdypt.vip -cookie-file /tmp/xdy.cookie \
+//	              -list /tmp/xdy.txt -tags-map /tmp/xdy.tags.json [-apply] [-sleep 1.5s]
+//
+//	-list      种子链接列表（details.php?id=N 每行一条）
+//	-tags-map  tid → 推断标签 JSON（{"2810":["chinese_audio",...]}，来自
+//	           publish_result_records × torrent_metadata.tags 预生成）
+//	-apply     缺省 dry-run（只打印计划不提交）
 package main
 
 import (

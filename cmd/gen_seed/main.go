@@ -5,15 +5,16 @@
 // 用户添加站点时必须从该白名单选择，前端 a-select 下拉 + 后端 handleCreate 强校验。
 //
 // 重新生成场景：
-//   1. 新增/移除站点（修改了 sites 表或 frontendOverrides/site_config_overrides）
-//   2. 修改了 SupportedSite schema（增减字段）
-//   3. 框架默认 download_url_template 调整
+//  1. 新增/移除站点（修改了 sites 表或 frontendOverrides/site_config_overrides）
+//  2. 修改了 SupportedSite schema（增减字段）
+//  3. 框架默认 download_url_template 调整
 //
 // 用法：go run ./cmd/gen_seed/
 // 输出：internal/site/supported_sites.json（107 站点，约 30KB）
 //
 // ⚠️ 注意：本脚本不修改 sites 表 / site_config_overrides 表，只读取并生成 seed。
-//         迁移工作（如把 passkey_alias 从 site_config_overrides 迁到 seed）由步骤 6 完成。
+//
+//	迁移工作（如把 passkey_alias 从 site_config_overrides 迁到 seed）由步骤 6 完成。
 package main
 
 import (
@@ -111,23 +112,23 @@ var blockedDomains = map[string]string{
 
 // From site-auth skill §3.1: special_notes
 var specialNotes = map[string]string{
-	"pt.keepfrds.com":       "仅源站",
-	"pt.ptskit.org":         "仅源站",
-	"u2.dmhy.org":           "仅源站",
-	"ubits.club":            "仅源站",
-	"ourbits.club":          "仅源站",
-	"sunnypt.top":           "仅源站",
-	"hhanclub.net":          "仅源站，全站官种",
-	"hdroute.org":           "仅源站，http://",
-	"piggo.me":              "仅目标",
-	"bilibili.download":     "仅目标",
-	"playlet.cc":            "无上传权限，仅辅种",
-	"www.52movie.top":       "无上传权限，仅辅种",
-	"www.tokyo-manga.top":   "无上传权限，仅辅种",
-	"www.hddolby.com":       "需过 2FA 页",
-	"www.qingwapt.com":      "CookieCloud 域名 qingwapt.com",
-	"api.m-team.cc":         "CookieCloud 域名 m-team.cc；禁调 /login /admin/** /apikey/**",
-	"www.yemapt.org":        "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API",
+	"pt.keepfrds.com":     "仅源站",
+	"pt.ptskit.org":       "仅源站",
+	"u2.dmhy.org":         "仅源站",
+	"ubits.club":          "仅源站",
+	"ourbits.club":        "仅源站",
+	"sunnypt.top":         "仅源站",
+	"hhanclub.net":        "仅源站，全站官种",
+	"hdroute.org":         "仅源站，http://",
+	"piggo.me":            "仅目标",
+	"bilibili.download":   "仅目标",
+	"playlet.cc":          "无上传权限，仅辅种",
+	"www.52movie.top":     "无上传权限，仅辅种",
+	"www.tokyo-manga.top": "无上传权限，仅辅种",
+	"www.hddolby.com":     "需过 2FA 页",
+	"www.qingwapt.com":    "CookieCloud 域名 qingwapt.com",
+	"api.m-team.cc":       "CookieCloud 域名 m-team.cc；禁调 /login /admin/** /apikey/**",
+	"www.yemapt.org":      "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API",
 }
 
 // Framework 默认 download_url_template（仅用于 sites 表为空时补值）
@@ -195,11 +196,11 @@ func main() {
 		}
 
 		entry := SupportedSite{
-			Domain:            domain,
-			NameCN:            s.Name,
-			Framework:         s.Framework,
-			AuthType:          s.AuthType,
-			CookiecloudDomain: ccDomain,
+			Domain:              domain,
+			NameCN:              s.Name,
+			Framework:           s.Framework,
+			AuthType:            s.AuthType,
+			CookiecloudDomain:   ccDomain,
 			DownloadURLTemplate: s.DownloadURLTpl,
 			VerificationStatus:  "verified",
 		}
@@ -315,7 +316,7 @@ func main() {
 		panic(err)
 	}
 
-outputPath := "internal/site/supported_sites.json"
+	outputPath := "internal/site/supported_sites.json"
 	if err := os.WriteFile(outputPath, data, 0644); err != nil {
 		panic(err)
 	}

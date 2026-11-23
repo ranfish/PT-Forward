@@ -2,21 +2,22 @@
 // 与主程序零耦合——xdy-codec-fix 同模式）。
 //
 // 用法：
-//   aka-title-fix -url https://xdypt.vip -cookie-file /tmp/xdy.cookie \
-//                 -list /tmp/aka_fix.jsonl [-apply] [-sleep 1.5s]
 //
-//   -list  JSONL 每行 {"tid":"3620","title":"旧标题","site":"修道院"}
-//          （从 publish_result_records 导出——见 docs §59.290）
+//	aka-title-fix -url https://xdypt.vip -cookie-file /tmp/xdy.cookie \
+//	              -list /tmp/aka_fix.jsonl [-apply] [-sleep 1.5s]
+//
+//	-list  JSONL 每行 {"tid":"3620","title":"旧标题","site":"修道院"}
+//	       （从 publish_result_records 导出——见 docs §59.290）
 package main
 
 import (
 	"bufio"
-	"regexp"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,7 +37,7 @@ func main() {
 		baseURL    = flag.String("url", "", "站点 base URL")
 		cookieFile = flag.String("cookie-file", "", "cookie 文件")
 		listFile   = flag.String("list", "", "JSONL 修复清单")
-	dump       = flag.String("dump", "", "输出新旧映射 JSONL（不请求站点——DB 记录同步用）")
+		dump       = flag.String("dump", "", "输出新旧映射 JSONL（不请求站点——DB 记录同步用）")
 		apply      = flag.Bool("apply", false, "真提交（缺省 dry-run）")
 		sleep      = flag.Duration("sleep", 1500*time.Millisecond, "请求间隔")
 	)

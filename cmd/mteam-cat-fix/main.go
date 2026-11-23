@@ -6,14 +6,17 @@
 // 刷正存量：不重 fetch（保 reviewed 状态），确定性逆映射。
 //
 // 逆映射依据（旧表两值唯一来源即馒头 map——normalize 族从不产出 cartoon）：
-//   category.cartoon   ← 旧表 "421" → 权威树 电影/BluRay → category.movie
-//   category.audiobook ← 旧表 "419" → 权威树 电影/HD    → category.movie
+//
+//	category.cartoon   ← 旧表 "421" → 权威树 电影/BluRay → category.movie
+//	category.audiobook ← 旧表 "419" → 权威树 电影/HD    → category.movie
+//
 // category 列随 source_category 同步（InferCategory ①级短路：源站归一 movie
 // 即 movie）。detail_source_json.type 同步更新。updated_at 不动（最小变更）。
 //
 // 用法：
-//   mteam-cat-fix -db /path/pt-forward.db            # dry-run（计数+样本，零写入）
-//   mteam-cat-fix -db /path/pt-forward.db -apply     # 实刷
+//
+//	mteam-cat-fix -db /path/pt-forward.db            # dry-run（计数+样本，零写入）
+//	mteam-cat-fix -db /path/pt-forward.db -apply     # 实刷
 package main
 
 import (
@@ -35,12 +38,12 @@ var fixMap = map[string]string{
 }
 
 type metaRow struct {
-	ID              uint   `gorm:"primaryKey"`
-	InfoHash        string `gorm:"column:info_hash"`
-	SiteName        string `gorm:"column:site_name"`
-	Title           string `gorm:"column:title"`
-	SourceCategory  string `gorm:"column:source_category"`
-	Category        string `gorm:"column:category"`
+	ID               uint   `gorm:"primaryKey"`
+	InfoHash         string `gorm:"column:info_hash"`
+	SiteName         string `gorm:"column:site_name"`
+	Title            string `gorm:"column:title"`
+	SourceCategory   string `gorm:"column:source_category"`
+	Category         string `gorm:"column:category"`
 	DetailSourceJSON string `gorm:"column:detail_source_json"`
 }
 

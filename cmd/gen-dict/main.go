@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
