@@ -126,7 +126,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, size := parsePagination(r)
-	light := r.URL.Query().Get("light") == "true"
+	light := parseBoolQuery(r, "light", false) // §59.559 PR-D
 	roleFilter := r.URL.Query().Get("role")
 
 	query := h.db.Model(&model.ClientConfig{})
@@ -863,7 +863,7 @@ func (h *ClientHandler) handleTorrentInfo(w http.ResponseWriter, r *http.Request
 			writeAppError(w, err)
 			return
 		}
-		deleteFiles := r.URL.Query().Get("deleteFiles") == "true"
+		deleteFiles := parseBoolQuery(r, "deleteFiles", false) // §59.559 PR-D
 		if err := dlClient.DeleteTorrent(r.Context(), infoHash, deleteFiles); err != nil {
 			writeAppError(w, err)
 			return

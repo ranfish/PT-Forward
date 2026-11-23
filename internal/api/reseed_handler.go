@@ -436,7 +436,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	site := r.URL.Query().Get("site")
 	torrentID := r.URL.Query().Get("torrentId")
 	status := r.URL.Query().Get("status")
-	videoOnly := r.URL.Query().Get("video_only") == "1" || r.URL.Query().Get("video_only") == "true"
+	videoOnly := parseBoolQuery(r, "video_only", false) // §59.559 PR-D（1/true 双形态）
 	orderField := r.URL.Query().Get("orderField")
 	order := r.URL.Query().Get("order")
 	page, pageSize := parsePagination(r) // §59.552 统一分页契约（补 page>10000 截断）

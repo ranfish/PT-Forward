@@ -38,16 +38,12 @@ type listSeedsQuery struct {
 // parseListSeedsQuery 参数解析与默认值。
 func parseListSeedsQuery(r *http.Request) listSeedsQuery {
 	q := listSeedsQuery{}
-	if v := r.URL.Query().Get("client_id"); v != "" {
-		if n, err := parseUintStrict(v); err == nil {
-			q.clientUID = n
-		}
-	}
+	q.clientUID = parseUintQuery(r, "client_id", 0) // §59.559 PR-D
 	q.savePath = r.URL.Query().Get("save_path")
 	q.statusFilter = r.URL.Query().Get("status")
 	q.search = strings.TrimSpace(r.URL.Query().Get("search"))
 	q.readyFilter = r.URL.Query().Get("ready")
-	q.excludeForbidden = r.URL.Query().Get("exclude_forbidden") == "true"
+	q.excludeForbidden = parseBoolQuery(r, "exclude_forbidden", false) // §59.559 PR-D
 	q.publishState = r.URL.Query().Get("publish_state")
 	q.publishTargetSite = r.URL.Query().Get("target_site")
 	// §59.552 变体：默认 50+上限 100 为 §59.166 单批发布业务定案（不迁标准 200）

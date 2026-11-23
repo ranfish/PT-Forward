@@ -1091,7 +1091,7 @@ func (h *RSSHandler) handleListSeen(w http.ResponseWriter, r *http.Request, idSt
 		Error(w, http.StatusNotFound, 13002, "订阅不存在")
 		return
 	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit := parseIntQuery(r, "limit", 0) // §59.559 PR-D
 	seen, err := h.repo.ListSeenBySubscription(r.Context(), fmt.Sprintf("%d", id), limit)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询失败")
