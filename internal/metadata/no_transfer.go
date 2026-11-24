@@ -30,7 +30,7 @@ func ParseRelativeAge(s string) time.Duration {
 	s = strings.ReplaceAll(s, " ", "")
 	// 档位顺序：月/年（必然超 24h 窗）→ 天 → 时（X时X分/X小时）→ 分
 	if strings.Contains(s, "月") || strings.Contains(s, "年") {
-		return 365 * 24 * time.Hour
+		return 365 * 24 * time.Hour // §59.568 刀3 定性：粗粒度上界哨兵（月/年档位→远超比较窗·非保留期语义·保留字面量）
 	}
 	if d := regexp.MustCompile(`(\d+)天`).FindStringSubmatch(s); d != nil {
 		days, _ := strconv.Atoi(d[1])

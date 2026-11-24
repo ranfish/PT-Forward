@@ -16,6 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// coverageRecordTTL §59.568 刀3: 覆盖记录 TTL（一年·与 fingerprint/reseed 同语义族；
+// §59.535: expires_at 语义已废弃——站上有=事实·仅新写行兜底值）
+const coverageRecordTTL = 365 * 24 * time.Hour
+
 type TrackerResolver interface {
 	Resolve(trackerURL string) string
 }
@@ -313,7 +317,7 @@ func (s *Service) buildCoverageForItem(
 				Confidence: 1.0,
 				TorrentID:  pr.TorrentID,
 				QueriedAt:  now,
-				ExpiresAt:  now.Add(365 * 24 * time.Hour),
+				ExpiresAt:  now.Add(coverageRecordTTL),
 			}
 		}
 	}
@@ -347,7 +351,7 @@ func (s *Service) UpdateFromPublishResult(ctx context.Context, infoHash, siteNam
 		Source:     model.CoverageSourcePublish,
 		Confidence: 1.0,
 		QueriedAt:  now,
-		ExpiresAt:  now.Add(365 * 24 * time.Hour),
+		ExpiresAt:  now.Add(coverageRecordTTL),
 	}
 	return s.upsertCoverage(ctx, &record)
 }
@@ -494,7 +498,7 @@ func (s *Service) QuerySharedCoverage(ctx context.Context, infoHashes []string, 
 			s.logger.Warn("shared coverage: IYUU query failed, degrading to cached rows",
 				zap.Int("hashes", len(stale)), zap.Error(err))
 		} else {
-			ttl := now.Add(365 * 24 * time.Hour) // §59.535: expires_at 废弃（站上有=事实不因时间失效·站方删种才失效）
+			ttl := now.Add(coverageRecordTTL) // §59.535: expires_at 废弃（站上有=事实不因时间失效·站方删种才失效）
 			for hash, list := range hits {
 				for _, hit := range list {
 					rec := &model.SiteCoverageCache{

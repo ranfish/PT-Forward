@@ -10,6 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// retentionOneYear §59.568 刀3: 指纹记录保留期（一年·与 coverage/reseed 同语义族）
+const retentionOneYear = 365 * 24 * time.Hour
+
 type Repository struct {
 	db     *gorm.DB
 	logger *zap.Logger
@@ -68,7 +71,7 @@ func (r *Repository) syncFetchCoverage(ctx context.Context, infoHash, siteName, 
 		(info_hash, site_name, status, source, confidence, torrent_id, queried_at, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		infoHash, siteName, model.CoverageConfirmedHas, model.CoverageSourceFetch,
-		1.0, torrentID, now, now.Add(365*24*time.Hour))
+		1.0, torrentID, now, now.Add(retentionOneYear))
 	if res.Error != nil {
 		r.logger.Debug("sync fetch coverage insert failed",
 			zap.String("hash", infoHash), zap.String("site", siteName), zap.Error(res.Error))

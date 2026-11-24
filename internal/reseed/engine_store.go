@@ -13,6 +13,9 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// matchRecordRetention §59.568 刀3: 匹配记录保留期（一年·同语义族）
+const matchRecordRetention = 365 * 24 * time.Hour
+
 func (e *Engine) CreateTask(ctx context.Context, task *model.ReseedTask) error {
 	task.Status = model.ReseedTaskIdle
 	return dbimpl.ForceCreate(e.db.WithContext(ctx), task)
@@ -198,7 +201,7 @@ func (e *Engine) syncMatchCoverage(ctx context.Context, m *model.ReseedMatch) {
 		(info_hash, site_name, status, source, confidence, torrent_id, target_info_hash, queried_at, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.SourceInfoHash, m.TargetSite, model.CoverageConfirmedHas, m.MatchMethod,
-		m.Confidence, m.TargetTorrentID, m.TargetInfoHash, now, now.Add(365*24*time.Hour))
+		m.Confidence, m.TargetTorrentID, m.TargetInfoHash, now, now.Add(matchRecordRetention))
 	if res.Error != nil {
 		e.logger.Debug("sync match coverage insert failed",
 			zap.String("hash", m.SourceInfoHash), zap.String("site", m.TargetSite), zap.Error(res.Error))
