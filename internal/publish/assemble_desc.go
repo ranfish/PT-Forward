@@ -61,12 +61,10 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 		b.WriteString("[/quote]\n\n")
 	}
 	if d := strings.TrimSpace(meta.Description); d != "" {
-		// §59.541 附十一: 配置了 cover 域 → 剥简介首行海报 [img]（海报走
-		// 独立框·descr 重复多余——劳改所站方审核「其它信息不能带图」；
-		// 首行非 [img] 形态或未配 cover 域原样保留·未配域站零变化）
-		if cfg != nil && cfg.FormFields[model.FieldDomainCover] != "" {
-			d = stripLeadingPosterImage(d)
-		}
+		// §59.569: 撤 §59.541 附十一 stripLeadingPosterImage（用户复盘：
+		// 劳改所 DescrQuoteOnly 已跳过整个简介正文——剥海报冗余；
+		// 好学/瓷器被误伤——正常 NP 站简介首行 [img] 海报应保留·
+		// cover 域是「PT-Gen 封面复制投一份」的额外投递·不替代简介内海报）
 		// §59.541 附十二: DescrQuoteOnly（劳改所形态）——站方详情页有
 		// 独立「豆瓣信息」渲染区（根据 pt_gen 链接自动解析简介），descr
 		// 里的 PTGen 正文是重复冗余：仅投引用块+来源声明·跳过简介正文。
@@ -103,22 +101,6 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 		}
 	}
 	return b.String()
-}
-
-// stripLeadingPosterImage §59.541 附十一: 剥简介首行海报 [img] 行
-// （cover 独立框配置下 descr 的海报重复）。首行形态 "[img]URL[/img]"
-// （允许前后空白）→ 剥除后 Trim 换行；非此形态原样返回。
-func stripLeadingPosterImage(desc string) string {
-	d := strings.TrimLeft(desc, "\r\n \t")
-	if !strings.HasPrefix(d, "[img]") {
-		return desc
-	}
-	end := strings.Index(d, "[/img]")
-	if end < 0 {
-		return desc
-	}
-	rest := d[end+len("[/img]"):]
-	return strings.TrimLeft(rest, "\r\n \t")
 }
 
 // trimQuoteWrapper §59.178: 剥外层 [quote] 壳 + Trim 换行。
