@@ -208,6 +208,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			lastErr = err
 		}
 		if ptgen == nil {
+			// §59.564 刀B: 5xx 业务日志
+			h.logger.Error("ptgen all tiers failed", zap.String("op", "ptgen"), zap.Error(lastErr))
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败（三级链全败）: %v", lastErr))
 			return
 		}
@@ -244,6 +246,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
 				meta, err := h.refreshFromSource(ctx, req.InfoHash, req.SiteName, req.Name)
 				if err != nil {
+					// §59.564 刀B: 5xx 业务日志
+					h.logger.Error("refresh from source failed", zap.String("op", "refresh_from_source"), zap.String("site", req.SiteName), zap.String("info_hash", req.InfoHash), zap.Error(err))
 					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
 					return
 				}
@@ -304,6 +308,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
 		if err != nil {
+			// §59.564 刀B: 5xx 业务日志
+			h.logger.Error("analyze local artifacts failed", zap.String("op", "analyze_artifacts"), zap.String("name", req.Name), zap.Error(err))
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("MediaInfo 获取失败: %v", err))
 			return
 		}
@@ -336,6 +342,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
 				meta, err := h.refreshFromSource(ctx, req.InfoHash, req.SiteName, req.Name)
 				if err != nil {
+					// §59.564 刀B: 5xx 业务日志
+					h.logger.Error("refresh from source failed", zap.String("op", "refresh_from_source"), zap.String("site", req.SiteName), zap.String("info_hash", req.InfoHash), zap.Error(err))
 					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
 					return
 				}

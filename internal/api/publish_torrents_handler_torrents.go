@@ -51,6 +51,8 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 
 	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志（审计 03 §2.3）
+		h.logger.Error("connect client failed", zap.String("op", "connect_client"), zap.Uint("client_id", cfg.ID), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
 	}
@@ -60,6 +62,8 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 
 	torrents, err := client.GetSeedingTorrents(ctx)
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("get seeding torrents failed", zap.String("op", "get_seeding_torrents"), zap.Uint("client_id", cfg.ID), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取种子列表失败: %v", err))
 		return
 	}
@@ -365,6 +369,8 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 
 	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志（审计 03 §2.3）
+		h.logger.Error("connect client failed", zap.String("op", "connect_client"), zap.Uint("client_id", cfg.ID), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
 	}
@@ -470,6 +476,8 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 	}
 	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志（审计 03 §2.3）
+		h.logger.Error("connect client failed", zap.String("op", "connect_client"), zap.Uint("client_id", cfg.ID), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
 	}
@@ -770,6 +778,8 @@ func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWrit
 		return
 	}
 	if err := h.declFilter.SetPatterns(r.Context(), req.Patterns); err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("save decl patterns failed", zap.String("op", "save_decl_patterns"), zap.Int("count", len(req.Patterns)), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("保存失败: %v", err))
 		return
 	}
@@ -911,6 +921,8 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 		IsOfficial: req.IsOfficial,
 	}
 	if err := h.db.Create(&mapping).Error; err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("create group mapping failed", zap.String("op", "create_group_mapping"), zap.String("group_name", req.GroupName), zap.String("domain", req.Domain), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("创建失败: %v", err))
 		return
 	}
@@ -945,6 +957,8 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 		"site_name":   req.SiteName,
 		"is_official": req.IsOfficial,
 	}).Error; err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("update group mapping failed", zap.String("op", "update_group_mapping"), zap.Uint64("id", id), zap.String("group_name", req.GroupName), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("更新失败: %v", err))
 		return
 	}
@@ -974,6 +988,8 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 	}
 
 	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("delete group mapping failed", zap.String("op", "delete_group_mapping"), zap.Uint64("id", id), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("删除失败: %v", err))
 		return
 	}

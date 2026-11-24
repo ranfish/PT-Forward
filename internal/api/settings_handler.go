@@ -94,6 +94,8 @@ func (h *SettingsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	prefix := r.URL.Query().Get("prefix")
 	settings, err := h.repo.ListByPrefix(r.Context(), prefix)
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志（审计 03 §2.3）
+		h.logger.Error("list settings failed", zap.String("op", "list_settings"), zap.String("prefix", prefix), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "查询设置失败")
 		return
 	}
@@ -174,6 +176,8 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 	}
 
 	if err := h.repo.Set(r.Context(), key, req.Value); err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("set setting failed", zap.String("op", "set_setting"), zap.String("key", key), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "保存设置失败")
 		return
 	}
@@ -206,6 +210,8 @@ func (h *SettingsHandler) handleDelete(w http.ResponseWriter, r *http.Request, k
 	}
 
 	if err := h.repo.Delete(r.Context(), key); err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("delete setting failed", zap.String("op", "delete_setting"), zap.String("key", key), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "删除设置失败")
 		return
 	}
@@ -224,6 +230,8 @@ func (h *SettingsHandler) handleDelete(w http.ResponseWriter, r *http.Request, k
 func (h *SettingsHandler) handleBackup(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.repo.ListAll(r.Context())
 	if err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("backup settings failed", zap.String("op", "backup_settings"), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "备份设置失败")
 		return
 	}
@@ -279,6 +287,8 @@ func (h *SettingsHandler) handleRestore(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.repo.RestoreAll(r.Context(), filtered); err != nil {
+		// §59.564 刀B: 5xx 业务日志
+		h.logger.Error("restore settings failed", zap.String("op", "restore_settings"), zap.Int("count", len(filtered)), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "恢复设置失败")
 		return
 	}
