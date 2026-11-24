@@ -258,7 +258,7 @@
     "placeholderConfigured": "•••••••• (configured, leave empty to retain)",
     "placeholderCookie": "Site Cookie",
     "placeholderPasskey": "Site Passkey",
-    "placeholderApiKey": "Site API Key (M-Team uses x-api-key)",
+    "placeholderApiKey": "Site API Key",
     "roleAndPublish": "Role & Publish",
     "asSource": "As Source",
     "asTarget": "As Target",

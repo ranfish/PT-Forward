@@ -260,7 +260,7 @@
     "placeholderConfigured": "••••••••（已配置，留空保持不变）",
     "placeholderCookie": "站点 Cookie",
     "placeholderPasskey": "站点 Passkey",
-    "placeholderApiKey": "站点 API Key（馒头使用 x-api-key）",
+    "placeholderApiKey": "站点 API Key",
     "roleAndPublish": "角色与发布",
     "asSource": "作为源站",
     "asTarget": "作为目标站",
