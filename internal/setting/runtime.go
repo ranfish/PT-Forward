@@ -194,6 +194,31 @@ func (rc *RuntimeConfig) GetString(ctx context.Context, key string) string {
 	return rc.get(ctx, key)
 }
 
+// GetIntDefault §59.568 刀4: 带默认/范围的读取（07 §2.5 P3）——解析失败或
+// 越界回退默认并 Warn（GetInt 对非法值静默 0 会掩盖配置错误成"关闭/无限制"）。
+func (rc *RuntimeConfig) GetIntDefault(ctx context.Context, key string, def, min, max int) int {
+	v := rc.get(ctx, key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		if rc.logger != nil { // 附录A §2.5 nil 兜底
+			rc.logger.Warn("setting parse failed, fallback to default",
+				zap.String("key", key), zap.String("value", v), zap.Int("default", def), zap.Error(err))
+		}
+		return def
+	}
+	if n < min || (max > 0 && n > max) {
+		if rc.logger != nil {
+			rc.logger.Warn("setting out of range, fallback to default",
+				zap.String("key", key), zap.Int("value", n), zap.Int("min", min), zap.Int("max", max), zap.Int("default", def))
+		}
+		return def
+	}
+	return n
+}
+
 func (rc *RuntimeConfig) GetInt(ctx context.Context, key string) int {
 	v := rc.get(ctx, key)
 	if v == "" {
