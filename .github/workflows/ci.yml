@@ -5,6 +5,8 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+  schedule:
+    - cron: "0 20 * * *"  # §59.567 刀A: 每日 UTC 20:00（北京时间 04:00）full race 层
 
 jobs:
   secrets:
@@ -72,8 +74,57 @@ jobs:
           go run ./cmd/gen-dict
           git diff --exit-code web/src/generated/dict.ts || (echo "ERROR: dict.ts 与 dict/*.json 不同步，运行 go run ./cmd/gen-dict 并提交" && exit 1)
 
-      - name: Test
+      - name: Test (fast 层：-short 快速回归)
         run: CGO_ENABLED=1 go test -short -count=1 -timeout 600s ./internal/...
+
+  # §59.567 刀A: race 层——高风险并发包每 push 带 -race（Makefile test 目标
+  # 本就含 -race·CI 此前缺失=并发回归漏检面：eventbus/watcher/write queue/
+  # reseed/seeding 并发路径）。
+  test-race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc libsqlite3-dev
+
+      - name: Create frontend dist placeholder
+        run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Test (race 层：高风险并发包 -race)
+        run: CGO_ENABLED=1 go test -race -count=1 -timeout 900s ./internal/pusher/ ./internal/watcher/ ./internal/seeding/ ./internal/reseed/ ./internal/db/...
+
+  # §59.567 刀A: full 层——每日定时全量 -race 无 -short（覆盖 fast 层跳过的
+  # 4 处 testing.Short 项：metadata fetcher/API 网络测试 ×2/adapter 真实
+  # HTML fixture——避免跳过项长期失效）。
+  test-full-race:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc libsqlite3-dev
+
+      - name: Create frontend dist placeholder
+        run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Test (full 层：全量 -race·无 -short)
+        run: CGO_ENABLED=1 go test -race -count=1 -timeout 3600s ./internal/...
 
   lint:
     runs-on: ubuntu-latest
@@ -99,7 +150,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [frontend, test, lint, secrets]
+    needs: [frontend, test, test-race, lint, secrets]
     steps:
       - uses: actions/checkout@v5
 
