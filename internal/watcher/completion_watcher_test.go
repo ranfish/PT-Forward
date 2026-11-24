@@ -527,3 +527,18 @@ func TestWatcher_PollOnce_DetectsCompletion(t *testing.T) {
 		t.Errorf("expected /data/complete, got %s", updated.LocalSavePath)
 	}
 }
+
+// §59.567 刀C 锚：Stop 幂等——双 Stop 不 panic 不挂。
+func TestWatcher_StopIdempotent(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
+	w.SetPollInterval(100 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := w.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(30 * time.Millisecond)
+	w.Stop()
+	w.Stop() // 重入：应安全返回
+}

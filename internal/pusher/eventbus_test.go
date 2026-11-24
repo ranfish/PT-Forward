@@ -133,3 +133,25 @@ func TestEventBusCloseIdempotent(t *testing.T) {
 	bus.Close()
 	bus.Close() // 幂等
 }
+
+// §59.567 刀C 锚：重复投递 at-least-once 语义——同一事件投两次应送达两次
+// （消费者幂等是消费方契约·总线不去重不丢失）。
+func TestEventBusDuplicatePublishDelivered(t *testing.T) {
+	bus := NewEventBus(context.Background(), zap.NewNop(), 16)
+	var count atomic.Int64
+	bus.Register(consumerFunc(func(ctx context.Context, event *PushedEvent) {
+		count.Add(1)
+	}))
+	ev := &PushedEvent{ClientUID: 7, InfoHash: "dup"}
+	bus.Publish(ev)
+	bus.Publish(ev)
+	bus.Close()
+	select {
+	case <-bus.Done():
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close 后 dispatch 应排空退出")
+	}
+	if got := count.Load(); got != 2 {
+		t.Fatalf("重复投递应送达两次（at-least-once）, got %d", got)
+	}
+}

@@ -76,3 +76,28 @@ func TestEngineRootCtxStored(t *testing.T) {
 	}
 	e.Stop(context.Background())
 }
+
+// §59.567 刀C 锚：Stop 幂等——双 Stop 不 panic 不挂（停机链重入安全）。
+func TestEngineStopIdempotent(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.SeedingTorrentRecord{}, &model.DeleteRule{}, &model.SeedingClientConfig{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	e := NewEngine(db, zap.NewNop())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := e.Start(ctx); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := e.Stop(context.Background()); err != nil {
+		t.Fatalf("first stop: %v", err)
+	}
+	if err := e.Stop(context.Background()); err != nil { // 重入
+		t.Fatalf("second stop should be idempotent: %v", err)
+	}
+}
