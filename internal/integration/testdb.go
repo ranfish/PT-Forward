@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/mocks"
@@ -11,9 +13,16 @@ import (
 	"gorm.io/gorm"
 )
 
+var integrationDBCounter atomic.Uint64
+
+// setupDB §59.567 刀B 补修二：`:memory:` 在 gorm 池开第二连接时分裂为空库
+// （刀B 的 WaitFor 轮询与 watcher goroutine 并发打 DB·-race 下必现
+// 「no such table」——用户复现 F6 两测红；与 audit 1c7d0454 同根因）——
+// unique+cache=shared 内存库（每调用自增防跨测试污染）。
 func setupDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:integrationtest_%d?mode=memory&cache=shared&_busy_timeout=5000", integrationDBCounter.Add(1))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

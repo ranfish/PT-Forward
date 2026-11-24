@@ -141,9 +141,7 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 	sourceClientID := seedClient(t, db, "source-client", "source")
 	reseedClientID := seedClient(t, db, "reseed-client", "reseed")
 
-	exportCalled := false
-	addFromFileCalled := false
-	deleteCalled := false
+	var exportCalled, addFromFileCalled, deleteCalled atomic.Bool // §59.567 刀B 补修二：goroutine 写·WaitFor 并发读→原子
 
 	mockSiteProvider := &mocks.SiteInfoProvider{
 		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
@@ -181,18 +179,18 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 			}, nil
 		},
 		ExportTorrentFn: func(ctx context.Context, hash string) ([]byte, error) {
-			exportCalled = true
+			exportCalled.Store(true)
 			return []byte("d8:announce30:http://tracker.example.com/announcee"), nil
 		},
 		DeleteTorrentFn: func(ctx context.Context, hash string, deleteFiles bool) error {
-			deleteCalled = true
+			deleteCalled.Store(true)
 			return nil
 		},
 	}
 	reseedMockDL := &mocks.DownloaderClient{
 		ID: reseedClientID, Name: "reseed-client", Role: "reseed",
 		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
-			addFromFileCalled = true
+			addFromFileCalled.Store(true)
 			assert.Equal(t, "reseed", opts.Category)
 			return &model.AddResult{InfoHash: "reseeded_hash_123"}, nil
 		},
@@ -226,24 +224,30 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 	require.NoError(t, w.Start(wCtx))
 
 	// §59.567 刀B: 固定 300ms → 条件轮询（转移链副作用就绪再 Stop）
+	// 补修二：flag 在流程中段置位·candidate 行终态更新在其后——条件须含
+	// DB 终态（否则 -race 下 flag 就绪即 Stop·终态未落=flaky pending）
 	if !testutil.WaitFor(t, 3*time.Second, func() bool {
-		return exportCalled && addFromFileCalled && deleteCalled
+		if !exportCalled.Load() || !addFromFileCalled.Load() || !deleteCalled.Load() {
+			return false
+		}
+		var u model.PublishCandidate
+		return db.First(&u).Error == nil && u.DownloadCompleted
 	}) {
 		t.Fatal("transfer chain effects not ready before stop")
 	}
 	w.Stop()
 	cancel()
 
-	assert.True(t, exportCalled, "source client should export torrent")
-	assert.True(t, addFromFileCalled, "reseed client should add torrent from file")
-	assert.True(t, deleteCalled, "source client should delete torrent after transfer")
+	assert.True(t, exportCalled.Load(), "source client should export torrent")
+	assert.True(t, addFromFileCalled.Load(), "reseed client should add torrent from file")
+	assert.True(t, deleteCalled.Load(), "source client should delete torrent after transfer")
 
 	var updated model.PublishCandidate
 	require.NoError(t, db.First(&updated).Error)
 	assert.True(t, updated.DownloadCompleted)
 
 	t.Logf("PASS F6-transfer: export=%v addFromFile=%v delete=%v status=%s",
-		exportCalled, addFromFileCalled, deleteCalled, updated.PublishStatus)
+		exportCalled.Load(), addFromFileCalled.Load(), deleteCalled.Load(), updated.PublishStatus)
 }
 
 // F6: 种子不存在标记孤儿
