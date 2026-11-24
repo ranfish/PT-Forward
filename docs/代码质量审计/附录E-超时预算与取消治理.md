@@ -25,7 +25,7 @@
 
 **外部请求类 5**：iyuu 探活 30s / iyuu 同步 2h / OTA 下载 5min / OTA SHA256 30s / CookieCloud 同步 2min
 
-**批量后台类 7**：execute 单站 10min（§59.156）/多站批次 10min/站批预算公式+24h 封顶（§59.51）/簇处理 30min/截图后处理 12min（§59.300）/孤儿恢复 5min/rss 同步 15min/截图探活 90s（§59.49）
+**批量后台类 8**：execute 单站 10min（§59.156）/多站批次 10min/站批预算公式+24h 封顶（§59.51）/簇处理 30min/截图后处理 12min（§59.300）/孤儿恢复 5min/rss 同步 15min/截图探活 90s（§59.49）
 
 **本地任务类 8**：BDInfo 后处理 5min /client 连接测试 5s /统计触发 30s /站点删除 5min /选中站点同步（n×30s 公式）/云端上报 flush 5s+10s /BDInfo 队列 30min（need 动态）
 
