@@ -903,9 +903,9 @@
     "domain": "www.hxpt.org",
     "name_cn": "好学",
     "framework": "hxpt",
-    "auth_type": "cookie",
+    "auth_type": "apikey",
     "cookiecloud_domain": "www.hxpt.org",
-    "download_url_template": "api/v1/torrents/{id}/download",
+    "download_url_template": "api/v1/downloads/{id}",
     "verification_status": "verified",
     "publish_supported": true
   },
