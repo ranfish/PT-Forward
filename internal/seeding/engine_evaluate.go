@@ -233,6 +233,8 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientUID uint, cfg
 	}, nil
 }
 
+// §59.566 刀3 定性：状态推进多步写无事务=周期自愈型（evaluate 循环每轮
+// 重判重写·中间态下轮收敛——05 篇 §2.4 分类 B·事务包状态机反而引入长事务）。
 func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, cycleID string) (candidate *CleanupCandidate, evaluated bool, shouldCleanup bool) {
 	if rec.Status != model.SeedingStatusSeeding && rec.Status != model.SeedingStatusDeleteFailed && rec.Status != model.SeedingStatusPausedRule && rec.Status != model.SeedingStatusPausedFreeEnd {
 		return nil, false, false

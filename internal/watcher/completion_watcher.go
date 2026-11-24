@@ -136,6 +136,8 @@ func (w *CompletionWatcher) watchLoop(ctx context.Context) {
 	}
 }
 
+// §59.566 刀3 定性：多步写无事务=周期自愈型（ticker 循环重处理·部分写
+// 失败下轮 poll 重收敛·事务收益低于循环重试成本——05 篇 §2.4 分类 B）。
 func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 	if w.clientMgr == nil {
 		return
