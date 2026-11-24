@@ -1,24 +1,25 @@
 # 好学 站点适配器设计
 
-> **v2（2026-11-15 重适配）**：站方彻底改版离开 NexusPHP（Next.js SPA + /api/v1 REST）——旧 NP 适配（§59.453 v0.0.1308 槽位错位特化）全部作废。本文档以新架构为权威；旧 NP 错位表见文末历史存档。
+> **v3（2026-11-25 §59.570 Token 全切）**：站方上线第三方 API 体系（fxo_/fxr_/fxk_ 三凭据）——cookie+CSRF 全链切换为 Authorization Token。本文档以 Token API 为权威；v2 cookie+CSRF 时期内容见文末历史存档。
+>
+> **v2（2026-11-15 重适配）**：站方彻底改版离开 NexusPHP（Next.js SPA + /api/v1 REST）——旧 NP 适配（§59.453 v0.0.1308 槽位错位特化）全部作废。
 
 ## 站点信息
 
 - **域名**: www.hxpt.org
 - **架构**: hxpt（Next.js + /api/v1 REST·2026-11 改版）
-- **鉴权**: cookie 同域直用（SPA 流）；POST/PUT 需 CSRF double-submit（cookie `flux_csrf` 值 ↔ header `x-csrf-token`·GET 免）
+- **鉴权**: Authorization: Token fxo_...（API Token·auth_type=apikey·AuthKey 字段存储）
 - **定位**: 综合站全品类（用户定案 2026-11-15 全放开——旧「仅纪录片」基于旧站教育定位作废）
-- **RSS**: 无（404·获取走 API·可乐先例同构）
+- **RSS**: 有（fxr_ token 订阅·/api/v1/rss/{token}——但我们统一走 API Token 通道）
 
 ## 一、获取链 API 契约（2026-11-15 活体探针实测）
 
 | 能力 | 端点 | 形态 |
 |------|------|------|
-| 搜索 | GET `/api/v1/torrents?search=&page=&limit=` | cursor 分页 next_cursor；**唯一搜索参数 `search`**（keyword/q/name 阴性对照实证被忽略）；条目含 info_hash/pieces_hash/sec_names/promotion/hr_policy |
-| 元数据 | GET `/api/v1/torrents/{id}` | category_id/info_hash/pieces_hash/hr_policy/promotion/created_at/seeders/owner_name |
-| 内容 | GET `/api/v1/torrents/{id}/detail` | descr BBCode+**mediainfo 独立字段**+sections 实例（dict_id/field_type/label/name/values）+numfiles+price |
-| 下载 | GET `/api/v1/torrents/{id}/download` | 真 bencode（tracker.hxpt·cookie 态） |
-| 用户 | GET `/api/v1/me` | username/class_name/uploaded/downloaded/seeding/uploads |
+| 搜索 | GET `/api/v1/compat/nexusphp/torrents.json` | NP 兼容层·page/pagesize 翻页·has_more 终页·Token |
+| 详情 | GET `/api/v1/open/torrents/{id}` | 开放 API 深详情·单端点（descr+mediainfo+sections+hr_policy） |
+| 下载 | POST `/api/v1/downloads/keys` → GET `/api/v1/downloads/{id}` | fxk_ 临时凭证两步（30min 泄露窗口） |
+| 用户 | GET `/api/v1/plugins/ptppUserInfo` | PT-Plugin-Plus 口径（id/name/bonus/uploaded/seeding/seedingSize/levelName） |
 | 详情页 | `/torrent/{id}` | SPA 路由（DetailURL 拼接形态） |
 
 ### 关键字段形态
@@ -31,8 +32,8 @@
 
 ## 二、发布契约（刀3 摸底定案+实施完成）
 
-- **上传**: POST `/api/v1/torrents`（FormData·cookie+CSRF double-submit）
-- **恒发字段**: category_id（必填·1-13 分类树）/anonymous（"true"/"false"）/file（种子文件）
+- **上传**: POST `/api/v1/open/torrents`（Token+multipart·info_hash 幂等·duplicate=true 不失败）
+- **恒发字段**: category_id（必填·1-13 分类树）/anonymous（"true"/"false"）/file（种子文件·≤4MiB）
 - **条件发字段**（非空才发·对齐站方 l() 语义）: name/imdb/douban/tmdb/small_descr/descr/poster/mediainfo/sections/tags
 - **恒不发字段**（用户定案/站方管理功能）: price（恒免费）/pos_state/pick_type/hr_punish/log/nfo
 - **sections 提交形态**: `{"media":443,"codec":435,...}` **纯数字 dict_id**（select 类型不包装——UploadForm JS 逆向；multiselect=`{dict_ids:[]}` 站内无实例不实现）；四维=media/codec/source/team **全站统一值集**（五分类对照实证·section-dict 参数化只是形式）
