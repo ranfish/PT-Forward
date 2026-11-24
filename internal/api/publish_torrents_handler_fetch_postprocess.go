@@ -204,6 +204,8 @@ func (h *PublishTorrentsHandler) inferFinalTags(ctx context.Context, clientUID u
 
 // purgeDeadScreenshots §59.49: 截图获取时探活——HEAD（含 1 次重试）逐张检查，
 // 清死留活；全死全清（screenshots=[]）。只反映获取时点存活状态。
+// §59.568 刀1: 本地任务类——探活 90s（单张 HEAD 含重试 × 截图数·上限覆盖）·
+// 失败=探活失败不阻塞·清死留活语义由 §59.49 定义
 func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()

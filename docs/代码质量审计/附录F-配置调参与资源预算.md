@@ -51,6 +51,10 @@
 | parseLimitQuery（默认/上限） | 20 / 200 | api/pagination | top-N limit 契约 |
 | parsePagination（默认/上限/maxPage） | 20 / 200 / 10000 | api/pagination | 分页契约 |
 
+## 4.5 GetIntDefault 使用现状
+
+`GetIntDefault(key, def, min, max)` 已就位（`internal/setting/runtime.go`）但**当前零生产调用点**——现有 `GetInt` 4 处（artifact_generator ×3/syncer ×1）均有本地默认回退（如 `cfg.Count == 0 → 6`），无静默掩盖风险。**新代码一律 GetIntDefault**；存量 GetInt 触达时顺路迁移。
+
 ## 5. 资源预算表（并发/队列容量·§2.3 盘点）
 
 | 资源 | 值 | 位置 | 理由 |
