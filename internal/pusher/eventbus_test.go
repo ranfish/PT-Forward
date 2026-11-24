@@ -31,6 +31,7 @@ func TestEventBusConsumerTimeoutCtx(t *testing.T) {
 		logger:          zap.NewNop(),
 		baseCtx:         context.Background(),
 		consumerTimeout: 30 * time.Millisecond, // 测试缩窗（生产=60s 常量）
+		dispatchDone:    make(chan struct{}),
 	}
 	c := &timeoutTestConsumer{}
 	bus.Register(c)
@@ -55,6 +56,7 @@ func TestEventBusBaseCtxCancelPropagation(t *testing.T) {
 		logger:          zap.NewNop(),
 		baseCtx:         baseCtx,
 		consumerTimeout: 10 * time.Second,
+		dispatchDone:    make(chan struct{}),
 	}
 
 	var gotErr atomic.Value
@@ -88,3 +90,46 @@ func TestEventBusNilCtxFallback(t *testing.T) {
 type consumerFunc func(ctx context.Context, event *PushedEvent)
 
 func (f consumerFunc) OnPushed(ctx context.Context, event *PushedEvent) { f(ctx, event) }
+
+// §59.563 刀B 锚：Close 语义三态。
+
+// TestEventBusPublishAfterCloseNoPanic: Close 后 Publish 丢弃不 panic
+// （send-on-closed 陷阱消除——closed 守卫机械证明）。
+func TestEventBusPublishAfterCloseNoPanic(t *testing.T) {
+	bus := NewEventBus(context.Background(), zap.NewNop(), 4)
+	bus.Close()
+	bus.Publish(&PushedEvent{ClientUID: 1, InfoHash: "abc"}) // 修复前=panic
+	bus.Publish(&PushedEvent{ClientUID: 2, InfoHash: "def"})
+}
+
+// TestEventBusCloseDrainsBuffer: Close 排空语义——缓冲内事件全部消费完
+// dispatch 才退出（Done 关闸=无丢失）。
+func TestEventBusCloseDrainsBuffer(t *testing.T) {
+	bus := NewEventBus(context.Background(), zap.NewNop(), 16)
+	var consumed atomic.Int64
+	bus.Register(consumerFunc(func(ctx context.Context, event *PushedEvent) {
+		consumed.Add(1)
+	})) // NewEventBus 已自带 dispatch goroutine——勿重复起（双 close 竞态）
+
+	const n = 8
+	for i := 0; i < n; i++ {
+		bus.Publish(&PushedEvent{ClientUID: uint(i), InfoHash: "h"})
+	}
+	bus.Close()
+
+	select {
+	case <-bus.Done():
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close 后 dispatch 应排空退出")
+	}
+	if got := consumed.Load(); got != n {
+		t.Fatalf("排空语义：应消费全部 %d 事件, got %d", n, got)
+	}
+}
+
+// TestEventBusCloseIdempotent: Close 幂等（重复 Close 不 panic）。
+func TestEventBusCloseIdempotent(t *testing.T) {
+	bus := NewEventBus(context.Background(), zap.NewNop(), 2)
+	bus.Close()
+	bus.Close() // 幂等
+}

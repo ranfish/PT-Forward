@@ -813,6 +813,18 @@ func main() {
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			log.Error("server shutdown error", zap.Error(err))
 		}
+
+		// §59.563 刀B: EventBus 停机排空——srv.Shutdown 后（HTTP 停·各引擎
+		// 已在上方 Stop·新 Publish 源头枯竭）Close 拒新+排空缓冲；限时 join
+		// dispatch 作停机观测（超时放行——进程退出兜底）。补齐 Stop 链最后
+		// 一块缺位（审计 02 §3.1 P1）。
+		eventBus.Close()
+		select {
+		case <-eventBus.Done():
+			log.Info("event bus drained")
+		case <-time.After(pusher.EventBusDrainTimeout):
+			log.Warn("event bus drain timeout, exiting")
+		}
 	}()
 
 	log.Info("server listening", zap.String("addr", addr))

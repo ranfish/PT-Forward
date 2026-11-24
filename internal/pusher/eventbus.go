@@ -18,6 +18,11 @@ type Consumer interface {
 	OnPushed(ctx context.Context, event *PushedEvent)
 }
 
+// EventBusDrainTimeout §59.563 刀B: 停机排空 join 上限——srv.Shutdown 后
+// Close→dispatch 排空缓冲的观测窗口（超时放行·进程退出兜底）。导出供
+// main 停机序消费（跨包命名常量·附录A §3）。
+const EventBusDrainTimeout = 10 * time.Second
+
 type EventBus struct {
 	mu              sync.RWMutex
 	consumers       []Consumer
@@ -25,6 +30,8 @@ type EventBus struct {
 	logger          *zap.Logger
 	baseCtx         context.Context
 	consumerTimeout time.Duration
+	closed          bool          // §59.563 刀B: Close 后 Publish 守卫（send-on-closed panic 消除）
+	dispatchDone    chan struct{} // §59.563 刀B: dispatch 排空完成观测点
 }
 
 // NewEventBus §59.562 刀2: baseCtx=service ctx（main 根 ctx）——停机 cancel
@@ -41,6 +48,7 @@ func NewEventBus(ctx context.Context, logger *zap.Logger, bufferSize int) *Event
 		logger:          logger,
 		baseCtx:         ctx,
 		consumerTimeout: eventBusConsumerTimeout,
+		dispatchDone:    make(chan struct{}),
 	}
 	go bus.dispatch()
 	return bus
@@ -56,6 +64,17 @@ func (b *EventBus) Publish(event *PushedEvent) {
 	if event == nil {
 		return
 	}
+	// §59.563 刀B: closed 守卫——RLock 与 Close 的 Lock 互斥保证：
+	// Close 先等在途 Publish 的 RLock 释放再 close(channel)·置位后
+	// 新 Publish 直接丢弃（消除 send-on-closed panic 陷阱·审计 02 §3.1）。
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.closed {
+		b.logger.Warn("event bus closed, dropping push event",
+			zap.Uint("client_uid", event.ClientUID),
+			zap.String("info_hash", event.InfoHash))
+		return
+	}
 	select {
 	case b.eventCh <- event:
 	default:
@@ -65,11 +84,27 @@ func (b *EventBus) Publish(event *PushedEvent) {
 	}
 }
 
+// Close §59.563 刀B: 停机排空入口——置位 closed（拒新事件）+close channel
+// （dispatch range 排空缓冲后自然退出=排空完成）；幂等可重入。
+// 停机序约定：srv.Shutdown 之后调用（HTTP 停·新 Publish 源头已枯竭）。
 func (b *EventBus) Close() {
+	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+	b.closed = true
+	b.mu.Unlock()
 	close(b.eventCh)
 }
 
+// Done §59.563 刀B: dispatch 排空完成观测点（Close 后缓冲消费完退出时关闸）。
+func (b *EventBus) Done() <-chan struct{} {
+	return b.dispatchDone
+}
+
 func (b *EventBus) dispatch() {
+	defer close(b.dispatchDone)
 	for event := range b.eventCh {
 		b.mu.RLock()
 		consumers := b.consumers
