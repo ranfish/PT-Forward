@@ -105,7 +105,9 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	delete(m.timers, key)
 	m.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// §59.563 刀C: 回调 ctx 派生自 engine rootCtx（停机 cancel 中止在途回调·
+	// 原 Background——审计 02 §3.2 残留清账）；30s 上限保留（单行 DB 更新幂等）。
+	ctx, cancel := context.WithTimeout(m.engine.baseContext(), 30*time.Second)
 	defer cancel()
 
 	var current model.SeedingTorrentRecord

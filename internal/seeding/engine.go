@@ -194,6 +194,16 @@ func recordKey(clientUID uint, infoHash string) string {
 	return fmt.Sprintf("%d:%s", clientUID, infoHash)
 }
 
+// baseContext §59.563 刀C: rootCtx 的 nil 安全读取（worker 派生单源——
+// free_end 等持有 engine 引用的子组件消费；nil receiver/nil rootCtx 兜底
+// Background·附录A §2.5）。
+func (e *Engine) baseContext() context.Context {
+	if e != nil && e.rootCtx != nil {
+		return e.rootCtx
+	}
+	return context.Background()
+}
+
 func (e *Engine) Start(ctx context.Context) error {
 	if ctx == nil { // 附录A §2.5 边界防御
 		ctx = context.Background()

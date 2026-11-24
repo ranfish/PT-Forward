@@ -33,6 +33,7 @@ func calcDiskMinBytes(cfg *model.SeedingClientConfig, totalSpace int64) int64 {
 }
 
 type flushContext struct {
+	ctx             context.Context // §59.563 刀C: 刷写链 ctx（buildFlushContext 载入·下游消费者共用——01 篇 :249 Background 残留清账）
 	subscriptionID  string
 	sub             *model.RSSSubscription
 	scoringCfg      model.SeedingScoringConfig
@@ -153,6 +154,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 	}
 
 	return &flushContext{
+		ctx:             ctx, // §59.563 刀C: 载入（nil 兜底由消费点 baseContext 处理）
 		subscriptionID:  subscriptionID,
 		sub:             &sub,
 		scoringCfg:      scoringCfg,
@@ -171,6 +173,15 @@ type flushCandidate struct {
 	TorrentID string
 	SiteName  string
 	InfoHash  string
+}
+
+// flushCtx §59.563 刀C: 刷写链 ctx 的 nil 安全读取（直接构造的测试形态
+// 无 ctx 字段值——兜底 Background·附录A §2.5）。
+func (fc *flushContext) flushCtx() context.Context {
+	if fc != nil && fc.ctx != nil {
+		return fc.ctx
+	}
+	return context.Background()
 }
 
 // getDiscountFromCache §14.21 EnhancementCacheTTL: 从缓存获取折扣查询结果。
@@ -246,7 +257,9 @@ func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
 			rec.IsFree = true
 			rec.Discount = model.DiscountAssumeFree
 			isFree = true
-			if err := e.db.WithContext(context.Background()).Model(&model.SeedingTorrentRecord{}).
+			// §59.563 刀C: assume_free 回填派生自刷写链 ctx（原 Background——
+			// 审计 02 §3.2 残留清账·flushContext.ctx 载入）
+			if err := e.db.WithContext(fc.flushCtx()).Model(&model.SeedingTorrentRecord{}).
 				Where("id = ?", rec.ID).
 				Updates(map[string]interface{}{
 					"discount": model.DiscountAssumeFree,
