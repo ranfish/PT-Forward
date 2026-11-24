@@ -50,7 +50,7 @@ func (h *ComplianceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *ComplianceHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	var rules []model.ComplianceRule
-	if err := h.db.Order("rule_type, source DESC, created_at").Find(&rules).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("rule_type, source DESC, created_at").Find(&rules).Error; err != nil {
 		h.logger.Error("list compliance rules", zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "db error")
 		return

@@ -148,7 +148,7 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 		UploadDelta int64  `json:"upload_delta"`
 	}
 	var uploadRows []uploadRow
-	h.db.Raw(`SELECT site_name, SUM(delta_upload) as upload_delta
+	h.db.WithContext(r.Context()).Raw(`SELECT site_name, SUM(delta_upload) as upload_delta
 		FROM (
 			SELECT site_name, info_hash,
 				MAX(uploaded) - MIN(uploaded) AS delta_upload
@@ -175,7 +175,7 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 	// §59.152: 历史总量直读 current_uploaded 列（Vertex torrents 表模式——
 	// 每 UPSERT 最新值；final_uploaded 兜底删除种子；traffic 全表扫 fallback 移除）
 	var historyRows []historyRow
-	h.db.Raw(`SELECT site_name, SUM(uploaded) as uploaded
+	h.db.WithContext(r.Context()).Raw(`SELECT site_name, SUM(uploaded) as uploaded
 		FROM (
 			SELECT str.site_name, str.info_hash,
 				CASE WHEN str.current_uploaded > 0 THEN str.current_uploaded
@@ -283,7 +283,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	}
 	siteMap := map[string]siteInfo{}
 	var siteList []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&siteList).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&siteList).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -307,7 +307,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 			Uploaded int64  `json:"uploaded"`
 		}
 		var rows []trafficRow
-		h.db.Raw(`SELECT info_hash, MAX(uploaded) as uploaded
+		h.db.WithContext(r.Context()).Raw(`SELECT info_hash, MAX(uploaded) as uploaded
 			FROM torrent_traffic
 			WHERE info_hash IN (?) AND recorded_at >= ?
 			GROUP BY info_hash`, hashes, time.Now().Truncate(24*time.Hour)).Scan(&rows)
@@ -325,7 +325,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 		for _, rec := range records {
 			siteTorrents = append(siteTorrents, rec.SiteName+"|"+rec.TorrentID)
 		}
-		h.db.Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, siteTorrents).Scan(&titles)
+		h.db.WithContext(r.Context()).Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, siteTorrents).Scan(&titles)
 		for _, t := range titles {
 			titleKeyMap[t.SiteName+"|"+t.TorrentID] = t.Title
 		}

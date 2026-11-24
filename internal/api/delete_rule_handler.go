@@ -89,7 +89,7 @@ func (h *DeleteRuleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *DeleteRuleHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	var rules []model.DeleteRule
-	if err := h.db.Order("priority ASC, id ASC").Find(&rules).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("priority ASC, id ASC").Find(&rules).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询删种规则失败")
 		return
 	}

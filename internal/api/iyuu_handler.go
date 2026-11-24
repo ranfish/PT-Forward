@@ -344,7 +344,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 
 func (h *IYUUHandler) handleListSites(w http.ResponseWriter, r *http.Request) {
 	var mappings []model.IYUUSiteMapping
-	if err := h.db.Order("site_name ASC").Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("site_name ASC").Find(&mappings).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "获取站点映射失败")
 		return
 	}

@@ -132,7 +132,7 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var sites []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&sites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -278,7 +278,7 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 		Framework string
 	}
 	var sites []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&sites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -405,7 +405,7 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var sites []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&sites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 

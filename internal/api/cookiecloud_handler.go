@@ -207,7 +207,7 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 	}
 
 	var histories []model.CookieCloudSyncHistory
-	if err := h.db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询同步历史失败")
 		return
 	}

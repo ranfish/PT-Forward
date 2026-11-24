@@ -199,7 +199,7 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 
 	var seen []model.RSSTorrentSeen
 	offset := int((page - 1) * size)
-	if err := h.db.Order("created_at DESC").Offset(offset).Limit(int(size)).Find(&seen).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("created_at DESC").Offset(offset).Limit(int(size)).Find(&seen).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询最近种子失败")
 		return
 	}
@@ -224,7 +224,7 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 		Framework string
 	}
 	var sites []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&sites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 

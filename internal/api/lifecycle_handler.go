@@ -108,14 +108,14 @@ func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, r *http.Req
 	}
 
 	maxConcurrent := int64(5)
-	if val, err := h.getSettingFromDB("lifecycle.max_concurrent_publishes"); err == nil && val != "" {
+	if val, err := h.getSettingFromDB(r, "lifecycle.max_concurrent_publishes"); err == nil && val != "" {
 		if n, err := parseInt64(val); err == nil {
 			maxConcurrent = n
 		}
 	}
 
 	pauseOnPressure := true
-	if val, err := h.getSettingFromDB("lifecycle_backpressure"); err == nil && val != "" {
+	if val, err := h.getSettingFromDB(r, "lifecycle_backpressure"); err == nil && val != "" {
 		var cfg map[string]interface{}
 		if json.Unmarshal([]byte(val), &cfg) == nil {
 			if v, ok := cfg["max_concurrent"]; ok {
@@ -152,7 +152,7 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 	}
 
 	existing := map[string]interface{}{}
-	if val, err := h.getSettingFromDB("lifecycle_backpressure"); err == nil && val != "" {
+	if val, err := h.getSettingFromDB(r, "lifecycle_backpressure"); err == nil && val != "" {
 		if jsonErr := json.Unmarshal([]byte(val), &existing); jsonErr != nil {
 			h.logger.Warn("parse existing backpressure config failed", zap.Error(jsonErr))
 		}
@@ -181,11 +181,11 @@ func (h *LifecycleHandler) getSetting(r *http.Request, key string) (string, erro
 	return s.Value, err
 }
 
-func (h *LifecycleHandler) getSettingFromDB(key string) (string, error) {
+func (h *LifecycleHandler) getSettingFromDB(r *http.Request, key string) (string, error) {
 	var s struct {
 		Value string `gorm:"column:value"`
 	}
-	err := h.db.Table("system_settings").Where("key = ?", key).First(&s).Error
+	err := h.db.WithContext(r.Context()).Table("system_settings").Where("key = ?", key).First(&s).Error
 	return s.Value, err
 }
 

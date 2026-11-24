@@ -366,7 +366,7 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		var val string
-		_ = h.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row().Scan(&val) // 空表 → 空串
+		_ = h.db.WithContext(r.Context()).Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row().Scan(&val) // 空表 → 空串
 		var keywords []string
 		if val != "" {
 			_ = json.Unmarshal([]byte(val), &keywords) // 非法 JSON → 空表回退
@@ -405,7 +405,7 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 	}
 
 	var logs []model.ScoringLog
-	if err := h.db.Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询评分日志失败")
 		return
 	}
@@ -421,7 +421,7 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 		for _, l := range logs {
 			keys = append(keys, l.SiteName+"|"+l.TorrentID)
 		}
-		h.db.Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, keys).Scan(&titles)
+		h.db.WithContext(r.Context()).Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, keys).Scan(&titles)
 	}
 	titleMap := make(map[string]string, len(titles))
 	for _, t := range titles {
@@ -433,7 +433,7 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var siteList []model.Site
-	if err := h.db.Select("name, base_url, framework").Find(&siteList).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Select("name, base_url, framework").Find(&siteList).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 

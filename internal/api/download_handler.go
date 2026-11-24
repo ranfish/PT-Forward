@@ -587,7 +587,7 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		Where("s.client_uid = ? AND s.save_path = ? AND s.is_hidden = ?", clientUID, savePath, false).
 		Where("s.progress >= ?", 1.0).
 		Where("s.name NOT IN (?)",
-			h.db.Table("torrent_snapshots AS s2").
+			h.db.WithContext(r.Context()).Table("torrent_snapshots AS s2").
 				Joins("INNER JOIN torrent_metadata m ON s2.hash = m.info_hash").
 				Where("s2.client_uid = ? AND s2.save_path = ? AND s2.is_hidden = 0 AND s2.name != ''", clientUID, savePath).
 				Select("DISTINCT s2.name")).
