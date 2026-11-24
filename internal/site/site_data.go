@@ -233,6 +233,9 @@ func SeedSites(db *gorm.DB) error {
 	// （修道院仅在 supported·105 vs 104——误判=误删用户配置）。只删
 	// sites 行（关联悬空由消费方容忍·migration36 单表先例）。回滚代价
 	// 已定案接受（旧版对账删新版站行→用户配置丢·罕见场景）。
+	// §59.566 刀2 定性：小配置表全量可接受——sites 表规模≈支持集上限
+	// （supported_sites.json 固定集合·60+ 行·有上界）；bootstrap 期无请求
+	// ctx·裸 Find 为定性例外（附录B `_ =` 分级同族思路）。
 	var all []model.Site
 	if err := db.Find(&all).Error; err != nil {
 		return siteError(ErrSiteSeed, "对账查询站点失败", err)

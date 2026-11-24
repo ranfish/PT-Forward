@@ -21,6 +21,10 @@ type runTaskSources struct {
 	seedTorrentIDs map[string]string
 }
 
+// seedRecordsIndexWarnThreshold §59.566 刀2: 做种索引全量加载的增长观测阈值
+// （超出打 Warn 提示分批化评估——非硬限·匹配语义要求全量）。
+const seedRecordsIndexWarnThreshold = 50000
+
 // collectRunTaskSources 源收集：seedRecords 映射 + 全下载器遍历
 // （进度门+tracker 解析+nameSites 聚合）。
 func (e *Engine) collectRunTaskSources(ctx context.Context, clientUIDs []uint) *runTaskSources {
@@ -30,8 +34,15 @@ func (e *Engine) collectRunTaskSources(ctx context.Context, clientUIDs []uint) *
 		seedTorrentIDs: make(map[string]string),
 	}
 	var seedRecords []model.SeedingTorrentRecord
+	// §59.566 刀2 定性：全量=辅种匹配索引的业务语义（覆盖全部做种记录才能
+	// 不漏匹配·硬 LIMIT 会破坏正确性）；列已裁剪（info_hash+torrent_id 两短
+	// 列·2 万级≈数 MB）。防御=增长观测：超阈值 Warn 提示未来需分批化。
 	if err := e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords).Error; err != nil {
 		e.logger.Warn("query seed records failed", zap.Error(err))
+	}
+	if n := len(seedRecords); n > seedRecordsIndexWarnThreshold {
+		e.logger.Warn("seed records index large - consider batching",
+			zap.Int("count", n), zap.Int("threshold", seedRecordsIndexWarnThreshold))
 	}
 	for _, r := range seedRecords {
 		if r.InfoHash != "" && r.TorrentID != "" {

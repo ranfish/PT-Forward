@@ -23,6 +23,8 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 	currentHour := now.Truncate(time.Hour)
 	prevHour := currentHour.Add(-time.Hour)
 
+	// §59.566 刀2 定性：已有小时窗（prevHour..currentHour）+WithContext——
+	// 有界查询合规（快照量=采集频率×客户端数·窗口内自然上界）。
 	var snapshots []model.DownloaderSpeedSnapshot
 	if err := a.db.WithContext(ctx).
 		Where("recorded_at >= ? AND recorded_at < ?", prevHour, currentHour).
