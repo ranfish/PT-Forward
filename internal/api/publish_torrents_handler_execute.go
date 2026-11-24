@@ -146,6 +146,7 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 	}
 	results := make([]siteResult, len(req.TargetSites))
 	var wg sync.WaitGroup
+	// §59.568 刀1: 批量后台类：多站发布批次 10min——单轮批次预算·失败=批次终态可重发
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	for i, site := range req.TargetSites {
@@ -269,6 +270,8 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 		budget = 24 * time.Hour
 	}
 	go func() {
+		// §59.568 刀1: 批量后台类——站批预算=n×(60s+间隔)+30min 重试余量·
+		// 封顶 24h（§59.51 长任务铁律·脱离 HTTP 生命周期）
 		ctx, cancel := context.WithTimeout(context.Background(), budget)
 		defer cancel()
 		batchGroupID := taskID

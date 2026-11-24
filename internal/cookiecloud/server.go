@@ -200,6 +200,7 @@ func (s *Server) doSync() {
 		return
 	}
 
+	// §59.568 刀1: 外部请求类：CookieCloud 同步 2min——对端服务器拉取·失败=下轮定时重试
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 

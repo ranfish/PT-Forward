@@ -263,6 +263,7 @@ func (r *deleteReporter) run() {
 }
 
 func (r *deleteReporter) flush(batch []model.CloudFPDeleteReport) {
+	// §59.568 刀1: 收尾类：删除上报 flush 5s——批量上报尾部落库/上传·失败=日志观测
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.service.ReportDeleted(ctx, batch); err != nil {
@@ -364,6 +365,7 @@ func (r *contributeReporter) run() {
 }
 
 func (r *contributeReporter) flush(batch []model.CloudFPContribute) {
+	// §59.568 刀1: 收尾类：贡献上报 flush 10s——同上·批量上报尾部
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := r.service.UploadRecords(ctx, batch); err != nil {

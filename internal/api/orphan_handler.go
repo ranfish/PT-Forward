@@ -165,6 +165,7 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	h.recoverStore.Store(taskID, &orphan.RecoverResult{Orphan: target, Message: "searching..."})
 
 	go func() {
+		// §59.568 刀1: 批量后台类：孤儿恢复 5min——单轮恢复预算·失败=下轮扫描重试
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		start := time.Now()

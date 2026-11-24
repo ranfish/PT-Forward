@@ -165,6 +165,7 @@ func (q *BDInfoScanQueue) runOne(task BDInfoScanTask) {
 			budget = need
 		}
 	}
+	// §59.568 刀1: 批量后台类：BDInfo 队列 30min（need 动态取大）——扫描队列预算·失败=下轮重扫
 	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 

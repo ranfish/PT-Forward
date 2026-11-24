@@ -324,6 +324,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 
 	if cfg.Enabled && cfg.Token != "" {
 		go func() {
+			// §59.568 刀1: 外部请求类：IYUU 探活 30s——对端 API P99 余量·失败=探活结果非致命
 			syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if _, err := h.iyuuSvc.GetSiteList(syncCtx); err != nil {
@@ -557,6 +558,7 @@ func (h *IYUUHandler) handleCoverageRun(w http.ResponseWriter, r *http.Request) 
 		window = model.CoverageWindow(schedule)
 	}
 	go func() {
+		// §59.568 刀1: 外部请求类：IYUU 同步 2h——外部批量拉取·中止下轮定时重试（最终一致）
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 		defer cancel()
 		if err := h.coverageSvc.RunCoverageSync(ctx, window); err != nil && !errors.Is(err, coverage.ErrCoverageRunning) {

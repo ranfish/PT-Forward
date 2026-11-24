@@ -364,6 +364,7 @@ func (h *SiteHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr s
 
 	if h.statsSync != nil {
 		go func() { //nolint:gosec // G118: intentional — must outlive request context
+			// §59.568 刀1: 本地任务类：统计同步触发 30s——单站统计查询·失败=下次触发重试
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := h.statsSync.SyncSiteStats(ctx, s.ID); err != nil {
@@ -547,6 +548,7 @@ func (h *SiteHandler) handleSyncAllStats(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// §59.568 刀1: 本地任务类：站点删除后台 5min——DB 级联清理·失败=重删可重试
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	synced, failedSites := h.statsSync.SyncAllSites(ctx)
@@ -581,6 +583,7 @@ func (h *SiteHandler) handleBatchSyncSiteStats(w http.ResponseWriter, r *http.Re
 		timeout = 5 * time.Minute
 	}
 
+	// §59.568 刀1: 本地任务类：选中站点同步——预算=n×30s 公式（附录E §4 形态）
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	synced, failedSites := h.statsSync.SyncSelectedSites(ctx, req.IDs)

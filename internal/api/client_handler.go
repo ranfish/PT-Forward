@@ -171,6 +171,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					return
 				}
+				// §59.568 刀1: 本地任务类：client 连接测试 5s——RPC 探活·失败=测试结果非致命
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				md, mdErr := dlClient.GetMainData(ctx)

@@ -10,6 +10,7 @@ import (
 )
 
 func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
+	// §59.568 刀1: 工具边界：参数化 timeout helper（调用方定预算·附录A §2.5 定性）
 	return context.WithTimeout(context.Background(), d)
 }
 

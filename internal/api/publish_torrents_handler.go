@@ -187,6 +187,7 @@ func (h *PublishTorrentsHandler) clusterHasBDInfo(ctx context.Context, clientUID
 // （BDInfo 报告经 ExtractMediaInfo 格式分流自动解析；簇同名同 title
 // 算一次写全簇）。
 func (h *PublishTorrentsHandler) onBDInfoScanDone(task publish.BDInfoScanTask, report string, err error) {
+	// §59.568 刀1: 本地任务类：BDInfo 后处理 5min——磁盘扫描后处理·失败=下轮重扫
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	hashes := h.clusterHashes(ctx, task.ClientUID, task.SavePath, task.Name)

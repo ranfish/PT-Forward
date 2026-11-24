@@ -320,6 +320,7 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 	tmpPath := filepath.Join(exeDir, fmt.Sprintf(".pt-forward.new.%d", os.Getpid()))
 	h.logger.Info("OTA: downloading", zap.String("url", downloadURL), zap.String("dest", tmpPath))
 
+	// §59.568 刀1: 外部请求类：OTA 下载 5min——大文件下载预算·失败=OTA 中止可重试
 	dlCtx, dlCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer dlCancel()
 
@@ -402,6 +403,7 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 }
 
 func (h *SystemHandler) downloadSHA256(url string) (string, error) {
+	// §59.568 刀1: 外部请求类：SHA256 下载 30s——小文件校验预算·失败=校验跳过可重试
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

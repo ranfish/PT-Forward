@@ -108,6 +108,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		} else if retErr != nil || (result.Failed > 0 && result.Injected == 0 && result.Matched == 0) {
 			status = model.ReseedTaskFailed
 		}
+		// §59.568 刀1: 收尾类：任务失败状态回写 5s——父 ctx 已取消的 finalize（附录A §2.1）
 		deferCtx, deferCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer deferCancel()
 		if err := e.db.WithContext(deferCtx).Model(task).Updates(map[string]interface{}{
