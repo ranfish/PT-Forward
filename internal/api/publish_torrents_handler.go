@@ -332,14 +332,26 @@ func (h *PublishTorrentsHandler) reinferTagsForCluster(ctx context.Context, task
 // StartObservingCleanup §59.38: 观察期定时清理——日级扫描超 7 天的观察组并
 // 执行两级清理（立即清理与定时共用 purgeObservingResource）。启动 +5min 避开
 // 启动 IO 高峰，此后每 24h 一轮。
+// §59.563 刀3: 接 baseCtx 停机通道（审计 02 §3.3——原 Background+无 stop
+// 的永久 goroutine）：避峰等待与 ticker 轮均挂 Done；清理幂等（超 7 天扫描
+// +删文件·下次重扫）→ 幂等型语义（停机中止可重查）。
 func (h *PublishTorrentsHandler) StartObservingCleanup() {
 	go func() {
-		time.Sleep(5 * time.Minute)
-		h.runObservingCleanup(context.Background())
+		select {
+		case <-time.After(5 * time.Minute):
+		case <-h.baseCtx.Done():
+			return
+		}
+		h.runObservingCleanup(h.baseCtx)
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			h.runObservingCleanup(context.Background())
+		for {
+			select {
+			case <-h.baseCtx.Done():
+				return
+			case <-ticker.C:
+				h.runObservingCleanup(h.baseCtx)
+			}
 		}
 	}()
 }

@@ -273,6 +273,16 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 		defer cancel()
 		batchGroupID := taskID
 		for i, hash := range req.InfoHashes {
+			// §59.563 刀4: 服务停机检查点（baseCtx.Done 与 StopRequested 同
+			// 语义位——batch fetch §59.562 刀3 同款：不再开始新颗·当前颗完整
+			// 执行；颗内 ctx 保持 Background 派生不被停机中断——发布是站侧
+			// 事实动作·半途取消不如完整落终态）。
+			select {
+			case <-h.baseCtx.Done():
+				h.finishSiteBatch(task, "服务停机（已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
+				return
+			default:
+			}
 			// §59.513: graceful 停止检查点①——每颗开始前（取消后当前颗已
 			// 完整执行，未开始颗不再开始；§59.495 批量获取同款语义）。
 			h.siteBatch.mu.Lock()
