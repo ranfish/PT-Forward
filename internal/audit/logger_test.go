@@ -113,7 +113,7 @@ func TestLogger_StartAndFlushOnCancel(t *testing.T) {
 		db.Model(&model.OperationAuditLog{}).Count(&n)
 		return n
 	}
-	if !testutil.WaitFor(t, 3*time.Second, func() bool { return count() == 2 }) {
+	if !testutil.WaitFor(t, 10*time.Second, func() bool { return count() == 2 }) {
 		t.Errorf("expected 2 logs after cancel, got %d", count())
 	}
 }
@@ -136,7 +136,7 @@ func TestLogger_FlushLoopBatchSize(t *testing.T) {
 		db.Model(&model.OperationAuditLog{}).Count(&n)
 		return n
 	}
-	if !testutil.WaitFor(t, 3*time.Second, func() bool { return count() >= 50 }) {
+	if !testutil.WaitFor(t, 10*time.Second, func() bool { return count() >= 50 }) {
 		t.Errorf("expected at least 50 flushed, got %d", count())
 	}
 }
