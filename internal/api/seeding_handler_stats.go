@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -103,12 +102,10 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 }
 
 func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 {
-		limit = 20
-	}
-	if limit > 200 {
-		limit = 200
+	// §59.565 D2: limit 补上限（parseLimitQuery 单点·原 <1 回落 20 无上限）
+	limit, clamped := parseLimitQuery(r)
+	if clamped {
+		h.logger.Warn("limit clamped to 200", zap.String("op", "stats_by_site"))
 	}
 
 	today := time.Now().Truncate(24 * time.Hour)

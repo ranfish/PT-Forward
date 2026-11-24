@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -399,12 +398,10 @@ func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *ht
 }
 
 func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 {
-		limit = 20
-	}
-	if limit > 200 {
-		limit = 200
+	// §59.565 D2: limit 补上限（parseLimitQuery 单点·原 <1 回落 20 无上限）
+	limit, clamped := parseLimitQuery(r)
+	if clamped {
+		h.logger.Warn("limit clamped to 200", zap.String("op", "scoring_logs"))
 	}
 
 	var logs []model.ScoringLog

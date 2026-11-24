@@ -275,7 +275,11 @@ func (h *PublishHandler) handleGetCandidate(w http.ResponseWriter, r *http.Reque
 
 func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Request) {
 	candidateIDStr := r.URL.Query().Get("candidateId")
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	// §59.565 D2: limit 补上限（原 <1 回落 20 无上限——超大 limit 重查询面）
+	limit, clamped := parseLimitQuery(r)
+	if clamped {
+		h.logger.Warn("limit clamped to 200", zap.String("op", "list_results_legacy"))
+	}
 	status := r.URL.Query().Get("status")
 	targetSite := r.URL.Query().Get("target_site")
 	trigger := r.URL.Query().Get("trigger")

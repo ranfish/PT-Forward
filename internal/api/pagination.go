@@ -12,6 +12,22 @@ type PaginatedResult struct {
 	Size  int         `json:"size"`
 }
 
+// parseLimitQuery §59.565 D2: limit 型查询解析（top-N 非分页语义）——默认 20·
+// 上限 200 clamp（§59.509 附七 clamp 语义：显式要大值 clamp 到上限·非静默回落
+// 默认——用户显式行为优先）。第二返回值=是否被 clamp（调用方打 Warn 观测
+// 调用方行为——04 篇 D2 建议）。三消费点：publish results 旧模式/
+// seeding stats/seeding config。
+func parseLimitQuery(r *http.Request) (limit int, clamped bool) {
+	limit, _ = strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		return 20, false
+	}
+	if limit > 200 {
+		return 200, true
+	}
+	return limit, false
+}
+
 // parsePagination §59.552: 标准分页解析——page 默认 1（非法/<=0 回落·
 // >10000 截断）；size 默认 20（有效域 1..200·非法/越界回落默认）。
 //
