@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/testutil"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -97,14 +98,15 @@ func TestLogger_StartAndFlushOnCancel(t *testing.T) {
 	l.Log("admin", "site", "create", "site", "1", "detail", "success")
 	l.Log("admin", "site", "delete", "site", "2", "", "failure")
 
-	time.Sleep(100 * time.Millisecond)
+	// §59.567 刀B: 固定 sleep → 条件轮询（cancel 触发 flush·等 count 就绪）
 	cancel()
-	time.Sleep(300 * time.Millisecond)
-
-	var count int64
-	db.Model(&model.OperationAuditLog{}).Count(&count)
-	if count != 2 {
-		t.Errorf("expected 2 logs after cancel, got %d", count)
+	count := func() int64 {
+		var n int64
+		db.Model(&model.OperationAuditLog{}).Count(&n)
+		return n
+	}
+	if !testutil.WaitFor(t, 3*time.Second, func() bool { return count() == 2 }) {
+		t.Errorf("expected 2 logs after cancel, got %d", count())
 	}
 }
 
@@ -120,12 +122,14 @@ func TestLogger_FlushLoopBatchSize(t *testing.T) {
 		l.Log("admin", "site", "action", "type", string(rune(i)), "", "ok")
 	}
 
-	time.Sleep(300 * time.Millisecond)
-
-	var count int64
-	db.Model(&model.OperationAuditLog{}).Count(&count)
-	if count < 50 {
-		t.Errorf("expected at least 50 flushed, got %d", count)
+	// §59.567 刀B: 固定 sleep → 条件轮询（批量 50 flush 就绪）
+	count := func() int64 {
+		var n int64
+		db.Model(&model.OperationAuditLog{}).Count(&n)
+		return n
+	}
+	if !testutil.WaitFor(t, 3*time.Second, func() bool { return count() >= 50 }) {
+		t.Errorf("expected at least 50 flushed, got %d", count())
 	}
 }
 

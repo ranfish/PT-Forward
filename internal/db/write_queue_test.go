@@ -73,6 +73,7 @@ func TestWriteQueue_Cancelled(t *testing.T) {
 	q.Start(context.Background())
 	defer q.Stop(context.Background())
 
+	// §59.567 刀B 定性：行为必要（阻塞写构造=队列填充手段）
 	fillReq := &writeRequest{fn: func(d *gorm.DB) error { time.Sleep(2 * time.Second); return nil }, resp: make(chan error, 1)}
 	q.ch <- fillReq
 

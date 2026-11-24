@@ -184,6 +184,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 
 	// §59.122: OnTorrents 同步建 record——轮询等落库（count=N 首跑偶发
 	// 0.02s 即挂 = 事件处理链内异步分支未完成, First 立即查空）
+	// §59.567 刀B 定性：for+sleep+break=有界条件轮询（50×100ms=5s 上限）·形态合规
 	var rec model.SeedingTorrentRecord
 	var recErr error
 	for i := 0; i < 50; i++ {

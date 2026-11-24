@@ -71,7 +71,7 @@ func TestDiskBudget_Expire(t *testing.T) {
 	m := NewDiskBudgetManager(zap.NewNop())
 
 	_, _ = m.Reserve(1, 8000, 10000, 1*time.Millisecond)
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond) // §59.567 刀B 定性：行为必要（TTL 过期时序）
 
 	m.Expire()
 

@@ -14,7 +14,7 @@ func TestSmartDial_RaceWinner(t *testing.T) {
 		// 模拟：1.2.3.4 秒回 / 5.6.7.8 快回
 		switch host {
 		case "1.2.3.4":
-			time.Sleep(2 * time.Second)
+			time.Sleep(2 * time.Second) // §59.567 刀B 定性：行为必要（慢对端模拟·竞争择优的被测时序）
 			c1, c2 := net.Pipe()
 			_ = c2
 			return c1, nil

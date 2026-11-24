@@ -135,7 +135,7 @@ func TestRuntimeConfig_CacheAutoRefresh(t *testing.T) {
 
 	repo.Set(ctx, "cached_key", "v2")
 
-	time.Sleep(15 * time.Millisecond)
+	time.Sleep(15 * time.Millisecond) // §59.567 刀B 定性：行为必要（缓存 TTL 过期）
 
 	if v := rc.GetString(ctx, "cached_key"); v != "v2" {
 		t.Errorf("after TTL: got %q, want v2", v)

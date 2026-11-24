@@ -31,7 +31,7 @@ func TestBencodeCache_Expired(t *testing.T) {
 	cache := NewBencodeCache(10, 10*time.Millisecond)
 	cache.Set("site1:123", "abc123", 1024)
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond) // §59.567 刀B 定性：行为必要（TTL 过期）
 	_, ok := cache.Get("site1:123")
 	require.False(t, ok, "expired entry should miss")
 }

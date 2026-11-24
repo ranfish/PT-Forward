@@ -236,6 +236,8 @@ func TestWatcher_StartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// §59.567 刀B 定性：生命周期冒烟——sleep=运行窗口（≥1 个 poll tick）·
+	// 无状态可断言（watchStore 空·观测需注入·成本超收益）·50ms=Stop 收敛余量
 	time.Sleep(150 * time.Millisecond)
 	w.Stop()
 	cancel()

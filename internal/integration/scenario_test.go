@@ -17,6 +17,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/testutil"
 	"github.com/ranfish/pt-forward/internal/watcher"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,17 +111,15 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 	defer cancel()
 	require.NoError(t, w.Start(wCtx))
 
-	time.Sleep(300 * time.Millisecond)
+	// §59.567 刀B: 固定 300ms → 条件轮询（watch 轮询副作用就绪再 Stop）
+	if !testutil.WaitFor(t, 3*time.Second, func() bool {
+		var u model.PublishCandidate
+		return db.First(&u).Error == nil && u.DownloadCompleted
+	}) {
+		t.Fatal("download should be detected as completed before stop")
+	}
 	w.Stop()
 	cancel()
-
-	require.Eventually(t, func() bool {
-		var u model.PublishCandidate
-		if err := db.First(&u).Error; err != nil {
-			return false
-		}
-		return u.DownloadCompleted
-	}, 2*time.Second, 50*time.Millisecond, "download should be detected as completed")
 
 	var updated model.PublishCandidate
 	require.NoError(t, db.First(&updated).Error)
@@ -226,7 +225,12 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 	defer cancel()
 	require.NoError(t, w.Start(wCtx))
 
-	time.Sleep(300 * time.Millisecond)
+	// §59.567 刀B: 固定 300ms → 条件轮询（转移链副作用就绪再 Stop）
+	if !testutil.WaitFor(t, 3*time.Second, func() bool {
+		return exportCalled && addFromFileCalled && deleteCalled
+	}) {
+		t.Fatal("transfer chain effects not ready before stop")
+	}
 	w.Stop()
 	cancel()
 
@@ -282,7 +286,13 @@ func TestScenario_F6_WatchOrphanDetection(t *testing.T) {
 	defer cancel()
 	require.NoError(t, w.Start(wCtx))
 
-	time.Sleep(300 * time.Millisecond)
+	// §59.567 刀B: 固定 300ms → 条件轮询（孤儿标记就绪再 Stop）
+	if !testutil.WaitFor(t, 3*time.Second, func() bool {
+		var u model.PublishCandidate
+		return db.First(&u).Error == nil && u.PublishStatus == model.CandidateOrphan
+	}) {
+		t.Fatal("orphan detection not ready before stop")
+	}
 	w.Stop()
 	cancel()
 
