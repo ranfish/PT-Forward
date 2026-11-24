@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -11,9 +12,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var wqtestDBCounter atomic.Uint64 // §59.567 刀B 补修三：unique+cache=shared（goroutine 并发 DB 访问防连接分裂）
+
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:wqtest_%d?mode=memory&cache=shared&_busy_timeout=5000", wqtestDBCounter.Add(1))), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

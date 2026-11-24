@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,9 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var reseedtestDBCounter atomic.Uint64 // §59.567 刀B 补修三：unique+cache=shared（goroutine 并发 DB 访问防连接分裂）
+
 func setupReseedDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:reseedtest_%d?mode=memory&cache=shared&_busy_timeout=5000", reseedtestDBCounter.Add(1))), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

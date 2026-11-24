@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,9 +22,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var rsstestDBCounter atomic.Uint64 // §59.567 刀B 补修三：unique+cache=shared（goroutine 并发 DB 访问防连接分裂）
+
 func setupEngineDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:rsstest_%d?mode=memory&cache=shared&_busy_timeout=5000", rsstestDBCounter.Add(1))), &gorm.Config{})
 	require.NoError(t, err, "open db")
 	for _, m := range []interface{}{
 		&model.Site{},
@@ -339,7 +342,7 @@ func TestEngine_StartStop(t *testing.T) {
 }
 
 func TestEngine_Start_DBError(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:rsstest_%d?mode=memory&cache=shared&_busy_timeout=5000", rsstestDBCounter.Add(1))), &gorm.Config{})
 	require.NoError(t, err)
 	eng := NewEngine(db, zap.NewNop())
 	ctx, cancel := context.WithCancel(context.Background())

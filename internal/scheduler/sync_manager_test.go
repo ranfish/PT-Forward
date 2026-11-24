@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,9 +13,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var smtestDBCounter atomic.Uint64 // §59.567 刀B 补修三：unique+cache=shared（goroutine 并发 DB 访问防连接分裂）
+
 func setupSyncManagerDB(t *testing.T) (*gorm.DB, *setting.Repository) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:smtest_%d?mode=memory&cache=shared&_busy_timeout=5000", smtestDBCounter.Add(1))), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
