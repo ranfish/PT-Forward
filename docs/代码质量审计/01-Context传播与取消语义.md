@@ -1,8 +1,8 @@
 # 01 Context 传播与取消语义
 
-- **状态**：已精读
-- **日期**：2026-11-24
-- **基线**：`66bb3cf4`（`fix §59.561 英字误投双根因修复（圣克莱尔案）`）
+- **状态**：已完成（刀1-5 全落地·见文末整改落地记录）
+- **日期**：2026-11-24（精读）/ 2026-11-24（整改收官）
+- **基线**：精读 `66bb3cf4` → 整改落点 `c9763248`（v0.0.1585·生产实证）
 - **审计范围**：`internal/` 生产代码（排除 `_test.go`、`tools/`、`cmd/`）中的 `context.Background()` 使用。
 - **审计方法**：全局扫描 `context.Background()` 调用点；按“根上下文/取消后收尾/后台任务/请求链路/副作用”分类；对高风险点定点阅读上下文代码。
 
@@ -143,3 +143,23 @@
 ## 7. 后续方向
 
 下一篇建议进入 **02 后台任务生命周期与优雅停机**，将本篇发现的后台任务模式与 `time.Sleep` 轮询、`stopRequested`、worker 退出协作一起审计。
+
+## 8. 整改落地记录（2026-11-24·§59.562）
+
+| 发现 | 刀 | 版本 | 落地 |
+|---|---|---|---|
+| §3.3 client reload 静默失败 | 刀1 | v0.0.1582 | 三处 Warn 日志化（op/client_id/client_name） |
+| §4.1/4.2 规范缺失 | 刀5 | v0.0.1582 | 附录A-Context使用规范（四类 ctx+六规则+评审清单）+AGENTS 短指针 |
+| §3.2 eventbus consumer 无超时 | 刀2 | v0.0.1583 | baseCtx 注入+60s 命名常量+超时五字段 Warn·锚三枚 |
+| §3.1 batch/manual/stats 脱离停机 | 刀3 | v0.0.1584 | NewRouter ctx 穿透+语义分型三型接线（循环 graceful/幂等/工件）·锚两枚 |
+| §3.4 seeding 自建局部根 ctx | 刀4 | v0.0.1585 | rootCtx 单源+refreshCtx 双通道+transferRecord 派生巡检 ctx·锚两枚 |
+
+生产实证：v0.0.1585 OTA 重启复验（版本/七端点 200/零 panic/停机收敛日志——
+seeding engine stopped→started 2.7s 干净换血 21403 记录）。
+
+**已知取舍（定向移交方向 2 跟踪）**：
+- batch fetch 颗内 Background 有意保留（graceful 当前颗跑完）；更强停机保证
+  需评估「当前颗可安全中断」边界，不可直接全换 ctx。
+- 停机期 consumer timeout Warn 可能噪音（停机取消未响应≠真超时）——先观察
+  日志上下文区分，不改代码。
+- flush.go:249 / free_end.go:108 / EventBus Close() 零调用面——移交方向 2。
