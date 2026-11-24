@@ -428,7 +428,7 @@ func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		Count(&total)
 
 	var subs []model.RSSSubscription
-	h.db.
+	h.db.WithContext(r.Context()).
 		Order("name ASC").
 		Offset(offset(page, size)).Limit(size).
 		Find(&subs)

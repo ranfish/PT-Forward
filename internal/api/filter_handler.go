@@ -144,7 +144,7 @@ func (h *FilterHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		Count(&total)
 
 	var rules []model.FilterRule
-	h.db.
+	h.db.WithContext(r.Context()).
 		Order("priority ASC, id ASC").
 		Offset(offset(page, size)).Limit(size).
 		Find(&rules)
