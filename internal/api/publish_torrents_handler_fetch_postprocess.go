@@ -294,7 +294,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	// 手动捕获结果也刷新锚点（Q4）。过期=miss 走既有策略（Q2=A：源站充足仍转存
 	// 源站，不足才 mpv——与 §59.53 语义一致）。
 	if !noCache {
-		if cached, ok := h.lookupScreenshotCache(clientUID, savePath, name); ok {
+		if cached, ok := h.lookupScreenshotCache(ctx, clientUID, savePath, name); ok {
 			data, _ := json.Marshal(cached)
 			if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", infoHash, siteName).

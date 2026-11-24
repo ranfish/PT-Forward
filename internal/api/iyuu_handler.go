@@ -133,9 +133,9 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
 }
 
-func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
+func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	var configs []model.IYUUConfig
-	if err := h.db.Find(&configs).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Find(&configs).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
 		return
 	}
@@ -167,9 +167,9 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *IYUUHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
+func (h *IYUUHandler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	var cfg model.IYUUConfig
-	if err := h.db.First(&cfg).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg).Error; err != nil {
 		Success(w, map[string]interface{}{
 			"available": false,
 			"domains":   []string{},
@@ -187,7 +187,7 @@ func (h *IYUUHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	var mappings []model.IYUUSiteMapping
-	if err := h.db.Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Find(&mappings).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -225,7 +225,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 	}
 
 	var cfg model.IYUUConfig
-	result := h.db.First(&cfg)
+	result := h.db.WithContext(r.Context()).First(&cfg)
 	switch {
 	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
 		if req.BaseURL != "" {
@@ -266,7 +266,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.CoverageSchedule != "" {
 			cfg.CoverageSchedule = req.CoverageSchedule
 		}
-		if err := h.db.Create(&cfg).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Create(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
 			return
 		}
@@ -314,7 +314,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.CoverageSchedule != "" {
 			cfg.CoverageSchedule = req.CoverageSchedule
 		}
-		if err := h.db.Save(&cfg).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Save(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
 			return
 		}
@@ -342,7 +342,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 	Success(w, map[string]interface{}{"message": "配置已更新"})
 }
 
-func (h *IYUUHandler) handleListSites(w http.ResponseWriter, _ *http.Request) {
+func (h *IYUUHandler) handleListSites(w http.ResponseWriter, r *http.Request) {
 	var mappings []model.IYUUSiteMapping
 	if err := h.db.Order("site_name ASC").Find(&mappings).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "获取站点映射失败")
@@ -405,9 +405,9 @@ func (h *IYUUHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
+func (h *IYUUHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 	var cfg model.IYUUConfig
-	if err := h.db.First(&cfg).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg).Error; err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请先配置 IYUU Token")
 		return
 	}
@@ -470,15 +470,15 @@ type iyuuSupportedTarget struct {
 	IYUUSid int    `json:"iyuu_sid"`
 }
 
-func (h *IYUUHandler) handleSupportedTargets(w http.ResponseWriter, _ *http.Request) {
+func (h *IYUUHandler) handleSupportedTargets(w http.ResponseWriter, r *http.Request) {
 	var mappings []model.IYUUSiteMapping
-	if err := h.db.Where("enabled = ?", true).Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&mappings).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询 IYUU 站点映射失败")
 		return
 	}
 
 	var sites []model.Site
-	if err := h.db.Where("enabled = ? AND is_reseed_target = ?", true, true).Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("enabled = ? AND is_reseed_target = ?", true, true).Find(&sites).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询站点列表失败")
 		return
 	}

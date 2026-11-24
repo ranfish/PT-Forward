@@ -85,7 +85,7 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	q := h.db.Model(&model.SeedingTorrentRecord{}).
+	q := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
 	if clientUID != 0 {
 		q = q.Where("client_uid = ?", clientUID)
@@ -119,7 +119,7 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		Title     string
 	}
 	var titles []seenTitle
-	h.db.Model(&model.RSSTorrentSeen{}).
+	h.db.WithContext(r.Context()).Model(&model.RSSTorrentSeen{}).
 		Select("site_name, torrent_id, title").
 		Find(&titles)
 	titleMap := make(map[string]string, len(titles))
@@ -222,7 +222,7 @@ func (h *SeedingHandler) handlePauseRecord(w http.ResponseWriter, r *http.Reques
 	Success(w, map[string]interface{}{"message": "已暂停"})
 }
 
-func (h *SeedingHandler) handleFreeWaitQueue(w http.ResponseWriter, _ *http.Request) {
+func (h *SeedingHandler) handleFreeWaitQueue(w http.ResponseWriter, r *http.Request) {
 	if h.engine == nil {
 		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
 		return
@@ -232,7 +232,7 @@ func (h *SeedingHandler) handleFreeWaitQueue(w http.ResponseWriter, _ *http.Requ
 }
 
 func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Request) {
-	q := h.db.Model(&model.SeedingTorrentRecord{}).
+	q := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
 
 	if v := r.URL.Query().Get("client_id"); v != "" {
@@ -265,7 +265,7 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 		Title     string
 	}
 	var titles []seenTitle
-	h.db.Model(&model.RSSTorrentSeen{}).
+	h.db.WithContext(r.Context()).Model(&model.RSSTorrentSeen{}).
 		Select("site_name, torrent_id, title").
 		Find(&titles)
 	titleMap := make(map[string]string, len(titles))
@@ -311,9 +311,9 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-func (h *SeedingHandler) handleListClients(w http.ResponseWriter, _ *http.Request) {
+func (h *SeedingHandler) handleListClients(w http.ResponseWriter, r *http.Request) {
 	var configs []model.SeedingClientConfig
-	if err := h.db.Find(&configs).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Find(&configs).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询做种客户端配置失败")
 		return
 	}
@@ -332,7 +332,7 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		size = 50
 	}
 
-	q := h.db.Model(&model.SeedingTorrentRecord{}).
+	q := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Where("status = ?", "deleted")
 
 	if v := r.URL.Query().Get("client_id"); v != "" {
@@ -369,7 +369,7 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		Title     string
 	}
 	var titles []seenTitle
-	h.db.Model(&model.RSSTorrentSeen{}).
+	h.db.WithContext(r.Context()).Model(&model.RSSTorrentSeen{}).
 		Select("site_name, torrent_id, title").
 		Find(&titles)
 	titleMap := make(map[string]string, len(titles))
@@ -390,7 +390,7 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		for i, r := range records {
 			hashes[i] = r.InfoHash
 		}
-		h.db.Model(&model.TorrentTraffic{}).
+		h.db.WithContext(r.Context()).Model(&model.TorrentTraffic{}).
 			Select("info_hash, uploaded, downloaded, ratio, upload_speed").
 			Where("info_hash IN ?", hashes).
 			Find(&traffics)

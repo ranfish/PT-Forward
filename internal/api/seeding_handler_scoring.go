@@ -58,7 +58,7 @@ func (h *SeedingHandler) handleScoringDryrun(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Request) {
+func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, r *http.Request) {
 	activeCount := 0
 	pausedCount := 0
 	realSeeding := 0
@@ -74,7 +74,7 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 	}
 
 	var total int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Where("client_uid IN (SELECT id FROM clients WHERE role = 'seeding')").
 		Count(&total).Error; err != nil {
 		h.logger.Warn("engine status: query total count failed", zap.Error(err))

@@ -129,7 +129,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	light := parseBoolQuery(r, "light", false) // §59.559 PR-D
 	roleFilter := r.URL.Query().Get("role")
 
-	query := h.db.Model(&model.ClientConfig{})
+	query := h.db.WithContext(r.Context()).Model(&model.ClientConfig{})
 	if roleFilter != "" {
 		query = query.Where("role = ?", roleFilter)
 	}
@@ -145,7 +145,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	items := make([]downloaderResponse, 0, len(clients))
 	for i := range clients {
 		var mappings []model.ClientPathMapping
-		if err := h.db.Where("source_client_id = ? OR reseed_client_id = ?", clients[i].ID, clients[i].ID).Find(&mappings).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("source_client_id = ? OR reseed_client_id = ?", clients[i].ID, clients[i].ID).Find(&mappings).Error; err != nil {
 			h.logger.Error("query path mappings failed", zap.Uint("clientID", clients[i].ID), zap.Error(err))
 			continue
 		}
@@ -213,7 +213,7 @@ func (h *ClientHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var client model.ClientConfig
-	if err := h.db.First(&client, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&client, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			Error(w, http.StatusNotFound, 11001, "下载器不存在")
 			return
@@ -223,7 +223,7 @@ func (h *ClientHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var mappings []model.ClientPathMapping
-	if err := h.db.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Find(&mappings).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询路径映射失败")
 		return
 	}
@@ -270,12 +270,12 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var existing model.ClientConfig
-	if h.db.Where("name = ?", req.Name).First(&existing).Error == nil {
+	if h.db.WithContext(r.Context()).Where("name = ?", req.Name).First(&existing).Error == nil {
 		Error(w, http.StatusConflict, 40900, "下载器名称已存在")
 		return
 	}
 	var existingURL model.ClientConfig
-	if h.db.Where("url = ?", req.URL).First(&existingURL).Error == nil {
+	if h.db.WithContext(r.Context()).Where("url = ?", req.URL).First(&existingURL).Error == nil {
 		Error(w, http.StatusConflict, 40900, "下载器地址已存在（同一地址端口不能添加两次）")
 		return
 	}
@@ -336,7 +336,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var mappings []model.ClientPathMapping
-	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
 		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
 	}
 	Success(w, h.toResponse(&client, mappings))
@@ -355,7 +355,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var client model.ClientConfig
-	if err := h.db.First(&client, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&client, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			Error(w, http.StatusNotFound, 11001, "下载器不存在")
 			return
@@ -422,7 +422,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// url 唯一校验（排除自身，§55.14 地址唯一约束）
 	var dupURL model.ClientConfig
-	if h.db.Where("url = ? AND id != ?", client.URL, client.ID).First(&dupURL).Error == nil {
+	if h.db.WithContext(r.Context()).Where("url = ? AND id != ?", client.URL, client.ID).First(&dupURL).Error == nil {
 		Error(w, http.StatusConflict, 40900, "下载器地址已存在（同一地址端口不能添加两次）")
 		return
 	}
@@ -493,7 +493,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var mappings []model.ClientPathMapping
-	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
 		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
 	}
 	Success(w, h.toResponse(&client, mappings))
@@ -512,7 +512,7 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var client model.ClientConfig
-	if err := h.db.First(&client, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&client, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			Error(w, http.StatusNotFound, 11001, "下载器不存在")
 			return
@@ -578,7 +578,7 @@ func (h *ClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var client model.ClientConfig
-	if err := h.db.First(&client, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&client, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 11001, "下载器不存在")
 		return
 	}
@@ -690,7 +690,7 @@ func (h *ClientHandler) testConnection(ctx context.Context, cfg *model.ClientCon
 
 func (h *ClientHandler) buildClient(ctx context.Context, id uint) (model.DownloaderClient, error) {
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&cfg, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, &model.AppError{Code: 11001, Message: "下载器不存在"}
 		}
@@ -704,7 +704,7 @@ func (h *ClientHandler) buildClient(ctx context.Context, id uint) (model.Downloa
 	}
 
 	var mappings []model.ClientPathMapping
-	if err := h.db.Where("source_client_id = ?", cfg.ID).Find(&mappings).Error; err != nil {
+	if err := h.db.WithContext(ctx).Where("source_client_id = ?", cfg.ID).Find(&mappings).Error; err != nil {
 		return nil, &model.AppError{Code: 11002, Message: "查询路径映射失败"}
 	}
 

@@ -78,7 +78,7 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	offset := (page - 1) * pageSize
 
-	q := h.db.Model(&model.PTGenCache{})
+	q := h.db.WithContext(r.Context()).Model(&model.PTGenCache{})
 	if keyword := r.URL.Query().Get("keyword"); keyword != "" {
 		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(keyword)
 		q = q.Where("query_key LIKE ? OR chinese_title LIKE ?", "%"+escaped+"%", "%"+escaped+"%")

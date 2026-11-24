@@ -64,9 +64,9 @@ func (h *CookieCloudHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
 }
 
-func (h *CookieCloudHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
+func (h *CookieCloudHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg model.CookieCloudConfig
-	err := h.db.First(&cfg).Error
+	err := h.db.WithContext(r.Context()).First(&cfg).Error
 	if err != nil && err == gorm.ErrRecordNotFound {
 		Success(w, map[string]interface{}{
 			"serverUrl":    "",
@@ -114,7 +114,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 	// Note: CookieCloud URL is user-configured (trusted input), skip SSRF validation
 
 	var cfg model.CookieCloudConfig
-	result := h.db.First(&cfg)
+	result := h.db.WithContext(r.Context()).First(&cfg)
 	wasEnabled := result.Error == nil && cfg.SyncEnabled
 	switch {
 	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
@@ -140,7 +140,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		if cfg.SyncInterval <= 0 {
 			cfg.SyncInterval = 60
 		}
-		if err := h.db.Create(&cfg).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Create(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
 			return
 		}
@@ -169,7 +169,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		if req.SyncInterval != nil {
 			cfg.SyncInterval = *req.SyncInterval
 		}
-		if err := h.db.Save(&cfg).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Save(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
 			return
 		}
@@ -177,7 +177,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 
 	if req.SyncEnabled != nil && *req.SyncEnabled && !wasEnabled {
 		// §59.542 追记十: 精确更新（替代 Where("1 = 1")·同类收敛第三处）
-		h.db.Model(&cfg).Update("last_sync_at", nil)
+		h.db.WithContext(r.Context()).Model(&cfg).Update("last_sync_at", nil)
 	}
 
 	h.logger.Info("cookiecloud config updated", zap.String("component", "cookiecloud"))
@@ -202,7 +202,7 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 	offset := (page - 1) * pageSize
 
 	var total int64
-	if err := h.db.Model(&model.CookieCloudSyncHistory{}).Count(&total).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.CookieCloudSyncHistory{}).Count(&total).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -221,7 +221,7 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 
 func (h *CookieCloudHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 	var cfg model.CookieCloudConfig
-	if err := h.db.First(&cfg).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg).Error; err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请先配置 CookieCloud")
 		return
 	}

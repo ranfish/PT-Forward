@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *SeedingHandler) handleStats(w http.ResponseWriter, _ *http.Request) {
+func (h *SeedingHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 	activeCount := 0
 	var managedCounts *seeding.ManagedCounts
 	if h.engine != nil {
@@ -29,7 +29,7 @@ func (h *SeedingHandler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Request) {
+func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, r *http.Request) {
 	activeTorrents := 0
 	pausedTorrents := 0
 	realSeeding := 0
@@ -45,18 +45,18 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 	}
 
 	var total int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Count(&total).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).Count(&total).Error; err != nil {
 		h.logger.Warn("stats overview: query total count failed", zap.Error(err))
 	}
 
 	today := time.Now().Truncate(24 * time.Hour)
 	var todayAdded int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("created_at >= ?", today).Count(&todayAdded).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).Where("created_at >= ?", today).Count(&todayAdded).Error; err != nil {
 		h.logger.Warn("stats overview: query today added count failed", zap.Error(err))
 	}
 
 	var todayDeleted int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ? AND updated_at >= ?", "deleted", today).Count(&todayDeleted).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).Where("status = ? AND updated_at >= ?", "deleted", today).Count(&todayDeleted).Error; err != nil {
 		h.logger.Warn("stats overview: query today deleted count failed", zap.Error(err))
 	}
 
@@ -123,7 +123,7 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 	}
 
 	var stats []siteStat
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Select(`site_name,
 			SUM(CASE WHEN status IN ('seeding','pending','paused_free_end','paused_rule') THEN 1 ELSE 0 END) as seeding_count,
 			COUNT(*) as total_count,
@@ -218,7 +218,7 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 		dayEnd := dayStart.AddDate(0, 0, 1)
 
 		var count int64
-		if err := h.db.Model(&model.SeedingTorrentRecord{}).
+		if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 			Where("site_name = ? AND created_at >= ? AND created_at < ?", site, dayStart, dayEnd).
 			Count(&count).Error; err != nil {
 			h.logger.Warn("site trend: query count failed", zap.Error(err))
@@ -242,7 +242,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	offset := (page - 1) * pageSize
 
 	status := r.URL.Query().Get("status")
-	q := h.db.Model(&model.SeedingTorrentRecord{}).
+	q := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
 	if status != "" {
 		q = q.Where("status = ?", status)
@@ -371,7 +371,7 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 	rangeEnd := now.Truncate(time.Hour).Add(time.Hour)
 
 	var snapshots []model.DownloaderSpeedSnapshot
-	if err := h.db.Where("client_uid = ? AND recorded_at >= ? AND recorded_at < ?", clientUID, rangeStart, rangeEnd).
+	if err := h.db.WithContext(r.Context()).Where("client_uid = ? AND recorded_at >= ? AND recorded_at < ?", clientUID, rangeStart, rangeEnd).
 		Order("recorded_at ASC").Find(&snapshots).Error; err != nil {
 		h.logger.Warn("query speed snapshots failed",
 			zap.Uint("client_uid", clientUID),

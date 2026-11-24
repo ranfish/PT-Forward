@@ -52,7 +52,7 @@ func (h *SchedulerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *SchedulerHandler) handleList(w http.ResponseWriter, _ *http.Request) {
+func (h *SchedulerHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	tasks := h.registry.List()
 	Success(w, map[string]interface{}{
 		"items": tasks,
@@ -60,7 +60,7 @@ func (h *SchedulerHandler) handleList(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *SchedulerHandler) handleGet(w http.ResponseWriter, _ *http.Request, name string) {
+func (h *SchedulerHandler) handleGet(w http.ResponseWriter, r *http.Request, name string) {
 	if name == "" {
 		Error(w, http.StatusBadRequest, 40001, "任务名称不能为空")
 		return
@@ -73,7 +73,7 @@ func (h *SchedulerHandler) handleGet(w http.ResponseWriter, _ *http.Request, nam
 	Success(w, task)
 }
 
-func (h *SchedulerHandler) handlePause(w http.ResponseWriter, _ *http.Request, name string) {
+func (h *SchedulerHandler) handlePause(w http.ResponseWriter, r *http.Request, name string) {
 	if name == "" {
 		Error(w, http.StatusBadRequest, 40001, "任务名称不能为空")
 		return
@@ -85,7 +85,7 @@ func (h *SchedulerHandler) handlePause(w http.ResponseWriter, _ *http.Request, n
 	Success(w, map[string]interface{}{"paused": true, "name": name})
 }
 
-func (h *SchedulerHandler) handleResume(w http.ResponseWriter, _ *http.Request, name string) {
+func (h *SchedulerHandler) handleResume(w http.ResponseWriter, r *http.Request, name string) {
 	if name == "" {
 		Error(w, http.StatusBadRequest, 40001, "任务名称不能为空")
 		return

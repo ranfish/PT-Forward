@@ -96,7 +96,7 @@ func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Reque
 	switch r.Method {
 	case http.MethodGet:
 		var s setting.Setting
-		h.db.Where("`key` = ?", "encryption_key").First(&s)
+		h.db.WithContext(r.Context()).Where("`key` = ?", "encryption_key").First(&s)
 		Success(w, map[string]interface{}{"key": s.Value})
 	case http.MethodPost:
 		var req struct {
@@ -110,7 +110,7 @@ func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		s := setting.Setting{Key: "encryption_key", Value: req.Key}
-		if err := h.db.Save(&s).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Save(&s).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50001, "保存失败")
 			return
 		}
@@ -121,14 +121,14 @@ func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *SystemHandler) handlePing(w http.ResponseWriter, _ *http.Request) {
+func (h *SystemHandler) handlePing(w http.ResponseWriter, r *http.Request) {
 	Success(w, map[string]interface{}{
 		"status":    "ok",
 		"timestamp": time.Now().Unix(),
 	})
 }
 
-func (h *SystemHandler) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (h *SystemHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	dbOK := true
 	sqlDB, err := h.db.DB()
 	if err != nil {
@@ -151,14 +151,14 @@ func (h *SystemHandler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *SystemHandler) handleInfo(w http.ResponseWriter, _ *http.Request) {
+func (h *SystemHandler) handleInfo(w http.ResponseWriter, r *http.Request) {
 	connectedClients := 0
 	if h.clientMgr != nil {
 		connectedClients = h.clientMgr.ConnectedCount()
 	}
 
 	var rssCount int64
-	if err := h.db.Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
 		h.logger.Warn("query rss subscription count failed", zap.Error(err))
 	}
 

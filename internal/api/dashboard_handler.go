@@ -67,9 +67,9 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request) {
+func (h *DashboardHandler) handleOverview(w http.ResponseWriter, r *http.Request) {
 	var rssCount int64
-	if err := h.db.Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
 		h.logger.Warn("dashboard: query rss count failed", zap.Error(err))
 	}
 
@@ -87,48 +87,48 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 	}
 
 	var reseedActive int64
-	if err := h.db.Model(&model.ReseedTask{}).Where("enabled = ?", true).Count(&reseedActive).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.ReseedTask{}).Where("enabled = ?", true).Count(&reseedActive).Error; err != nil {
 		h.logger.Warn("dashboard: query reseed active count failed", zap.Error(err))
 	}
 
 	var publishPending int64
-	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "pending").Count(&publishPending).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).Where("publish_status = ?", "pending").Count(&publishPending).Error; err != nil {
 		h.logger.Warn("dashboard: query publish pending count failed", zap.Error(err))
 	}
 
 	var publishToday int64
 	today := time.Now().Truncate(24 * time.Hour)
-	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ? AND updated_at >= ?", "done", today).Count(&publishToday).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).Where("publish_status = ? AND updated_at >= ?", "done", today).Count(&publishToday).Error; err != nil {
 		h.logger.Warn("dashboard: query publish today count failed", zap.Error(err))
 	}
 
 	var publishTotal int64
-	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "done").Count(&publishTotal).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).Where("publish_status = ?", "done").Count(&publishTotal).Error; err != nil {
 		h.logger.Warn("dashboard: query publish total count failed", zap.Error(err))
 	}
 
 	var reseedToday int64
-	if err := h.db.Model(&model.ReseedMatch{}).Where("status = ? AND injected_at >= ?", "injected", today).Count(&reseedToday).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.ReseedMatch{}).Where("status = ? AND injected_at >= ?", "injected", today).Count(&reseedToday).Error; err != nil {
 		h.logger.Warn("dashboard: query reseed today count failed", zap.Error(err))
 	}
 
 	var reseedTotal int64
-	if err := h.db.Model(&model.ReseedMatch{}).Where("status = ?", "injected").Count(&reseedTotal).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.ReseedMatch{}).Where("status = ?", "injected").Count(&reseedTotal).Error; err != nil {
 		h.logger.Warn("dashboard: query reseed total count failed", zap.Error(err))
 	}
 
 	var siteTotal int64
-	if err := h.db.Model(&model.Site{}).Count(&siteTotal).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).Count(&siteTotal).Error; err != nil {
 		h.logger.Warn("dashboard: query site total count failed", zap.Error(err))
 	}
 
 	var siteOnline int64
-	if err := h.db.Model(&model.Site{}).Where("enabled = ?", true).Count(&siteOnline).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).Where("enabled = ?", true).Count(&siteOnline).Error; err != nil {
 		h.logger.Warn("dashboard: query site online count failed", zap.Error(err))
 	}
 
 	var clientConfigs []model.ClientConfig
-	if err := h.db.Where("enabled = ?", true).Find(&clientConfigs).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&clientConfigs).Error; err != nil {
 		h.logger.Warn("dashboard: query client configs failed", zap.Error(err))
 	}
 
@@ -193,7 +193,7 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 	}
 
 	var total int64
-	if err := h.db.Model(&model.RSSTorrentSeen{}).Count(&total).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.RSSTorrentSeen{}).Count(&total).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -210,7 +210,7 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 		InfoHash  string
 	}
 	var seedingHashes []seedingHash
-	h.db.Model(&model.SeedingTorrentRecord{}).
+	h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).
 		Select("site_name, torrent_id, info_hash").
 		Find(&seedingHashes)
 
@@ -288,7 +288,7 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var eventCounts []dayCount
-	if err := h.db.Model(&model.TorrentEvent{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.TorrentEvent{}).
 		Select("DATE(created_at) as date, COUNT(*) as count").
 		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
 		Group("DATE(created_at)").Find(&eventCounts).Error; err != nil {
@@ -296,7 +296,7 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var seenCounts []dayCount
-	if err := h.db.Model(&model.RSSTorrentSeen{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.RSSTorrentSeen{}).
 		Select("DATE(created_at) as date, COUNT(*) as count").
 		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
 		Group("DATE(created_at)").Find(&seenCounts).Error; err != nil {
@@ -304,7 +304,7 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var publishCounts []dayCount
-	if err := h.db.Model(&model.PublishCandidate{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).
 		Select("DATE(updated_at) as date, COUNT(*) as count").
 		Where("updated_at >= ? AND updated_at < ? AND publish_status = ?", dayStart, dayEnd, "done").
 		Group("DATE(updated_at)").Find(&publishCounts).Error; err != nil {
@@ -312,7 +312,7 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var reseedCounts []dayCount
-	if err := h.db.Model(&model.ReseedMatch{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.ReseedMatch{}).
 		Select("DATE(injected_at) as date, COUNT(*) as count").
 		Where("injected_at >= ? AND injected_at < ?", dayStart, dayEnd).
 		Group("DATE(injected_at)").Find(&reseedCounts).Error; err != nil {
@@ -365,7 +365,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 		var events []model.TorrentEvent
 		var total int64
 
-		q := h.db.Model(&model.TorrentEvent{})
+		q := h.db.WithContext(r.Context()).Model(&model.TorrentEvent{})
 		if site := r.URL.Query().Get("site"); site != "" {
 			q = q.Where("site_name = ?", site)
 		}
@@ -398,7 +398,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 			return
 		}
 		before := time.Now().AddDate(0, 0, -30)
-		result := h.db.Where("created_at < ?", before).Delete(&model.TorrentEvent{})
+		result := h.db.WithContext(r.Context()).Where("created_at < ?", before).Delete(&model.TorrentEvent{})
 		if result.Error != nil {
 			Error(w, http.StatusInternalServerError, 50000, "清理事件失败")
 			return
@@ -415,7 +415,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 	}
 
 	var event model.TorrentEvent
-	if err := h.db.First(&event, remaining).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&event, remaining).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "事件不存在")
 		return
 	}
@@ -648,22 +648,22 @@ func (h *DashboardHandler) handleTaskAction(w http.ResponseWriter, r *http.Reque
 	switch req.Kind {
 	case "download_task":
 		var task model.DownloadTask
-		if err := h.db.Where("id = ?", req.ID).First(&task).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("id = ?", req.ID).First(&task).Error; err != nil {
 			Error(w, http.StatusNotFound, 40400, "任务不存在")
 			return
 		}
 		if req.Action == "finish" {
-			h.db.Model(&task).Updates(map[string]interface{}{"status": "completed"})
+			h.db.WithContext(r.Context()).Model(&task).Updates(map[string]interface{}{"status": "completed"})
 		}
 		Success(w, map[string]interface{}{"success": true})
 	case "publish_candidate":
 		var candidate model.PublishCandidate
-		if err := h.db.Where("id = ?", req.ID).First(&candidate).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("id = ?", req.ID).First(&candidate).Error; err != nil {
 			Error(w, http.StatusNotFound, 40400, "任务不存在")
 			return
 		}
 		if req.Action == "finish" {
-			h.db.Model(&candidate).Updates(map[string]interface{}{"publish_status": "done", "skip_reason": "manual_finish"})
+			h.db.WithContext(r.Context()).Model(&candidate).Updates(map[string]interface{}{"publish_status": "done", "skip_reason": "manual_finish"})
 		}
 		Success(w, map[string]interface{}{"success": true})
 	default:

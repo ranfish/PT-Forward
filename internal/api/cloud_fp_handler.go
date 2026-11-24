@@ -54,9 +54,9 @@ func (h *CloudFPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *CloudFPHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
+func (h *CloudFPHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg model.CloudFPConfig
-	if err := h.db.First(&cfg, 1).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, 1).Error; err != nil {
 		cfg = model.CloudFPConfig{ID: 1, RequestTimeoutSec: 10}
 	}
 	cfg.APIToken = maskCloudFPToken(cfg.APIToken)
@@ -74,11 +74,11 @@ func (h *CloudFPHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	}
 	if input.APIToken == "***" {
 		var existing model.CloudFPConfig
-		if err := h.db.First(&existing, 1).Error; err == nil {
+		if err := h.db.WithContext(r.Context()).First(&existing, 1).Error; err == nil {
 			input.APIToken = existing.APIToken
 		}
 	}
-	if err := h.db.Save(&input).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Save(&input).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50001, "保存配置失败")
 		return
 	}
@@ -88,7 +88,7 @@ func (h *CloudFPHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 
 func (h *CloudFPHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 	var cfg model.CloudFPConfig
-	if err := h.db.First(&cfg, 1).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, 1).Error; err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请先保存配置")
 		return
 	}
@@ -126,9 +126,9 @@ func (h *CloudFPHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 	Success(w, map[string]interface{}{"status": "ok"})
 }
 
-func (h *CloudFPHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
+func (h *CloudFPHandler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	var cfg model.CloudFPConfig
-	if err := h.db.First(&cfg, 1).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, 1).Error; err != nil {
 		Success(w, map[string]interface{}{"configured": false, "enabled": false})
 		return
 	}

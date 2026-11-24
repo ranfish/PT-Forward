@@ -101,9 +101,9 @@ func (h *LifecycleHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Req
 	Success(w, req)
 }
 
-func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, _ *http.Request) {
+func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, r *http.Request) {
 	var activePublishes int64
-	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "publishing").Count(&activePublishes).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).Where("publish_status = ?", "publishing").Count(&activePublishes).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -177,7 +177,7 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 
 func (h *LifecycleHandler) getSetting(r *http.Request, key string) (string, error) {
 	var s setting.Setting
-	err := h.db.Where("key = ?", key).First(&s).Error
+	err := h.db.WithContext(r.Context()).Where("key = ?", key).First(&s).Error
 	return s.Value, err
 }
 

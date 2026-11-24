@@ -26,7 +26,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	clientIDStr := r.URL.Query().Get("client_id")
 	if clientIDStr == "" {
 		var clients []model.ClientConfig
-		if err := h.db.Where("enabled = ?", true).Find(&clients).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&clients).Error; err != nil {
 			h.logger.Warn("query failed", zap.Error(err))
 		}
 
@@ -44,7 +44,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, clientUID).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, clientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
@@ -72,7 +72,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	trackerMatcher := site.NewTrackerMatcher(h.db)
 
 	var totalSites int64
-	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -362,7 +362,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, req.ClientUID).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, req.ClientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
@@ -431,7 +431,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	cached, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)
 
 	var totalSites int64
-	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).Where("enabled = ? AND is_reseed_target = ?", true, true).Count(&totalSites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -470,7 +470,7 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, req.ClientUID).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, req.ClientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
@@ -672,7 +672,7 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 		for name := range siteMap {
 			siteNames = append(siteNames, name)
 		}
-		if err := h.db.Where("name IN ?", siteNames).Find(&sites).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("name IN ?", siteNames).Find(&sites).Error; err != nil {
 			h.logger.Warn("query failed", zap.Error(err))
 		}
 
@@ -920,7 +920,7 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 		SiteName:   req.SiteName,
 		IsOfficial: req.IsOfficial,
 	}
-	if err := h.db.Create(&mapping).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Create(&mapping).Error; err != nil {
 		// §59.564 刀B: 5xx 业务日志
 		h.logger.Error("create group mapping failed", zap.String("op", "create_group_mapping"), zap.String("group_name", req.GroupName), zap.String("domain", req.Domain), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "创建失败，请查看服务端日志")
@@ -951,7 +951,7 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-	if err := h.db.Model(&model.ReleaseGroupMapping{}).Where("id = ?", id).Updates(map[string]interface{}{
+	if err := h.db.WithContext(r.Context()).Model(&model.ReleaseGroupMapping{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"group_name":  req.GroupName,
 		"domain":      req.Domain,
 		"site_name":   req.SiteName,
@@ -987,7 +987,7 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 		return
 	}
 
-	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
 		// §59.564 刀B: 5xx 业务日志
 		h.logger.Error("delete group mapping failed", zap.String("op", "delete_group_mapping"), zap.Uint64("id", id), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "删除失败，请查看服务端日志")
@@ -1005,7 +1005,7 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 		h.db.WithContext(r.Context()).Model(&model.ReleaseGroupMapping{}).
 			Where("site_name = ?", mapping.SiteName).Count(&remaining)
 		if remaining == 0 {
-			result := h.db.Model(&model.Site{}).
+			result := h.db.WithContext(r.Context()).Model(&model.Site{}).
 				Where("name = ? AND is_source = ?", mapping.SiteName, true).
 				Update("is_source", false)
 			if result.RowsAffected > 0 {
@@ -1050,14 +1050,14 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 
 	// 查目标站是否启用
 	var targetSite model.Site
-	if err := h.db.Where("name = ? AND enabled = ?", req.TargetSite, true).First(&targetSite).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("name = ? AND enabled = ?", req.TargetSite, true).First(&targetSite).Error; err != nil {
 		Error(w, http.StatusBadRequest, 40001, "目标站点不存在或未启用")
 		return
 	}
 
 	// 查排除规则
 	var exclusions []model.PublishExclusion
-	if err := h.db.Find(&exclusions).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Find(&exclusions).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
@@ -1097,7 +1097,7 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 			DownloadCompleted: true,
 			Role:              "manual",
 		}
-		if err := h.db.Create(candidate).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Create(candidate).Error; err != nil {
 			h.logger.Warn("batch publish: create candidate failed",
 				zap.String("hash", item.InfoHash[:8]),
 				zap.Error(err))

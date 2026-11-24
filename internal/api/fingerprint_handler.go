@@ -68,7 +68,7 @@ func (h *FingerprintHandler) handleList(w http.ResponseWriter, r *http.Request) 
 	page, pageSize := parsePagination(r) // §59.552 统一（100→200 有意放宽）
 	offset := (page - 1) * pageSize
 
-	q := h.db.Model(&model.ContentFingerprint{})
+	q := h.db.WithContext(r.Context()).Model(&model.ContentFingerprint{})
 	if siteName := r.URL.Query().Get("siteName"); siteName != "" {
 		q = q.Where("site_name = ?", siteName)
 	}
@@ -94,7 +94,7 @@ func (h *FingerprintHandler) handleList(w http.ResponseWriter, r *http.Request) 
 
 func (h *FingerprintHandler) handleGet(w http.ResponseWriter, r *http.Request, id uint) {
 	var fp model.ContentFingerprint
-	if err := h.db.First(&fp, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&fp, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "指纹不存在")
 		return
 	}
@@ -107,7 +107,7 @@ func (h *FingerprintHandler) handleSearch(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	q := h.db.Model(&model.ContentFingerprint{})
+	q := h.db.WithContext(r.Context()).Model(&model.ContentFingerprint{})
 	if infoHash := r.URL.Query().Get("infoHash"); infoHash != "" {
 		q = q.Where("info_hash = ?", infoHash)
 	} else if piecesHash := r.URL.Query().Get("piecesHash"); piecesHash != "" {
@@ -130,7 +130,7 @@ func (h *FingerprintHandler) handleSearch(w http.ResponseWriter, r *http.Request
 }
 
 func (h *FingerprintHandler) handleDelete(w http.ResponseWriter, r *http.Request, id uint) {
-	if err := h.db.Delete(&model.ContentFingerprint{}, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Delete(&model.ContentFingerprint{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除指纹失败")
 		return
 	}
@@ -138,7 +138,7 @@ func (h *FingerprintHandler) handleDelete(w http.ResponseWriter, r *http.Request
 }
 
 func (h *FingerprintHandler) handleDeleteCache(w http.ResponseWriter, r *http.Request) {
-	result := h.db.Where("1 = 1").Delete(&model.SearchCache{})
+	result := h.db.WithContext(r.Context()).Where("1 = 1").Delete(&model.SearchCache{})
 	if result.Error != nil {
 		Error(w, http.StatusInternalServerError, 50000, "清理缓存失败")
 		return

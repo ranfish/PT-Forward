@@ -183,12 +183,12 @@ func upsertClusterScreenshotCache(db *gorm.DB, logger *zap.Logger, ttlDays int, 
 
 // lookupScreenshotCache §59.63: 观察期判定（惰性，Q5——无后台扫描，获取事件时判）。
 // 命中且 updated_at + ttlDays > now → 返回缓存链接；否则 miss。
-func (h *PublishTorrentsHandler) lookupScreenshotCache(clientUID uint, savePath, name string) ([]string, bool) {
+func (h *PublishTorrentsHandler) lookupScreenshotCache(ctx context.Context, clientUID uint, savePath, name string) ([]string, bool) {
 	if h.db == nil || h.screenshotCacheDays <= 0 {
 		return nil, false
 	}
 	var row model.ClusterScreenshotCache
-	if err := h.db.Where("client_uid = ? AND save_path = ? AND name = ?", clientUID, savePath, name).
+	if err := h.db.WithContext(ctx).Where("client_uid = ? AND save_path = ? AND name = ?", clientUID, savePath, name).
 		First(&row).Error; err != nil {
 		return nil, false
 	}

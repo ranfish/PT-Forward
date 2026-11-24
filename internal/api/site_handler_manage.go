@@ -36,7 +36,7 @@ func (h *SiteHandler) handleOverrides(w http.ResponseWriter, r *http.Request, id
 	}
 }
 
-func (h *SiteHandler) handleListOverrides(w http.ResponseWriter, _ *http.Request, siteName string) {
+func (h *SiteHandler) handleListOverrides(w http.ResponseWriter, r *http.Request, siteName string) {
 	var overrides []model.SiteConfigOverride
 	if err := h.repo.DB().Where("site_name = ?", siteName).Find(&overrides).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "获取站点配置覆盖失败")
@@ -124,7 +124,7 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 		freezeMap := httpclient.GlobalLimiter.GetDomainStatuses()
 
 		var sites []model.Site
-		h.db.Where("enabled = ?", true).Find(&sites)
+		h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites)
 
 		type freezeRow struct {
 			Name   string `json:"name"`
@@ -169,7 +169,7 @@ func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request
 		}
 
 		var sites []model.Site
-		h.db.Where("enabled = ?", true).Find(&sites)
+		h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites)
 
 		type circuitRow struct {
 			Name     string `json:"name"`

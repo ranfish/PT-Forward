@@ -25,7 +25,7 @@ func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	isSource := q.Get("isSource")
 	isTarget := q.Get("isTarget")
 
-	query := h.db.Model(&model.Site{})
+	query := h.db.WithContext(r.Context()).Model(&model.Site{})
 	if search != "" {
 		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(search)
 		like := "%" + escaped + "%"
@@ -673,7 +673,7 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 	noRedirectClient := &http.Client{
 		Timeout:   client.Timeout,
 		Transport: client.Transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		CheckRedirect: func(r *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse // 不跟随重定向
 		},
 	}
@@ -867,7 +867,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	noRedirectClient := &http.Client{
 		Timeout:   client.Timeout,
 		Transport: client.Transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		CheckRedirect: func(r *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}

@@ -140,7 +140,7 @@ func (h *FilterHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	page, size := parsePagination(r)
 
 	var total int64
-	h.db.Model(&model.FilterRule{}).
+	h.db.WithContext(r.Context()).Model(&model.FilterRule{}).
 		Count(&total)
 
 	var rules []model.FilterRule

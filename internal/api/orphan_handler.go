@@ -85,7 +85,7 @@ func (h *OrphanHandler) handleScan(w http.ResponseWriter, r *http.Request) {
 	var ignoredPaths []string
 	if h.db != nil {
 		var settings []setting.Setting
-		h.db.Where("key = ?", "orphan_ignored_path").Find(&settings)
+		h.db.WithContext(r.Context()).Where("key = ?", "orphan_ignored_path").Find(&settings)
 		for _, s := range settings {
 			ignoredPaths = append(ignoredPaths, s.Value)
 		}
@@ -229,7 +229,7 @@ func (h *OrphanHandler) handleIgnore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).
+	h.db.WithContext(r.Context()).Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).
 		FirstOrCreate(&setting.Setting{Key: "orphan_ignored_path", Value: req.Path})
 
 	h.mu.Lock()
@@ -319,7 +319,7 @@ func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *OrphanHandler) handleListIgnored(w http.ResponseWriter, r *http.Request) {
 	var settings []setting.Setting
-	h.db.Where("key = ?", "orphan_ignored_path").Find(&settings)
+	h.db.WithContext(r.Context()).Where("key = ?", "orphan_ignored_path").Find(&settings)
 	var paths []string
 	for _, s := range settings {
 		paths = append(paths, s.Value)
@@ -346,13 +346,13 @@ func (h *OrphanHandler) handleUnignore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", path).Delete(&setting.Setting{})
+	h.db.WithContext(r.Context()).Where("key = ? AND value = ?", "orphan_ignored_path", path).Delete(&setting.Setting{})
 	Success(w, map[string]interface{}{"unignored": true})
 }
 
 func (h *OrphanHandler) handleListScanConfigs(w http.ResponseWriter, r *http.Request) {
 	var configs []model.OrphanScanConfig
-	h.db.Find(&configs)
+	h.db.WithContext(r.Context()).Find(&configs)
 	Success(w, configs)
 }
 
@@ -375,13 +375,13 @@ func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Reque
 		ScanPath:  req.ScanPath,
 		Enabled:   req.Enabled,
 	}
-	if err := h.db.Where("client_uid = ? AND scan_path = ?", req.ClientUID, req.ScanPath).
+	if err := h.db.WithContext(r.Context()).Where("client_uid = ? AND scan_path = ?", req.ClientUID, req.ScanPath).
 		FirstOrCreate(&cfg).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50001, "保存失败")
 		return
 	}
 	if !cfg.Enabled && req.Enabled {
-		h.db.Model(&cfg).Update("enabled", true)
+		h.db.WithContext(r.Context()).Model(&cfg).Update("enabled", true)
 	}
 	Success(w, cfg)
 }
@@ -397,6 +397,6 @@ func (h *OrphanHandler) handleDeleteScanConfig(w http.ResponseWriter, r *http.Re
 		Error(w, http.StatusBadRequest, 40001, "无效的 id")
 		return
 	}
-	h.db.Delete(&model.OrphanScanConfig{}, id)
+	h.db.WithContext(r.Context()).Delete(&model.OrphanScanConfig{}, id)
 	Success(w, map[string]interface{}{"deleted": true})
 }

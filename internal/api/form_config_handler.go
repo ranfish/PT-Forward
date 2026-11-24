@@ -161,9 +161,9 @@ func (h *FormConfigHandler) loadSite(ctx context.Context, name string) (*model.S
 
 // handleTargets §59.156 切片 3.5: 可发布目标站列表（publish_form_config enabled 的站）。
 // 选站发布入口数据源——只回名字+预检能力，轻量。
-func (h *FormConfigHandler) handleTargets(w http.ResponseWriter, _ *http.Request) {
+func (h *FormConfigHandler) handleTargets(w http.ResponseWriter, r *http.Request) {
 	var sites []model.Site
-	if err := h.db.Find(&sites).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Find(&sites).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 500, err.Error())
 		return
 	}

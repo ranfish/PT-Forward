@@ -87,7 +87,7 @@ func (h *DeleteRuleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *DeleteRuleHandler) handleList(w http.ResponseWriter, _ *http.Request) {
+func (h *DeleteRuleHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	var rules []model.DeleteRule
 	if err := h.db.Order("priority ASC, id ASC").Find(&rules).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询删种规则失败")
@@ -99,9 +99,9 @@ func (h *DeleteRuleHandler) handleList(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *DeleteRuleHandler) handleGet(w http.ResponseWriter, _ *http.Request, id uint) {
+func (h *DeleteRuleHandler) handleGet(w http.ResponseWriter, r *http.Request, id uint) {
 	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&rule, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "规则不存在")
 		return
 	}
@@ -187,7 +187,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 
 func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id uint) {
 	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&rule, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "规则不存在")
 		return
 	}
@@ -260,17 +260,17 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 	}
 	updates["updated_at"] = time.Now()
 
-	if err := h.db.Model(&rule).Updates(updates).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&rule).Updates(updates).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新规则失败")
 		return
 	}
-	h.db.First(&rule, id)
+	h.db.WithContext(r.Context()).First(&rule, id)
 	auditLog(r, "delete_rule", "update", "rule", fmt.Sprintf("%d", id), rule.Alias, "success")
 	Success(w, rule)
 }
 
 func (h *DeleteRuleHandler) handleDelete(w http.ResponseWriter, r *http.Request, id uint) {
-	if err := h.db.Delete(&model.DeleteRule{}, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Delete(&model.DeleteRule{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除规则失败")
 		return
 	}
@@ -280,13 +280,13 @@ func (h *DeleteRuleHandler) handleDelete(w http.ResponseWriter, r *http.Request,
 
 func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Request, id uint) {
 	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&rule, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "规则不存在")
 		return
 	}
 
 	var records []model.SeedingTorrentRecord
-	if err := h.db.Where("status = ?", "seeding").Limit(100).Find(&records).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("status = ?", "seeding").Limit(100).Find(&records).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询活跃种子失败")
 		return
 	}
@@ -412,7 +412,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 
 func (h *DeleteRuleHandler) handleTestRuleDryrun(w http.ResponseWriter, r *http.Request, id uint) {
 	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&rule, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "规则不存在")
 		return
 	}

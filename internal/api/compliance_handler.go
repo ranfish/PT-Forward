@@ -48,7 +48,7 @@ func (h *ComplianceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *ComplianceHandler) handleList(w http.ResponseWriter, _ *http.Request) {
+func (h *ComplianceHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	var rules []model.ComplianceRule
 	if err := h.db.Order("rule_type, source DESC, created_at").Find(&rules).Error; err != nil {
 		h.logger.Error("list compliance rules", zap.Error(err))
@@ -97,7 +97,7 @@ func (h *ComplianceHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Scope:    req.Scope,
 		Source:   "user",
 	}
-	if err := h.db.Create(&rule).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Create(&rule).Error; err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			Error(w, http.StatusConflict, 40900, "rule already exists")
 			return
@@ -128,7 +128,7 @@ func (h *ComplianceHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 	id = uint(parsed)
 
 	var rule model.ComplianceRule
-	if err := h.db.First(&rule, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&rule, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(w, http.StatusNotFound, 40400, "rule not found")
 			return
@@ -141,7 +141,7 @@ func (h *ComplianceHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 		Error(w, http.StatusForbidden, 40300, "builtin rule cannot be deleted")
 		return
 	}
-	if err := h.db.Delete(&rule).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Delete(&rule).Error; err != nil {
 		h.logger.Error("delete compliance rule", zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "db error")
 		return

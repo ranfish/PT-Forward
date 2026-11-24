@@ -320,7 +320,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			// （PT31 实锤：Tab5 获取"成功"仅表单内存，DB 恒空）。与手动截图
 			// §59.169 行为对齐。
 			if miStr, isStr := mi.(string); isStr && miStr != "" && req.InfoHash != "" && h.db != nil {
-				q := h.db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
+				q := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
 				if req.SiteName != "" {
 					q = q.Where("site_name = ?", req.SiteName)
 				}
@@ -569,7 +569,9 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		// 落库（事实源：编辑器重新打开从 detail 读到）
 		if len(shots) > 0 && req.InfoHash != "" && h.db != nil {
 			data, _ := json.Marshal(shots)
-			q := h.db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
+			// §59.566 刀1: 截图落库用任务 ctx（闭包内 15min 任务 ctx 在域——
+			// persist 先于 defer cancel·生命周期正确）
+			q := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
 			if req.SiteName != "" {
 				q = q.Where("site_name = ?", req.SiteName)
 			}

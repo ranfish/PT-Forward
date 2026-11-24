@@ -424,7 +424,7 @@ func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	page, size := parsePagination(r)
 
 	var total int64
-	h.db.Model(&model.RSSSubscription{}).
+	h.db.WithContext(r.Context()).Model(&model.RSSSubscription{}).
 		Count(&total)
 
 	var subs []model.RSSSubscription
@@ -526,7 +526,7 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var site model.Site
-	if err := h.db.Where("name = ? OR domain = ?", req.SiteName, req.SiteName).First(&site).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("name = ? OR domain = ?", req.SiteName, req.SiteName).First(&site).Error; err != nil {
 		Error(w, http.StatusBadRequest, 13001, "关联站点不存在，请先创建站点")
 		return
 	}

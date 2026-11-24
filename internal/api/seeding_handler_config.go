@@ -15,7 +15,7 @@ import (
 func (h *SeedingHandler) handleListConfigs(w http.ResponseWriter, r *http.Request) {
 	var configs []model.SeedingClientConfig
 	// §59.13: 统一表后必须过滤 role=seeding，否则 download 配置也会出现在 /seeding 页面
-	if err := h.db.Where("role = ? OR role = ?", "seeding", "").Find(&configs).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("role = ? OR role = ?", "seeding", "").Find(&configs).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
@@ -25,9 +25,9 @@ func (h *SeedingHandler) handleListConfigs(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *SeedingHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request, id uint) {
+func (h *SeedingHandler) handleGetConfig(w http.ResponseWriter, r *http.Request, id uint) {
 	var config model.SeedingClientConfig
-	if err := h.db.First(&config, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&config, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "配置不存在")
 		return
 	}
@@ -77,7 +77,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 	// §55.14 role 校验：/seeding 只接 role=seeding
 	var seedClient model.ClientConfig
-	if h.db.Where("id = ?", req.ClientUID).First(&seedClient).Error == nil {
+	if h.db.WithContext(r.Context()).Where("id = ?", req.ClientUID).First(&seedClient).Error == nil {
 		if seedClient.Role != "seeding" {
 			Error(w, http.StatusBadRequest, 40001, "刷流管理只接受刷流专用(role=seeding)下载器，普通下载器请到下载管理添加")
 			return
@@ -85,7 +85,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	var count int64
-	if err := h.db.Model(&model.SeedingClientConfig{}).Where("client_uid = ?", req.ClientUID).Count(&count).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&model.SeedingClientConfig{}).Where("client_uid = ?", req.ClientUID).Count(&count).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
@@ -162,7 +162,7 @@ func normalizeRuleIDs(v interface{}) interface{} {
 
 func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request, id uint) {
 	var config model.SeedingClientConfig
-	if err := h.db.First(&config, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&config, id).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "配置不存在")
 		return
 	}
@@ -268,11 +268,11 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	}
 	updates["updated_at"] = time.Now()
 
-	if err := h.db.Model(&config).Updates(updates).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Model(&config).Updates(updates).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新刷流配置失败")
 		return
 	}
-	if err := h.db.First(&config, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&config, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
@@ -281,7 +281,7 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *SeedingHandler) handleDeleteConfig(w http.ResponseWriter, r *http.Request, id uint) {
-	if err := h.db.Delete(&model.SeedingClientConfig{}, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Delete(&model.SeedingClientConfig{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除刷流配置失败")
 		return
 	}
@@ -301,7 +301,7 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 	}
 
 	var sub model.RSSSubscription
-	if err := h.db.Where("id = ?", subID).First(&sub).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("id = ?", subID).First(&sub).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "订阅不存在")
 		return
 	}
@@ -353,7 +353,7 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 			updates["push_interval_ms"] = int(v)
 		}
 		if len(updates) > 0 {
-			if err := h.db.Model(&sub).Updates(updates).Error; err != nil {
+			if err := h.db.WithContext(r.Context()).Model(&sub).Updates(updates).Error; err != nil {
 				Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
 				return
 			}
@@ -389,7 +389,7 @@ func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *ht
 			return
 		}
 		data, _ := json.Marshal(body.Keywords)
-		h.db.Exec("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		h.db.WithContext(r.Context()).Exec("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 			"seeding.unregistered_keywords", string(data))
 		Success(w, map[string]interface{}{"keywords": body.Keywords})
 		return
@@ -467,7 +467,7 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 
 func (h *SeedingHandler) handleScoringConfigByID(w http.ResponseWriter, r *http.Request, subID string) {
 	var sub model.RSSSubscription
-	if err := h.db.Where("id = ?", subID).First(&sub).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("id = ?", subID).First(&sub).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "订阅不存在")
 		return
 	}
@@ -519,7 +519,7 @@ func (h *SeedingHandler) handleScoringConfigByID(w http.ResponseWriter, r *http.
 			updates["push_interval_ms"] = int(v)
 		}
 		if len(updates) > 0 {
-			if err := h.db.Model(&sub).Updates(updates).Error; err != nil {
+			if err := h.db.WithContext(r.Context()).Model(&sub).Updates(updates).Error; err != nil {
 				Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
 				return
 			}
