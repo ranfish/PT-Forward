@@ -25,6 +25,7 @@ const (
 type Engine struct {
 	db               *gorm.DB
 	logger           *zap.Logger
+	rootCtx          context.Context // §59.562 刀4: service ctx（Start 注入·main 根 ctx）——worker 派生单源
 	clientProvider   model.DownloaderProvider
 	clientProviderMu sync.RWMutex
 	siteProvider     model.SiteInfoProvider
@@ -194,6 +195,9 @@ func recordKey(clientUID uint, infoHash string) string {
 }
 
 func (e *Engine) Start(ctx context.Context) error {
+	if ctx == nil { // 附录A §2.5 边界防御
+		ctx = context.Background()
+	}
 	var records []model.SeedingTorrentRecord
 	if err := e.db.WithContext(ctx).
 		Where("status IN ?", []string{"pending", "seeding", "transferring", "paused_free_end", "paused_rule", "deleting"}).
@@ -282,7 +286,11 @@ func (e *Engine) Start(ctx context.Context) error {
 		}
 	}
 
-	refreshCtx, cancel := context.WithCancel(context.Background())
+	// §59.562 刀4: refresh 族 ctx 派生自 service ctx（rootCtx）——停机
+	// cancel（main 根 ctx）与 Stop 的 refreshCancel 双通道都能收敛 worker
+	// （审计 01 §3.4：自建 Background 局部根=停机不可达）。
+	e.rootCtx = ctx
+	refreshCtx, cancel := context.WithCancel(e.rootCtx)
 	e.refreshCancel = cancel
 	e.wg.Add(1)
 	go func() { defer e.wg.Done(); e.refreshMaindataLoop(refreshCtx) }()

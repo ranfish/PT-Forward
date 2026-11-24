@@ -392,7 +392,10 @@ func (e *Engine) checkAutoTransfer(ctx context.Context, clientUID uint, torrentM
 			continue
 		}
 		recCopy := *rec
-		go e.transferRecord(context.Background(), recCopy, key)
+		// §59.562 刀4: 转移任务派生自巡检 loop ctx（refreshCtx 族）——
+		// 停机/Stop cancel 中止在途转移；transferring 中断回退 seeding
+		// 是既有设计（Start 回滚+下轮重试）·非新增风险面。
+		go e.transferRecord(ctx, recCopy, key)
 	}
 }
 
