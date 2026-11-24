@@ -182,7 +182,11 @@ func (e *Engine) SyncTaskSchedule(ctx context.Context, task *model.ReseedTask) {
 	}
 	name := reseedSchedulerName(task.ID)
 	if !task.Enabled {
-		_ = e.scheduler.Unregister(name)
+		// §59.564 刀C: 注销失败 Warn（残留旧调度不可不可见——审计 03 §2.2）
+		if err := e.scheduler.Unregister(name); err != nil {
+			e.logger.Warn("reseed scheduler unregister failed",
+				zap.Uint("task_id", task.ID), zap.String("name", name), zap.Error(err))
+		}
 		return
 	}
 	handler := func(ctx context.Context) error {
@@ -215,7 +219,11 @@ func (e *Engine) RemoveTaskSchedule(taskID uint) {
 	if e.scheduler == nil {
 		return
 	}
-	_ = e.scheduler.Unregister(reseedSchedulerName(taskID))
+	// §59.564 刀C: 注销失败 Warn（同 §2.2）
+	if err := e.scheduler.Unregister(reseedSchedulerName(taskID)); err != nil {
+		e.logger.Warn("reseed scheduler unregister failed",
+			zap.Uint("task_id", taskID), zap.String("name", reseedSchedulerName(taskID)), zap.Error(err))
+	}
 }
 
 func (e *Engine) RegisterAllTaskSchedules(ctx context.Context) {

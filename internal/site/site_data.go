@@ -3,6 +3,7 @@ package site
 import (
 	"encoding/json"
 	"fmt"
+	stdlog "log" // §59.564 刀C: bootstrap 期审计落库失败 fallback（zap 全局可能未就绪）
 
 	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -245,12 +246,16 @@ func SeedSites(db *gorm.DB) error {
 		}
 		// 审计留痕（DB 侧——SeedSites 早于全局 logger 就绪·zap.L() 可能
 		// Nop 静默丢；operation_audit_logs 与导入/删除等站点操作同表可查）
-		_ = db.Create(&model.OperationAuditLog{
+		// §59.564 刀C: 失败 std log 落 stderr（docker 可见）——审计留痕
+		// 丢失不可全静默（审计 03 §2.2）
+		if err := db.Create(&model.OperationAuditLog{
 			Actor: "system", Module: "site", Action: "reconcile_delete_ghost",
 			TargetType: "sites", TargetID: all[i].Domain,
 			Detail: fmt.Sprintf("启动对账：删除幽灵站点 %s（%s·不在当前版本支持集）", all[i].Domain, all[i].Name),
 			Result: "success",
-		}).Error
+		}).Error; err != nil {
+			stdlog.Printf("[site] reconcile_delete_ghost audit persist failed: domain=%s err=%v", all[i].Domain, err)
+		}
 	}
 
 	return nil

@@ -1161,13 +1161,19 @@ func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap
 		if stored == key && keyFromDB && configPath != "" {
 			// §仓库安全-12 回归审核修：替换式（追加式在 config 已有 security 段时产生双段）
 			if err := replaceEncryptionKeyInConfig(configPath, key); err == nil {
-				_ = syncRepo.Delete(context.Background(), "encryption_key")
+				// §59.564 刀C: 清理失败 Warn（不影响迁移结果·下次启动重清）
+				if err := syncRepo.Delete(context.Background(), "encryption_key"); err != nil {
+					log.Warn("clear migrated encryption_key row failed (next startup retries)", zap.Error(err))
+				}
 				log.Info("encryption_key migrated from DB to config file (\u00a7\u4ed3\u5e93\u5b89\u5168-3)", zap.String("path", configPath))
 			} else {
 				log.Warn("config not writable, key temporarily stays in DB", zap.Error(err))
 			}
 		} else {
-			_ = syncRepo.Delete(context.Background(), "encryption_key")
+			// §59.564 刀C: 同上
+			if err := syncRepo.Delete(context.Background(), "encryption_key"); err != nil {
+				log.Warn("clear legacy encryption_key row failed (next startup retries)", zap.Error(err))
+			}
 			log.Info("cleared legacy encryption_key row in DB (\u00a7\u4ed3\u5e93\u5b89\u5168-3: key never in DB)")
 		}
 	}

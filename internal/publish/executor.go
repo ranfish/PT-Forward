@@ -361,6 +361,23 @@ func (e *PublishExecutor) recordResult(ctx context.Context, in ExecuteInput, met
 	e.recordResultFull(ctx, in, meta, rv, status, msg, torrentID, url, false)
 }
 
+// createResultLogged §59.564 刀A: 发布结果落库——失败 Warn 日志化（审计 03 §2.1 P1）。
+// 语义（用户定案 2026-11-24）：发布动作已完成·落库失败不反转终态（副作用更大）
+// ·纯审计面观测（定位字段九项）；后续若确认强一致依赖再评估重试/返回策略。
+func (e *PublishExecutor) createResultLogged(ctx context.Context, rec *model.PublishResultRecord) {
+	if err := e.pipe.CreateResult(ctx, rec); err != nil {
+		e.logger.Warn("publish result persist failed",
+			zap.String("target_site", rec.TargetSite),
+			zap.String("source_site", rec.SourceSite),
+			zap.String("source_info_hash", rec.SourceInfoHash),
+			zap.String("pieces_hash", rec.PiecesHash),
+			zap.String("status", string(rec.Status)),
+			zap.String("trigger", rec.Trigger),
+			zap.String("batch_group_id", rec.BatchGroupID),
+			zap.Error(err))
+	}
+}
+
 // recordResultFull 统一落库单点（piecesHash §59.166 dedup 本地记忆——一种多站/
 // 一站多种发布链公共生效：成功/拦截均落，下次发布 dedup 先查本地零依赖站方 API）。
 func (e *PublishExecutor) recordResultFullWithLogs(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
@@ -370,7 +387,7 @@ func (e *PublishExecutor) recordResultFullWithLogs(ctx context.Context, in Execu
 	if strings.Contains(note, "加种失败") {
 		seedErr = note
 	}
-	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
+	e.createResultLogged(ctx, &model.PublishResultRecord{
 		PiecesHash:     piecesHash,
 		TargetSite:     in.TargetSite,
 		SourceSite:     meta.SiteName,
@@ -408,7 +425,7 @@ func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput,
 	if len(piecesHash) > 0 {
 		ph = piecesHash[0]
 	}
-	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
+	e.createResultLogged(ctx, &model.PublishResultRecord{
 		PiecesHash:     ph,
 		TargetSite:     in.TargetSite,
 		SourceSite:     meta.SiteName,

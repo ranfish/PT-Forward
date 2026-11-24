@@ -145,8 +145,10 @@ func runRotateKey(cfg *config.Config, configPath string, db *gorm.DB, log *zap.L
 		return fmt.Errorf("DB 已重加密但写 config 失败（请手动写入以下密钥后重启·或恢复备份重试）: %w\n密钥: %s", err, newKey)
 	}
 
-	// ⑤ 清 DB 密钥残留行
-	_ = setting.NewRepository(db).Delete(context.Background(), "encryption_key")
+	// ⑤ 清 DB 密钥残留行（§59.564 刀C: 失败 Warn——残留行下次启动会再清）
+	if err := setting.NewRepository(db).Delete(context.Background(), "encryption_key"); err != nil {
+		log.Warn("clear legacy encryption_key row failed (下次启动会重试清理)", zap.Error(err))
+	}
 
 	log.Info("✓ 密钥轮换完成",
 		zap.String("config", configPath),
