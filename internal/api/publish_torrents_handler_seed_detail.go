@@ -195,22 +195,30 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 
 	config, err := h.siteProvider.GetSiteConfig(ctx, req.Site)
 	if err != nil || config == nil {
-		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("获取站点配置失败: %v", err))
+		// §59.565 刀D1: 5xx 透传收敛
+		h.logger.Error("get site config failed", zap.String("op", "get_site_config"), zap.String("site", req.Site), zap.Error(err))
+		Error(w, http.StatusBadGateway, 50201, "获取站点配置失败，请查看服务端日志")
 		return
 	}
 	adapter, err := h.siteProvider.GetAdapter(ctx, req.Site)
 	if err != nil || adapter == nil {
-		Error(w, http.StatusBadGateway, 50202, fmt.Sprintf("获取适配器失败: %v", err))
+		// §59.565 刀D1
+		h.logger.Error("get adapter failed", zap.String("op", "get_adapter"), zap.String("site", req.Site), zap.Error(err))
+		Error(w, http.StatusBadGateway, 50202, "获取适配器失败，请查看服务端日志")
 		return
 	}
 	data, err := adapter.DownloadTorrent(ctx, config, req.TorrentID)
 	if err != nil {
-		Error(w, http.StatusBadGateway, 50203, fmt.Sprintf("下载 .torrent 失败: %v", err))
+		// §59.565 刀D1
+		h.logger.Error("download torrent failed", zap.String("op", "download_torrent"), zap.String("site", req.Site), zap.String("torrent_id", req.TorrentID), zap.Error(err))
+		Error(w, http.StatusBadGateway, 50203, "下载种子文件失败，请查看服务端日志")
 		return
 	}
 	meta, err := fingerprint.ComputeFromTorrent(data)
 	if err != nil || meta == nil {
-		Error(w, http.StatusInternalServerError, 50002, fmt.Sprintf("解析 .torrent 失败: %v", err))
+		// §59.565 刀D1
+		h.logger.Error("parse torrent failed", zap.String("op", "parse_torrent"), zap.String("torrent_id", req.TorrentID), zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50002, "解析种子文件失败，请查看服务端日志")
 		return
 	}
 	noSrc, _ := fingerprint.ComputeNoSourceHash(data)
@@ -745,7 +753,9 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 	}
 
 	if err := h.fetchSingleTorrent(r.Context(), clientUID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal, true); err != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
+		// §59.565 刀D1
+		h.logger.Error("fetch single torrent failed", zap.String("op", "fetch_single"), zap.Uint("client_id", clientUID), zap.String("info_hash", infoHash), zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, "获取种子失败，请查看服务端日志")
 		return
 	}
 

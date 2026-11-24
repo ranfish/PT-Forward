@@ -210,7 +210,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		if ptgen == nil {
 			// §59.564 刀B: 5xx 业务日志
 			h.logger.Error("ptgen all tiers failed", zap.String("op", "ptgen"), zap.Error(lastErr))
-			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败（三级链全败）: %v", lastErr))
+			Error(w, http.StatusInternalServerError, 50000, "PTGen 查询失败，请查看服务端日志")
 			return
 		}
 		if ptgen != nil {
@@ -248,7 +248,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 				if err != nil {
 					// §59.564 刀B: 5xx 业务日志
 					h.logger.Error("refresh from source failed", zap.String("op", "refresh_from_source"), zap.String("site", req.SiteName), zap.String("info_hash", req.InfoHash), zap.Error(err))
-					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
+					Error(w, http.StatusInternalServerError, 50000, "源站重新获取失败，请查看服务端日志")
 					return
 				}
 				if meta != nil {
@@ -310,7 +310,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			// §59.564 刀B: 5xx 业务日志
 			h.logger.Error("analyze local artifacts failed", zap.String("op", "analyze_artifacts"), zap.String("name", req.Name), zap.Error(err))
-			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("MediaInfo 获取失败: %v", err))
+			Error(w, http.StatusInternalServerError, 50000, "MediaInfo 获取失败，请查看服务端日志")
 			return
 		}
 		if mi, ok := artifacts["media_info"]; ok {
@@ -344,7 +344,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 				if err != nil {
 					// §59.564 刀B: 5xx 业务日志
 					h.logger.Error("refresh from source failed", zap.String("op", "refresh_from_source"), zap.String("site", req.SiteName), zap.String("info_hash", req.InfoHash), zap.Error(err))
-					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
+					Error(w, http.StatusInternalServerError, 50000, "源站重新获取失败，请查看服务端日志")
 					return
 				}
 				if meta != nil && len(model.ParseScreenshotColumn(meta.Screenshots)) > 0 {

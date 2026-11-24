@@ -32,7 +32,9 @@ func (h *SupportedSitesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	if err := site.SupportedSitesErr(); err != nil {
 		h.logger.Error("supported_sites.json parse failed", zap.Error(err))
-		ErrorWithDetail(w, http.StatusInternalServerError, 50001, "白名单数据加载失败", err.Error())
+		// §59.565 刀D1: detail 不透传原始 err.Error()（用户定案：detail 也是
+		// 客户端可见字段·排障依赖服务端日志）
+		Error(w, http.StatusInternalServerError, 50001, "白名单数据加载失败，请查看服务端日志")
 		return
 	}
 

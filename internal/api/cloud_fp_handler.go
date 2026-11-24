@@ -109,7 +109,9 @@ func (h *CloudFPHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+cfg.APIToken)
 	resp, err := client.Do(req)
 	if err != nil {
-		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("连接失败: %v", err))
+		// §59.565 刀D1: 5xx 透传收敛——err 只入服务端日志（审计 04 §3.4）
+		h.logger.Error("cloud fp connect failed", zap.String("op", "cloud_fp_connect"), zap.Error(err))
+		Error(w, http.StatusBadGateway, 50201, "连接云端指纹服务失败，请查看服务端日志")
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()

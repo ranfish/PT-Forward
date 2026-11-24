@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,7 +67,9 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		Where("id = ?", id).
 		Updates(updates)
 	if result.Error != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("保存失败: %v", result.Error))
+		// §59.565 刀D1
+		h.logger.Error("seed data save failed", zap.String("op", "seed_data_save"), zap.Uint64("id", id), zap.Error(result.Error))
+		Error(w, http.StatusInternalServerError, 50000, "保存失败，请查看服务端日志")
 		return
 	}
 	if result.RowsAffected == 0 {

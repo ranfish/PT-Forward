@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -19,6 +20,26 @@ import (
 //  4. site_handler 批量审核端点：`_ =` 忽略·坏 body 走后续 400
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return false
+	}
+	return true
+}
+
+// decodeJSONBodyStrict §59.565 D3a: 严格解码变体（审计 04 §3.1）——
+// DisallowUnknownFields（未知字段拒绝·防「拼写错静默成功」）+ 单值检查
+// （body 只允许一个 JSON 值·拒绝尾随多余数据）。
+// 使用边界：仅新接口/明确契约边界启用·存量不一刀切（04 篇 D3 定案）；
+// 新增例外必须登记原因。错误文案与 decodeJSONBody 同源（40001 稳定契约）。
+func decodeJSONBodyStrict(w http.ResponseWriter, r *http.Request, dst any) bool {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return false
+	}
+	// 单值检查：再 Decode 一次应得 io.EOF（有多余尾随值则拒绝）
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return false
 	}
