@@ -2,6 +2,8 @@ package audit
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,7 +16,11 @@ import (
 
 func setupAuditDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// §59.567 刀B 补修：`:memory:` 在 gorm 池开第二连接时分裂为空库
+	// （WaitFor 轮询与 flush INSERT 并发触发·原固定 sleep 串行化掩住）——
+	// unique+cache=shared 内存库（seeding 包 uniqueSQLiteDSN 同款惯例）
+	dsn := fmt.Sprintf("file:audittest_%d?mode=memory&cache=shared&_busy_timeout=5000", auditDBCounter.Add(1))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -23,6 +29,8 @@ func setupAuditDB(t *testing.T) *gorm.DB {
 	}
 	return db
 }
+
+var auditDBCounter atomic.Uint64
 
 func TestLogger_Flush(t *testing.T) {
 	db := setupAuditDB(t)
