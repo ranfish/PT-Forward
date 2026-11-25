@@ -80,7 +80,6 @@ func (q *BDInfoScanQueue) Enqueue(task BDInfoScanTask) bool {
 		}
 	}
 	q.pending = append(q.pending, task)
-	q.startOnce.Do(func() { go q.loop() })
 	select {
 	case q.wake <- struct{}{}:
 	default:
@@ -89,6 +88,16 @@ func (q *BDInfoScanQueue) Enqueue(task BDInfoScanTask) bool {
 		zap.String("name", task.Name),
 		zap.Int("pending", len(q.pending)))
 	return true
+}
+
+// Start 启动消费 goroutine（装配期 main 一次性调用·幂等）。
+// §59.573 附（CI 首红驱动）：原「Enqueue 首次触发懒启动」让测试与
+// 生产共享竞态窗口——worker 立即消费+快速失败任务会穿透测试的
+// pending/dedup 同步断言（CI race 层实证 pending=1 want=2）。
+// 显式生命周期对齐 Engine.Start 先例（§59.567 刀C）：测试不调
+// Start 即无消费——断言确定性；生产装配即启动（行为等价）。
+func (q *BDInfoScanQueue) Start() {
+	q.startOnce.Do(func() { go q.loop() })
 }
 
 // BDInfoQueueStatus 队列状态快照（P3 手动批量端点/前端轮询共用）。

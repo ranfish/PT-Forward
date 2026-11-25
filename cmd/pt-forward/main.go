@@ -597,9 +597,11 @@ func main() {
 	// §59.319 回归清理：pipeline.bdinfoScanner 死字段删除（Set 后零消费）——
 	// scanner 消费方为 api 层（router.SetBDInfoQueue 注入 publishTorrents/
 	// manualForward 两 handler）
-	// §59.319 P1: 原盘 BDInfo 扫描队列（全局单例串行+簇去重）——Enqueue
-	// 首次触发时启动消费 goroutine；onDone 落库回调由 router.SetBDInfoQueue 注册
+	// §59.319 P1: 原盘 BDInfo 扫描队列（全局单例串行+簇去重）——装配期
+	// Start() 启动消费 goroutine（§59.573 附显式生命周期·原 Enqueue 懒启动
+	// 已撤）；onDone 落库回调由 router.SetBDInfoQueue 注册
 	bdinfoQueue := publish.NewBDInfoScanQueue(bdinfoScanner, log)
+	bdinfoQueue.Start()
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
