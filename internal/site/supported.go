@@ -84,7 +84,9 @@ func GetSupportedSite(domain string) (*SupportedSite, bool) {
 // IsPublishSupported §59.318→§59.571 双源: 站点是否已适配发布。
 // 源① supported_sites.json publish_supported=true（静态声明·兼容存量 69 站）
 // 源② sites 表 form_config enabled=true（migration 交付即生效——适配完成
-//        的交付物就是 form_config·它的存在就是证明）
+//
+//	的交付物就是 form_config·它的存在就是证明）
+//
 // 满足任一即 true——json 标记降级为「预声明」而非「门卫」。
 // §59.571 定案：单环境用户 OTA → migration → form_config → 直接可开目标站
 // （手工 json 同步遗漏不再阻断用户——乌托邦/朱雀/海豹/肉丝/野马五站案驱动）。

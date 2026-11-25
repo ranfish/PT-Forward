@@ -40,7 +40,10 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 		// 原盘 raw 带 x265 惯用词的穿透防线）；WEB 流捕获（无压制工具词·
 		// v1.05 WEB 词表 H.264/H.265——透传造成站值 miss）；空隙残留
 		// （压制但标题无编码器词 → 格式词照旧·不杜撰编码器）。
-		if !(mi.Encoded && hasEncoderCodecWord(p.VideoCodec) && !hasEncoderCodecWord(mi.VideoCodec)) {
+		// （QF1001 正形态：命名布尔+单取反——staticcheck 1623 CI 红根修）
+		encodePassthrough := mi.Encoded &&
+			hasEncoderCodecWord(p.VideoCodec) && !hasEncoderCodecWord(mi.VideoCodec)
+		if !encodePassthrough {
 			p.VideoCodec = mi.VideoCodec
 		}
 	}

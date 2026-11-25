@@ -49,15 +49,15 @@ func TestMergeMediaInfoIntoEncodePassthrough(t *testing.T) {
 // codecStyle 无 encode case（default 原样）——空隙残留语义。
 func TestClassifyMediumForCodecHyphen(t *testing.T) {
 	cases := map[string]string{
-		"BluRay":     "encode", // 驼峰=压制写法（composeMedium 走 SourceType 此形态）
-		"UHD BluRay": "encode",
-		"Blu-ray":    "disc", // 连字符=原盘
+		"BluRay":      "encode", // 驼峰=压制写法（composeMedium 走 SourceType 此形态）
+		"UHD BluRay":  "encode",
+		"Blu-ray":     "disc", // 连字符=原盘
 		"UHD Blu-ray": "disc",
-		"3D Blu-ray": "disc",
-		"REMUX":      "disc",
-		"BDRip":      "encode",
-		"WEB-DL":     "web",
-		"HDTV":       "hdtv",
+		"3D Blu-ray":  "disc",
+		"REMUX":       "disc",
+		"BDRip":       "encode",
+		"WEB-DL":      "web",
+		"HDTV":        "hdtv",
 	}
 	for medium, want := range cases {
 		if got := classifyMediumForCodec(medium); got != want {

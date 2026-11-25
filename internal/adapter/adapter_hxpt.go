@@ -64,7 +64,7 @@ type hxptCompatItem struct {
 	Seeders      int    `json:"seeders"`
 	Leechers     int    `json:"leechers"`
 	Completed    int    `json:"completed"`
-	Size         int64  `json:"size"` // 字节
+	Size         int64  `json:"size"`  // 字节
 	Added        int64  `json:"added"` // Unix 秒
 	Category     int    `json:"category"`
 	CategoryName string `json:"category_name"`
@@ -78,15 +78,15 @@ type hxptCompatItem struct {
 
 // hxptOpenTorrent 开放 API /open/torrents/{id} 深详情形态。
 type hxptOpenTorrent struct {
-	ID       int64           `json:"id"`
-	Name     string          `json:"name"`
-	InfoHash string          `json:"info_hash"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	InfoHash string `json:"info_hash"`
 	// NP 兼容层与开放 API 共有的核心字段
-	Seeders    int    `json:"seeders"`
-	Leechers   int    `json:"leechers"`
-	Size       int64  `json:"size"`
-	Added      int64  `json:"added"`
-	CategoryID int    `json:"category_id"`
+	Seeders    int   `json:"seeders"`
+	Leechers   int   `json:"leechers"`
+	Size       int64 `json:"size"`
+	Added      int64 `json:"added"`
+	CategoryID int   `json:"category_id"`
 	// 开放 API 独有深数据
 	SmallDescr string          `json:"small_descr"`
 	Descr      string          `json:"descr"`
@@ -184,11 +184,11 @@ func (a *HxptAdapter) SearchTorrents(ctx context.Context, config *model.SiteConf
 		u += "&keyword=" + url.QueryEscape(keyword)
 	}
 	var resp struct {
-		Page      int              `json:"page"`
-		PageSize  int              `json:"page_size"`
-		Total     int              `json:"total_estimate"`
-		HasMore   bool             `json:"has_more"`
-		Items     []hxptCompatItem `json:"items"`
+		Page     int              `json:"page"`
+		PageSize int              `json:"page_size"`
+		Total    int              `json:"total_estimate"`
+		HasMore  bool             `json:"has_more"`
+		Items    []hxptCompatItem `json:"items"`
 	}
 	if err := a.apiCall(ctx, config, http.MethodGet, u, nil, &resp); err != nil {
 		return nil, err
@@ -389,18 +389,18 @@ func (a *HxptAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, to
 // ── 用户统计（PT-Plugin-Plus 口径） ──
 
 type hxptUserInfo struct {
-	ID           int64  `json:"id"`
-	Name         string `json:"name"`
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
 	Bonus        float64 `json:"bonus"`
-	Uploaded     int64  `json:"uploaded"`
-	Downloaded   int64  `json:"downloaded"`
-	Seeding      int    `json:"seeding"`
-	Leeching     int    `json:"leeching"`
-	SeedingSize  int64  `json:"seedingSize"`
-	Invites      int    `json:"invites"`
-	LevelName    string `json:"levelName"`
-	JoinTime     string `json:"joinTime"`
-	MessageCount int    `json:"messageCount"`
+	Uploaded     int64   `json:"uploaded"`
+	Downloaded   int64   `json:"downloaded"`
+	Seeding      int     `json:"seeding"`
+	Leeching     int     `json:"leeching"`
+	SeedingSize  int64   `json:"seedingSize"`
+	Invites      int     `json:"invites"`
+	LevelName    string  `json:"levelName"`
+	JoinTime     string  `json:"joinTime"`
+	MessageCount int     `json:"messageCount"`
 }
 
 func (a *HxptAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -457,8 +457,8 @@ func (a *HxptAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteCo
 		return nil, err
 	}
 	return &model.SLData{
-		Seeders:   t.Seeders,
-		Leechers:  t.Leechers,
+		Seeders:  t.Seeders,
+		Leechers: t.Leechers,
 	}, nil
 }
 
@@ -574,9 +574,9 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	}
 
 	var data struct {
-		ID         int64  `json:"id"`
-		Duplicate  bool   `json:"duplicate"`
-		DetailURL  string `json:"detail_url"`
+		ID        int64  `json:"id"`
+		Duplicate bool   `json:"duplicate"`
+		DetailURL string `json:"detail_url"`
 	}
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		return nil, parseError("上传 data 解析失败: "+err.Error(), err)
@@ -586,9 +586,9 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	// !resp.Success →「上传未成功」→ failed 终态+不推种（243 首颗 5310
 	// 实证：站方 code=0 已建种 tid=23941·我们判 failed）。
 	result := &model.PublishResponse{
-		Success:    true,
-		TorrentID:  strconv.FormatInt(data.ID, 10),
-		DetailURL:  fmt.Sprintf("%s/torrent/%d", a.base(config), data.ID),
+		Success:   true,
+		TorrentID: strconv.FormatInt(data.ID, 10),
+		DetailURL: fmt.Sprintf("%s/torrent/%d", a.base(config), data.ID),
 	}
 	if data.Duplicate {
 		result.IsExisting = true
