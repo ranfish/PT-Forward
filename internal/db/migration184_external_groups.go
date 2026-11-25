@@ -83,8 +83,15 @@ func init() {
 				return err
 			}
 		}
+		// §59.577 附（1631 根修·243 crash loop）：json_extract 对空串/畸形
+		// JSON 直接报错（非返回 NULL）——UPDATE 无守卫时单颗脏行即炸整
+		// migration → os.Exit → docker crash loop。243 实证：1 行空串
+		// （11-15 朋友站残留）锁死生产。三重守卫：NULL/空串/json_valid。
+		// （29 当时零空串纯运气——数据面差异非代码差异）
 		return gormDB.Exec(`UPDATE torrent_metadata SET release_group = COALESCE(
-			json_extract(detail_source_json, '$.release_group'), '')`).Error
+			json_extract(detail_source_json, '$.release_group'), '')
+			WHERE detail_source_json IS NOT NULL AND detail_source_json != ''
+			AND json_valid(detail_source_json)`).Error
 	})
 }
 
