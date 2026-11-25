@@ -349,3 +349,16 @@ export const seedConfigApi = {
     return client.delete<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}`)
   },
 }
+
+// §59.577 刀1: 外站组注册表（策展通道——no_mapping 长尾收录）
+export const externalGroupsApi = {
+  list() {
+    return client.get<ApiResponse<{ items: unknown[]; total: number }>>('/publish/torrents/external-groups')
+  },
+  create(data: { group_name: string; home_site?: string; notes?: string }) {
+    return client.post<ApiResponse<{ item: unknown }>>('/publish/torrents/external-groups', data)
+  },
+  remove(id: number) {
+    return client.delete<ApiResponse<{ deleted: boolean }>>(`/publish/torrents/external-groups/${id}`)
+  },
+}

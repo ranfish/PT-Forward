@@ -631,21 +631,37 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 	// 表述）·音乐链已定向音乐源站（coverage/簇判定）·组映射是影视获取通道
 	// 语义；不跳过则已审核音乐种恒 no_mapping（许景淳案：③ 早退优先于
 	// ④ reviewed——审核态被组映射遮蔽）。
+	// §59.577 刀1: 三级回退链（站方发布页组名选择→标题→文件名笔误）+
+	// 外站组注册表第二查询（LookupGroup miss → LookupExternalGroup 命中 →
+	// external_group 新状态）。刀1 发布门保持关（前端 external_group 仍不可
+	// 发布·刀2 声明扩展后开闸——防错标「官组作品」声明流出）。
 	if h.sourceDetector != nil && !isMusicSeed {
 		if meta == nil {
+			// Ⅲ 未获取：快照名组名（发布者手写文件名·笔误容忍靠容错行）
 			group := publish.ExtractGroupName(name)
 			if group == "" {
 				return "no_mapping"
 			}
-			site := h.sourceDetector.LookupGroup(ctx, group)
-			if site == "" {
+			if h.sourceDetector.LookupGroup(ctx, group) == "" {
+				if h.sourceDetector.LookupExternalGroup(ctx, group) {
+					return "external_group" // 未获取态：组已识别·显示+获取按钮
+				}
 				return "no_mapping"
 			}
 		} else if meta.Title != "" {
+			// Ⅱ 标题组名（站方标题权威——§59.230 PERFUME 先例）
 			group := publish.ExtractGroupName(meta.Title)
+			// Ⅰ 站方发布页组名选择（release_group 列·标准键 team.xxx）：
+			// 标题无组名时的救回通道（Ⅰ级只定组身份·不定源站——13city 型
+			// 站点发布组下拉含外站组·PT-depiler 站定义实证）
+			if group == "" {
+				group = groupFromReleaseGroupSlot(meta.ReleaseGroup)
+			}
 			if group != "" {
-				site := h.sourceDetector.LookupGroup(ctx, group)
-				if site == "" {
+				if h.sourceDetector.LookupGroup(ctx, group) == "" {
+					if h.sourceDetector.LookupExternalGroup(ctx, group) {
+						return "external_group" // 已获取态：组已识别·刀2 开发布门
+					}
 					// 站方标题有组名但无映射——真无映射（比裸名可信）
 					return "no_mapping"
 				}
@@ -783,6 +799,13 @@ func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group s
 	if len(exact) > 0 {
 		return exact[0]
 	}
+	// §59.577 刀1: 外部注册表归一查询（词条名标准写法·同 §59.550 显式
+	// 收编语义——变体由注册表显式收编）
+	h.db.WithContext(ctx).Model(&model.ExternalReleaseGroup{}).
+		Where("LOWER(group_name) = LOWER(?)", group).Limit(1).Pluck("group_name", &exact)
+	if len(exact) > 0 {
+		return exact[0]
+	}
 	// §59.550: 前缀回退退役（用户定案「官组必须显式映射·系统不推导」）——
 	// miss 返回原词（诚实形态）。变体由映射表显式收编（DSWeb 先例）。
 	return group
@@ -790,9 +813,13 @@ func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group s
 
 // syncGroupLexicon §59.233: mappings CRUD 后重建组名词表（识别+展示双层——
 // RefreshCache 只刷 LookupGroup 缓存，lexicon 不联动则新词条不生效）。
+// §59.577 刀1: 外部注册表词条并入（识别+展示共享·LookupGroup 语义不沾染）。
 func (h *PublishTorrentsHandler) syncGroupLexicon(ctx context.Context) {
 	var words []string
 	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &words)
+	var extWords []string
+	h.db.WithContext(ctx).Model(&model.ExternalReleaseGroup{}).Pluck("group_name", &extWords)
+	words = append(words, extWords...)
 	// §59.343: 组名词表单点注册（titleparser 收敛到 util——双注册废止）
 	util.SetGroupLexicon(words)
 }
@@ -889,4 +916,15 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	go h.runBatchFetch(req.ClientUID, req.Items, req.Force)
 
 	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
+}
+
+// groupFromReleaseGroupSlot §59.577 刀1: Ⅰ级槽位值→组名。
+// 标准键形态 team.xxx 剥前缀得组名（LOWER 查询兼容 HHWEB 大小写）；
+// team.other（站方声明非本站官组）/ NOGROUP / 空 → 空（无组身份·落Ⅱ级）。
+func groupFromReleaseGroupSlot(slot string) string {
+	s := strings.TrimSpace(slot)
+	if s == "" || s == "team.other" || s == "NOGROUP" {
+		return ""
+	}
+	return strings.TrimPrefix(s, "team.")
 }

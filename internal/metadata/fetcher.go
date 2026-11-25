@@ -844,6 +844,9 @@ func (f *Fetcher) buildMetadata(ctx context.Context, infoHash, siteName, torrent
 	detailSource := SeedToDetailSource(seed, now, engineMeta)
 	if data, err := json.Marshal(detailSource); err == nil {
 		meta.DetailSourceJSON = string(data)
+		// §59.577 刀1: Ⅰ级升列——站方发布页组名选择（标准键 team.xxx/
+		// team.other/NOGROUP）同步写独立列（backfill migration184 覆盖存量）
+		meta.ReleaseGroup = detailSource.ReleaseGroup
 	}
 
 	return meta

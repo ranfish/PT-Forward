@@ -41,6 +41,7 @@
           <a-radio-button value="incomplete">不完整</a-radio-button>
           <a-radio-button value="unfetched">未获取</a-radio-button>
           <a-radio-button value="issues">禁转/无映射</a-radio-button>
+          <a-radio-button value="external_group">外站组</a-radio-button>
           <a-radio-button value="observing">观察期</a-radio-button>
         </a-radio-group>
 
@@ -158,7 +159,7 @@
       :row-selection="{
         selectedRowKeys: selectedHashes,
         onChange: onSelectChange,
-        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' }), // §59.230: no_mapping=未获取族（无映射提醒态，无数据）
+        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' }), // §59.230: no_mapping=未获取族；§59.577 刀1: external_group 刀2 开闸前保持禁（防错标声明流出）
       }"
       @change="onTableChange"
     >
@@ -250,10 +251,16 @@
               :loading="fetchingSet.has(record.hash)"
               @click="fetchSingle(record)"
             >
-              {{ record.status === 'unfetched' || record.status === 'no_mapping' ? '获取' : '重获' }}
+              {{ record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' ? '获取' : '重获' }}
             </a-button>
             <a-button
-              v-if="record.status !== 'unfetched' && record.status !== 'no_mapping'"
+              v-if="record.status === 'no_mapping'"
+              size="small"
+              type="link"
+              @click="openRegisterExternalGroup(record)"
+            >收录外站组</a-button>
+            <a-button
+              v-if="record.status !== 'unfetched' && record.status !== 'no_mapping' && record.status !== 'external_group'"
               size="small"
               type="link"
               danger
@@ -307,7 +314,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SyncOutlined, PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined, LoadingOutlined, SafetyCertificateOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -315,7 +322,7 @@ import CrossSeedPanel from './CrossSeedPanel.vue'
 import MusicDetailPanel from './MusicDetailPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatBytes, formatTime } from '@/utils/format'
-import { seedConfigApi, type SeedDetail, type SeedListItem } from '@/api/publish'
+import { seedConfigApi, externalGroupsApi, type SeedDetail, type SeedListItem } from '@/api/publish'
 
 const route = useRoute()
 const router = useRouter()
@@ -488,6 +495,7 @@ function statusLabel(status: string): string {
     forbidden: '禁转',
     system_forbidden: '系统禁转',
     no_mapping: '无源站映射',
+    external_group: '外站组',
     reviewed: '已审核',
     pending: '待审核',
     incomplete: '不完整',
@@ -502,6 +510,7 @@ function statusColor(status: string): string {
     forbidden: 'red',
     system_forbidden: 'orange',
     no_mapping: 'default',
+    external_group: 'geekblue',
     reviewed: 'success',
     pending: 'warning',
     incomplete: 'default',
@@ -513,7 +522,7 @@ function statusColor(status: string): string {
 
 function statusRowClass(status: string): string {
   if (status === 'forbidden' || status === 'system_forbidden') return 'row-forbidden'
-  if (status === 'no_mapping') return 'row-disabled'
+  if (status === 'no_mapping' || status === 'external_group') return 'row-disabled'
   return ''
 }
 
@@ -633,6 +642,44 @@ async function rescanBDInfo(item: SeedListItem) {
   } finally {
     rescanSet.value.delete(item.hash)
   }
+}
+
+// §59.577 刀1: 外站组收录（no_mapping 行——策展通道）
+const registerInput = ref('')
+
+function openRegisterExternalGroup(record: SeedListItem) {
+  // 客户端预填：标题尾 -token（服务端权威校验在 create 端点）
+  const m = (record.name || '').replace(/\.(mkv|mp4|avi|ts|wmv|flv|torrent|iso)$/i, '').match(/-([A-Za-z0-9@.&_]{2,})$/)
+  registerInput.value = m ? m[1] : ''
+  Modal.confirm({
+    title: '收录外站组',
+    content: () => h('div', [
+      h('p', { style: 'margin-bottom:8px' }, `种子：${(record.name || '').slice(0, 60)}`),
+      h('input', {
+        value: registerInput.value,
+        style: 'width:100%;padding:4px 8px;border:1px solid #d9d9d9;border-radius:4px',
+        placeholder: '组名（站方标题侧权威形态）',
+        onInput: (e: Event) => { registerInput.value = (e.target as HTMLInputElement).value },
+      }),
+    ]),
+    okText: '收录',
+    cancelText: '取消',
+    onOk: async () => {
+      const group = registerInput.value.trim()
+      if (!group) {
+        message.warning('组名不能为空')
+        return Promise.reject()
+      }
+      try {
+        await externalGroupsApi.create({ group_name: group })
+        message.success(`已收录外站组 ${group}·刷新后生效`)
+        await fetchList()
+      } catch (e) {
+        message.error('收录失败：' + (e instanceof Error ? e.message : String(e)))
+        return Promise.reject(e)
+      }
+    },
+  })
 }
 
 async function fetchSingle(item: SeedListItem) {

@@ -450,6 +450,12 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleDetectSource(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodGet:
 		h.handleListGroupMappings(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/external-groups") && r.Method == http.MethodGet:
+		h.handleListExternalGroups(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/external-groups") && r.Method == http.MethodPost:
+		h.handleCreateExternalGroup(w, r)
+	case strings.Contains(path, "/publish/torrents/external-groups/") && r.Method == http.MethodDelete:
+		h.handleDeleteExternalGroup(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings/sites") && r.Method == http.MethodGet:
 		h.handleListGroupedSiteNames(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/declaration-filters") && r.Method == http.MethodGet:

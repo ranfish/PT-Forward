@@ -43,6 +43,10 @@ type TorrentMetadata struct {
 
 	// §56.8 三源 JSON 列（详情页/PTGen/本地产物原始结果）
 	DetailSourceJSON string `json:"detail_source_json" gorm:"column:detail_source_json;type:TEXT"`
+	// §59.577 刀1: 站方发布页组名选择（Ⅰ级——标准键形态 team.xxx/
+	// team.other/NOGROUP；从 detail_source_json.release_group 升列·backfill
+	// migration184）。
+	ReleaseGroup string `json:"release_group" gorm:"column:release_group;type:TEXT"`
 	PTGenSourceJSON  string `json:"ptgen_source_json"  gorm:"column:ptgen_source_json;type:TEXT"`
 	LocalSourceJSON  string `json:"local_source_json"  gorm:"column:local_source_json;type:TEXT"`
 

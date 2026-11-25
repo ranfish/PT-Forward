@@ -93,7 +93,7 @@ func extractGroupName(title string, full bool) string {
 	clean := title
 	// §59.342: .torrent 补入——syncer 快照名是 .torrent 文件名（教皇的驱魔人
 	// 案：尾部 "FRDS.torrent" 词表/dash 全 miss → 空组名 → no_mapping 误标）
-	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv", ".torrent"} {
+	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv", ".torrent", ".iso"} { // §59.577: .iso 补——TNND@CMCT.iso 案
 		if strings.HasSuffix(strings.ToLower(clean), ext) {
 			clean = clean[:len(clean)-len(ext)]
 			break

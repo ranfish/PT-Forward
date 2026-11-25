@@ -19,12 +19,14 @@ type SourceSiteDetector struct {
 	logger *zap.Logger
 	cache  map[string]string // group_name → site_name
 	mu     sync.RWMutex
+	// §59.577 刀1: 外站组注册表缓存（group_name → true·命中=外站组）
+	extCache map[string]bool
 	// §59.331: 当前层选的种子标识（SelectFetchSite set，logSelect 落库读）
 	pendingHash string
 }
 
 func NewSourceSiteDetector(db *gorm.DB, logger *zap.Logger) *SourceSiteDetector {
-	return &SourceSiteDetector{db: db, logger: logger, cache: make(map[string]string)}
+	return &SourceSiteDetector{db: db, logger: logger, cache: make(map[string]string), extCache: make(map[string]bool)}
 }
 
 // ExtractGroupName 从标题末尾提取制作组名（委托至 util.ExtractGroupName）
@@ -194,6 +196,10 @@ func (d *SourceSiteDetector) RefreshCache(ctx context.Context) {
 	if err := d.db.WithContext(ctx).Find(&mappings).Error; err != nil {
 		d.logger.Warn("query group mappings failed", zap.Error(err))
 	}
+	var extGroups []model.ExternalReleaseGroup
+	if err := d.db.WithContext(ctx).Find(&extGroups).Error; err != nil {
+		d.logger.Warn("query external release groups failed", zap.Error(err))
+	}
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -203,6 +209,48 @@ func (d *SourceSiteDetector) RefreshCache(ctx context.Context) {
 			d.cache[m.GroupName] = m.SiteName
 		}
 	}
+	// §59.577 刀1: 外站组缓存重建（CRUD 后 RefreshCache 联动——mappings 同款）
+	d.extCache = make(map[string]bool, len(extGroups))
+	for _, g := range extGroups {
+		d.extCache[g.GroupName] = true
+	}
+}
+
+// LookupExternalGroup §59.577 刀1: 外站组注册表查询（命中=true=外站组）。
+// @子组回退镜像 LookupGroup（OfficialGroupKey——Yumi@FRDS 先例）：
+// 全名 miss 时回退 @ 后段官方组键再查。miss 缓存（nil 不缓存——
+// CRUD 后 RefreshCache 重建·与 mappings 缓存生命周期一致）。
+func (d *SourceSiteDetector) LookupExternalGroup(ctx context.Context, groupName string) bool {
+	if groupName == "" {
+		return false
+	}
+	d.mu.RLock()
+	if hit, ok := d.extCache[groupName]; ok {
+		d.mu.RUnlock()
+		return hit
+	}
+	d.mu.RUnlock()
+
+	lookupName := groupName
+	if util.OfficialGroupKey(groupName) != groupName {
+		var sub model.ExternalReleaseGroup
+		if err := d.db.WithContext(ctx).
+			Where("LOWER(group_name) = LOWER(?)", groupName).
+			First(&sub).Error; err != nil {
+			lookupName = util.OfficialGroupKey(groupName)
+		}
+	}
+
+	var count int64
+	d.db.WithContext(ctx).Model(&model.ExternalReleaseGroup{}).
+		Where("LOWER(group_name) = LOWER(?)", lookupName).
+		Count(&count)
+	hit := count > 0
+
+	d.mu.Lock()
+	d.extCache[groupName] = hit
+	d.mu.Unlock()
+	return hit
 }
 
 // HasGroupMappings 检查站点是否有官组映射
