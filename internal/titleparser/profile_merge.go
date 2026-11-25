@@ -1,5 +1,13 @@
 package titleparser
 
+import "strings"
+
+// hasEncoderCodecWord §59.532 解挂：x264/x265 编码器词判定（大小写不敏感）。
+func hasEncoderCodecWord(codec string) bool {
+	u := strings.ToUpper(codec)
+	return strings.Contains(u, "X264") || strings.Contains(u, "X265")
+}
+
 // MergeTechProfile 三源字段级合并 → TechProfile（§56.34 决策 4）。
 //
 // 步骤 1 兼容接口：从 TitleComponents + MediaInfo 构造 TechProfile。
@@ -22,7 +30,19 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 		p.Resolution = mi.Resolution
 	}
 	if mi.VideoCodec != "" {
-		p.VideoCodec = mi.VideoCodec
+		// §59.532 解挂（v0.0.1623·馒头 1298316 冻结案）：Encode 限定透传。
+		// 压制铁证（mi.Encoded=Writing library 压制工具词·§59.319 附三十二）
+		// ∧标题带编码器词（x264/x265）∧MI 词非编码器词（HEVC/AVC 格式词）
+		// → 保留标题编码器词不降级。族内精度声明（x265↔HEVC 同 H.265 族·
+		// 发布组声明编码器·MI 证格式）非跨族事实错误——「MI 铁证」原意
+		// （From 媒介案/Atmos 案）不过度适用。
+		// 门关闭形态：原盘/REMUX（mi.Encoded=false·MI 格式词照旧覆盖——
+		// 原盘 raw 带 x265 惯用词的穿透防线）；WEB 流捕获（无压制工具词·
+		// v1.05 WEB 词表 H.264/H.265——透传造成站值 miss）；空隙残留
+		// （压制但标题无编码器词 → 格式词照旧·不杜撰编码器）。
+		if !(mi.Encoded && hasEncoderCodecWord(p.VideoCodec) && !hasEncoderCodecWord(mi.VideoCodec)) {
+			p.VideoCodec = mi.VideoCodec
+		}
 	}
 	// §59.514 附六（用户定案）：音频族 MI 唯一权威——MI Audio 段在场时
 	// 四字段以 MI 为准（直接赋值：提取 miss 清零标题值——宁缺毋错，

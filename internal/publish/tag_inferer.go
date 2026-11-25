@@ -599,6 +599,15 @@ func inferRegionLanguageTags(miSec titleparser.MISections, in TagInput, tags []s
 			tags = append(tags, "cantonese_audio")
 		}
 	}
+	// §59.576（v0.0.1623·馒头 1298316 labels=0 案）：副标中字通道——
+	// 副标含 中字/中文字幕/简中/简繁/简体/繁体 → chinese_subtitle。
+	// 窄词表（cat_site :139 词表对齐·去裸「字幕」宽词）：「英文字幕」
+	// 「特效字幕」不收（特效字幕声明≠中字纪律·:132 注释先例）。
+	// 不设 MI Text 门：外挂字幕不在 MI（副标声明是唯一证据）——MI 内
+	// 嵌中字轨仍由 inferSubtitleFromMITexts 主通道先行（has 去重）。
+	if !has("chinese_subtitle") && util.ContainsAny(subLower, "中字", "中文字幕", "简中", "简繁", "简体", "繁体") {
+		tags = append(tags, "chinese_subtitle")
+	}
 
 	// B. PTGen 联合回退（仅零字幕轨——MI 无语言证据时兜底）
 	if len(miSec.Texts) > 0 {

@@ -409,7 +409,15 @@ func classifyMediumForCodec(medium string) string {
 	if strings.Contains(upper, "UHDTV") || strings.Contains(upper, "HDTV") {
 		return "hdtv"
 	}
-	if strings.Contains(upper, "REMUX") || strings.Contains(upper, "BLU-RAY") || strings.Contains(upper, "BLURAY") {
+	// §59.532 解挂：驼峰 BLURAY（无连字符）=压制写法（v1.05 :34/§59.349
+	// 连字符=原盘）→ encode 类。原 BLURAY 与 BLU-RAY 同归 disc——压制片源
+	// （composeMedium 走 SourceType 驼峰形态）被归原盘类（Zhizn HEVC 输出
+	// 路径之一·AVC 族同型 BluRay AVC 同坑）。codecStyle 无 encode case
+	// （default 原样）——空隙残留语义：无编码器词不杜撰。
+	if strings.Contains(upper, "BLURAY") {
+		return "encode"
+	}
+	if strings.Contains(upper, "REMUX") || strings.Contains(upper, "BLU-RAY") {
 		return "disc"
 	}
 	return ""

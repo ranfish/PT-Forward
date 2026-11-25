@@ -494,8 +494,19 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 	adjustSourceTags := map[string]bool{
 		"complete": true, "collection": true, "ongoing": true,
 	}
+	// §59.576（v0.0.1623·馒头 1298316 labels=0 案）：labels 位掩码消费键
+	// 放行——mteamLabelsBits（executor_site_rules.go §59.451）在 assembleTags
+	// 输出之后消费 fb.tags·而 allowed 过滤按「站方 tags 表单域映射」收键
+	// ——馒头标记走 labels 位掩码无 tags 表单域 → chinese_audio/
+	// chinese_subtitle/diy 全被过滤杀掉 → labels 恒 0（Zhizn 实证：DB tags
+	// 齐·站方 labels=0·副标明写简中字幕）。放行集=位掩码白名单精确同款
+	// ——有 tags 域的站 allowed 已覆盖（零变化）；无 tags 域的站键存活至
+	// mteamLabelsBits 消费（其余站无消费方·tagArrayFields miss 自然蒸发）。
+	bitmaskConsumerTags := map[string]bool{
+		"diy": true, "chinese_audio": true, "chinese_subtitle": true,
+	}
 	for _, t := range storedTags {
-		if _, okAll := allowed[t]; (okAll || adjustSourceTags[t]) && !seen[t] {
+		if _, okAll := allowed[t]; (okAll || adjustSourceTags[t] || bitmaskConsumerTags[t]) && !seen[t] {
 			out = append(out, t)
 			seen[t] = true
 		}
