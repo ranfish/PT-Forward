@@ -67,13 +67,13 @@
           <CheckOutlined /> 批量审核{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
         </a-button>
         <a-popconfirm
-          :title="statusFilter === 'observing' ? `确定清理 ${selectedHashes.length} 个观察期资源？（快照+元数据，发布记录保留）` : `确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
-          :ok-text="statusFilter === 'observing' ? '清理' : '清除'"
+          :title="statusFilter === 'observing' ? `确定清理 ${selectedHashes.length} 个观察期资源？（快照+元数据，发布记录保留）` : statusFilter === 'unsupported' ? `确定重置当前视图 ${tableData.length} 个不支持种子？（清除获取失败烙印——弹窗重现可重取）` : `确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
+          :ok-text="statusFilter === 'observing' ? '清理' : statusFilter === 'unsupported' ? '重置' : '清除'"
           cancel-text="取消"
-          @confirm="(statusFilter === 'observing' ? batchPurgeObserving : batchClear)()"
+          @confirm="(statusFilter === 'observing' ? batchPurgeObserving : statusFilter === 'unsupported' ? batchClearUnsupported : batchClear)()"
         >
-          <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
-            <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
+          <a-button danger :loading="batchClearing" :disabled="statusFilter === 'unsupported' ? tableData.length === 0 : selectedHashes.length === 0">
+            <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : statusFilter === 'unsupported' ? '批量重置不支持' : '批量清除' }}{{ statusFilter === 'unsupported' ? `（${tableData.length}）` : selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
           </a-button>
         </a-popconfirm>
         <a-button
@@ -266,7 +266,7 @@
               @click="openRegisterExternalGroup(record)"
             >收录外站组</a-button>
             <a-button
-              v-if="record.status !== 'unfetched' && record.status !== 'unsupported'"
+              v-if="record.status !== 'unfetched'"
               size="small"
               type="link"
               danger
@@ -779,6 +779,32 @@ async function batchClear() {
     if (fail === 0) message.success(`已清除 ${ok} 个种子`)
     else message.warning(`清除完成：成功 ${ok}，失败 ${fail}`)
     selectedHashes.value = []
+    await fetchList()
+  } finally {
+    batchClearing.value = false
+  }
+}
+
+// §59.578 刀2（补丁1）: unsupported 视图批量清除烙印——不依赖 checkbox
+// （未获取族禁选·发布选择器意图不掺和·§59.479 C 问题视图先例模式）：
+// 作用于当前视图全部行。deleteSeed 对无 metadata 行=清烙印（弹窗重现
+// 通道——误烙恢复·分钟级闭环）。
+async function batchClearUnsupported() {
+  if (tableData.value.length === 0) return
+  batchClearing.value = true
+  let ok = 0
+  let fail = 0
+  try {
+    for (const row of tableData.value) {
+      try {
+        await seedConfigApi.deleteSeed(row.hash)
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    if (fail === 0) message.success(`已重置 ${ok} 个不支持种子（弹窗重现可重取）`)
+    else message.warning(`重置完成：成功 ${ok}，失败 ${fail}`)
     await fetchList()
   } finally {
     batchClearing.value = false

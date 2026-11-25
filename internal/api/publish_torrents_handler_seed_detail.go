@@ -816,6 +816,14 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 				Delete(&model.TorrentMetadata{})
 		}
 	}
+	// §59.578 刀2: 同步清烙印（簇级）——「清除过种子信息的种子可以回到
+	// 获取未配置」闭环接线（只删 metadata 不清印=弹窗仍排除·通道断）。
+	// 无 metadata 行也执行（误烙颗的唯一恢复路径——清印有独立意义）。
+	if hasCluster {
+		h.clearFetchBrand(r.Context(), ck.ClientUID, ck.SavePath, ck.Name)
+	} else {
+		h.clearFetchBrandByHash(r.Context(), infoHash)
+	}
 	// §59.319 附七：清除审计——原 `_ = result` 零日志吞掉删除痕迹（243 Mercy
 	// 簇消失调查一小时主因：单行"清除"删整簇 62 行 metadata 无任何可观测信号）
 	h.logger.Info("seed metadata cleared",

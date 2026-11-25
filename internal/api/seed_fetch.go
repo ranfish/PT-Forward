@@ -422,10 +422,20 @@ func (h *PublishTorrentsHandler) finalizeFetchProfile(ctx context.Context, meta 
 func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientUID uint, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
 	force := len(forcePTGen) > 0 && forcePTGen[0]
 
+	// §59.578 刀2: 烙印基线——首获（无 metadata）才可能烙印（重获失败
+	// 数据在手可发布·不烙——设计定案边界）。查询在链前（获取链自身
+	// INSERT/UPDATE metadata·链后查会误判）。
+	var metaCount int64
+	if h.db != nil {
+		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ?", hash).Count(&metaCount)
+	}
+
 	coverageSites := h.ensureFetchCoverage(ctx, clientUID, hash)
 	fr := h.resolveFetchRouting(ctx, clientUID, savePath, name, hash, coverageSites)
 	result := h.selectFetchSourceSite(ctx, name, fr, hash)
 	if result == nil {
+		h.markFetchFailed(ctx, clientUID, hash, metaCount == 0, fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）"))
 		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
 	}
 
@@ -437,10 +447,71 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 
 	meta, err := h.fetchMetadataChain(fetchCtx, result, fr, hash, name, size, clientUID, savePath, localMI)
 	if err != nil {
+		h.markFetchFailed(ctx, clientUID, hash, metaCount == 0, err)
 		return err
 	}
+
+	// §59.578 刀2: 成功清印（簇级）——获取成功=走过且成功的语义终结
+	// （残留烙印会让「清除 metadata→弹窗重现」通道断裂）。
+	h.clearFetchBrand(ctx, clientUID, savePath, name)
 
 	h.runFetchPostArtifacts(ctx, meta, clientUID, savePath, name, isLocal, force, localMI)
 	h.finalizeFetchProfile(ctx, meta, clientUID, savePath, name, isLocal)
 	return nil
+}
+
+// clearFetchBrandByHash §59.578 刀2: 单 hash 清烙印（deleteSeed 无簇
+// 直删分支——快照 name 为空的兜底路径）。
+func (h *PublishTorrentsHandler) clearFetchBrandByHash(ctx context.Context, hash string) {
+	if h.db == nil || hash == "" {
+		return
+	}
+	if uerr := h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("hash = ? AND fetch_failed_at IS NOT NULL", hash).
+		Updates(map[string]interface{}{
+			"fetch_failed_at": nil,
+			"fetch_error":     "",
+		}).Error; uerr != nil && h.logger != nil {
+		h.logger.Warn("fetch brand clear failed", zap.String("hash", hash), zap.Error(uerr))
+	}
+}
+
+// markFetchFailed §59.578 刀2: 获取失败烙印（口径 A·用户定案）——
+// 瞬态（isTransientFetchErr 含扩四形态）外全烙。三不烙边界：
+// ① 重获失败（fresh=false·数据在手）② 瞬态失败 ③ DB 更新自身失败
+// （Warn 不静默·不反转获取终态）。写=当前 hash（弹窗 name 级排除靠
+// 「任一 hash 烙印」语义覆盖·清除簇级全清）。
+func (h *PublishTorrentsHandler) markFetchFailed(ctx context.Context, clientUID uint, hash string, fresh bool, err error) {
+	if h.db == nil || !fresh || err == nil || isTransientFetchErr(err) {
+		return
+	}
+	fetchErr := err.Error()
+	if len(fetchErr) > 500 { // 列宽 size:500
+		fetchErr = fetchErr[:500]
+	}
+	if uerr := h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("hash = ? AND client_uid = ?", hash, clientUID).
+		Updates(map[string]interface{}{
+			"fetch_failed_at": time.Now(),
+			"fetch_error":     fetchErr,
+		}).Error; uerr != nil && h.logger != nil {
+		h.logger.Warn("fetch brand update failed", zap.String("hash", hash), zap.Error(uerr))
+	}
+}
+
+// clearFetchBrand §59.578 刀2: 清烙印（簇级·紧键域 client+path+name）
+// ——获取成功与 handleDeleteSeed 共用。幂等（无烙印行零变化零噪音）。
+func (h *PublishTorrentsHandler) clearFetchBrand(ctx context.Context, clientUID uint, savePath, name string) {
+	if h.db == nil || name == "" {
+		return
+	}
+	if uerr := h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_uid = ? AND save_path = ? AND name = ? AND fetch_failed_at IS NOT NULL",
+			clientUID, savePath, name).
+		Updates(map[string]interface{}{
+			"fetch_failed_at": nil,
+			"fetch_error":     "",
+		}).Error; uerr != nil && h.logger != nil {
+		h.logger.Warn("fetch brand clear failed", zap.String("name", name), zap.Error(uerr))
+	}
 }

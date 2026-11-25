@@ -267,7 +267,15 @@ func isTransientFetchErr(err error) bool {
 		strings.Contains(s, "domain frozen") ||
 		strings.Contains(s, "empty_response") ||
 		strings.Contains(s, "Client.Timeout") ||
-		strings.Contains(s, "transient upstream")
+		strings.Contains(s, "transient upstream") ||
+		// §59.578 刀2: 瞬态扩四形态（站方临时宕机/DNS 抖动/连接重置——
+		// 口径 A 烙印策略的配套：明显瞬态不烙·防误烙埋颗。注意本函数
+		// 同源 retryDeferredBatch 的 deferred 判定——扩清单=更多 deferred
+		// 二轮重试（行为变好·既有消费面有意识变更）。
+		strings.Contains(s, "connection refused") ||
+		strings.Contains(s, "no such host") || // DNS 解析失败（Go net 错误文案）
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "EOF")
 }
 
 // retryDeferredBatch §59.330 P4: deferred 集探测式二轮——等冻结状态归零
@@ -598,7 +606,7 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 // 全量循环用；compliance 由调用方对当前页（或筛选 system_forbidden 时对全量）补跑。
 // §59.469 附七: isMusicSeed 由列表层批量预查传入（metas 查询轻量化不带
 // detail_source_json 列·内部判定恒空——防列表/getSeed 审核门口径分裂）。
-func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, name string, meta *model.TorrentMetadata, isMusicSeed bool) string {
+func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, name string, meta *model.TorrentMetadata, isMusicSeed bool, fetchFailed bool) string {
 	// ① flags 检查
 	if meta != nil && meta.Flags != "" {
 		var flags []string
@@ -619,6 +627,12 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 				}
 			}
 		}
+	}
+
+	// §59.578 刀2: 烙印②优先判定——认识但走链终态失败 → unsupported
+	//（优先于身份判定·省注册表查询·且烙印是「已试过」的实证信号）。
+	if fetchFailed {
+		return "unsupported"
 	}
 
 	// ③ 制作组映射检查 §59.578（状态模型重构·用户定案）：

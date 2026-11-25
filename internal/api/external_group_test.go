@@ -60,7 +60,7 @@ func TestClassifySeedStatusExternalGroup(t *testing.T) {
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园", ReleaseGroup: "team.hhweb"}, "incomplete"},
 	}
 	for _, c := range cases {
-		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta, false)
+		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta, false, false)
 		if got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}

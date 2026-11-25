@@ -466,7 +466,8 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 			mr = sc.musicMeta[meta.InfoHash]
 		}
 		isMusic := mr.InfoHash != ""
-		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic)
+		// §59.578 刀2: 烙印②（snap 循环变量直接可读——零额外查询）
+		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic, snap.FetchFailedAt != nil)
 		item["status"] = status
 		// §59.577 刀2: 外站组身份并行字段（已获取态状态流后·身份从状态剥离）
 		itemExternal := h.seedExternalGroupFlag(r.Context(), meta)
