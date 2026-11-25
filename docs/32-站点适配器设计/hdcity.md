@@ -13,6 +13,20 @@
 | 特殊功能 | 两步上传、候选区、NoVA/NoPA/NoTA/NoXA 官组体系、字幕区、音乐流派标签 |
 | 规则页面 | /rules |
 
+### 凭证体系（§59.574 实证·2026-11-25）
+
+城市有**两个独立的每用户凭证**——勿混淆：
+
+| 凭证 | 形态 | 用途 | 我们系统 |
+|------|------|------|---------|
+| tracker passkey | 32hex（如 `cc8774f4...`） | 种子做种认证——嵌在站方发放的 .torrent 的 announce（`https://sync.leniter.org/?passkey=...`） | **不入库**（.torrent 文件自带·下载器直接消费） |
+| cuhash | 32hex（如 `9458d001...`） | **下载 .torrent 的端点凭证**——`download?id={种子id}&cuhash={值}`·会轮换（窗口未知） | 存 sites.passkey 列（「下载凭证」通用列·模板 `{passkey}` 占位符消费）·§59.185 自动同步（§59.574 根修后生效） |
+
+- 下载地址每种子不同 = `id=` 部分不同·**cuhash 值全站相同**（首页 15 链接实证·每用户一个）
+- cuhash 不在控制面板——在站内任意种子下载链接里提取（scrapeCuhash 首页抓取）
+- .torrent 的 info dict 含 `source` 字段（leniter.org）——城市注入 source 改写 info_hash（跨站同内容不同 hash）
+- 下载为 302 二跳：`download?id&cuhash` → `hctres.leniter.org/dl.php?k&d&u&v`（签名 URL·u=tracker passkey）
+
 ---
 
 ## 一、发布页面表单字段分析

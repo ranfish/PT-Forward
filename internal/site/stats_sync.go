@@ -200,17 +200,23 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 	a := s.factory.Create(site.Framework, doer)
 
 	config := &model.SiteConfig{
-		Domain:        site.BaseURL,
-		Enabled:       site.Enabled,
-		Cookie:        site.Cookie,
-		APIKey:        site.APIKey,
-		Passkey:       site.Passkey,
-		BearerToken:   site.BearerToken,
-		AuthKey:       site.AuthKey,
-		AuthHash:      site.AuthHash,
-		UserID:        site.UserID,
-		ProxyURL:      effectiveProxy,
-		SkipSSLVerify: site.SkipSSLVerify,
+		Domain:      site.BaseURL,
+		Enabled:     site.Enabled,
+		Cookie:      site.Cookie,
+		APIKey:      site.APIKey,
+		Passkey:     site.Passkey,
+		BearerToken: site.BearerToken,
+		AuthKey:     site.AuthKey,
+		AuthHash:    site.AuthHash,
+		UserID:      site.UserID,
+		ProxyURL:    effectiveProxy,
+		// §59.574（cuhash 同步断链根修）：模板/mode 必带——cuhashEnabled
+		// 判「mode 显式或模板含 cuhash=」·此前手搓副本漏带两字段 → 门恒
+		// false → scrapeCuhash 在统计同步链永不执行（§59.185② 设计脱节点：
+		// 门修了但输入没接上——城市 passkey stale 实证 8b71≠9458）。
+		DownloadMode:        site.DownloadMode,
+		DownloadURLTemplate: site.DownloadURLTemplate,
+		SkipSSLVerify:       site.SkipSSLVerify,
 	}
 
 	var alts []string
