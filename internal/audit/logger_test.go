@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/testutil"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -106,15 +104,17 @@ func TestLogger_StartAndFlushOnCancel(t *testing.T) {
 	l.Log("admin", "site", "create", "site", "1", "detail", "success")
 	l.Log("admin", "site", "delete", "site", "2", "", "failure")
 
-	// §59.567 刀B: 固定 sleep → 条件轮询（cancel 触发 flush·等 count 就绪）
+	// §59.577 附（1625 build 门二拦实证·同测试第三修）：轮询可见性竞态
+	// 终结——cancel→Stop()=flush 完成的精确同步点（wg.Wait 在 flush 返回
+	// 后才归零·INSERT 已提交）·直断言零轮询。前两修（§59.567 刀B
+	// cache=shared+WAL / §59.568 刀4 窗口 3→10s）都在竞态窗口上加码·
+	// 本修消灭窗口本身。
 	cancel()
-	count := func() int64 {
-		var n int64
-		db.Model(&model.OperationAuditLog{}).Count(&n)
-		return n
-	}
-	if !testutil.WaitFor(t, 10*time.Second, func() bool { return count() == 2 }) {
-		t.Errorf("expected 2 logs after cancel, got %d", count())
+	l.Stop()
+	var n int64
+	db.Model(&model.OperationAuditLog{}).Count(&n)
+	if n != 2 {
+		t.Errorf("expected 2 logs after cancel, got %d", n)
 	}
 }
 
@@ -130,13 +130,15 @@ func TestLogger_FlushLoopBatchSize(t *testing.T) {
 		l.Log("admin", "site", "action", "type", string(rune(i)), "", "ok")
 	}
 
-	// §59.567 刀B: 固定 sleep → 条件轮询（批量 50 flush 就绪）
+	// §59.577 附：同上——cancel→Stop 精确同步·直断言（55 条全落库）
+	cancel()
+	l.Stop()
 	count := func() int64 {
 		var n int64
 		db.Model(&model.OperationAuditLog{}).Count(&n)
 		return n
 	}
-	if !testutil.WaitFor(t, 10*time.Second, func() bool { return count() >= 50 }) {
+	if n := count(); n < 50 {
 		t.Errorf("expected at least 50 flushed, got %d", count())
 	}
 }
