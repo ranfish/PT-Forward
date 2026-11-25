@@ -8,7 +8,7 @@
 
 - **域名**: www.hxpt.org
 - **架构**: hxpt（Next.js + /api/v1 REST·2026-11 改版）
-- **鉴权**: Authorization: Token fxo_...（API Token·auth_type=apikey·AuthKey 字段存储）
+- **鉴权**: Authorization: Token fxo_...（API Token·auth_type=apikey·api_key 列〔APIKey 字段〕存储——馒头先例同款；§59.570 附：初版误写 AuthKey 字段·v0.0.1616 修正）
 - **定位**: 综合站全品类（用户定案 2026-11-15 全放开——旧「仅纪录片」基于旧站教育定位作废）
 - **RSS**: 有（fxr_ token 订阅·/api/v1/rss/{token}——但我们统一走 API Token 通道）
 

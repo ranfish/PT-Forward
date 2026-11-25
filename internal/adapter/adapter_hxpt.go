@@ -22,7 +22,7 @@ import (
 //
 // 站方 2026-11 改版离开 NP·2026-11-17/18 上线第三方 API 体系。
 // §59.570 全切 Token（用户定案 2026-11-25）：
-//   - 鉴权：Authorization: Token fxo_...（sites.AuthKey·auth_type=apikey）
+//   - 鉴权：Authorization: Token fxo_...（sites.APIKey·api_key 列·auth_type=apikey——馒头先例同款字段）
 //   - 搜索：GET /api/v1/compat/nexusphp/torrents.json（NP 兼容层·Token）
 //   - 详情：GET /api/v1/open/torrents/{id}（开放 API·深数据）
 //   - 下载：POST /api/v1/downloads/keys → GET /api/v1/downloads/{id}?token=fxk_...
@@ -118,11 +118,11 @@ func (a *HxptAdapter) base(config *model.SiteConfig) string {
 	return "https://" + config.Domain
 }
 
-// apiCall §59.570 Token 鉴权请求。Authorization: Token fxo_...（AuthKey 字段）。
+// apiCall §59.570 Token 鉴权请求。Authorization: Token fxo_...（APIKey 字段·api_key 列）。
 // 统一信封 {code, message, data}；code!==0 返回错误。
 // 429 限流：读取 Retry-After 并返回带提示的错误（调用方退避）。
 func (a *HxptAdapter) apiCall(ctx context.Context, config *model.SiteConfig, method, url string, body io.Reader, out any) error {
-	token := strings.TrimSpace(config.AuthKey)
+	token := strings.TrimSpace(config.APIKey)
 	if token == "" {
 		return &model.AppError{Code: 40001, Message: "好学 API 需要 Token（站点配置认证凭证·fxo_ 开头）"}
 	}
@@ -273,7 +273,7 @@ func (a *HxptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCon
 	if err := httpclient.GlobalDownloadLimiter.AcquireWithLimit(domain, config.DownloadHourlyLimit); err != nil {
 		return nil, downloadError("下载限流: "+err.Error(), nil)
 	}
-	token := strings.TrimSpace(config.AuthKey)
+	token := strings.TrimSpace(config.APIKey)
 	if token == "" {
 		return nil, &model.AppError{Code: 40001, Message: "好学下载需要 API Token（站点配置认证凭证）"}
 	}
@@ -479,7 +479,7 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	if len(req.TorrentData) == 0 {
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
-	token := strings.TrimSpace(config.AuthKey)
+	token := strings.TrimSpace(config.APIKey)
 	if token == "" {
 		return nil, &model.AppError{Code: 40001, Message: "好学发布需要 API Token（站点配置认证凭证·fxo_ 开头）"}
 	}
