@@ -192,7 +192,8 @@
     "api_key_label": "API Key",
     "api_key_hint": "用户设置页（Settings）API 区块获取：灰色文本框即当前值；只有重置按钮时点重置后刷新显示新值。base64url 长串形态；发布链（api.php）认证用；获取链仍走 Cookie 通道",
     "show_cookie": true,
-    "show_apikey": true
+    "show_apikey": true,
+    "publish_supported": true
   },
   "hdarea.club": {
     "domain": "hdarea.club",
@@ -726,7 +727,8 @@
     "verification_status": "verified",
     "show_apikey": true,
     "api_key_hint": "pgk_ 开头的 API Key（站方改版后新增——用于 API 与种子下载；旧 Passkey 仅作 Tracker announce 保留）",
-    "show_passkey": false
+    "show_passkey": false,
+    "publish_supported": true
   },
   "sbpt.link": {
     "domain": "sbpt.link",
@@ -917,7 +919,8 @@
     "cookiecloud_domain": "www.musopia.vip",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
-    "special_notes": ""
+    "special_notes": "",
+    "publish_supported": true
   },
   "www.okpt.net": {
     "domain": "www.okpt.net",
@@ -991,7 +994,8 @@
     "api_key_hint": "请从 个人面板-安全设定 页面创建，默认有效期 180 天",
     "show_cookie": true,
     "verification_status": "verified",
-    "special_notes": "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API"
+    "special_notes": "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API",
+    "publish_supported": true
   },
   "xdypt.vip": {
     "domain": "xdypt.vip",
@@ -1039,7 +1043,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "zhuque.in",
     "download_url_template": "api/torrent/download/{id}",
-    "verification_status": "verified"
+    "verification_status": "verified",
+    "publish_supported": true
   },
   "zmpt.cc": {
     "domain": "zmpt.cc",

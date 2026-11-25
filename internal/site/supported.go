@@ -81,11 +81,41 @@ func GetSupportedSite(domain string) (*SupportedSite, bool) {
 	return s, ok
 }
 
-// IsPublishSupported §59.318: 站点是否已适配发布（supported_sites.json 权威位）。
+// IsPublishSupported §59.318→§59.571 双源: 站点是否已适配发布。
+// 源① supported_sites.json publish_supported=true（静态声明·兼容存量 69 站）
+// 源② sites 表 form_config enabled=true（migration 交付即生效——适配完成
+//        的交付物就是 form_config·它的存在就是证明）
+// 满足任一即 true——json 标记降级为「预声明」而非「门卫」。
+// §59.571 定案：单环境用户 OTA → migration → form_config → 直接可开目标站
+// （手工 json 同步遗漏不再阻断用户——乌托邦/朱雀/海豹/肉丝/野马五站案驱动）。
 // 不在白名单的站（理论不存在——强白名单体系）恒 false。
 func IsPublishSupported(domain string) bool {
 	s, ok := GetSupportedSite(domain)
-	return ok && s.PublishSupported
+	if !ok {
+		return false // §59.318: 白名单外恒 false（强白名单前置门）
+	}
+	if s.PublishSupported {
+		return true // 源一：json 静态声明
+	}
+	// §59.571: 源二——form_config 派生（白名单内站·migration 交付即生效）
+	return siteFormConfigEnabled(domain)
+}
+
+// siteFormConfigEnabled §59.571: DB sites 表 form_config enabled=true 判定。
+// 闭包 DB 访问（site 包不直接依赖 gorm——由 SetFormConfigChecker 注入）。
+var formConfigChecker func(domain string) bool
+
+// SetFormConfigChecker §59.571: main 启动时注入 DB 查询闭包。
+// site 包保持零 DB 依赖（包边界不破）。
+func SetFormConfigChecker(fn func(domain string) bool) {
+	formConfigChecker = fn
+}
+
+func siteFormConfigEnabled(domain string) bool {
+	if formConfigChecker == nil {
+		return false
+	}
+	return formConfigChecker(domain)
 }
 
 // ListSupportedSites 返回按 domain 升序的全部白名单站点。

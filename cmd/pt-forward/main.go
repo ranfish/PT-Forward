@@ -128,6 +128,16 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
+	// §59.571: IsPublishSupported 双源——注入 DB form_config 查询闭包
+	// （site 包零 DB 依赖·闭包桥接；migration 交付即生效）
+	site.SetFormConfigChecker(func(domain string) bool {
+		var s model.Site
+		if err := db.Where("domain = ?", domain).First(&s).Error; err != nil {
+			return false
+		}
+		return strings.Contains(s.PublishFormConfig, `"enabled":true`)
+	})
+
 	if err := syncStandardKeys(db, log); err != nil {
 		log.Error("failed to sync standard keys", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
