@@ -468,6 +468,9 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 		isMusic := mr.InfoHash != ""
 		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic)
 		item["status"] = status
+		// §59.577 刀2: 外站组身份并行字段（已获取态状态流后·身份从状态剥离）
+		itemExternal := h.seedExternalGroupFlag(r.Context(), meta)
+		item["external_group"] = itemExternal
 		item["is_music"] = isMusic
 		if isMusic {
 			item["music_artist"] = mr.Artist
@@ -561,6 +564,12 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 		if q.statusFilter != "" && q.statusFilter != "system_forbidden" {
 			if q.statusFilter == "issues" {
 				if status != "forbidden" && status != "no_mapping" {
+					continue
+				}
+			} else if q.statusFilter == "external_group" {
+				// §59.577 刀2: 「外站组」桶=未获取态 status（获取提醒）∨
+				// 已获取态并行字段（状态流后身份剥离——tag 消费）
+				if status != "external_group" && !itemExternal {
 					continue
 				}
 			} else if status != q.statusFilter {

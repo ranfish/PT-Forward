@@ -660,13 +660,19 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 			if group != "" {
 				if h.sourceDetector.LookupGroup(ctx, group) == "" {
 					if h.sourceDetector.LookupExternalGroup(ctx, group) {
-						return "external_group" // 已获取态：组已识别·刀2 开发布门
+						// §59.577 刀2 形态修正：已获取外站组走状态流（④⑤⑥
+						// reviewed/pending/incomplete·§59.230 原则——PERFUME
+						// 案「已获取种子按获取后状态流展示」同构）。外站组身份
+						// 并行字段 external_group（seedExternalGroupFlag）·
+						// 非状态。发布门由此自开（状态流=正常门径）。
+						// 未知组（双 miss）→ 不合成声明（诚实）。
+					} else {
+						// 站方标题有组名但无映射——真无映射（比裸名可信）
+						return "no_mapping"
 					}
-					// 站方标题有组名但无映射——真无映射（比裸名可信）
-					return "no_mapping"
 				}
 			}
-			// 站方标题无组名（电影等）或有映射——均按获取后状态流展示
+			// 站方标题无组名（电影等）或有映射（或外站组落穿）——均按获取后状态流展示
 		}
 	}
 
@@ -927,4 +933,25 @@ func groupFromReleaseGroupSlot(slot string) string {
 		return ""
 	}
 	return strings.TrimPrefix(s, "team.")
+}
+
+// seedExternalGroupFlag §59.577 刀2: 外站组身份并行字段（非状态——
+// 已获取外站组走状态流后·身份从状态剥离·tag 展示与「外站组」筛选桶消费）。
+// 已获取种子：Ⅱ标题组名/Ⅰ级槽位救回 → LookupGroup miss ∧ 注册表命中。
+// 未获取种子：status=external_group 本身即身份（tag 冗余·false）。
+func (h *PublishTorrentsHandler) seedExternalGroupFlag(ctx context.Context, meta *model.TorrentMetadata) bool {
+	if meta == nil || meta.Title == "" || h.sourceDetector == nil {
+		return false
+	}
+	group := publish.ExtractGroupName(meta.Title)
+	if group == "" {
+		group = groupFromReleaseGroupSlot(meta.ReleaseGroup)
+	}
+	if group == "" || group == "NOGROUP" || group == "Other" {
+		return false
+	}
+	if h.sourceDetector.LookupGroup(ctx, group) != "" {
+		return false // 官组——非外站组
+	}
+	return h.sourceDetector.LookupExternalGroup(ctx, group)
 }

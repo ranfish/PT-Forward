@@ -200,6 +200,8 @@
           <a-tag v-else :color="statusColor(record.status)" size="small">
             {{ statusLabel(record.status) }}
           </a-tag>
+          <!-- §59.577 刀2: 外站组身份 tag（状态流后身份剥离——并行字段展示） -->
+          <a-tag v-if="record.external_group && record.status !== 'external_group'" color="geekblue" size="small" style="margin-left: 4px">外站组</a-tag>
         </template>
 
         <template v-else-if="column.key === 'size'">

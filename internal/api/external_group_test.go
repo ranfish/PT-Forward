@@ -40,12 +40,13 @@ func TestClassifySeedStatusExternalGroup(t *testing.T) {
 		{"未获取快照外站组", "Some Movie 2020 1080p BluRay AVC-MAMA", nil, "external_group"},
 		// Ⅲ 未获取+未知组 → no_mapping（窄门 A：未收录）
 		{"未获取未知组", "Some Movie 2020 1080p BluRay AVC-UNKNOWNGRP", nil, "no_mapping"},
-		// Ⅱ 已获取+标题外站组 → external_group（刀2 开发布门）
+		// Ⅱ 已获取+标题外站组 → 状态流（§59.577 刀2 形态修正：已获取外站组
+		// 走 ④⑤⑥——§59.230 原则·身份剥离为并行字段）
 		{"获取后标题外站组", "SOME MOVIE",
-			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园"}, "external_group"},
-		// Ⅰ 标题无组名+release_group 列外站组（team.mama）→ external_group（Ⅰ级救回）
+			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园"}, "incomplete"},
+		// Ⅰ 标题无组名+release_group 列外站组（team.mama）→ 状态流（同上）
 		{"Ⅰ级救回外站组", "SOME MOVIE",
-			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS", SiteName: "家园", ReleaseGroup: "team.mama"}, "external_group"},
+			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS", SiteName: "家园", ReleaseGroup: "team.mama"}, "incomplete"},
 		// Ⅰ 标题无组名+release_group 列官组（team.hhweb）→ 状态流（LookupGroup 命中走官组路径）
 		{"Ⅰ级官组状态流", "SOME MOVIE",
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS", SiteName: "家园", ReleaseGroup: "team.hhweb"}, "incomplete"},
@@ -53,9 +54,9 @@ func TestClassifySeedStatusExternalGroup(t *testing.T) {
 		{"Ⅰ级other落Ⅱ级", "SOME MOVIE",
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS", SiteName: "家园", ReleaseGroup: "team.other"}, "incomplete"},
 		// 13city 反例：Ⅰ级 team.hhweb + 标题带外站组 MAMA——Ⅱ级标题组名优先消费
-		//（标题是发布链消费面）→ MAMA 注册表命中 → external_group
+		//（标题是发布链消费面）→ MAMA 注册表命中 → 状态流（身份并行字段）
 		{"Ⅰ级官组Ⅱ级外站组", "SOME MOVIE",
-			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园", ReleaseGroup: "team.hhweb"}, "external_group"},
+			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园", ReleaseGroup: "team.hhweb"}, "incomplete"},
 	}
 	for _, c := range cases {
 		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta, false)

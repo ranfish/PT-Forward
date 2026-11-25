@@ -32,6 +32,10 @@ const (
 	// GroupNamePlaceholder §59.20: 制作组名占位符。
 	GroupNamePlaceholder = "{group_name}"
 
+	// §59.577 刀2: 外站组专属模板（用户定案文案——「小组」非「官组」：
+	// 外站组非系统支持站点官组·称谓诚实；格式与官组模板同构）。
+	ExternalGroupThanksQuote = "{group_name}小组作品，感谢原制作者发布。"
+
 	// ThanksCoreText §59.542 刀1: 禁转引言文本单源——追加锚/剥离锚/
 	// 声明过滤词表全部派生于此（改措辞只动这一处·生成与剥离永不漂移）。
 	// 系统独有措辞（用户确认未见于其它发布者）。
@@ -44,6 +48,32 @@ const (
 // 存量 backfill 声明均无句号；剥离消费面（词表/正则）用本锚=同时命中
 // 存量与新形态（无句号子串在句号文本中亦 Contains）。
 var ThanksCoreTextLegacy = strings.TrimSuffix(ThanksCoreText, "。")
+
+// GroupKind §59.577 刀2: 组身份三辨（声明门消费）。
+type GroupKind int
+
+const (
+	GroupKindOfficial GroupKind = iota // 官组（mappings 命中）
+	GroupKindExternal                  // 外站组（注册表命中）
+	GroupKindUnknown                   // 未知（双 miss——不合成声明）
+)
+
+// groupKindChecker §59.577 刀2: 闭包注入（main 装配期——§59.571
+// SetFormConfigChecker 先例；description 包零 DB 依赖）。
+// nil → 全按官组兼容（缺口 3 甲定案：装配期必注入·nil 只在单测）。
+var groupKindChecker func(group string) GroupKind
+
+// SetGroupKindChecker 注入组身份判定闭包。
+func SetGroupKindChecker(fn func(group string) GroupKind) {
+	groupKindChecker = fn
+}
+
+func kindOf(group string) GroupKind {
+	if groupKindChecker == nil {
+		return GroupKindOfficial
+	}
+	return groupKindChecker(group)
+}
 
 // GenerateThanksQuote 生成感谢引言。
 //
@@ -97,8 +127,18 @@ func BuildOfficialThanks(siteName, group string) string {
 
 // HasOfficialThanks statement 是否已含我方致谢（消费合成判别——历史
 // backfill 行与回流形态均含「官组作品」锚词·两态兼容判别）。
+// §59.577 刀2: 双锚——官组作品∨小组作品（外站组新形态防双加）。
 func HasOfficialThanks(statement string) bool {
-	return strings.Contains(statement, "官组作品")
+	return strings.Contains(statement, "官组作品") || strings.Contains(statement, "小组作品")
+}
+
+// BuildExternalGroupThanks §59.577 刀2: 外站组两句致谢块（head 换小组
+// 模板·tail 与官组块共票——「只替换第一句」用户定案）。
+func BuildExternalGroupThanks(siteName, group string) string {
+	thanksLine := strings.ReplaceAll(ExternalGroupThanksQuote, GroupNamePlaceholder, group)
+	head := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]"
+	tail := "[quote][b][color=red][size=5]" + ThanksCoreText + "[/size][/color][/b][/quote]"
+	return head + "\n" + tail
 }
 
 // ComposeStatement §59.542 追记十二（用户定案·回归 v0.0.597 原始设计）：
@@ -116,7 +156,17 @@ func ComposeStatement(statement, siteName, title string) string {
 	if HasOfficialThanks(statement) {
 		return statement
 	}
-	thanks := BuildOfficialThanks(siteName, group)
+	// §59.577 刀2: 三辨门——官组→官组模板；外站组→小组模板；
+	// 未知→不合成（诚实·A 门下不可发布）。nil checker 全按官组（兼容）。
+	var thanks string
+	switch kindOf(group) {
+	case GroupKindExternal:
+		thanks = BuildExternalGroupThanks(siteName, group)
+	case GroupKindUnknown:
+		return statement // 未知——不合成（不杜撰称谓）
+	default:
+		thanks = BuildOfficialThanks(siteName, group)
+	}
 	if strings.TrimSpace(statement) == "" {
 		return thanks
 	}

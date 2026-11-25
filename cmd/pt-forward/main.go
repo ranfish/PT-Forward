@@ -30,6 +30,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/cloudfp"
 	"github.com/ranfish/pt-forward/internal/compliance"
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/config"
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
 	"github.com/ranfish/pt-forward/internal/coverage"
@@ -604,6 +605,24 @@ func main() {
 	bdinfoQueue.Start()
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
+	// §59.577 刀2: 组身份三辨闭包注入（description 包零 DB 依赖——
+	// §59.571 SetFormConfigChecker 先例；mappings 命中=官组·
+	// external_release_groups 命中=外站组·双 miss=未知不合成声明）
+	description.SetGroupKindChecker(func(group string) description.GroupKind {
+		if group == "" {
+			return description.GroupKindUnknown
+		}
+		var cnt int64
+		db.Table("release_group_mappings").Where("LOWER(group_name) = LOWER(?)", group).Count(&cnt)
+		if cnt > 0 {
+			return description.GroupKindOfficial
+		}
+		db.Table("external_release_groups").Where("LOWER(group_name) = LOWER(?)", group).Count(&cnt)
+		if cnt > 0 {
+			return description.GroupKindExternal
+		}
+		return description.GroupKindUnknown
+	})
 	sourceDetector.RefreshCache(context.Background())
 	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher, coverageSvc, sourceDetector, complianceChecker, imageHostMgr)
 	router.SetConfigEventBus(configEventBus)
