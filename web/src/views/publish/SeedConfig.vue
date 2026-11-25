@@ -159,7 +159,7 @@
       :row-selection="{
         selectedRowKeys: selectedHashes,
         onChange: onSelectChange,
-        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' }), // §59.230: no_mapping=未获取族；§59.577 刀1: external_group 刀2 开闸前保持禁（防错标声明流出）
+        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' }), // §59.230: no_mapping=未获取族；§59.577 刀2: external_group=未获取态（已获取外站组走状态流·§59.230 原则——状态流行天然可选发布·此门拦的是无数据行）
       }"
       @change="onTableChange"
     >

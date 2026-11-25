@@ -163,7 +163,9 @@ export interface SeedListItem {
   has_screenshots?: boolean
   fetched_at?: string
   fetched?: boolean
-  status: string // forbidden / system_forbidden / no_mapping / reviewed / pending / incomplete / unfetched
+  status: string // forbidden / system_forbidden / no_mapping / external_group（§59.577 未获取态·获取提醒） / reviewed / pending / incomplete / unfetched / observing
+  // §59.577 刀2: 外站组身份并行字段（已获取态状态流后·身份从状态剥离——tag 展示与「外站组」筛选桶消费）
+  external_group?: boolean
   // §59.469 附八: 音乐种行标记（SeedConfig 主入口"详情"按钮/MDP 分流）
   is_music?: boolean
   // §59.469 附九: 字段列音乐行红绿标（方案 1a·与审核门同构）
