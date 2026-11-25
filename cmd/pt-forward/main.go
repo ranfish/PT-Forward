@@ -129,13 +129,19 @@ func main() {
 	}
 
 	// §59.571: IsPublishSupported 双源——注入 DB form_config 查询闭包
-	// （site 包零 DB 依赖·闭包桥接；migration 交付即生效）
+	// （site 包零 DB 依赖·闭包桥接；migration 交付即生效）。
+	// 解析走 json.Unmarshal→cfg.Enabled（migration40/45/46/63 同款惯例）——
+	// 禁用 strings.Contains 匹配（带空格形态静默漏判+嵌套 enabled 键伪命中）。
 	site.SetFormConfigChecker(func(domain string) bool {
 		var s model.Site
 		if err := db.Where("domain = ?", domain).First(&s).Error; err != nil {
 			return false
 		}
-		return strings.Contains(s.PublishFormConfig, `"enabled":true`)
+		var cfg model.PublishFormConfig
+		if err := json.Unmarshal([]byte(s.PublishFormConfig), &cfg); err != nil {
+			return false
+		}
+		return cfg.Enabled
 	})
 
 	if err := syncStandardKeys(db, log); err != nil {
