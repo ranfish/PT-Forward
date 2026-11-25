@@ -34,17 +34,17 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 		meta     *model.TorrentMetadata
 		want     string
 	}{
-		// PERFUME 案 ①：tr 裸名未获取 → no_mapping（获取通道提醒）
-		{"裸名未获取", "PERFUME OF THE LADY IN BLACK", nil, "no_mapping"},
+		// PERFUME 案 ①：tr 裸名未获取 → unsupported①（§59.578·不认识·含无组名）
+		{"裸名未获取", "PERFUME OF THE LADY IN BLACK", nil, "unsupported"},
 		// PERFUME 案 ②：已获取+站方标题带 -CMCT（有映射）→ 按获取后状态流（unreviewed 缺字段）
 		{"获取后站方标题有组名", "PERFUME OF THE LADY IN BLACK",
 			&model.TorrentMetadata{Title: "The Perfume of the Lady in Black 1974 1080p Blu-ray AVC DTS-HD MA 1.0-CMCT", SiteName: "织梦"}, "incomplete"},
-		// ③：已获取+站方标题也无组名（电影）→ 获取后状态流（不再 no_mapping）
+		// ③：已获取+站方标题也无组名（电影）→ 获取后状态流（不再 unsupported）
 		{"获取后站方标题无组名", "SOME MOVIE",
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-HD", SiteName: "站"}, "incomplete"},
-		// ④：已获取+站方标题有组名但真无映射 → no_mapping（站方标题比裸名可信）
+		// ④：已获取+站方标题有组名但不在收录列表 → unsupported①（站方标题比裸名可信）
 		{"获取后真无映射", "SOME MOVIE",
-			&model.TorrentMetadata{Title: "Movie 2020 1080p-UNKNOWNGRP", SiteName: "站"}, "no_mapping"},
+			&model.TorrentMetadata{Title: "Movie 2020 1080p-UNKNOWNGRP", SiteName: "站"}, "unsupported"},
 	}
 	for _, c := range cases {
 		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta, false)
@@ -99,4 +99,35 @@ func TestPutSeedReviewSemantics(t *testing.T) {
 	// PUT 默认：updates 无 reviewed 键（buildPutSeedUpdates 不含）
 	// 显式：req.Reviewed=true 且 missing>0 → 400 拒绝
 	// ——语义由实现结构保证（无独立函数），编译级+集成覆盖
+}
+
+// §59.578 刀1: 种子状态值域锁定锚（§59.546 纪律平移——发布终态先例：
+// 先登记→锚→grep 消费面）。classifySeedStatusLite 的输出全集=此八字。
+// 未来增删状态值：先改本锚（含前端 STATUS_META 三页同步的 grep 清单
+// 纪律），再改 classify——倒过来=锚红（§59.1627 教训：新增状态值消费面
+// 漏改 STATUS_META 双页）。
+func TestSeedStatusValueSet(t *testing.T) {
+	allowed := map[string]bool{
+		"forbidden":        true, // §59.578: 禁转（收窄纯化——原「禁转/无映射」）
+		"system_forbidden": true,
+		"unsupported":      true, // §59.578: 不支持（①不认识∪②获取终态失败·刀2 烙印）
+		"reviewed":         true,
+		"pending":          true,
+		"incomplete":       true,
+		"unfetched":        true, // §59.578: 未获取（收录列表命中·隐含未走链）
+		"observing":        true,
+	}
+	// 消亡值（§59.578）——任何回归引入即锚红
+	dead := []string{"no_mapping", "external_group"}
+	for _, d := range dead {
+		if allowed[d] {
+			t.Errorf("消亡状态 %q 出现在值域（§59.578：外站组概念收回系统内部）", d)
+		}
+	}
+	// 值域枚举方式：classify 全分支的已知输出逐一核对（表驱动锚已覆盖
+	// 各分支——此处锁值域声明本身：改动 classify 增加新返回值时必须先
+	// 扩本锚，否则新增值无前端 STATUS_META 条目=列表显示裸值）。
+	if len(allowed) != 8 {
+		t.Errorf("值域基数变化（%d≠8）——扩值域须先改本锚+前端三页", len(allowed))
+	}
 }

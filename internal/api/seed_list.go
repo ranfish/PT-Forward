@@ -562,17 +562,11 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 			}
 		}
 		if q.statusFilter != "" && q.statusFilter != "system_forbidden" {
-			if q.statusFilter == "issues" {
-				if status != "forbidden" && status != "no_mapping" {
-					continue
-				}
-			} else if q.statusFilter == "external_group" {
-				// §59.577 刀2: 「外站组」桶=未获取态 status（获取提醒）∨
-				// 已获取态并行字段（状态流后身份剥离——tag 消费）
-				if status != "external_group" && !itemExternal {
-					continue
-				}
-			} else if status != q.statusFilter {
+			// §59.578: issues/external_group 特判删除——前端 value 改
+			// forbidden/unsupported 直通 status === filter（前后端同版本
+			// embed 部署·无兼容负担）。已获取外站组 tag 颗不入筛选桶
+			// （状态流桶消费——外站组概念收回系统内部）。
+			if status != q.statusFilter {
 				continue
 			}
 		}
@@ -623,7 +617,9 @@ func (h *PublishTorrentsHandler) finalizeSeedList(r *http.Request, items []map[s
 			name, _ := item["name"].(string)
 			siteName, _ := item["site_name"].(string)
 			status, _ := item["status"].(string)
-			if status != "forbidden" && status != "no_mapping" {
+			// §59.578: 跳过清单=禁转+不支持（原 no_mapping 位——
+			// compliance 精化跳过未获取族·防双重覆盖）
+			if status != "forbidden" && status != "unsupported" {
 				if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName, clusterIsMusic(item)); r2 != nil && !r2.Passed {
 					item["status"] = "system_forbidden"
 				}

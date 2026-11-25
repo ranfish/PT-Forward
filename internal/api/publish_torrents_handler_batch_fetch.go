@@ -621,33 +621,31 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 		}
 	}
 
-	// ③ 制作组映射检查 §59.230: 仅对未获取种子有意义（无映射=获取通道提醒——
-	// 已获取种子该状态双重过时：a)簇 comment/coverage 兜底已获取成功 b)站方标题
-	// 可能带组名（PERFUME 案：tr 裸名无组名判 no_mapping，获取后织梦标题
-	// 实为 -CMCT 官组种有映射——本地裸名误判被站方标题纠正）。
-	// 已获取种子用站方标题（meta.Title）重判映射——站方标题是权威
-	// （发布/审核消费的就是它）。
-	// §59.469 附七: 音乐种跳过组映射——音乐标题通常无组名（§59.469 定案
-	// 表述）·音乐链已定向音乐源站（coverage/簇判定）·组映射是影视获取通道
-	// 语义；不跳过则已审核音乐种恒 no_mapping（许景淳案：③ 早退优先于
-	// ④ reviewed——审核态被组映射遮蔽）。
-	// §59.577 刀1: 三级回退链（站方发布页组名选择→标题→文件名笔误）+
-	// 外站组注册表第二查询（LookupGroup miss → LookupExternalGroup 命中 →
-	// external_group 新状态）。刀1 发布门保持关（前端 external_group 仍不可
-	// 发布·刀2 声明扩展后开闸——防错标「官组作品」声明流出）。
+	// ③ 制作组映射检查 §59.578（状态模型重构·用户定案）：
+	// 未获取族二元身份——收录列表（官组∪外站注册表）命中 → unfetched
+	// （可获取候选）；miss（含无组名）→ unsupported①（不认识·静态终态
+	// ·隐含不支持转载发布）。原 no_mapping/external_group 状态消亡。
+	// §59.230 已获取重判保留（PERFUME 案·站方标题权威）。
+	// §59.469 附七: 音乐种跳过组映射（音乐标题通常无组名·音乐链定向
+	// 音乐源站——组映射是影视获取通道语义）→ 落穿 unfetched。
+	// §59.577 刀1: 三级回退链（站方发布页组名选择→标题→文件名笔误）
+	// + 外站注册表第二查询保持。
 	if h.sourceDetector != nil && !isMusicSeed {
 		if meta == nil {
 			// Ⅲ 未获取：快照名组名（发布者手写文件名·笔误容忍靠容错行）
 			group := publish.ExtractGroupName(name)
 			if group == "" {
-				return "no_mapping"
+				return "unsupported"
 			}
 			if h.sourceDetector.LookupGroup(ctx, group) == "" {
 				if h.sourceDetector.LookupExternalGroup(ctx, group) {
-					return "external_group" // 未获取态：组已识别·显示+获取按钮
+					// §59.578 A 扩展：收录列表命中（注册表）→ unfetched
+					// （可获取候选·簇/覆盖通道——SPHD 先例）
+				} else {
+					return "unsupported"
 				}
-				return "no_mapping"
 			}
+			// 官组映射命中 ∨ 注册表命中 → 落穿 unfetched
 		} else if meta.Title != "" {
 			// Ⅱ 标题组名（站方标题权威——§59.230 PERFUME 先例）
 			group := publish.ExtractGroupName(meta.Title)
@@ -660,15 +658,14 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 			if group != "" {
 				if h.sourceDetector.LookupGroup(ctx, group) == "" {
 					if h.sourceDetector.LookupExternalGroup(ctx, group) {
-						// §59.577 刀2 形态修正：已获取外站组走状态流（④⑤⑥
-						// reviewed/pending/incomplete·§59.230 原则——PERFUME
-						// 案「已获取种子按获取后状态流展示」同构）。外站组身份
-						// 并行字段 external_group（seedExternalGroupFlag）·
-						// 非状态。发布门由此自开（状态流=正常门径）。
+						// §59.577 刀2 形态修正（§59.578 保留）：已获取外站组
+						// 走状态流（④⑤⑥ reviewed/pending/incomplete·§59.230
+						// 原则）。外站组身份并行字段 external_group（tag 消费）。
 						// 未知组（双 miss）→ 不合成声明（诚实）。
 					} else {
-						// 站方标题有组名但无映射——真无映射（比裸名可信）
-						return "no_mapping"
+						// 站方标题有组名但不在收录列表 → unsupported①
+						// （站方标题比裸名可信）
+						return "unsupported"
 					}
 				}
 			}

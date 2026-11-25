@@ -39,9 +39,9 @@
           <a-radio-button value="reviewed">已审核</a-radio-button>
           <a-radio-button value="pending">待审核</a-radio-button>
           <a-radio-button value="incomplete">不完整</a-radio-button>
+          <a-radio-button value="forbidden">禁转</a-radio-button>
           <a-radio-button value="unfetched">未获取</a-radio-button>
-          <a-radio-button value="issues">禁转/无映射</a-radio-button>
-          <a-radio-button value="external_group">外站组</a-radio-button>
+          <a-radio-button value="unsupported">不支持</a-radio-button>
           <a-radio-button value="observing">观察期</a-radio-button>
         </a-radio-group>
 
@@ -85,9 +85,11 @@
           <PlusOutlined /> 获取未配置
         </a-button>
         <!-- §59.479 C: 问题视图批量重获——当前筛选行集带入弹窗强刷重取
-             （常规批量获取会被簇跳过 no-op；单行重获的批量形态） -->
+             （常规批量获取会被簇跳过 no-op；单行重获的批量形态）
+             §59.578: value 迁移 issues→unsupported（问题视图=不支持视图——
+             force 重取烙印颗·与行内 force 通道一致） -->
         <a-button
-          v-if="filterClient && filterPath && statusFilter === 'issues' && tableData.length > 0"
+          v-if="filterClient && filterPath && statusFilter === 'unsupported' && tableData.length > 0"
           :loading="batchFetchActive"
           @click="openBatchRefetch"
         >
@@ -159,7 +161,7 @@
       :row-selection="{
         selectedRowKeys: selectedHashes,
         onChange: onSelectChange,
-        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' }), // §59.230: no_mapping=未获取族；§59.577 刀2: external_group=未获取态（已获取外站组走状态流·§59.230 原则——状态流行天然可选发布·此门拦的是无数据行）
+        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'unsupported' }), // §59.578: 未获取族无数据行不可选（发布选择器意图——unsupported 的「清除烙印」通道走刀2 的 unsupported 视图批量清除按钮·不经 checkbox）
       }"
       @change="onTableChange"
     >
@@ -201,7 +203,7 @@
             {{ statusLabel(record.status) }}
           </a-tag>
           <!-- §59.577 刀2: 外站组身份 tag（状态流后身份剥离——并行字段展示） -->
-          <a-tag v-if="record.external_group && record.status !== 'external_group'" color="geekblue" size="small" style="margin-left: 4px">外站组</a-tag>
+          <a-tag v-if="record.external_group && record.status !== 'unsupported'" color="geekblue" size="small" style="margin-left: 4px">外站组</a-tag>
         </template>
 
         <template v-else-if="column.key === 'size'">
@@ -253,8 +255,10 @@
               :loading="fetchingSet.has(record.hash)"
               @click="fetchSingle(record)"
             >
-              {{ record.status === 'unfetched' || record.status === 'no_mapping' || record.status === 'external_group' ? '获取' : '重获' }}
+              {{ record.status === 'unfetched' || record.status === 'unsupported' ? '获取' : '重获' }}
             </a-button>
+            <!-- §59.578 刀1: 收录按钮 v-if='no_mapping' 恒 false（状态消亡·入口自动关闭）
+                 ——刀3 清尸体（按钮+弹窗+openRegisterExternalGroup 函数） -->
             <a-button
               v-if="record.status === 'no_mapping'"
               size="small"
@@ -262,7 +266,7 @@
               @click="openRegisterExternalGroup(record)"
             >收录外站组</a-button>
             <a-button
-              v-if="record.status !== 'unfetched' && record.status !== 'no_mapping' && record.status !== 'external_group'"
+              v-if="record.status !== 'unfetched' && record.status !== 'unsupported'"
               size="small"
               type="link"
               danger
@@ -357,7 +361,10 @@ function loadPersistedFilters() {
     const saved = JSON.parse(raw)
     filterClient.value = saved.client ? Number(saved.client) || undefined : undefined
     filterPath.value = saved.path || undefined
-    statusFilter.value = saved.status || 'all'
+    // §59.578: 筛选 value 迁移容错——旧值（issues/external_group/no_mapping）
+    // 回流 'all'（value 变更后 localStorage 残留不白屏）
+    const s = saved.status || 'all'
+    statusFilter.value = ['all', 'reviewed', 'pending', 'incomplete', 'unfetched', 'forbidden', 'unsupported', 'observing', 'system_forbidden'].includes(s) ? s : 'all'
   } catch { /* silent */ }
 }
 
@@ -460,7 +467,7 @@ async function fetchList() {
     const params = {
       client_id: filterClient.value,
       save_path: filterPath.value || '',
-      status: statusFilter.value === 'all' ? '' : (statusFilter.value === 'issues' ? 'issues' : statusFilter.value),
+      status: statusFilter.value === 'all' ? '' : statusFilter.value,
       search: searchText.value,
       page: currentPage.value,
       page_size: pageSize.value,
@@ -496,8 +503,7 @@ function statusLabel(status: string): string {
   const map: Record<string, string> = {
     forbidden: '禁转',
     system_forbidden: '系统禁转',
-    no_mapping: '无源站映射',
-    external_group: '外站组',
+    unsupported: '不支持', // §59.578: ①不认识∪②获取终态失败（刀2 烙印）
     reviewed: '已审核',
     pending: '待审核',
     incomplete: '不完整',
@@ -511,8 +517,7 @@ function statusColor(status: string): string {
   const map: Record<string, string> = {
     forbidden: 'red',
     system_forbidden: 'orange',
-    no_mapping: 'default',
-    external_group: 'geekblue',
+    unsupported: 'volcano', // §59.578: 终态警示（不支持转载发布）
     reviewed: 'success',
     pending: 'warning',
     incomplete: 'default',
@@ -524,7 +529,7 @@ function statusColor(status: string): string {
 
 function statusRowClass(status: string): string {
   if (status === 'forbidden' || status === 'system_forbidden') return 'row-forbidden'
-  if (status === 'no_mapping' || status === 'external_group') return 'row-disabled'
+  if (status === 'unsupported') return 'row-disabled'
   return ''
 }
 

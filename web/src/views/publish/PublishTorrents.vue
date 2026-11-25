@@ -346,8 +346,7 @@ const columns = [
 const STATUS_META: Record<string, { label: string; color: string }> = {
   forbidden: { label: '禁转', color: 'red' },
   system_forbidden: { label: '系统禁转', color: 'red' },
-  no_mapping: { label: '无源站映射', color: 'volcano' },
-  external_group: { label: '外站组', color: 'geekblue' }, // §59.577 刀1
+  unsupported: { label: '不支持', color: 'volcano' }, // §59.578: ①不认识∪②获取终态失败
   reviewed: { label: '已审核', color: 'green' },
   pending: { label: '待审核', color: 'blue' },
   incomplete: { label: '配置不完整', color: 'orange' },

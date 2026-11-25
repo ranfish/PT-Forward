@@ -36,10 +36,11 @@ func TestClassifySeedStatusExternalGroup(t *testing.T) {
 		meta     *model.TorrentMetadata
 		want     string
 	}{
-		// Ⅲ 未获取+快照名外站组（注册表命中）→ external_group（只显示+获取）
-		{"未获取快照外站组", "Some Movie 2020 1080p BluRay AVC-MAMA", nil, "external_group"},
-		// Ⅲ 未获取+未知组 → no_mapping（窄门 A：未收录）
-		{"未获取未知组", "Some Movie 2020 1080p BluRay AVC-UNKNOWNGRP", nil, "no_mapping"},
+		// Ⅲ 未获取+快照名外站组（注册表命中）→ unfetched（§59.578 A 扩展：
+		// 收录列表命中=可获取候选·簇/覆盖通道——SPHD 先例）
+		{"未获取快照外站组", "Some Movie 2020 1080p BluRay AVC-MAMA", nil, "unfetched"},
+		// Ⅲ 未获取+未知组 → unsupported①（不认识——窄门 A：未收录）
+		{"未获取未知组", "Some Movie 2020 1080p BluRay AVC-UNKNOWNGRP", nil, "unsupported"},
 		// Ⅱ 已获取+标题外站组 → 状态流（§59.577 刀2 形态修正：已获取外站组
 		// 走 ④⑤⑥——§59.230 原则·身份剥离为并行字段）
 		{"获取后标题外站组", "SOME MOVIE",
