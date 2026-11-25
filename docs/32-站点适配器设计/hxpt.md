@@ -9,6 +9,8 @@
 - **域名**: www.hxpt.org
 - **架构**: hxpt（Next.js + /api/v1 REST·2026-11 改版）
 - **鉴权**: Authorization: Token fxo_...（API Token·auth_type=apikey·api_key 列〔APIKey 字段〕存储——馒头先例同款；§59.570 附：初版误写 AuthKey 字段·v0.0.1616 修正）
+- **⚠ §59.572 关闸（v0.0.1618·用户定案）**: 站方 open API 上传不注入 source 字段（web 路径注入——指纹库跨站对照实证：同一内容三站三 hash·唯 API 上传=源 hash 原样存储）→ 站内种子与源站同 info_hash → 下载器去重无法做种（qB/TR 均不建同 hash 第二任务）→ 我方不可修·migration183 软关闸等站方。重启前置=站方 API 补 source 注入+重开目标站+契约复验。
+- **上传契约（v0.0.1618 对齐·openapi.json 实拉）**: multipart 只收 `file`（≤4MiB）+可选 `nfo`（文本≤1MiB·简介通道待站方明确）；元数据走**查询参数**：category_id（必填）/name/small_descr/anonymous（"1"=匿名）/price（恒不传——免费·缺省=0 实证）。descr/mediainfo/tags/sections/imdb 无投递通道（API 未完成）。§59.533 v2 的「multipart 15 字段」契约已作废——站方第三方 API 形态不同。
 - **定位**: 综合站全品类（用户定案 2026-11-15 全放开——旧「仅纪录片」基于旧站教育定位作废）
 - **RSS**: 有（fxr_ token 订阅·/api/v1/rss/{token}——但我们统一走 API Token 通道）
 

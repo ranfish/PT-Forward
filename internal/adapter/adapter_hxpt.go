@@ -27,7 +27,10 @@ import (
 //   - 详情：GET /api/v1/open/torrents/{id}（开放 API·深数据）
 //   - 下载：POST /api/v1/downloads/keys → GET /api/v1/downloads/{id}?token=fxk_...
 //   - 用户：GET /api/v1/plugins/ptppUserInfo（PT-Plugin-Plus 口径）
-//   - 发种：POST /api/v1/open/torrents（Token+multipart·info_hash 幂等）
+//   - 发种：POST /api/v1/open/torrents（Token+multipart·info_hash 幂等·
+//     元数据走查询参数〔v0.0.1618 契约对齐——descr/mediainfo/tags 无投递通道〕）
+//   - ⚠ §59.572 关闸（v0.0.1618）：站方 open API 上传不注入 source（web 路径
+//     注入）→ 种子与源站同 info_hash → 下载器去重无法做种——等站方修后重启
 //   - CSRF：Token 免·全链移除
 //   - 限流：60/min·429+Retry-After 退避
 //
@@ -474,7 +477,11 @@ func (a *HxptAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConf
 var hxptSectionKinds = []string{"media", "codec", "source", "team"}
 
 // UploadTorrent POST /api/v1/open/torrents（Token+multipart·info_hash 幂等）。
-// §59.570 刀2：从旧 cookie+CSRF FormData 切换到 Token 鉴权 multipart。
+// §59.570 刀2 v2（v0.0.1618 契约对齐）：元数据走查询参数·multipart 只留 file。
+// 站方当前契约（openapi.json 实拉·2026-11-25）：category_id/name/small_descr/
+// anonymous/price 走 query 参数·multipart 只收 file+nfo（文本）。
+// descr/mediainfo/tags/sections/imdb 无投递通道（API 未完成——§59.572 定案
+// 好学关闸等站方）。price 恒不传（§59.533 定案：免费发布·23941 实证缺省=0）。
 func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
@@ -489,7 +496,24 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 		return nil, &model.AppError{Code: 40001, Message: "好学发布需要 category_id"}
 	}
 
-	// multipart 组装（§59.533 契约不变——file/category_id/恒发/条件发）
+	// 元数据走查询参数（url.Values 自动编码·中文/空格安全）
+	q := url.Values{}
+	q.Set("category_id", categoryID)
+	if v := strings.TrimSpace(req.FormFields["name"]); v != "" {
+		q.Set("name", v)
+	}
+	if v := strings.TrimSpace(req.FormFields["small_descr"]); v != "" {
+		q.Set("small_descr", v)
+	}
+	// anonymous "1"/"0"（openapi 形态——非旧 v2 的 "true"/"false"）：
+	// 缺省 "0"（23941 实证站方默认非匿名）
+	anonymous := "0"
+	if v, ok := req.FormFields["anonymous"]; ok && (v == "true" || v == "yes" || v == "1") {
+		anonymous = "1"
+	}
+	q.Set("anonymous", anonymous)
+
+	// multipart 只留 file（站方契约：nfo 可选文本域——§59.570 附二刀3 未定案·不投递）
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 
@@ -500,31 +524,12 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	if _, err := fw.Write(req.TorrentData); err != nil {
 		return nil, networkError("写入种子数据失败", err)
 	}
-
-	_ = w.WriteField("category_id", categoryID)
-	anonymous := "false"
-	if v, ok := req.FormFields["anonymous"]; ok && (v == "true" || v == "yes") {
-		anonymous = "true"
-	}
-	_ = w.WriteField("anonymous", anonymous)
-
-	for _, field := range []string{"name", "imdb", "douban", "tmdb", "small_descr", "descr", "poster", "mediainfo"} {
-		if v := strings.TrimSpace(req.FormFields[field]); v != "" {
-			_ = w.WriteField(field, v)
-		}
-	}
-	if v := strings.TrimSpace(req.FormFields["sections"]); v != "" {
-		_ = w.WriteField("sections", v)
-	}
-	if v := strings.TrimSpace(req.FormFields["tags"]); v != "" {
-		_ = w.WriteField("tags", v)
-	}
 	if err := w.Close(); err != nil {
 		return nil, parseError("关闭 multipart writer 失败", err)
 	}
 
-	// POST /api/v1/open/torrents（Token 鉴权·multipart）
-	uploadURL := fmt.Sprintf("%s/api/v1/open/torrents", a.base(config))
+	// POST /api/v1/open/torrents?category_id=...（Token 鉴权·multipart）
+	uploadURL := fmt.Sprintf("%s/api/v1/open/torrents?%s", a.base(config), q.Encode())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, &buf)
 	if err != nil {
 		return nil, networkError("构造上传请求失败: "+err.Error(), err)
@@ -576,7 +581,11 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 		return nil, parseError("上传 data 解析失败: "+err.Error(), err)
 	}
 
+	// §59.570 附二刀1：Success 标志必设——executor_upload.go:223 判
+	// !resp.Success →「上传未成功」→ failed 终态+不推种（243 首颗 5310
+	// 实证：站方 code=0 已建种 tid=23941·我们判 failed）。
 	result := &model.PublishResponse{
+		Success:    true,
 		TorrentID:  strconv.FormatInt(data.ID, 10),
 		DetailURL:  fmt.Sprintf("%s/torrent/%d", a.base(config), data.ID),
 	}
