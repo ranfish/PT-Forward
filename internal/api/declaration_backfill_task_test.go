@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/setting"
@@ -191,6 +192,95 @@ func TestDeclBackfillEmptyStatementReappend(t *testing.T) {
 	// 幂等：二轮零变化（Filter 剥掉再加回 final==原值不 UPDATE）
 	var fresh []model.TorrentMetadata
 	db.Where("info_hash IN ?", []string{"ee", "ff"}).Find(&fresh)
+	h.declBackfill.changed = 0
+	h.declBackfill.done = 0
+	h.declBackfill.active = true
+	h.declBackfill.finished = false
+	h.declBackfill.total = len(fresh)
+	h.runDeclBackfillTask(fresh, patterns)
+	if h.declBackfill.changed != 0 {
+		t.Errorf("幂等失败：changed=%d（应 0）", h.declBackfill.changed)
+	}
+}
+
+// §59.577 附（1633·猫 tid=802365 Send Help SPHD 案）: 编码日志纳入清洗
+// 范围（用户定案——词表签名生效）+ backfill 三辨门对齐（外站组行不 append
+// 官组块——旧 buildThanks 无三辨门的错形态防回归锚）。
+func TestDeclBackfillEncoderLog(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := db.AutoMigrate(&model.TorrentMetadata{}, &setting.Setting{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	f := publish.NewDeclarationFilter(setting.NewRepository(db), nil)
+	h := &PublishTorrentsHandler{db: db, declFilter: f}
+	// 三辨门注入（生产=main 装配期闭包；测试模拟同形态）——测完恢复 nil
+	// 防污染同包其它测试（TestDeclBackfillEmptyStatementReappend 依赖
+	// nil→全按官组的兼容语义）。
+	description.SetGroupKindChecker(func(g string) description.GroupKind {
+		if g == "SPHD" {
+			return description.GroupKindExternal
+		}
+		if g == "ZZZUNK" {
+			return description.GroupKindUnknown
+		}
+		return description.GroupKindOfficial
+	})
+	defer description.SetGroupKindChecker(nil)
+
+	rows := []model.TorrentMetadata{
+		// ① 猫案复刻：statement=纯编码日志 quote（191 字实证形态）+ title
+		// 含外站组 SPHD → 清洗后小组模板（非官组块——三辨门）
+		{InfoHash: "enc1", SiteName: "猫", Title: "Send Help 2026 2160p UHD BluRay DoVi HDR10+ x265 TrueHD 7.1 Atmos 2Audios-SPHD",
+			Statement: "[quote]x265 [INFO]: frame I:  1252, Avg QP:11.54  kb/s: 85071.08\nx265 [INFO]: frame P:  32378, Avg QP:12.22  kb/s: 54477.34\nx265 [INFO]: frame B: 128971, Avg QP:14.00  kb/s: 38788.84[/quote]"},
+		// ② 对照：未知组 → 不合成（诚实——原样空）
+		{InfoHash: "enc2", SiteName: "猫", Title: "Some Movie 2026 1080p BluRay x264-ZZZUNK",
+			Statement: "[quote]x264 [info]: frame I:   700, Avg QP:15.00  kb/s: 12000.00[/quote]"},
+	}
+	for i := range rows {
+		if err := db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	ctx := context.Background()
+	patterns := f.GetPatterns(ctx)
+	// 预筛端到端：词表签名 LIKE 命中两行（大小写不敏感）
+	selected, err := h.declBackfillSelectRows(ctx, patterns)
+	if err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if len(selected) != 2 {
+		t.Fatalf("预筛应选中 2 行（编码日志签名命中）, got %d", len(selected))
+	}
+	h.declBackfill.total = len(rows)
+	h.runDeclBackfillTask(rows, patterns)
+
+	var enc1 model.TorrentMetadata
+	db.Where("info_hash = ?", "enc1").First(&enc1)
+	if strings.Contains(enc1.Statement, "x265 [INFO]") {
+		t.Errorf("enc1 statement=%q（编码日志应被清洗）", enc1.Statement)
+	}
+	if !strings.Contains(enc1.Statement, "SPHD小组作品") {
+		t.Errorf("enc1 statement=%q（外站组应 append 小组模板）", enc1.Statement)
+	}
+	if strings.Contains(enc1.Statement, "SPHD官组作品") {
+		t.Errorf("enc1 statement=%q（外站组错 append 官组块——三辨门失效）", enc1.Statement)
+	}
+	var enc2 model.TorrentMetadata
+	db.Where("info_hash = ?", "enc2").First(&enc2)
+	if enc2.Statement != "" {
+		t.Errorf("enc2 statement=%q（未知组应不合成——原样空）", enc2.Statement)
+	}
+	// 计数：changed=2（enc1 小组模板+enc2 净化为空均真实落库变化）·
+	// done=2·failed=0
+	if h.declBackfill.changed != 2 || h.declBackfill.done != 2 || h.declBackfill.failed != 0 {
+		t.Errorf("计数 changed=%d done=%d failed=%d（应 2/2/0）", h.declBackfill.changed, h.declBackfill.done, h.declBackfill.failed)
+	}
+	// 幂等：二轮零变化
+	var fresh []model.TorrentMetadata
+	db.Where("info_hash IN ?", []string{"enc1", "enc2"}).Find(&fresh)
 	h.declBackfill.changed = 0
 	h.declBackfill.done = 0
 	h.declBackfill.active = true

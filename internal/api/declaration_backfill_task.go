@@ -10,7 +10,6 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -189,43 +188,33 @@ func (h *PublishTorrentsHandler) declBackfillRow(ctx context.Context, row model.
 			updates["description"] = fr.CleanedText
 		}
 	}
-	// §59.542 追记六: 组名提取对齐发布链 :2487 同源——util.ExtractGroupName
-	// （§59.342/64 多轮修复的权威单点·dash 后缀站方标题主流通路全命中）。
-	// detail_source_json.release_group 是目标站值集槽位键（team.other/
-	// team.ubweb/数字 id）非真实组名——v0.0.1523 首版误用致 16625 行致谢
-	// 组名错形态（「team.other官组作品」·Pope 案实抓）。提取 miss 的行
-	// （中缀形态少数）保持原状不 append（诚实缺省好过错误组名）。
-	rg := util.ExtractGroupName(row.Title)
-	// buildThanks 官组行补回标准致谢（对齐发布 handler :3147 语义）。
-	buildThanks := func(base string) string {
-		if rg == "" || rg == "NOGROUP" {
-			return base
-		}
-		thanksLine := description.GenerateThanksQuote(row.SiteName, rg, false, nil)
-		thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + thanksNoTransferTail
-		if base == "" {
-			return thanks
-		}
-		return base + "\n\n" + thanks
-	}
+	// §59.577 附（1633·猫 SPHD 案）: append 单点换 ComposeStatement——
+	// 旧 buildThanks 直调 GenerateThanksQuote 无三辨门，外站组行（如 SPHD）
+	// 清洗后错 append「官组作品」（刀2 漏改本通道的消费面）。ComposeStatement
+	// 内建三辨门：官组→官组模板 / 外站组→小组模板 / 未知→不合成（诚实）；
+	// 组名提取（util.ExtractGroupName）与 NOGROUP/Other 门均内建同源。
 	if row.Statement != "" {
 		if fs := h.declFilter.Filter(row.Statement, patterns); fs.CleanedText != row.Statement {
 			// §59.542 追记二 bug 修复：backfill 不能只 Filter 全剥——
 			// 官组种的 statement=源站声明+我方追加的 thanks（tab2 显示体）。
 			// 全剥后官组种 statement 变空（源站无声明·全靠 thanks 充当显示）。
-			// 对齐发布 handler :3147 语义：Filter 净化 → 官组 re-append。
-			// 追记五: final 与原值相同则不算 changed——官组种 statement 恒含
-			// 水印词（我们的 thanks）·每轮「剥掉再加回」落库值不变·changed
+			// 对齐 ComposeStatement 消费合成语义：Filter 净化 → 剥历史
+			// 追加形态（stripAppendedThanks 色值锚宽容——词表漏网兜底）→
+			// 三辨门合成。追记五: final 与原值相同则不算 changed——官组种
+			// statement 恒含水印词·每轮「剥掉再加回」落库值不变·changed
 			// 虚计会误导（changed 语义=真实落库变化）。
-			if final := buildThanks(stripAppendedThanks(fs.CleanedText)); final != row.Statement {
+			if final := description.ComposeStatement(stripAppendedThanks(fs.CleanedText), row.SiteName, row.Title); final != row.Statement {
 				updates["statement"] = final
 			}
 		}
-	} else if rg != "" && rg != "NOGROUP" {
+	} else {
 		// §59.542 追记五 bug 修复：空 statement + 官组 → 直接 append——
 		// 原实现被 `row.Statement != ""` 守卫整体跳过·上轮清洗清空的
 		// 官组种（16625 行）即使被预筛选中也永不 re-append。
-		updates["statement"] = buildThanks("")
+		// §59.577 附: 三辨门同上——外站组小组模板 / 未知不合成（原样空）。
+		if final := description.ComposeStatement("", row.SiteName, row.Title); final != "" {
+			updates["statement"] = final
+		}
 	}
 	if len(updates) > 0 {
 		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).

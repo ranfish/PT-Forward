@@ -89,6 +89,26 @@ func StripByARDTUPrefix(text string) string {
 	return strings.TrimSpace(stripped)
 }
 
+// encoderLogSignatures §59.577 附（1633·用户指正）: 编码器日志签名——
+// 压制信息 quote（x265/x264 [INFO] 帧统计形态）非转载声明·采集时剥离
+// Statement（保留 Body——压制参数属简介正文·信息不丢）。
+// 实证：猫 tid=802365（Send Help SPHD）x265 编码日志混入 Statement
+// （IsAcknowledgmentQuote 的 <200 rune 短文本启发式误纳）。
+var encoderLogSignatures = []string{
+	"x265 [INFO]", "x265 [info]", // x265 输出头（大小写两种构建）
+	"x264 [info]", "x264 [INFO]", // x264 输出头
+}
+
+// IsEncoderLogQuote 判断 quote 块是否为编码器日志（压制信息）。
+func IsEncoderLogQuote(text string) bool {
+	for _, sig := range encoderLogSignatures {
+		if strings.Contains(text, sig) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsAcknowledgmentQuote 判断 quote 块是否为官组声明（始终保留为 Statement）。
 // 命中"官组/感谢/原制作者/字幕组"或文本较短（< 200 rune）视为声明。
 func IsAcknowledgmentQuote(text string) bool {

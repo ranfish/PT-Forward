@@ -30,6 +30,29 @@ func TestIsToolSignatureQuote(t *testing.T) {
 	}
 }
 
+func TestIsEncoderLogQuote(t *testing.T) {
+	cases := []struct {
+		text string
+		want bool
+	}{
+		// §59.577 附（1633·猫 tid=802365 实证形态——大小写双构建）
+		{"x265 [INFO]: frame I:  1252, Avg QP:11.54  kb/s: 85071.08", true},
+		{"x265 [info]: frame P:  32378, Avg QP:12.22  kb/s: 54477.34", true},
+		{"x264 [info]: frame I:   700, Avg QP:15.00  kb/s: 12000.00", true},
+		{"x264 [INFO]: frame B: 128971, Avg QP:14.00  kb/s: 38788.84", true},
+		// 声明文本不误伤（编码日志签名≠声明锚词）
+		{"MTeam官组作品，感谢原制作者发布。", false},
+		{"郑重声明：本站提供的所有作品均是用户自行搜集并且上传", false},
+		{"普通正文", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := IsEncoderLogQuote(c.text); got != c.want {
+			t.Errorf("IsEncoderLogQuote(%q) = %v, want %v", c.text, got, c.want)
+		}
+	}
+}
+
 func TestIsTechParamsQuote(t *testing.T) {
 	cases := []struct {
 		text string

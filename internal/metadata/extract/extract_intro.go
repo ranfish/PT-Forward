@@ -266,6 +266,15 @@ func classifyBeforePosterQuotes(quotes []quoteBlock, lenientAck bool) (statement
 			ardtuFulls = append(ardtuFulls, q.OrigFull)
 			continue
 		}
+		// 2b. §59.577 附（1633·用户指正）: 压制信息 quote（编码器日志——
+		// x265/x264 [INFO] 帧统计）→ 非声明·不入 Statement·保留 Body
+		// （压制参数属简介正文·信息不丢——与工具签名整块移除的语义差异：
+		// 签名无信息价值·编码日志含压制参数）。
+		// 置于 lenientAck 之前：编码日志无论位置（keepfrds 头区豁免也不能纳
+		// ——位置即信号的豁免只适用于真声明短句）。
+		if IsEncoderLogQuote(text) {
+			continue
+		}
 		// 3. 官组声明 → 归 Statement（完整 BBCode），整块从 Body 移除
 		// §59.172 附五: lenientAck（keepfrds 头区）豁免鸣谢门槛——位置即信号
 		// §59.172 附七: statement 用剥图 Full（引用=干净文本）；

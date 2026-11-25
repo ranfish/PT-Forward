@@ -198,3 +198,50 @@ func TestMatchBasicInfoLabel(t *testing.T) {
 		}
 	}
 }
+
+// §59.577 附（1633·猫 tid=802365 Send Help SPHD 案）: 编码器日志 quote
+// （压制信息）不入 Statement·保留 Body（压制参数属简介正文·信息不丢）；
+// 同区真官组声明仍入 Statement（分类互不干扰）。
+const sampleEncoderLogPage = `<!DOCTYPE html>
+<html><head><title>Send Help 2026 2160p UHD BluRay DoVi HDR10+ x265 TrueHD 7.1 Atmos 2Audios-SPHD</title></head>
+<body>
+<h1 id="top">Send Help 2026 2160p UHD BluRay DoVi HDR10+ x265 TrueHD 7.1 Atmos 2Audios-SPHD</h1>
+<table class="torrent_info">
+  <tr><th>类型</th><td>电影</td></tr>
+  <tr><th>媒介</th><td>UHD Blu-ray</td></tr>
+</table>
+<div id="kdescr">
+  <blockquote>MTeam官组作品，感谢原制作者发布。</blockquote>
+  <blockquote>x265 [INFO]: frame I:  1252, Avg QP:11.54  kb/s: 85071.08
+x265 [INFO]: frame P:  32378, Avg QP:12.22  kb/s: 54477.34
+x265 [INFO]: frame B: 128971, Avg QP:14.00  kb/s: 38788.84</blockquote>
+  <img src="https://img.example.com/poster.jpg"/>
+  <p>简介正文</p>
+</div>
+</body>
+</html>`
+
+func TestPublicExtractor_EncoderLogExcludedFromStatement(t *testing.T) {
+	p := NewPublicExtractor("test-site", "测试站")
+	seed, err := p.Extract(Input{
+		SiteCode:      "test-site",
+		SiteNickname:  "测试站",
+		PageHTML:      sampleEncoderLogPage,
+		FallbackTitle: "fallback",
+	})
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	// ① 编码日志不入 Statement（猫案修复本体）
+	if strings.Contains(seed.Intro.Statement, "x265 [INFO]") {
+		t.Errorf("Statement 不应含编码日志, got %q", seed.Intro.Statement)
+	}
+	// ② 同区真声明仍入 Statement（互不干扰）
+	if !strings.Contains(seed.Intro.Statement, "官组作品") {
+		t.Errorf("Statement 应含真官组声明, got %q", seed.Intro.Statement)
+	}
+	// ③ 编码日志保留 Body（压制参数属简介正文·信息不丢）
+	if !strings.Contains(seed.Intro.Body, "x265 [INFO]") {
+		t.Errorf("Body 应保留编码日志（压制参数）, got %q", seed.Intro.Body)
+	}
+}
