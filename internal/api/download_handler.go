@@ -577,7 +577,7 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 	// 只要有一个挂了 metadata 就算已配置（与列表页 name→hash 桥口径一致，
 	// 修复 §59.28 H1 在弹窗的体现：按去重保留行 hash 判定会误报已获取资源）。
 	// §59.578 刀2: 烙印排除——任一 hash 终态失败烙印 → 整 name 排除
-	//（走过获取链的下次不再显示——瞬态不烙故可重试颗保留）。
+	// （走过获取链的下次不再显示——瞬态不烙故可重试颗保留）。
 	var rawItems []unconfiguredItem
 	// §59.537: 完成度 100% 边界——未完成种不进弹窗条目清单（数据不完整
 	// 不是可获取素材·与列表页 handleListSeeds/弹窗树 handleSeedUniquePaths

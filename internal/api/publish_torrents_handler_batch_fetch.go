@@ -630,7 +630,7 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 	}
 
 	// §59.578 刀2: 烙印②优先判定——认识但走链终态失败 → unsupported
-	//（优先于身份判定·省注册表查询·且烙印是「已试过」的实证信号）。
+	// （优先于身份判定·省注册表查询·且烙印是「已试过」的实证信号）。
 	if fetchFailed {
 		return "unsupported"
 	}

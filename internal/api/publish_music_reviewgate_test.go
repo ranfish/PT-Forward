@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -91,10 +92,10 @@ func TestClassifySeedStatusMusicSkipsGroupMapping(t *testing.T) {
 		DetailSourceJSON: `{"music":{"artist":"许景淳","album":"路长情更长"}}`,
 		Reviewed:         true,
 	}
-	if got := h.classifySeedStatusLite(nil, meta.Title, meta, true, false); got != "reviewed" {
+	if got := h.classifySeedStatusLite(context.TODO(), meta.Title, meta, true, false); got != "reviewed" {
 		t.Errorf("音乐种已审核 status = %q, want reviewed（组映射应跳过）", got)
 	}
 	// 同标题影视语义（hint false）·未审核 → 组映射路径（h.sourceDetector nil
 	// 场景不早退 no_mapping·走后续状态——此处锚定行为不回归即可）
-	_ = h.classifySeedStatusLite(nil, meta.Title, meta, false, false)
+	_ = h.classifySeedStatusLite(context.TODO(), meta.Title, meta, false, false)
 }
