@@ -115,10 +115,11 @@ var hxptCategoryNames = map[int]string{
 // ── 内部请求骨架 ──
 
 func (a *HxptAdapter) base(config *model.SiteConfig) string {
-	if config.BaseURL != "" {
-		return strings.TrimSuffix(config.BaseURL, "/")
-	}
-	return "https://" + config.Domain
+	// §59.575: 复用公共 siteBaseURL（三态：BaseURL 优先/带 scheme 的 Domain/
+	// 裸 Domain 补 https）。原手搓 "https://"+Domain 在统计同步链的
+	// Domain=site.BaseURL（带 scheme）形态下产出 "https://https//..." 双
+	// scheme（12:00 同步 EOF 实证·§59.570 Token 修复前被 token 检查掩盖）。
+	return siteBaseURL(config)
 }
 
 // apiCall §59.570 Token 鉴权请求。Authorization: Token fxo_...（APIKey 字段·api_key 列）。
