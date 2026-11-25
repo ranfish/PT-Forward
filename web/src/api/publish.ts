@@ -166,6 +166,9 @@ export interface SeedListItem {
   status: string // forbidden / system_forbidden / unsupported（§59.578：①不认识∪②获取终态失败——隐含不支持转载发布） / reviewed / pending / incomplete / unfetched / observing
   // §59.577 刀2: 外站组身份并行字段（已获取态状态流后·身份从状态剥离——tag 展示与「外站组」筛选桶消费）
   external_group?: boolean
+  // §59.578 刀3: 获取失败烙印（unsupported② 可解释性——tooltip 消费）
+  fetch_failed_at?: string
+  fetch_error?: string
   // §59.469 附八: 音乐种行标记（SeedConfig 主入口"详情"按钮/MDP 分流）
   is_music?: boolean
   // §59.469 附九: 字段列音乐行红绿标（方案 1a·与审核门同构）
@@ -352,15 +355,3 @@ export const seedConfigApi = {
   },
 }
 
-// §59.577 刀1: 外站组注册表（策展通道——no_mapping 长尾收录）
-export const externalGroupsApi = {
-  list() {
-    return client.get<ApiResponse<{ items: unknown[]; total: number }>>('/publish/torrents/external-groups')
-  },
-  create(data: { group_name: string; home_site?: string; notes?: string }) {
-    return client.post<ApiResponse<{ item: unknown }>>('/publish/torrents/external-groups', data)
-  },
-  remove(id: number) {
-    return client.delete<ApiResponse<{ deleted: boolean }>>(`/publish/torrents/external-groups/${id}`)
-  },
-}

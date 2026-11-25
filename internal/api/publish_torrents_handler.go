@@ -452,10 +452,9 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleListGroupMappings(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/external-groups") && r.Method == http.MethodGet:
 		h.handleListExternalGroups(w, r)
-	case strings.HasSuffix(path, "/publish/torrents/external-groups") && r.Method == http.MethodPost:
-		h.handleCreateExternalGroup(w, r)
-	case strings.Contains(path, "/publish/torrents/external-groups/") && r.Method == http.MethodDelete:
-		h.handleDeleteExternalGroup(w, r)
+	// §59.578 刀3: 收录通道关闭（用户定案严格 migration-only）——
+	// POST/DELETE 端点撤除·收录走 migration（普查→seed→tag 模式·
+	// 842 普查→19 组先例）·多环境注册表单源。GET 留（列表展示）。
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings/sites") && r.Method == http.MethodGet:
 		h.handleListGroupedSiteNames(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/declaration-filters") && r.Method == http.MethodGet:

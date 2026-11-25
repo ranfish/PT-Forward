@@ -469,6 +469,12 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 		// §59.578 刀2: 烙印②（snap 循环变量直接可读——零额外查询）
 		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic, snap.FetchFailedAt != nil)
 		item["status"] = status
+		// §59.578 刀3: 烙印原因透出（可解释性——unsupported② 颗用户须能
+		// 查「为什么不支持」：tooltip 消费）
+		if snap.FetchFailedAt != nil {
+			item["fetch_failed_at"] = snap.FetchFailedAt
+			item["fetch_error"] = snap.FetchError
+		}
 		// §59.577 刀2: 外站组身份并行字段（已获取态状态流后·身份从状态剥离）
 		itemExternal := h.seedExternalGroupFlag(r.Context(), meta)
 		item["external_group"] = itemExternal

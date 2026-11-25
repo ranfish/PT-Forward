@@ -192,6 +192,10 @@
           <a-tooltip v-else-if="record.disc_scan_failed" :title="`扫描失败：${record.disc_scan_error || '未知原因'}（${record.disc_scan_failed_at ? formatTime(record.disc_scan_failed_at) : ''}）——可重扫`">
             <a-tag color="error" size="small">扫描失败</a-tag>
           </a-tooltip>
+          <!-- §59.578 刀3: 不支持② 烙印原因 tooltip（可解释性——「为什么不支持」） -->
+          <a-tooltip v-else-if="record.status === 'unsupported' && record.fetch_error" :title="`获取失败：${record.fetch_error}（${record.fetch_failed_at ? formatTime(record.fetch_failed_at) : ''}）——不支持视图可批量重置后重试`">
+            <a-tag :color="statusColor(record.status)" size="small">{{ statusLabel(record.status) }}</a-tag>
+          </a-tooltip>
           <!-- §59.319 附十八: 原盘扫描中提示——bd_info 落库前 5-11 分钟窗口 -->
           <a-tooltip v-else-if="record.disc_scan_pending" title="正在扫描蓝光原盘（BDInfo 分析中，约 5-11 分钟）">
             <a-tag color="processing" size="small">
@@ -257,14 +261,6 @@
             >
               {{ record.status === 'unfetched' || record.status === 'unsupported' ? '获取' : '重获' }}
             </a-button>
-            <!-- §59.578 刀1: 收录按钮 v-if='no_mapping' 恒 false（状态消亡·入口自动关闭）
-                 ——刀3 清尸体（按钮+弹窗+openRegisterExternalGroup 函数） -->
-            <a-button
-              v-if="record.status === 'no_mapping'"
-              size="small"
-              type="link"
-              @click="openRegisterExternalGroup(record)"
-            >收录外站组</a-button>
             <a-button
               v-if="record.status !== 'unfetched'"
               size="small"
@@ -328,7 +324,7 @@ import CrossSeedPanel from './CrossSeedPanel.vue'
 import MusicDetailPanel from './MusicDetailPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatBytes, formatTime } from '@/utils/format'
-import { seedConfigApi, externalGroupsApi, type SeedDetail, type SeedListItem } from '@/api/publish'
+import { seedConfigApi, type SeedDetail, type SeedListItem } from '@/api/publish'
 
 const route = useRoute()
 const router = useRouter()
@@ -652,43 +648,6 @@ async function rescanBDInfo(item: SeedListItem) {
 }
 
 // §59.577 刀1: 外站组收录（no_mapping 行——策展通道）
-const registerInput = ref('')
-
-function openRegisterExternalGroup(record: SeedListItem) {
-  // 客户端预填：标题尾 -token（服务端权威校验在 create 端点）
-  const m = (record.name || '').replace(/\.(mkv|mp4|avi|ts|wmv|flv|torrent|iso)$/i, '').match(/-([A-Za-z0-9@.&_]{2,})$/)
-  registerInput.value = m ? m[1] : ''
-  Modal.confirm({
-    title: '收录外站组',
-    content: () => h('div', [
-      h('p', { style: 'margin-bottom:8px' }, `种子：${(record.name || '').slice(0, 60)}`),
-      h('input', {
-        value: registerInput.value,
-        style: 'width:100%;padding:4px 8px;border:1px solid #d9d9d9;border-radius:4px',
-        placeholder: '组名（站方标题侧权威形态）',
-        onInput: (e: Event) => { registerInput.value = (e.target as HTMLInputElement).value },
-      }),
-    ]),
-    okText: '收录',
-    cancelText: '取消',
-    onOk: async () => {
-      const group = registerInput.value.trim()
-      if (!group) {
-        message.warning('组名不能为空')
-        return Promise.reject()
-      }
-      try {
-        await externalGroupsApi.create({ group_name: group })
-        message.success(`已收录外站组 ${group}·刷新后生效`)
-        await fetchList()
-      } catch (e) {
-        message.error('收录失败：' + (e instanceof Error ? e.message : String(e)))
-        return Promise.reject(e)
-      }
-    },
-  })
-}
-
 async function fetchSingle(item: SeedListItem) {
   fetchingSet.value.add(item.hash)
   try {
@@ -697,6 +656,9 @@ async function fetchSingle(item: SeedListItem) {
     await fetchList()
   } catch (e: any) {
     message.error('获取失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+    // §59.578 刀3: 失败后刷新——终态失败已烙印·列表显示 unsupported②
+    // （tag tooltip 含失败原因——可解释性）·瞬态失败保持原状态
+    await fetchList()
   } finally {
     fetchingSet.value.delete(item.hash)
   }
