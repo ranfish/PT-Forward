@@ -46,9 +46,9 @@ type TorrentMetadata struct {
 	// §59.577 刀1: 站方发布页组名选择（Ⅰ级——标准键形态 team.xxx/
 	// team.other/NOGROUP；从 detail_source_json.release_group 升列·backfill
 	// migration184）。
-	ReleaseGroup string `json:"release_group" gorm:"column:release_group;type:TEXT"`
-	PTGenSourceJSON  string `json:"ptgen_source_json"  gorm:"column:ptgen_source_json;type:TEXT"`
-	LocalSourceJSON  string `json:"local_source_json"  gorm:"column:local_source_json;type:TEXT"`
+	ReleaseGroup    string `json:"release_group" gorm:"column:release_group;type:TEXT"`
+	PTGenSourceJSON string `json:"ptgen_source_json"  gorm:"column:ptgen_source_json;type:TEXT"`
+	LocalSourceJSON string `json:"local_source_json"  gorm:"column:local_source_json;type:TEXT"`
 
 	// §56.8 合并结果 JSON（前端直接读"上次合并结果"，toggle 切换时合并一次写回）
 	MergedJSON string `json:"merged_json" gorm:"column:merged_json;type:TEXT"`

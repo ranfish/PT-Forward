@@ -54,7 +54,7 @@ func TestClassifySeedStatusExternalGroup(t *testing.T) {
 		{"Ⅰ级other落Ⅱ级", "SOME MOVIE",
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS", SiteName: "家园", ReleaseGroup: "team.other"}, "incomplete"},
 		// 13city 反例：Ⅰ级 team.hhweb + 标题带外站组 MAMA——Ⅱ级标题组名优先消费
-		//（标题是发布链消费面）→ MAMA 注册表命中 → 状态流（身份并行字段）
+		// （标题是发布链消费面）→ MAMA 注册表命中 → 状态流（身份并行字段）
 		{"Ⅰ级官组Ⅱ级外站组", "SOME MOVIE",
 			&model.TorrentMetadata{Title: "Some Movie 2020 1080p BluRay AVC DTS-MAMA", SiteName: "家园", ReleaseGroup: "team.hhweb"}, "incomplete"},
 	}

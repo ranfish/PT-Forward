@@ -85,4 +85,3 @@ func (h *PublishTorrentsHandler) handleDeleteExternalGroup(w http.ResponseWriter
 	}
 	Success(w, map[string]interface{}{"deleted": true})
 }
-
