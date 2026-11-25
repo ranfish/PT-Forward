@@ -6,8 +6,9 @@ import (
 	"sort"
 )
 
-// DecodeBencode §59.541 附七: 导出 bencode 解码（TR AddFromFile 去重补挂
-// tracker 需提取 announce——原私有函数收编公共）。
+// DecodeBencode bencode 解码公共入口（§59.541 附七导出·原消费方
+// extractAnnounces 已随 §59.573 撤除——保留为通用工具·当前仅基准
+// 测试消费·未来 bencode 需求复用点）。
 func DecodeBencode(data []byte) (any, error) {
 	return decodeBencode(data)
 }
