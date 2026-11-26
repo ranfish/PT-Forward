@@ -673,9 +673,12 @@ func extractIMDbIDGeneric(link string) string {
 }
 
 // baseURLOf BaseURL 优先回落 Domain（§59.159 下载 URL 公共单点配套）。
+// baseURLOf 08 刀2：委托 resolveBaseURL（消费点端到端等价——两个调用点
+// generic:109/nexusphp_upload:57 全部经 BuildNexusDownloadURL 的幂等
+// 补协议+去斜杠兜底·helper 层差异被吞掉·最终 URL 四态一致。
+// 本体曾是「裸取」旧形态（不补协议不去斜杠）——等价性依赖下游
+// 幂等兜底这一外部前提（附录G §2.2/§2.3：新增不经 BuildNexus 的
+// 消费点前必须重新评估）。
 func baseURLOf(config *model.SiteConfig) string {
-	if config.BaseURL != "" {
-		return config.BaseURL
-	}
-	return config.Domain
+	return resolveBaseURL(config)
 }

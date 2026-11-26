@@ -279,6 +279,13 @@ func resolveBaseURL(config *model.SiteConfig) string {
 	// 请求发到 www 主机：profile 打中 reelcore Web API 超时不响应）。
 	// 馒头等 API 即主域站 base_url==domain 零变化；全库 base_url≠domain
 	// 仅可乐一例。
+	// §59.578 附·08 刀2 注释修正：本函数【补协议+去尾斜杠】——
+	// HasPrefix("http") 补 https:// + TrimRight("/")。上方「纯 Domain
+	// 构造」是修复前的问题叙述（历史语境）·非当前语义——语义与
+	// siteBaseURL 标准三态一致（附录G §2.1/§2.3：判 helper 语义以
+	// 代码本体+git log -L 为准·不据本段历史叙述）。§59.559 创建起
+	// 即带补协议·此后零修改（git log -L 276,289 实证）。
+	// baseURLOf 委托此函数（08 刀2·消费点端到端等价）。
 	u := config.BaseURL
 	if u == "" {
 		u = config.Domain
