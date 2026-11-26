@@ -62,9 +62,15 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 	items := make([]map[string]interface{}, 0, len(rows))
 	now := time.Now()
 	for _, row := range rows {
+		// 11 刀3 F-01: 两层解析全 miss 时补 SQLite 本地布局兜底
+		// （"2006-01-02 15:04:05" 无时区形态常见）·全 miss 显式归零
+		// 前已有守卫——但缺第三层导致合法数据静默丢误。
 		lastSeen, _ := time.Parse("2006-01-02 15:04:05.999999999-07:00", row.LastSeen)
 		if lastSeen.IsZero() {
 			lastSeen, _ = time.Parse(time.RFC3339, row.LastSeen)
+		}
+		if lastSeen.IsZero() {
+			lastSeen, _ = time.ParseInLocation("2006-01-02 15:04:05", row.LastSeen, time.Local)
 		}
 		remainingDays := 0
 		if !lastSeen.IsZero() {

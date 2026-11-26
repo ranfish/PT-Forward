@@ -311,6 +311,12 @@ func computeInfoHash(torrentData []byte) (string, error) {
 	if err != nil {
 		return "", qbError(ErrQBParse, "parse info dict", err)
 	}
+	// 11 刀1（v0.0.1652）: 纵深防御——findBencodeEnd 修复后正常不应
+	// 返回 end < infoStart·但作为独立断言防止未来退化（V-01 场景下
+	// 此断言先于 slice 越界 panic 拦截）。
+	if end < infoStart || end > len(torrentData) {
+		return "", qbError(ErrQBParse, "info dict bounds invalid", nil)
+	}
 	h := sha1.Sum(torrentData[infoStart:end]) //nolint:gosec // SHA1 required by BitTorrent protocol
 	return hex.EncodeToString(h[:]), nil
 }
@@ -352,10 +358,15 @@ func findBencodeEnd(data []byte, pos int) (int, error) {
 			if err != nil {
 				return 0, err
 			}
-			strEnd := pos + colon + 1 + length
-			if strEnd > len(data) {
+			// 11 刀1（v0.0.1652）: 先判长度上界再加法——减法形式各量非负
+			// 无回绕（pos+colon < len(data) 已由 IndexByte 保证）。原实现
+			// "先加法后判上界"对 MaxInt 长度串回绕为负完全失效（V-01）。
+			// 前置检查 length 合法性：≥0（Atoi 对纯数字恒非负·防御性）
+			// 且不超过剩余数据长度。
+			if length < 0 || length > len(data)-pos-colon-1 {
 				return 0, qbError(ErrQBParse, "string exceeds data", nil)
 			}
+			strEnd := pos + colon + 1 + length
 			return strEnd, nil
 		}
 		return 0, qbError(ErrQBParse, fmt.Sprintf("unexpected char %c at pos %d", data[pos], pos), nil) //nolint:gosec // 上方守卫已界

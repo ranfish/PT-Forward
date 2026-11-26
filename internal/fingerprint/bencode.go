@@ -127,12 +127,16 @@ func decodeString(data []byte, pos int) (any, int, error) {
 		return nil, pos, fpError(ErrFPBencode, "parse string length", err)
 	}
 
+	// 11 刀2（v0.0.1652）: 先判长度上界再加法——减法形式无回绕。
+	// 原实现 start+length 对 MaxInt 回绕为负·end > len(data) 失效
+	// → data[start:end] 负索引 panic（V-02·离线驱动实测 [:-...789]）。
+	// Sscanf("%d") 对 MaxInt64 解析成功不报 overflow——前置守卫必须
+	// 在加法前（同 V-01 findBencodeEnd 同批范式）。
 	start := colon + 1
-	end := start + length
-	if end > len(data) {
+	if length > len(data)-start {
 		return nil, pos, fpError(ErrFPBencode, "string extends beyond data", nil)
 	}
-
+	end := start + length
 	return string(data[start:end]), end, nil
 }
 
