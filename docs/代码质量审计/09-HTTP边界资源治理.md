@@ -66,7 +66,7 @@ func (m *Manager) withProxy(fn func() error) error {
 | `adapter/adapter_generic_stats.go:33/149`、`adapter/adapter_generic_probe.go:131` | 通用统计/探测 | 同上 |
 | `adapter/adapter_mteam_upload.go:439`、`adapter/adapter_yemapt.go:730`、`adapter/adapter_nexusphp_edit.go:169` | 上传回执/编辑 | 同上 |
 
-对照公共口径：`internal/httpclient/drain.go:9-38` 的 `ReadBody`（10 MiB 上限）/ `DrainBody`（1 MiB 排空）已被生产调用 86 / 12 处——说明单点可用且被广泛采用，上述 17 处是**绕过点**。`imagehost/host.go:49-55` 则是另一种破法：`io.Copy(io.Discard, resp.Body)` 排空无 `LimitReader`（无界读），紧接 `io.ReadAll(io.LimitReader(resp.Body, 50<<20))` 虽有读上限，但排空阶段已可被远端持续推流。
+对照公共口径：`internal/httpclient/drain.go:9-38` 的 `ReadBody`（10 MiB 读上限，生产 **12** 处）与 `DrainBody`（1 MiB 排空，生产 **85** 处调用；另 `pusher/pusher.go:334` 有 1 行 `var _ = httpclient.DrainBody` 占位引用、非调用，不计入）——说明单点可用且被广泛采用，上述 17 处是**绕过点**。`imagehost/host.go:49-55` 则是另一种破法：`io.Copy(io.Discard, resp.Body)` 排空无 `LimitReader`（无界读），紧接 `io.ReadAll(io.LimitReader(resp.Body, 50<<20))` 虽有读上限，但排空阶段已可被远端持续推流。
 
 **风险**：无上限读取=远端可驱动的内存放大；只 `Close` 不排空=HTTP 连接无法复用（连接池失效、握手放大）；忽略读 err=数据截断静默。`publish/executor.go` 尤其典型——它已经正确取得公共 client，却因响应体处置破裂而抵消了单点的价值，证明本篇不是 07/08 的重复。
 
@@ -101,7 +101,7 @@ func (m *Manager) withProxy(fn func() error) error {
 
 ### 2.5 正面结论：不应被误判为问题的部分
 
-- `httpclient.NewSiteHTTPClient` + `ReadBody/DrainBody` + `BrowserUserAgent` 三套单点**健康且被广泛使用**（86/12 处响应体 helper），本篇不推翻、不重写。
+- `httpclient.NewSiteHTTPClient` + `ReadBody/DrainBody` + `BrowserUserAgent` 三套单点**健康且被广泛使用**（`ReadBody` 12 处/`DrainBody` 85 处响应体 helper），本篇不推翻、不重写。
 - `rss/fetcher.go:32,64`、`site/stats_sync.go:181+`、`adapter/apihelper.go:31`、`client/qbittorrent/client.go:117-118`、`cloudfp/service.go:215-216` 等已正确成对 `ReadBody+DrainBody`——是正例。
 - `adapter/adapter_piggo.go:757-784` 手搓 multipart boundary 有注释说明是站方 cURL `--form` 方言契约（数组字段形态），属已知方言例外，**不作为资源缺陷**——否则与 08 篇方言边界重叠。
 - 结构体成员 client（`cloudfp`/`qbittorrent`/`transmission`/`notification` service）生命周期随宿主，非"每请求新建"，问题等级低。
