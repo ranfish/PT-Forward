@@ -1,0 +1,11 @@
+=== 域键口径分裂：SetDomainConfig(裸 domain) 不影响 Acquire(https://domain) ===
+    zz_domainkey_probe_test.go:27: 域键分裂实证：SetDomainConfig(裸 domain) 未影响 Acquire(https://domain)，第二次立即成功——站点 rps 配置失效
+--- FAIL: TestZZDomainKeySplitProbe (0.00s)
+=== concurrentCh 锁外替换 DATA RACE ===
+WARNING: DATA RACE
+      /home/incast/work/engagements/10.0.0.49/PT-Forward/internal/httpclient/domain_limiter.go:94 +0x304
+      /home/incast/work/engagements/10.0.0.49/PT-Forward/internal/httpclient/domain_limiter.go:83 +0x33b
+--- FAIL: TestZZConcurrentChRaceProbe (0.67s)
+=== 取消路径永久阻塞 ===
+    zz_domainkey_probe_test.go:86: 取消路径永久阻塞实证：ctx 取消后 goroutine 仍卡在从新空 channel 接收
+--- FAIL: TestZZCancelPathHangProbe (0.53s)
