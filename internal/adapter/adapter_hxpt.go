@@ -136,7 +136,7 @@ func (a *HxptAdapter) apiCall(ctx context.Context, config *model.SiteConfig, met
 	}
 	// §59.570: Token 鉴权（免 cookie/CSRF）
 	req.Header.Set("Authorization", "Token "+token)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -295,7 +295,7 @@ func (a *HxptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCon
 	}
 	keyHTTPReq.Header.Set("Authorization", "Token "+token)
 	keyHTTPReq.Header.Set("Content-Type", "application/json")
-	keyHTTPReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	keyHTTPReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	keyResp, err := a.doer.Client.Do(keyHTTPReq)
 	if err != nil {
 		return nil, networkError("凭证请求失败: "+err.Error(), err)
@@ -332,7 +332,7 @@ func (a *HxptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("构造下载请求失败: "+err.Error(), err)
 	}
-	dlReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	dlReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	dlResp, err := a.doer.Client.Do(dlReq)
 	if err != nil {
 		return nil, networkError("下载请求失败: "+err.Error(), err)
@@ -537,7 +537,7 @@ func (a *HxptAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfi
 	}
 	httpReq.Header.Set("Authorization", "Token "+token)
 	httpReq.Header.Set("Content-Type", w.FormDataContentType())
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	httpReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {

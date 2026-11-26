@@ -355,7 +355,7 @@ func (h *SiteHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr s
 		return
 	}
 
-	ok, message := h.testSiteConnection(s)
+	ok, message := h.testSiteConnection(r.Context(), s)
 
 	if !ok {
 		Error(w, http.StatusBadGateway, 30001, message)
@@ -392,7 +392,7 @@ func (h *SiteHandler) handleDetect(w http.ResponseWriter, r *http.Request, idStr
 		return
 	}
 
-	result := h.detectFramework(s)
+	result := h.detectFramework(r.Context(), s)
 	Success(w, result)
 }
 
@@ -628,7 +628,7 @@ func (h *SiteHandler) handleSyncSiteStats(w http.ResponseWriter, r *http.Request
 	Success(w, h.toResponse(updated))
 }
 
-func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
+func (h *SiteHandler) testSiteConnection(ctx context.Context, s *model.Site) (bool, string) {
 	switch s.AuthType {
 	case "cookie":
 		if s.Cookie == "" {
@@ -648,28 +648,28 @@ func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
 
 	switch s.AuthType {
 	case "cookie":
-		ok, msg := h.testCookieAuth(client, s)
+		ok, msg := h.testCookieAuth(ctx, client, s)
 		if ok || !hasAlternativeDomains(s) {
 			return ok, msg
 		}
-		return h.testCookieAuthWithBaseURL(client, s, firstAltDomain(s))
+		return h.testCookieAuthWithBaseURL(ctx, client, s, firstAltDomain(s))
 	case "apikey":
-		ok, msg := h.testAPIKeyAuth(client, s)
+		ok, msg := h.testAPIKeyAuth(ctx, client, s)
 		if ok || !hasAlternativeDomains(s) {
 			return ok, msg
 		}
-		return h.testAPIKeyAuthWithBaseURL(client, s, firstAltDomain(s))
+		return h.testAPIKeyAuthWithBaseURL(ctx, client, s, firstAltDomain(s))
 	case "passkey":
-		ok, msg := h.testPasskeyAuth(client, s)
+		ok, msg := h.testPasskeyAuth(ctx, client, s)
 		if ok || !hasAlternativeDomains(s) {
 			return ok, msg
 		}
-		return h.testPasskeyAuthWithBaseURL(client, s, firstAltDomain(s))
+		return h.testPasskeyAuthWithBaseURL(ctx, client, s, firstAltDomain(s))
 	}
-	return h.testCookieAuth(client, s)
+	return h.testCookieAuth(ctx, client, s)
 }
 
-func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, string) {
+func (h *SiteHandler) testCookieAuth(ctx context.Context, client *http.Client, s *model.Site) (bool, string) {
 	// v0.0.254: 先用不跟随重定向的方式检测 cookie 有效性（精准检测 SPA 站点）
 	// 对朱雀（302→/entry/login）/ 野马（200 SPA 壳）等非标准 NexusPHP 站点，
 	// 传统 HTML 关键字检测会误判。先用重定向检测，再退化到 HTML 检测。
@@ -681,7 +681,7 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 		},
 	}
 
-	req, err := http.NewRequest("GET", s.BaseURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+	req, err := http.NewRequestWithContext(ctx, "GET", s.BaseURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
@@ -776,12 +776,12 @@ func isSPAShell(html string) bool {
 	return hasRootContainer && isSmallHTML && noNexusPHP
 }
 
-func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, string) {
+func (h *SiteHandler) testAPIKeyAuth(ctx context.Context, client *http.Client, s *model.Site) (bool, string) {
 	// §59.457 附五: 肉丝（PeerGo 兼容层）——Bearer pgk + GET torrents
 	// （POST BaseURL+x-api-key 对该站恒失败——auth_type=apikey 后需要真分支）
 	if s.Framework == "rousi" {
 		testURL := strings.TrimRight(s.BaseURL, "/") + "/api/v1/torrents?page_size=1"
-		req, err := http.NewRequest("GET", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+		req, err := http.NewRequestWithContext(ctx, "GET", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 		if err != nil {
 			return false, "构造请求失败: " + err.Error()
 		}
@@ -810,7 +810,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	// 对 API 站不适配）。
 	if s.Framework == "piggo" {
 		meURL := strings.TrimRight(s.BaseURL, "/") + "/v1/api/me"
-		req, err := http.NewRequest("POST", meURL, strings.NewReader("{}"))
+		req, err := http.NewRequestWithContext(ctx, "POST", meURL, strings.NewReader("{}"))
 		if err != nil {
 			return false, "构造请求失败: " + err.Error()
 		}
@@ -838,7 +838,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	// status 为 GET 探活端点（任意有效 Key·返回身份与协议入口）。
 	if s.Framework == "hdarea" {
 		statusURL := strings.TrimRight(s.BaseURL, "/") + "/api/v1/status"
-		req, err := http.NewRequest("GET", statusURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+		req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 		if err != nil {
 			return false, "构造请求失败: " + err.Error()
 		}
@@ -859,7 +859,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 			return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 		}
 	}
-	req, err := http.NewRequest("POST", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
+	req, err := http.NewRequestWithContext(ctx, "POST", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
@@ -905,8 +905,8 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	return true, "连接成功"
 }
 
-func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool, string) {
-	req, err := http.NewRequest("GET", strings.TrimRight(s.BaseURL, "/")+"/api/v1/torrents", nil) //nolint:gosec // admin test endpoint
+func (h *SiteHandler) testPasskeyAuth(ctx context.Context, client *http.Client, s *model.Site) (bool, string) {
+	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimRight(s.BaseURL, "/")+"/api/v1/torrents", nil) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
@@ -939,9 +939,9 @@ func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool,
 	return true, "连接成功"
 }
 
-func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
+func (h *SiteHandler) detectFramework(ctx context.Context, s *model.Site) *model.DetectResult {
 	client := buildSiteHTTPClient(s, 15*time.Second)
-	req, err := http.NewRequest("GET", s.BaseURL, nil) //nolint:gosec // admin detect endpoint, URL from site config
+	req, err := http.NewRequestWithContext(ctx, "GET", s.BaseURL, nil) //nolint:gosec // admin detect endpoint, URL from site config
 	if err != nil {
 		return &model.DetectResult{
 			Framework:       s.Framework,

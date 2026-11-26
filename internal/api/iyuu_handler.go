@@ -18,10 +18,9 @@ import (
 )
 
 type IYUUHandler struct {
-	db         *gorm.DB
-	logger     *zap.Logger
-	iyuuSvc    IYUUQueryService
-	httpClient *http.Client
+	db      *gorm.DB
+	logger  *zap.Logger
+	iyuuSvc IYUUQueryService
 	// §59.535 刀3: 覆盖定时任务——coverage service（run/status 端点）+
 	// 配置保存后调度同步回调（main 注入·读配置 Register/Unregister）。
 	coverageSvc *coverage.Service
@@ -44,13 +43,6 @@ func NewIYUUHandler(db *gorm.DB, logger *zap.Logger, iyuuSvc IYUUQueryService) *
 		db:      db,
 		logger:  logger,
 		iyuuSvc: iyuuSvc,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-			Transport: &http.Transport{
-				MaxIdleConnsPerHost: 2,
-				IdleConnTimeout:     30 * time.Second,
-			},
-		},
 	}
 }
 
@@ -418,14 +410,19 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest("GET", cfg.BaseURL+"/reseed/sites/index", nil)
+	req, err := http.NewRequestWithContext(r.Context(), "GET", cfg.BaseURL+"/reseed/sites/index", nil)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "构造请求失败")
 		return
 	}
 	req.Header.Set("Token", cfg.Token)
 
-	resp, err := h.httpClient.Do(req)
+	// 09 刀3: IYUU 双 client 合并——原 handler 自建 10s client（与
+	// iyuu/service 60s 各一套）·改公共工厂（超时由 r.Context 取消链管）
+	testClient := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		Timeout: 10 * time.Second,
+	})
+	resp, err := testClient.Do(req)
 	if err != nil {
 		Error(w, http.StatusBadGateway, 50001, "IYUU 服务连接失败，请检查网络")
 		return

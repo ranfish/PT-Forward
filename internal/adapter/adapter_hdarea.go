@@ -130,7 +130,7 @@ func (a *HDAreaAdapter) apiCall(ctx context.Context, config *model.SiteConfig, m
 		return networkError("构造请求失败: "+err.Error(), err)
 	}
 	setXAPIKey(req, config.APIKey)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -327,7 +327,7 @@ func (a *HDAreaAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 		}
 		setXAPIKey(req, config.APIKey)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+		req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 		return req, nil
 	}
 	req, err := buildReq()
@@ -560,7 +560,7 @@ func (a *HDAreaAdapter) CheckBeforeUpload(ctx context.Context, config *model.Sit
 	}
 	setXAPIKey(req, config.APIKey)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -667,7 +667,7 @@ func (a *HDAreaAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 	setXAPIKey(httpReq, config.APIKey)
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	httpReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {

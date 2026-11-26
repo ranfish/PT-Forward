@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/ranfish/pt-forward/internal/httpclient"
 )
 
 // apihelper.go API 网关站共性机制层（2026-11-12 好大架构定案·hdarea-api.md §10）。
@@ -43,11 +45,11 @@ func shortTokenDownload(client *http.Client, tokenReq *http.Request, parseURL fu
 		if err != nil || dlURL == "" {
 			return nil, parseError("短效凭证响应解析失败", err)
 		}
-		getReq, err := http.NewRequest("GET", dlURL, nil)
+		getReq, err := http.NewRequestWithContext(tokenReq.Context(), "GET", dlURL, nil)
 		if err != nil {
 			return nil, networkError("构造下载请求失败", err)
 		}
-		getReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+		getReq.Header.Set("User-Agent", httpclient.BrowserUserAgent())
 		dlResp, err := client.Do(getReq)
 		if err != nil {
 			return nil, networkError("短效下载请求失败: "+err.Error(), err)

@@ -421,25 +421,25 @@ func cloneSiteWithBaseURL(s *model.Site, baseURL string) *model.Site {
 	return &clone
 }
 
-func (h *SiteHandler) testCookieAuthWithBaseURL(client *http.Client, s *model.Site, altURL string) (bool, string) {
+func (h *SiteHandler) testCookieAuthWithBaseURL(ctx context.Context, client *http.Client, s *model.Site, altURL string) (bool, string) {
 	if altURL == "" {
 		return false, "无备选域名"
 	}
-	return h.testCookieAuth(client, cloneSiteWithBaseURL(s, altURL))
+	return h.testCookieAuth(ctx, client, cloneSiteWithBaseURL(s, altURL))
 }
 
-func (h *SiteHandler) testAPIKeyAuthWithBaseURL(client *http.Client, s *model.Site, altURL string) (bool, string) {
+func (h *SiteHandler) testAPIKeyAuthWithBaseURL(ctx context.Context, client *http.Client, s *model.Site, altURL string) (bool, string) {
 	if altURL == "" {
 		return false, "无备选域名"
 	}
-	return h.testAPIKeyAuth(client, cloneSiteWithBaseURL(s, altURL))
+	return h.testAPIKeyAuth(ctx, client, cloneSiteWithBaseURL(s, altURL))
 }
 
-func (h *SiteHandler) testPasskeyAuthWithBaseURL(client *http.Client, s *model.Site, altURL string) (bool, string) {
+func (h *SiteHandler) testPasskeyAuthWithBaseURL(ctx context.Context, client *http.Client, s *model.Site, altURL string) (bool, string) {
 	if altURL == "" {
 		return false, "无备选域名"
 	}
-	return h.testPasskeyAuth(client, cloneSiteWithBaseURL(s, altURL))
+	return h.testPasskeyAuth(ctx, client, cloneSiteWithBaseURL(s, altURL))
 }
 
 func (h *SiteHandler) resolveTnodeTorrentIDs(ctx context.Context, config *model.SiteConfig) ([]string, error) {
