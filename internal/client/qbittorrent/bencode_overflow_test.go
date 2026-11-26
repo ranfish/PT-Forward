@@ -54,9 +54,10 @@ func TestBencodeFindEndNormal(t *testing.T) {
 				t.Errorf("%s: err=%v", c.name, err)
 				return
 			}
-			_ = c.want // 正常路径验证 err==nil 且 end 在合理范围
-			if end <= c.pos || end > len(c.data) {
-				t.Errorf("%s: end=%d 不在 (%d, %d] 合理范围", c.name, end, c.pos, len(c.data))
+			// 11 联合回归修正（用户复审）：want 精确断言（原 _ = c.want
+			// 只做范围断言——防回归主旨不受影响但严谨性升级）
+			if end != c.want {
+				t.Errorf("%s: end=%d, want=%d（精确值校验）", c.name, end, c.want)
 			}
 		})
 	}
