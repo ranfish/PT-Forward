@@ -83,9 +83,9 @@ type TechProfile struct {
 // MainTitle 兜底（老调用方只填净化剧名的场景恒 false，无害）。
 func hasReencodeMark(p TechProfile) bool {
 	if p.RawTitle != "" {
-		return hasReencodeCodecInTitle(p.RawTitle)
+		return HasReencodeCodecInTitle(p.RawTitle)
 	}
-	return hasReencodeCodecInTitle(p.MainTitle)
+	return HasReencodeCodecInTitle(p.MainTitle)
 }
 
 func MediumCanonicalOf(p TechProfile) string {
@@ -96,7 +96,7 @@ func MediumCanonicalOf(p TechProfile) string {
 	// §59.319 附二十三: MINBD 排除——x264/x265 重编码后保持 BDMV 结构的
 	// "缩小版原盘"（CMCT 等组），有 BDInfo 报告但非原盘（PT 站归 Encode）；
 	// 标题的重编码标记（x264/x265）不被铁证覆盖
-	if p.FromBDInfo && !hasReencodeCodecInTitle(p.MainTitle) {
+	if p.FromBDInfo && !HasReencodeCodecInTitle(p.MainTitle) {
 		switch st {
 		case "UHD Blu-ray", "Blu-ray", "3D Blu-ray", "UHD BluRay", "BluRay", "3D BluRay":
 			uhd := strings.EqualFold(p.Resolution, "2160p") || p.Resolution == "4K"
@@ -245,11 +245,12 @@ func TechProfileToComponents(p TechProfile) TitleComponents {
 	}
 }
 
-// hasReencodeCodecInTitle §59.319 附二十三: 标题含重编码标记——
+// HasReencodeCodecInTitle §59.319 附二十三: 标题含重编码标记——
 // x264/x265/Xvid 词形（词边界防误命中如 "x264" 在文件名中为编码声明）。
 // MINBD（CMCT 等组的"缩小版原盘"）标题必带 x264/x265——是重编码的
 // 明确声明，不被 FromBDInfo 原盘铁证覆盖（PT 站归 Encode 非原盘）。
-func hasReencodeCodecInTitle(title string) bool {
+// §59.578 附: 导出（tag_inferer 结构通道复用——MiniBD 排除单源）。
+func HasReencodeCodecInTitle(title string) bool {
 	lower := strings.ToLower(title)
 	for _, codec := range []string{"x264", "x265", "xvid"} {
 		if strings.Contains(lower, codec) {

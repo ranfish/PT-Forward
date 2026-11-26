@@ -69,7 +69,8 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// （§59.151 唯一真相+§59.319 附三十二 General 段词表叠加）为终审：
 	// MIEncoded=true 时 original_disc/remux 一律不产出（文案只是素材，
 	// 推理融合判定后落库的才是产物——副标题"原盘压制"类来源描述天然免疫）。
-	if tech := titleparser.ExtractMediaInfo(in.MediaInfo); tech.Encoded {
+	tech := titleparser.ExtractMediaInfo(in.MediaInfo)
+	if tech.Encoded {
 		filtered := tags[:0]
 		for _, t := range tags {
 			if t == "original_disc" || t == "remux" {
@@ -78,6 +79,29 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			filtered = append(filtered, t)
 		}
 		tags = filtered
+	}
+	// §59.578 附（Death Ship 案·dict note 挂账兑现「亦从 source_type
+	// 原盘类推导(代码层可后续)」）: BDInfo 结构铁证正向通道——NFO 通道
+	// 装 BDInfo 全文（调用方 NFO: m.BDInfo），QUICK SUMMARY 锚与
+	// build_profile §59.319 附十六同源。文案通道（「原盘」中文子串）
+	// 保留双通道并集——站方规范 title 写「UHD Blu-ray」无中文「原盘」
+	// 字样（v1.05 规范词与 dict 词条不重叠·文案恒 miss）是本通道缺口。
+	// 置于 MI Encoded 门后：编码铁证优先剔除·结构通道不回加
+	// （Black Snow 案防线保持——tech.Encoded 前置：MI+BDInfo 同场
+	// 且 MI 明确编码 → 结构通道同样不产出·③锚锁定）。MiniBD 排除同款（§59.319 附二十三：
+	// title 重编码词→不产出——MiniBD 有 BDMV+BDInfo 但非原盘·PT 站
+	// 归 Encode）。HasReencodeCodecInTitle 导出单源复用。
+	if strings.Contains(in.NFO, "QUICK SUMMARY:") && !tech.Encoded && !titleparser.HasReencodeCodecInTitle(in.Title) {
+		found := false
+		for _, t := range tags {
+			if t == "original_disc" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			tags = append(tags, "original_disc")
+		}
 	}
 	// §59.326: MI 音轨完备门——Audios 非空且至少一轨有语言证据=MI 是
 	// 完备音轨清单，desc_raw 通道（TagInferMatches 扫豆瓣简介"◎语 言"=

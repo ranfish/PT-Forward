@@ -29,7 +29,7 @@ func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVide
 		// 等组的"缩小版原盘"，有 BDMV 结构+BDInfo 报告但非原盘，PT 站归
 		// Encode）；设 MIEncoded=true 走 IsEncode 编码路径，不设 FromBDInfo
 		if strings.Contains(mediaInfo, "QUICK SUMMARY:") {
-			if hasReencodeCodecInTitle(title) {
+			if HasReencodeCodecInTitle(title) {
 				profile.MIEncoded = true
 			} else {
 				profile.FromBDInfo = true

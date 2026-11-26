@@ -789,3 +789,69 @@ func TestCleanExistingForMerge(t *testing.T) {
 		}
 	}
 }
+
+// §59.578 附（Death Ship 案）: BDInfo 结构铁证正向通道锚——四态。
+// 案：站方规范 title「UHD Blu-ray」无中文「原盘」字样（v1.05 规范词与
+// dict infer_pattern 不重叠）+原盘天然无 MI（BDAV 结构）→ 文案/MI 双
+// miss → original_disc 永远推不出（243 实态 tags 无原盘键·青蛙「原生
+// 原盘」不勾）。修：NFO=BDInfo（QUICK SUMMARY 锚·build_profile
+// §59.319 附十六同源）→ 结构铁证产出。
+func TestInferOriginalDiscBDInfo(t *testing.T) {
+	inf := NewMediaTagInferer()
+	bdinfo := "DISC INFO:\nDisc Title: Death Ship\nPLAYLIST REPORT:\nQUICK SUMMARY:\nMPEG-H HEVC Video 93917 kbps 2160p / 24 fps / 10 bits / BT.2020\nDTS-HD Master Audio English 5.1"
+
+	// ① 结构铁证：BDInfo+无重编码 title → original_disc 产出（本修本体）
+	tags := inf.InferFull(TagInput{
+		NFO:   bdinfo,
+		Title: "Death Ship 1980 2160p UHD Blu-ray HEVC DTS-HD MA 5.1-B0MBARDiERS",
+	})
+	hasOD := false
+	for _, tg := range tags {
+		if tg == "original_disc" {
+			hasOD = true
+		}
+	}
+	if !hasOD {
+		t.Errorf("① BDInfo 结构铁证应产出 original_disc: %v", tags)
+	}
+
+	// ② MiniBD 排除（§59.319 附二十三同款）：title 重编码词 → 不产出
+	tags = inf.InferFull(TagInput{
+		NFO:   bdinfo,
+		Title: "Movie 2020 1080p MiniBD x264-CMCT",
+	})
+	for _, tg := range tags {
+		if tg == "original_disc" {
+			t.Errorf("② MiniBD（title 重编码词）不应产出 original_disc: %v", tags)
+		}
+	}
+
+	// ③ MI 编码铁证优先（Black Snow 案防线）：MI+BDInfo 同时在场且
+	// MI 明确编码 → 门剔除·结构通道不回加（Writing library 在 Video 段
+	// ——:116 判据位·General 段走 generalReencoderDetected 压制前端词表）
+	tags = inf.InferFull(TagInput{
+		NFO:       bdinfo,
+		Title:     "Movie 2020 1080p BluRay",
+		MediaInfo: "General\nUnique ID : x\nVideo\nFormat : AVC\nWriting library : x264 core 164",
+		Subtitle:  "*WCL原盘压制",
+	})
+	for _, tg := range tags {
+		if tg == "original_disc" {
+			t.Errorf("③ MI 编码铁证应剔除 original_disc（结构通道不得回加）: %v", tags)
+		}
+	}
+
+	// ④ 文案通道保留：title 中文「原盘」+无 BDInfo → 仍产出（双通道并集）
+	tags = inf.InferFull(TagInput{
+		Title: "Movie 2020 2160p 原盘 HEVC-GRP",
+	})
+	hasOD = false
+	for _, tg := range tags {
+		if tg == "original_disc" {
+			hasOD = true
+		}
+	}
+	if !hasOD {
+		t.Errorf("④ 文案通道（title 原盘字样）应保留产出: %v", tags)
+	}
+}
