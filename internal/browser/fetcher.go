@@ -10,6 +10,8 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"go.uber.org/zap"
+
+	"github.com/ranfish/pt-forward/internal/httpclient"
 )
 
 // §59.336: 浏览器 fallback 获取器——真实 Chromium 加载页面，
@@ -45,7 +47,7 @@ func (f *Fetcher) FetchHTML(ctx context.Context, url, cookie, userAgent string, 
 		timeout = 30 * time.Second
 	}
 	if userAgent == "" {
-		userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+		userAgent = httpclient.BrowserUserAgent()
 	}
 
 	// 隔离父 deadline，保留父取消信号
