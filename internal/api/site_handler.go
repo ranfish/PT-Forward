@@ -57,15 +57,15 @@ func applySiteMaxConcurrent(domain string, maxConcurrent int) {
 		// slot per minute). Scale MaxReqs proportionally so high-concurrency sites
 		// (e.g. TTG with max_concurrent=20 for batch RSS detect) don't get queued
 		// behind the default rate window.
-		// DomainRateLimiter keys by "https://<domain>" (see transport.extractDomain).
+		// 12 刀1（v0.0.1654）: 删手拼 "https://"+domain——DomainRateLimiter
+		// 入口统一 OriginKey 规范化（F-01 第三套口径收编）。
 		const (
 			defaultMaxConcurrent = 2
 			defaultMaxReqs       = 30
 			windowSecs           = 60
 		)
 		maxReqs := defaultMaxReqs * maxConcurrent / defaultMaxConcurrent
-		rateKey := "https://" + domain
-		httpclient.GlobalLimiter.SetDomainConfig(rateKey, httpclient.DomainLimitConfig{
+		httpclient.GlobalLimiter.SetDomainConfig(domain, httpclient.DomainLimitConfig{
 			MaxConcurrent: maxConcurrent,
 			MaxReqs:       maxReqs,
 			WindowSecs:    windowSecs,

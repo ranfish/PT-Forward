@@ -303,12 +303,11 @@ func main() {
 			if s.MaxConcurrent > 0 {
 				// Scale MaxReqs with MaxConcurrent (default 30 reqs/60s for
 				// maxConcurrent=2). See applySiteMaxConcurrent for rationale.
+				// 12 刀1（v0.0.1654）: 删手拼 "https://"+domain——
+				// DomainRateLimiter 入口统一 OriginKey 规范化。
 				const defaultMaxConcurrent = 2
 				const defaultMaxReqs = 30
-				// DomainRateLimiter keys by "https://<domain>" (see transport.extractDomain),
-				// so prepend the scheme here to match.
-				rateKey := "https://" + s.Domain
-				httpclient.GlobalLimiter.SetDomainConfig(rateKey, httpclient.DomainLimitConfig{
+				httpclient.GlobalLimiter.SetDomainConfig(s.Domain, httpclient.DomainLimitConfig{
 					MaxConcurrent: s.MaxConcurrent,
 					MaxReqs:       defaultMaxReqs * s.MaxConcurrent / defaultMaxConcurrent,
 					WindowSecs:    60,

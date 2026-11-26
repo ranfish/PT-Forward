@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/ranfish/pt-forward/internal/browser"
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -192,11 +191,15 @@ var FrameworkDefaults = map[string]FrameworkDefault{
 }
 
 // RegisterSiteRateLimit §59.340 C: 站点级获取 RPS 注册到全局 limiter
-// （provider.GetAdapter 一处接线；Domain 规范化去 scheme）。
+// （provider.GetAdapter 一处接线；Domain 原样传入——12 刀1：内部经
+// OriginKey 规范化·调用方禁手搓 key/禁 TrimPrefix 去 scheme〔V-01〕）。
 func RegisterSiteRateLimit(domain string, rps float64) {
-	d := strings.TrimPrefix(strings.TrimPrefix(domain, "https://"), "http://")
+	// 12 刀1（v0.0.1654）: 删 TrimPrefix 手搓裸 domain——原实现把
+	// site.Domain 剥成裸域写入，而请求侧 Acquire 用 https://host 桶
+	// ——key 永不相等·配置失效（V-01·keepfrds 4/min 跑成 30/min）。
+	// Domain 原样传入，DomainRateLimiter 内部 OriginKey 统一收敛。
 	windowSecs := 60
-	httpclient.GlobalLimiter.SetDomainConfig(d, httpclient.DomainLimitConfig{
+	httpclient.GlobalLimiter.SetDomainConfig(domain, httpclient.DomainLimitConfig{
 		MaxReqs:       int(rps * float64(windowSecs)),
 		WindowSecs:    windowSecs,
 		MaxConcurrent: 2,

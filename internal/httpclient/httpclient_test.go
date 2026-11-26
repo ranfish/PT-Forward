@@ -321,11 +321,13 @@ func TestGetDomainStatuses(t *testing.T) {
 	limiter.Acquire(context.Background(), "b.com")
 	limiter.Release("b.com")
 
+	// 12 刀1: map key 统一 origin 形态（OriginKey 收敛）——裸 domain
+	// 直查已死·消费方必须经 OriginKey 规范化查找。
 	statuses := limiter.GetDomainStatuses()
-	if !statuses["a.com"].Frozen {
+	if !statuses[OriginKey("a.com")].Frozen {
 		t.Error("a.com should be frozen")
 	}
-	if statuses["b.com"].Frozen {
+	if statuses[OriginKey("b.com")].Frozen {
 		t.Error("b.com should not be frozen")
 	}
 }

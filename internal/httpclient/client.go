@@ -20,6 +20,11 @@ var (
 func Init(logger *zap.Logger) {
 	GlobalEmitter = NewFreezeEventEmitter(logger)
 	GlobalCircuitBreaker = NewCircuitBreakerTransport(nil, DefaultCircuitBreakerConfig(), logger)
+	// 12 刀1（v0.0.1654）: 启动期 key 一致性自检——OriginKey 与请求侧
+	// extractOrigin 形态契约（fail-fast·防未来口径再分裂静默失效）。
+	if err := SelfCheckOriginKey(); err != nil {
+		logger.Fatal("origin key self-check failed", zap.Error(err))
+	}
 }
 
 func IsDomainCircuitOpen(domain string) bool {

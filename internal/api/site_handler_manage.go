@@ -135,7 +135,10 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 		result := make([]freezeRow, 0, len(sites))
 		for _, s := range sites {
 			row := freezeRow{Name: s.Name, Domain: s.Domain}
-			if fs, ok := freezeMap[s.Domain]; ok {
+			// 12 刀1（v0.0.1654）: map key 已统一 origin 形态——裸 domain
+			// 直查恒 miss（第四处口径分裂·冻结状态展示全灭）。经 OriginKey
+			// 规范化查找。
+			if fs, ok := freezeMap[httpclient.OriginKey(s.Domain)]; ok {
 				row.Frozen = fs.Frozen
 				row.Reason = fs.Reason
 			}
