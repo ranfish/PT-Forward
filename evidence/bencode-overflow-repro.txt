@@ -1,0 +1,8 @@
+=== A-1 qbittorrent computeInfoHash 整数溢出 → slice 越界 ===
+panic: runtime error: slice bounds out of range [:-9223372036854775782] [recovered, repanicked]
+github.com/ranfish/pt-forward/internal/client/qbittorrent.computeInfoHash({0xc000079741, 0x1f, 0x1f})
+	/home/incast/work/engagements/10.0.0.49/PT-Forward/internal/client/qbittorrent/client.go:314 +0x258
+=== A-2 fingerprint decodeString ===
+panic: runtime error: slice bounds out of range [:-9223372036854775789] [recovered, repanicked]
+github.com/ranfish/pt-forward/internal/fingerprint.decodeString({0xc00007df48, 0x18, 0x18}, 0x0)
+	/home/incast/work/engagements/10.0.0.49/PT-Forward/internal/fingerprint/bencode.go:136 +0x3ad
