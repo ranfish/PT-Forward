@@ -99,7 +99,7 @@ jobs:
         run: go mod download
 
       - name: Test (race 层：高风险并发包 -race)
-        run: CGO_ENABLED=1 go test -race -count=1 -timeout 900s ./internal/pusher/ ./internal/watcher/ ./internal/seeding/ ./internal/reseed/ ./internal/db/... ./internal/publish/ ./internal/rss/
+        run: CGO_ENABLED=1 go test -race -count=1 -timeout 900s ./internal/pusher/ ./internal/watcher/ ./internal/seeding/ ./internal/reseed/ ./internal/db/... ./internal/publish/ ./internal/rss/ ./internal/filter/
 
   # §59.567 刀A: full 层——每日定时全量 -race 无 -short（覆盖 fast 层跳过的
   # 4 处 testing.Short 项：metadata fetcher/API 网络测试 ×2/adapter 真实

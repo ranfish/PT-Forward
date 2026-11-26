@@ -34,6 +34,16 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 10 刀1（v0.0.1650）: 淘汰与写入移入写锁临界区+double-check——
+	// 原实现在 RUnlock 后裸写 map（len/range+delete/写入三处越界）·
+	// 并发触发 runtime fatal（不可 recover）。范式对齐 rss/engine.go
+	// getOrCompileRegex（读热路径 RLock·miss 升级写锁+二次检查防
+	// 重复编译写入）。10 篇 §2.1 · §59.186 同型漏网补齐。
+	regexCacheMu.Lock()
+	if cached, exists := regexCache[pattern]; exists {
+		regexCacheMu.Unlock()
+		return cached, nil
+	}
 	if len(regexCache) >= 5000 {
 		for k := range regexCache {
 			delete(regexCache, k)
@@ -41,6 +51,7 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 		}
 	}
 	regexCache[pattern] = re
+	regexCacheMu.Unlock()
 	return re, nil
 }
 
