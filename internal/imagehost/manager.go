@@ -57,9 +57,10 @@ func NewManager(logger *zap.Logger) *Manager {
 	}
 }
 
-// SetProxy 设置图床代理（v0.0.256）。
+// SetProxy 设置图床代理（09 刀1·v0.0.1644 重构）。
 // proxyURL 为空时关闭代理（直连）。
-// 开启后所有 host 的 HTTP 请求自动走代理（通过临时替换 http.DefaultTransport 实现）。
+// 开启后 host client 的 HTTP 请求走代理（通过 transportSwitcher 注入——
+// 弃 v0.0.256 的「临时替换 http.DefaultTransport」全局污染方案）。
 func (m *Manager) SetProxy(proxyURL string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
