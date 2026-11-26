@@ -104,7 +104,7 @@ func TestProxySwitcherNoGlobalTransportPollution(t *testing.T) {
 		t.Errorf("③ switcher 链从未经过代理（代理语义丢失）")
 	}
 	// ③ 普通链不经代理：directHits 至少来自 B 的 rounds 次
-	//（targetSrv 同时被 A 直连态命中·只断言下限）
+	// （targetSrv 同时被 A 直连态命中·只断言下限）
 	if directHits.Load() < rounds {
 		t.Errorf("④ 普通请求链经代理污染（direct=%d < %d）", directHits.Load(), rounds)
 	}
