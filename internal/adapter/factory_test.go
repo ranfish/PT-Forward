@@ -3,6 +3,7 @@ package adapter
 import (
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
 
@@ -22,14 +23,14 @@ func TestFactory_Create_Generic(t *testing.T) {
 	}
 }
 
+// 08 刀3：基准改单一来源——遍历 FrameworkDefaults 自身（原手抄 6 项
+// 子集→现在全 10 项覆盖）。hdarea/hxpt/piggo 不注册是设计决策
+// （§59.533·API-only 站——附录G §1.3 禁止机械补齐）。
 func TestFrameworkDefaults_ContainsAll(t *testing.T) {
-	expected := []string{"nexusphp", "unit3d", "gazelle", "mteam", "luminance", "generic"}
-	for _, fw := range expected {
-		def, ok := FrameworkDefaults[fw]
-		if !ok {
-			t.Errorf("FrameworkDefaults missing %q", fw)
-			continue
-		}
+	if len(FrameworkDefaults) != 10 {
+		t.Errorf("FrameworkDefaults has %d entries, expected 10（有意不注册 hdarea/hxpt/piggo——附录G §1.3）", len(FrameworkDefaults))
+	}
+	for fw, def := range FrameworkDefaults {
 		if def.HashStrategy == "" {
 			t.Errorf("%q has empty HashStrategy", fw)
 		}
@@ -55,24 +56,25 @@ func TestNewHTTPDoer(t *testing.T) {
 	}
 }
 
+// 08 刀3：基准改单一来源——cases 从 model.FrameworkLabels 派生
+// （原手抄 6 项→现在 13 项全覆盖）。类型断言锁 Labels ⊆ factory：
+// default 兜底也回显输入（TestFactory_Create_Generic 证明）——回显
+// 锚无法区分真 case 与兜底，必须断言具体类型（generic/luminance 项
+// 除外——luminance 是显式 case 无专属结构体）。新增 framework 忘进 Labels 时本锚测不到
+// （factory ⊃ Labels 方向）——靠附录G §1.4 checklist 纪律+model_test
+// 基数锁（13）兜住。
 func TestFactory_Create_AllFrameworks(t *testing.T) {
 	f := NewFactory(zap.NewNop(), nil)
-	cases := []struct {
-		framework string
-		want      string
-	}{
-		{"tnode", "tnode"},
-		{"mteam", "mteam"},
-		{"unit3d", "unit3d"},
-		{"gazelle", "gazelle"},
-		{"rousi", "rousi"},
-		{"luminance", "luminance"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.framework, func(t *testing.T) {
-			a := f.Create(tc.framework, NewHTTPDoer())
-			if a.Framework() != tc.want {
-				t.Errorf("expected %s, got %s", tc.want, a.Framework())
+	for fw := range model.FrameworkLabels {
+		t.Run(string(fw), func(t *testing.T) {
+			a := f.Create(string(fw), NewHTTPDoer())
+			if a.Framework() != string(fw) {
+				t.Errorf("expected %s, got %s", string(fw), a.Framework())
+			}
+			// luminance 无专属 adapter（factory.go :103 显式 case 返回
+			// GenericAdapter("luminance")）——与 generic 同走 GenericAdapter 合法
+			if _, isGeneric := a.(*GenericAdapter); isGeneric && fw != model.FrameworkGeneric && fw != model.FrameworkLuminance {
+				t.Errorf("framework %q fell into GenericAdapter default branch（Labels ⊆ factory 破坏·case 缺失或值拼错）", fw)
 			}
 		})
 	}

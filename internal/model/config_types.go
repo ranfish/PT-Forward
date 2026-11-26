@@ -263,6 +263,8 @@ const (
 
 type Framework string
 
+// 08 刀3：常量全集对齐 Factory.Create 的 13 个 case（值逐字一致——
+// 附录G §1.4 checklist 的第 2 项；生产零调用的展示层补全）。
 const (
 	FrameworkNexusPHP  Framework = "nexusphp"
 	FrameworkUnit3D    Framework = "unit3d"
@@ -272,6 +274,11 @@ const (
 	FrameworkLuminance Framework = "luminance"
 	FrameworkRousi     Framework = "rousi"
 	FrameworkGeneric   Framework = "generic"
+	FrameworkCola      Framework = "cola"
+	FrameworkYemapt    Framework = "yemapt"
+	FrameworkPiggo     Framework = "piggo"
+	FrameworkHDArea    Framework = "hdarea"
+	FrameworkHXPT      Framework = "hxpt"
 )
 
 var FrameworkLabels = map[Framework]string{
@@ -283,6 +290,11 @@ var FrameworkLabels = map[Framework]string{
 	FrameworkLuminance: "Luminance",
 	FrameworkRousi:     "Rousi",
 	FrameworkGeneric:   "Generic",
+	FrameworkCola:      "Cola (ReelCore)",
+	FrameworkYemapt:    "YemaPT",
+	FrameworkPiggo:     "PigGo",
+	FrameworkHDArea:    "HDArea API",
+	FrameworkHXPT:      "Hxpt API",
 }
 
 func ValidFramework(s string) bool {
