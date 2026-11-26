@@ -25,6 +25,10 @@ type ImageHost interface {
 	Upload(ctx context.Context, data []byte, filename string) (*UploadResult, error)
 	Rehost(ctx context.Context, sourceURL string) (*UploadResult, error)
 	HealthCheck(ctx context.Context) error
+	// SetTransport 09 刀1: Manager.Register 时一次性注入 transportSwitcher
+	// （此后 Transport 字段只读——零并发写 race·动态代理切换由 switcher
+	// 内部锁保证）。替代 v0.0.256 的全局 DefaultTransport 临时替换。
+	SetTransport(rt http.RoundTripper)
 }
 
 type UploadResult struct {
@@ -34,8 +38,10 @@ type UploadResult struct {
 	HostName  string `json:"host_name"`
 }
 
-func downloadURL(ctx context.Context, url string) ([]byte, string, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
+// downloadURL 09 刀1: rt 入参（host 的 switcher 注入——Rehost 下载源图
+// 走代理与上传同链·不再依赖全局 DefaultTransport 被临时替换的副作用）。
+func downloadURL(ctx context.Context, url string, rt http.RoundTripper) ([]byte, string, error) {
+	client := &http.Client{Timeout: 60 * time.Second, Transport: rt}
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("create request: %w", err)

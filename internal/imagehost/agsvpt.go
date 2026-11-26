@@ -23,6 +23,9 @@ type AGSVPTHost struct {
 	password string
 	client   *http.Client
 	logger   *zap.Logger
+	// transport 09 刀1: SetTransport 注入的 switcher（供 Rehost 的
+	// downloadURL——下载源图与上传同代理链）。
+	transport http.RoundTripper
 
 	mu    sync.Mutex
 	token string
@@ -38,6 +41,12 @@ func NewAGSVPTHost(email, password string, logger *zap.Logger) *AGSVPTHost {
 }
 
 func (a *AGSVPTHost) Name() string { return "agsvpt" }
+
+// SetTransport 09 刀1: Manager.Register 一次性注入（此后只读）。
+func (a *AGSVPTHost) SetTransport(rt http.RoundTripper) {
+	a.client.Transport = rt
+	a.transport = rt
+}
 
 func (a *AGSVPTHost) SetCredentials(email, password string) {
 	a.mu.Lock()
@@ -134,7 +143,7 @@ func (a *AGSVPTHost) doUpload(ctx context.Context, data []byte, filename string)
 }
 
 func (a *AGSVPTHost) Rehost(ctx context.Context, sourceURL string) (*UploadResult, error) {
-	data, filename, err := downloadURL(ctx, sourceURL)
+	data, filename, err := downloadURL(ctx, sourceURL, a.transport)
 	if err != nil {
 		return nil, fmt.Errorf("agsvpt rehost download: %w", err)
 	}

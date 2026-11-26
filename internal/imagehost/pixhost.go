@@ -27,6 +27,9 @@ type PixhostHost struct {
 	client  *http.Client
 	logger  *zap.Logger
 	domains []string
+	// transport 09 刀1: SetTransport 注入的 switcher（供 Rehost 的
+	// downloadURL——下载源图与上传同代理链）。
+	transport http.RoundTripper
 }
 
 func NewPixhostHost(logger *zap.Logger) *PixhostHost {
@@ -38,6 +41,12 @@ func NewPixhostHost(logger *zap.Logger) *PixhostHost {
 }
 
 func (p *PixhostHost) Name() string { return "pixhost" }
+
+// SetTransport 09 刀1: Manager.Register 一次性注入（此后只读）。
+func (p *PixhostHost) SetTransport(rt http.RoundTripper) {
+	p.client.Transport = rt
+	p.transport = rt
+}
 
 func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) (*UploadResult, error) {
 	var lastErr error
@@ -122,7 +131,7 @@ func (p *PixhostHost) uploadToDomain(ctx context.Context, domain string, data []
 }
 
 func (p *PixhostHost) Rehost(ctx context.Context, sourceURL string) (*UploadResult, error) {
-	data, filename, err := downloadURL(ctx, sourceURL)
+	data, filename, err := downloadURL(ctx, sourceURL, p.transport)
 	if err != nil {
 		return nil, fmt.Errorf("rehost download: %w", err)
 	}
