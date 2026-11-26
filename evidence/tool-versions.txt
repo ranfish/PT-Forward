@@ -1,2 +1,3 @@
 go version go1.25.0 linux/amd64
-基线: c1931e1c160427e2d2f97a2fce0aade1f48f7b0e
+基线: e9d279782ed96ebff3973d83e314ce97ed325f30
+sqlite: 3.53.4

@@ -1,0 +1,9 @@
+=== LIKE 通配符劫持（无转义 vs 转义）===
+用户输入 '%' 无转义: like='%%%' -> ['ProjectA', 'ProjectB', 'Foo_Bar', '100%done', 'abc']
+用户输入 '_' 无转义: like='%_%' -> ['ProjectA', 'ProjectB', 'Foo_Bar', '100%done', 'abc']
+用户输入 '%' 转义后: like='%\\%%' -> ['100%done']
+用户输入 '_' 转义后: like='%\\_%' -> ['Foo_Bar']
+=== ptgen_handler.go 正例缺陷：escaped 值无 ESCAPE 子句 ===
+pattern='%%\\%%'
+无 ESCAPE（ptgen 现状）: []
+带 ESCAPE '\\'（正确）: ['100%done']
