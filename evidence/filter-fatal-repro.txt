@@ -1,0 +1,4 @@
+fatal error: concurrent map read and map write
+	/home/incast/work/engagements/10.0.0.49/PT-Forward/internal/filter/engine.go:22 +0x85
+	/home/incast/work/engagements/10.0.0.49/PT-Forward/internal/filter/engine.go:43 +0x24c
+	/home/incast/work/engagements/10.0.0.49/PT-Forward/internal/filter/engine.go:33 +0x1a5
