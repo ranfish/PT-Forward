@@ -1,6 +1,6 @@
 # 09 HTTP 边界资源治理
 
-- **状态**：精读完成，整改建议待实施
+- **状态**：已完成（四刀 v0.0.1644-1648 落地·联合回归 165fb854）
 - **日期**：2026-11-26
 - **基线**：`678a61fe`（08 回归审核四修补齐·全案收官）
 - **审计范围**：`internal/` 生产代码中所有发起外部 HTTP 调用的路径（24 处自建 `http.Client`、9 处裸 `http.NewRequest`、17 处无上限 `io.ReadAll(resp.Body)`、23 处裸 `resp.Body.Close()`），重点覆盖 `imagehost`/`httpclient`/`api`/`publish`/`adapter`/`cookiecloud`/`iyuu`/`notification`/`download` 等包；对照 `docs/31` 既有 HTTP 单点决策（§59.156 `ResolveSiteProxy`、§59.334 Session 复用、§59.367 代理接入）校正。
@@ -101,7 +101,7 @@ func (m *Manager) withProxy(fn func() error) error {
 
 ### 2.5 正面结论：不应被误判为问题的部分
 
-- `httpclient.NewSiteHTTPClient` + `ReadBody/DrainBody` + `BrowserUserAgent` 三套单点**健康且被广泛使用**（`ReadBody` 12 处/`DrainBody` 85 处响应体 helper），本篇不推翻、不重写。
+- `httpclient.NewSiteHTTPClient` + `ReadBody/DrainBody` + `BrowserUserAgent` 三套单点**健康且被广泛使用**（基线：`ReadBody` 12 处/`DrainBody` 85 处；实施后 v0.0.1648：`ReadBody` 29 处〔17 处收编〕/`DrainBody` 85 处），本篇不推翻、不重写。
 - `rss/fetcher.go:32,64`、`site/stats_sync.go:181+`、`adapter/apihelper.go:31`、`client/qbittorrent/client.go:117-118`、`cloudfp/service.go:215-216` 等已正确成对 `ReadBody+DrainBody`——是正例。
 - `adapter/adapter_piggo.go:757-784` 手搓 multipart boundary 有注释说明是站方 cURL `--form` 方言契约（数组字段形态），属已知方言例外，**不作为资源缺陷**——否则与 08 篇方言边界重叠。
 - 结构体成员 client（`cloudfp`/`qbittorrent`/`transmission`/`notification` service）生命周期随宿主，非"每请求新建"，问题等级低。
