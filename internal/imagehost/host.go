@@ -52,7 +52,12 @@ func downloadURL(ctx context.Context, url string, rt http.RoundTripper) ([]byte,
 	if err != nil {
 		return nil, "", fmt.Errorf("download: %w", err)
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
+	// 09 刀2: 排空套 LimitReader（原无界 io.Copy——远端可驱动的持续推流
+	// 放大；上限与 httpclient.maxDrainSize 对齐）
+	defer func() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("download status %d", resp.StatusCode)

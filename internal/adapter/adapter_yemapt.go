@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -727,8 +728,11 @@ func (a *YemaptAdapter) SearchByPiecesHash(ctx context.Context, config *model.Si
 		if err != nil {
 			return nil, fmt.Errorf("pieces_hash 请求失败: %w", err)
 		}
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := httpclient.ReadBody(resp)
 		_ = resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("pieces_hash 响应读取失败: %w", readErr)
+		}
 
 		var result_struct struct {
 			Success      bool                   `json:"success"`

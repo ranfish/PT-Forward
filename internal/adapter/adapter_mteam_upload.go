@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -436,7 +435,7 @@ func (a *MTeamAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Sit
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	htmlBytes, err := io.ReadAll(resp.Body)
+	htmlBytes, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}

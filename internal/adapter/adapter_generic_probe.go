@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"strings"
 
@@ -128,7 +127,7 @@ func (a *GenericAdapter) fetchSeedingSizeFromBonusHour(ctx context.Context, conf
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return
 	}

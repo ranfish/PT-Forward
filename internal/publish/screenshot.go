@@ -311,7 +311,7 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 
 	// §59.300 附十五/附十八：IDR 精确慢链仅 mpegts（无索引容器 open-GOP concealment，
 	// Cold Storage/原始灰花投诉全为 m2ts）；mkv/mp4 精确 seek 保留 frames=1 快链
-	//（发布链截图策略 4min 预算兼容——全量化曾致其必然超时）。m2ts 找不到关键帧 →
+	// （发布链截图策略 4min 预算兼容——全量化曾致其必然超时）。m2ts 找不到关键帧 →
 	// hr-seek 兜底（mpv 内部关键帧前向解码，取 120 帧末帧，cs120 实证）
 	if isMpegTS {
 		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)

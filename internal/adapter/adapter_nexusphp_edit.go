@@ -9,13 +9,13 @@ package adapter
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -166,7 +166,7 @@ func (a *NexusPHPAdapter) SubmitEdit(ctx context.Context, req *model.EditRequest
 
 	// 200 = 真·错误页（站方 stderr 模板——含真实原因如"有项目没有填写"）
 	if resp.StatusCode == http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := httpclient.ReadBody(resp) // 错误页 enrich——读失败 body 空·不掩盖原始错误
 		return fmt.Errorf("edit failed: %s", extractErrorMessage(string(body)))
 	}
 

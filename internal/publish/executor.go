@@ -14,7 +14,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -622,7 +621,10 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		return nil, err.Error()
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, readErr := httpclient.ReadBody(resp)
+	if readErr != nil {
+		return nil, fmt.Sprintf("pre-audit 响应读取失败: %v", readErr)
+	}
 	var envelope struct {
 		Data *PreAuditResult `json:"data"`
 	}

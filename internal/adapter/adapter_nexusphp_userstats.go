@@ -79,7 +79,7 @@ func (a *NexusPHPAdapter) fetchUserStatsAPI(ctx context.Context, config *model.S
 		return nil, fmt.Errorf("API returned %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (a *NexusPHPAdapter) scrapePasskey(ctx context.Context, config *model.SiteC
 	if resp.StatusCode != http.StatusOK {
 		return
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return
 	}
@@ -209,7 +209,7 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +512,7 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return
 	}
@@ -738,7 +738,7 @@ func (a *NexusPHPAdapter) fetchSeedingFromAJAX(ctx context.Context, config *mode
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return
 	}

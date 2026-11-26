@@ -3,7 +3,6 @@ package adapter
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,7 +29,7 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	htmlBytes, err := io.ReadAll(resp.Body)
+	htmlBytes, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +145,7 @@ func (a *GenericAdapter) fetchTTGUserClass(ctx context.Context, config *model.Si
 	if resp.StatusCode != http.StatusOK {
 		return ""
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return ""
 	}

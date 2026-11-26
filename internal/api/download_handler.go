@@ -12,6 +12,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/download"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
@@ -350,7 +351,13 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 		paused = req.Paused
 		if req.URL != "" {
 			httpClient := &http.Client{Timeout: 30 * time.Second}
-			resp, err := httpClient.Get(req.URL)
+			// 09 刀2: r.Context() 接入（原裸 Get 无 ctx——请求取消不传播）
+			dlReq, reqErr := http.NewRequestWithContext(r.Context(), "GET", req.URL, nil)
+			if reqErr != nil {
+				Error(w, http.StatusBadRequest, 40001, "下载 .torrent 失败: "+reqErr.Error())
+				return
+			}
+			resp, err := httpClient.Do(dlReq)
 			if err != nil {
 				Error(w, http.StatusBadRequest, 40001, "下载 .torrent 失败: "+err.Error())
 				return
@@ -360,7 +367,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 				Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("下载 .torrent 失败: HTTP %d", resp.StatusCode))
 				return
 			}
-			torrentData, err = io.ReadAll(resp.Body)
+			torrentData, err = httpclient.ReadBody(resp)
 			if err != nil {
 				Error(w, http.StatusBadRequest, 40001, "读取 .torrent 数据失败")
 				return

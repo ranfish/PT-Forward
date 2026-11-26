@@ -203,7 +203,7 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 func (h *SettingsHandler) handleDelete(w http.ResponseWriter, r *http.Request, key string) {
 	// §59.367 附六: sensitive 且非 writeOnly（jwt 类系统键）禁删；
 	// writeOnly 键（github_token 等用户自配置凭证）放行——清除路径
-	//（此前 sensitive 一律拒删致 writeOnly 键无清除操作路径）。
+	// （此前 sensitive 一律拒删致 writeOnly 键无清除操作路径）。
 	if isSensitiveSettingKey(key) && !writeOnlySettingKeys[key] {
 		Error(w, http.StatusForbidden, 16003, "该设置项禁止删除")
 		return

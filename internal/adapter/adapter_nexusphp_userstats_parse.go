@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -65,7 +64,7 @@ func (a *NexusPHPAdapter) resolveUIDFromSelfProfile(ctx context.Context, config 
 		return ""
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return ""
 	}
@@ -98,7 +97,7 @@ func (a *NexusPHPAdapter) fetchSeedingSizeFromBonus(ctx context.Context, config 
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return
 	}

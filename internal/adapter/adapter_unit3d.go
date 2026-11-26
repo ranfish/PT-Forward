@@ -840,7 +840,7 @@ func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Sit
 		return nil, fmt.Errorf("API returned %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +890,7 @@ func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Si
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	htmlBytes, err := io.ReadAll(resp.Body)
+	htmlBytes, err := httpclient.ReadBody(resp)
 	if err != nil {
 		return nil, err
 	}

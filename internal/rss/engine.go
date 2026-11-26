@@ -805,7 +805,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			var wg sync.WaitGroup
 			var slowCount int64
 			// §59.368: detect 失败计数——落 fetch_log 供订阅状态列反向统计
-			//（隐性停摆信号：fetch ok 但 detect 全败 → fail-closed 静默零获取）
+			// （隐性停摆信号：fetch ok 但 detect 全败 → fail-closed 静默零获取）
 			var detectFailures int64
 
 			for _, item := range detectItems {
