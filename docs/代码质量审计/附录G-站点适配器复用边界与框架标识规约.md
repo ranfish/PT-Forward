@@ -58,17 +58,17 @@
 |---|---|---|---|
 | `siteBaseURL` | `adapter/errors.go:142` | BaseURL 非空→去尾斜杠；Domain 含协议→直用去斜杠；裸域→补 `https://` | 5 处（hdarea/hdcity/hxpt/nexusphp_edit/piggo）·§59.533 定为公共单点·§59.575 收编 hxpt 手搓 |
 | `resolveBaseURL` | `adapter_mteam_upload.go:276` | BaseURL→Domain + `HasPrefix("http")` 补协议 + `TrimRight` 去斜杠（**§59.559 创建起即带·git log -L 零修改**） | 12 文件（gazelle/cola/mteam 族/rousi/tnode/yemapt 等） |
-| `baseURLOf` | `adapter_generic.go:676` | BaseURL→Domain **裸取**（不补协议不去斜杠） | 仅 2 处（generic:109/nexusphp_upload:57）·全喂 `BuildNexusDownloadURL`（幂等兜底） |
+| `baseURLOf` | `adapter_generic.go:676` | **委托 `resolveBaseURL`**（08 刀2·v0.0.1640）——输出规范（补协议+去尾斜杠）；刀2 前曾是裸取旧形态 | 2 处（generic:109/nexusphp_upload:57）喂 `BuildNexusDownloadURL`——委托后兜底成死路径（幂等分支恒不触发·保留为公共契约） |
 
 ### 2.2 语义分层与选用规则
 
 - **标准三态**（BaseURL 含协议/Domain 含协议/裸 Domain）下 `siteBaseURL` ↔ `resolveBaseURL` 输出逐字一致——可互相委托的一对。第四态（BaseURL 非空但不含协议）两者不同·正常配置不出现。
-- `baseURLOf` 是裸取旧形态·**helper 层与上两者不等价**（裸 Domain 返回 `pt.site.com` vs `https://pt.site.com`）——其等价性依赖下游 `BuildNexusDownloadURL`（`download_url.go:25-33`）的幂等补协议+去斜杠兜底·**端到端等价**（08 §3 刀2 四态推演）。
-- **选用**：新代码一律 `siteBaseURL`（公共单点）；`resolveBaseURL` 消费面暂不动（行为变更需专项授权）；`baseURLOf` 保持喂 `BuildNexusDownloadURL`（若新增不经它的消费点·必须先评估）。
+- ~~`baseURLOf` 是裸取旧形态~~（刀2 前历史）——**刀2（v0.0.1640）委托 `resolveBaseURL` 后自身已规范**·helper 层与 resolveBaseURL 等价（别名）。委托前裸 Domain 返回 `pt.site.com` 的差异已消失·下游 `BuildNexusDownloadURL` 兜底成死路径（幂等分支恒不触发——保留为公共契约·`TestBuildNexusDownloadURL_Idempotence` 独立锚锁〔08 回归审核修正补〕）。
+- **选用**：新代码一律 `siteBaseURL`（公共单点）；`resolveBaseURL` 消费面暂不动（行为变更需专项授权）；`baseURLOf` 已规范——**新增消费点无需评估**（曾需评估的「裸取喂下游」前提随委托消失）。
 
 ### 2.3 等价性核对纪律
 
-**以代码本体 + `git log -L` 为准·不据函数头注释判语义**——`resolveBaseURL` 的函数头注释讲「纯 Domain 构造」是修复前的问题叙述·代码早已带补协议（08 精读初稿即被此误导·后经 git log -L 实证纠正）。
+**以代码本体 + `git log -L` 为准·不据函数头注释判语义**——`resolveBaseURL` 的函数头注释讲「纯 Domain 构造」是修复前的问题叙述·代码早已带补协议（08 精读初稿即被此误导·后经 git log -L 实证纠正）。本纪律同样适用于**测试锚注释**：08 回归审核实证——baseURLOf 委托后兜底成死路径·四态快照锚的「防兜底被改/防新消费点」声明不成立（虚拟安全感·与 §2.1 批评的同款错误）——已诚实化+补幂等独立锚（TestBuildNexusDownloadURL_Idempotence）。
 
 ## 3. SiteConfig 构造约定域（历史病灶收编）
 

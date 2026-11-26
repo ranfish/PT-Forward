@@ -335,7 +335,7 @@ func TestCompareType_Values(t *testing.T) {
 // 08 刀3：基准改单一来源——不再手抄切片（手抄=检测不到与 factory 真实
 // 集合的漂移·08 §2.1 虚假安全感）。三层锚：基数锁（增删 framework 先改
 // 本锚——§59.546 纪律平移）+ label 非空 + 值无重复（map 天然防）。
-// factory 侧的锁见 adapter/factory_test 的 TestFactoryCreate_CoversLabels
+// factory 侧的锁见 adapter/factory_test 的 TestFactory_Create_AllFrameworks
 // （类型断言——default 兜底也回显输入·回显锚无效·必须断具体类型）。
 func TestFrameworkLabels_Completeness(t *testing.T) {
 	if len(FrameworkLabels) != 13 {
