@@ -1,0 +1,17 @@
+=== 基线 = 32145be3559817ff55c2dee14329212b9c4400d6 ===
+=== 14 篇证据：结构化数据形态契约（本地离线复现·未碰靶机/真实数据）===
+
+--- A. omitempty 零值丢字段（真实 encoding/json）---
+false 两字段: {"show_cookie":false}
+true  两字段: {"show_cookie":true,"publish_supported":true}
+
+--- B. UNIT3D /api/user 响应形态（docs/34:344-347）与代码契约不匹配（真实 flexInt）---
+    contract_probe_test.go:12: 整体解析: err=json: cannot unmarshal string into Go struct field .ratio of type float64 uploaded=0 downloaded=0 ratio=0.00 bonus=0.00
+    contract_probe_test.go:15: 单字段 uploaded: err=<nil> value=0（静默归零）
+
+--- 形态来源：docs/34-UNIT3D-API完整指南.md:344-347 ---
+  "username": "string",
+  "group": "string",
+  "uploaded": "50.00 GiB",
+  "downloaded": "1.00 GiB",
+  "ratio": "50.00",
