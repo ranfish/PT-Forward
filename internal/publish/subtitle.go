@@ -19,11 +19,18 @@ import (
 
 type SubtitleCandidate struct {
 	StreamIndex int
-	Codec       string
-	Language    string
-	Title       string
-	IsText      bool
-	Score       int
+	// SubIndex §59.589: 字幕流绝对序（1-based）——mpv --sid 语义。
+	// Detect 按全部 ffprobe 字幕流行计数（含被 disposition 滤掉的轨——
+	// 它们不参与评分但在 mpv 轨表占号）；probeDisc 同步补齐（无滤轨
+	// 场景恰=StreamIndex）。原映射按「过滤后候选列表位置」数 sid——
+	// 被滤轨排在中文轨前时错位（Scandal 案：kor HI 轨被滤致 chi 从
+	// sid3 偏移成 sid2=韩文）。
+	SubIndex int
+	Codec    string
+	Language string
+	Title    string
+	IsText   bool
+	Score    int
 }
 
 type SubtitleDetector struct {
@@ -77,6 +84,8 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 	}
 
 	var candidates []SubtitleCandidate
+	// subIdx §59.589: ffprobe 字幕流绝对序（1-based）——含被滤轨
+	subIdx := 0
 	// §59.291: webvtt（NF/AMZN WEB-DL MKV 内嵌标配——UNABOMBER 中文简繁
 	// 双轨全 WEBVTT 实证）+ mov_text（MP4 内嵌）补入——原白名单致 Detect
 	// 全滤 → sid=0 → --sid=no 裸图
@@ -88,6 +97,8 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 	}
 
 	for _, stream := range result.Streams {
+		// §59.589: 字幕流绝对序先计数——被滤轨不参与评分但占 mpv 轨号
+		subIdx++
 		codec := strings.ToLower(stream.CodecName)
 		lang := strings.ToLower(stream.Tags.Language)
 		title := strings.ToLower(stream.Tags.Title)
@@ -134,6 +145,7 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 
 		candidates = append(candidates, SubtitleCandidate{
 			StreamIndex: stream.Index,
+			SubIndex:    subIdx,
 			Codec:       codec,
 			Language:    lang,
 			Title:       stream.Tags.Title,
@@ -259,12 +271,13 @@ func (d *SubtitleDetector) FindSubtitleStreamID(ctx context.Context, videoPath s
 		return 0, nil
 	}
 
-	sid := 1
+	// §59.589: sid=字幕流绝对序（mpv 语义）——原按「过滤后候选列表
+	// 位置」数，被 disposition 滤掉的轨排在中文轨前时错位（Scandal
+	// 案：kor HI 轨被滤致 chi 真实 sid3 偏移成 sid2=韩文 HI 轨）。
 	for _, c := range candidates {
 		if c.StreamIndex == streamID {
-			return sid, nil
+			return c.SubIndex, nil
 		}
-		sid++
 	}
 	return 1, nil
 }
@@ -372,9 +385,11 @@ func probeDiscSubtitleCandidates(ctx context.Context, discRoot, videoPath string
 		}
 		out = append(out, SubtitleCandidate{
 			StreamIndex: len(out) + 1,
-			Codec:       codec,
-			Language:    strings.ToLower(lang),
-			IsText:      codec == "text",
+			// §59.589: CLPI 无滤轨——绝对序恰=字幕序（mpv sid 1:1）
+			SubIndex: len(out) + 1,
+			Codec:    codec,
+			Language: strings.ToLower(lang),
+			IsText:   codec == "text",
 		})
 	}
 	return out

@@ -32,22 +32,25 @@ func TestPickSubtitleSidFromBDInfo(t *testing.T) {
 func TestSelectBestChinese_WebVTT(t *testing.T) {
 	// UNABOMBER 实测形态：#1 English CC / #2 简中 / #3 繁中（全 webvtt）
 	candidates := []SubtitleCandidate{
-		{StreamIndex: 3, Codec: "webvtt", Language: "english", Title: "English [Original] (CC)", IsText: true, Score: 0},
-		{StreamIndex: 4, Codec: "webvtt", Language: "chi", Title: "中文（简体）", IsText: true, Score: 15},
-		{StreamIndex: 5, Codec: "webvtt", Language: "chi", Title: "中文（繁體）", IsText: true, Score: 13},
+		{StreamIndex: 3, SubIndex: 1, Codec: "webvtt", Language: "english", Title: "English [Original] (CC)", IsText: true, Score: 0},
+		{StreamIndex: 4, SubIndex: 2, Codec: "webvtt", Language: "chi", Title: "中文（简体）", IsText: true, Score: 15},
+		{StreamIndex: 5, SubIndex: 3, Codec: "webvtt", Language: "chi", Title: "中文（繁體）", IsText: true, Score: 13},
 	}
 	d := &SubtitleDetector{}
 	idx, codec := d.SelectBestChinese(candidates)
 	if idx != 4 || codec != "webvtt" {
 		t.Errorf("应选简中轨(idx=4): got idx=%d codec=%s", idx, codec)
 	}
-	// sid 映射：候选序 1/2/3 → 简中是第 2 候选 → sid=2
-	sid := 1
+	// §59.589: sid 映射=SubIndex 绝对序（mpv 语义）。UNABOMBER 形态无
+	// 被滤轨——列表序恰=绝对序，简中=第 2 字幕轨 → sid=2。（原测试内
+	// 复刻「列表位置数法」映射循环已删——那正是 Scandal 案错位算法的
+	// 伪锚：被滤轨占号时它会数错。）
+	var sid int
 	for _, c := range candidates {
 		if c.StreamIndex == idx {
+			sid = c.SubIndex
 			break
 		}
-		sid++
 	}
 	if sid != 2 {
 		t.Errorf("mpv sid 应为 2: got %d", sid)
