@@ -88,13 +88,39 @@ func TestLocalDayStartDivergesFromTruncate(t *testing.T) {
 // （16 篇 V-01/V-02 形态指纹·收编后残留应为零。测试文件豁免
 // ——本锚文件自身的对照实现用字符串拼接规避自匹配）。
 func TestNoBareTruncate24h(t *testing.T) {
-	root := filepath.Join("..", "..", "internal")
+	// 17 篇用户复审提示：扫描根扩展到仓库根（internal/+cmd/+tools/
+	// ——cmd/pt-forward 是生产主程序·tools/siteprobe 有 DB 读写栈）。
+	// 目录白名单形态（internal/cmd/tools 明确列举）：examples/ 是
+	// 第三方参考代码（autobrr/pt-tools/qui vendored——非本项目维护
+	// 面·扩根首跑实证 3 处形态全在 examples/）不扫。
+	root := filepath.Join("..", "..")
 	var violations []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if info.IsDir() {
+			// 一级目录白名单（17 篇扩根）：root 的直接子目录限定
+			// internal/cmd/tools——examples/ 是第三方参考代码
+			// （autobrr/pt-tools/qui vendored 非维护面·扩根首跑实证
+			// 3 处形态全在其中）；web/frontend/.git 等跳过。二级及
+			// 以下（internal/util、cmd/pt-forward 等包目录）全放行
+			// ——目录名匹配形态会误跳包子目录（debug 实证 ENTER cmd
+			// 后 pt-forward 子目录被 Skip）。
+			if path == root {
+				return nil
+			}
+			if filepath.Dir(path) == root {
+				switch info.Name() {
+				case "internal", "cmd", "tools":
+					return nil
+				default:
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 		data, err := os.ReadFile(path)

@@ -18,13 +18,37 @@ import (
 // 阴性对照：任一生产文件注入 Assign(rec).FirstOrCreate(rec) → 本锚
 // 点名 FAIL。
 func TestNoBareAssignFirstOrCreateSamePointer(t *testing.T) {
-	root := filepath.Join("..", "..", "internal")
+	// 17 篇用户复审提示：扫描根扩展到仓库根（internal/+cmd/+tools/
+	// ——同 16 篇 Truncate 锚同批扩展·防未来 cmd/tools 新增 ORM
+	// 写入点漏网）。
+	root := filepath.Join("..", "..")
 	var violations []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if info.IsDir() {
+			// 一级目录白名单（17 篇扩根）：root 的直接子目录限定
+			// internal/cmd/tools——examples/ 是第三方参考代码
+			// （autobrr/pt-tools/qui vendored 非维护面·扩根首跑实证
+			// 3 处形态全在其中）；web/frontend/.git 等跳过。二级及
+			// 以下（internal/util、cmd/pt-forward 等包目录）全放行
+			// ——目录名匹配形态会误跳包子目录（debug 实证 ENTER cmd
+			// 后 pt-forward 子目录被 Skip）。
+			if path == root {
+				return nil
+			}
+			if filepath.Dir(path) == root {
+				switch info.Name() {
+				case "internal", "cmd", "tools":
+					return nil
+				default:
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 		data, err := os.ReadFile(path)
