@@ -10,6 +10,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm/clause"
 )
@@ -633,7 +634,7 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientUID uint, md *
 // for "today's upload" display (uses torrent_traffic max-min instead).
 // site_traffic_daily is retained for site-level trend charts only.
 func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientUID uint, md *model.Maindata, now time.Time) {
-	today := now.Truncate(24 * time.Hour)
+	today := util.LocalDayStart(now) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 
 	var records []model.SeedingTorrentRecord
 	e.db.WithContext(ctx).

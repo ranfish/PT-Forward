@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -906,7 +907,9 @@ func TestEngine_CollectSiteTrafficDaily_Update(t *testing.T) {
 	db := setupEngineTestDBAll(t)
 	ctx := context.Background()
 	now := time.Now()
-	today := now.Truncate(24 * time.Hour)
+	// 16 刀3 F-01（v0.0.1664）: 期望值改用与生产一致的本地午夜
+	// 单点（原同型 Truncate(24h)——测试与生产同错失去对照价值）。
+	today := util.LocalDayStart(now)
 
 	e := NewEngine(db, zap.NewNop())
 

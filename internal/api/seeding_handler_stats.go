@@ -7,6 +7,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/seeding"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -49,7 +50,7 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, r *http.Requ
 		h.logger.Warn("stats overview: query total count failed", zap.Error(err))
 	}
 
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 	var todayAdded int64
 	if err := h.db.WithContext(r.Context()).Model(&model.SeedingTorrentRecord{}).Where("created_at >= ?", today).Count(&todayAdded).Error; err != nil {
 		h.logger.Warn("stats overview: query today added count failed", zap.Error(err))
@@ -108,7 +109,7 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 		h.logger.Warn("limit clamped to 200", zap.String("op", "stats_by_site"))
 	}
 
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 
 	type siteStat struct {
 		SiteName      string `json:"siteName"`
@@ -214,7 +215,12 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 
 	for i := days; i >= 0; i-- {
 		day := now.AddDate(0, 0, -i)
-		dayStart := day.Truncate(24 * time.Hour)
+		// 16 刀2（v0.0.1664）: V-02 根修——dayStart 走本地午夜单点
+		// （原 Truncate(24h) 落本地 08:00·与 AddDate(0,0,1) 日历日
+		// 加一天混用致窗口边界 [本地08:00, 次日08:00) 错位）；
+		// 标签改 day.Format（取目标日本身——原 dayStart.Format 在
+		// UTC+8 下凌晨记录标签显示前一天）。
+		dayStart := util.LocalDayStart(day)
 		dayEnd := dayStart.AddDate(0, 0, 1)
 
 		var count int64
@@ -225,7 +231,7 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 		}
 
 		points = append(points, map[string]interface{}{
-			"date":  dayStart.Format("2006-01-02"),
+			"date":  day.Format("2006-01-02"), // 16 刀2: 标签取目标日本身（与窗口一致）
 			"count": count,
 		})
 	}
@@ -310,7 +316,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 		h.db.WithContext(r.Context()).Raw(`SELECT info_hash, MAX(uploaded) as uploaded
 			FROM torrent_traffic
 			WHERE info_hash IN (?) AND recorded_at >= ?
-			GROUP BY info_hash`, hashes, time.Now().Truncate(24*time.Hour)).Scan(&rows)
+			GROUP BY info_hash`, hashes, util.LocalDayStart(time.Now())).Scan(&rows)
 		for _, row := range rows {
 			latestMap[row.InfoHash] = row.Uploaded
 		}

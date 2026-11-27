@@ -9,6 +9,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/seeding"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -97,7 +98,7 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, r *http.Request
 	}
 
 	var publishToday int64
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 	if err := h.db.WithContext(r.Context()).Model(&model.PublishCandidate{}).Where("publish_status = ? AND updated_at >= ?", "done", today).Count(&publishToday).Error; err != nil {
 		h.logger.Warn("dashboard: query publish today count failed", zap.Error(err))
 	}
@@ -428,7 +429,7 @@ func parseInt64(s string) (int64, error) {
 
 func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 
 	// 刷流卡片
 	var seedingActive int64
@@ -562,7 +563,7 @@ func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.R
 	}
 
 	var deletedToday int64
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 	h.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("status = ? AND updated_at >= ?", "deleted", today).Count(&deletedToday)
 
@@ -608,7 +609,7 @@ func (h *DashboardHandler) handlePublishMonitor(w http.ResponseWriter, r *http.R
 		byStatus[s] = c
 	}
 
-	today := time.Now().Truncate(24 * time.Hour)
+	today := util.LocalDayStart(time.Now()) // 16 刀1（v0.0.1664）: 本地午夜口径（V-01——原 Truncate(24h) 窗口错开 8 小时）
 	var resultsToday []model.PublishResultRecord
 	if err := h.db.WithContext(ctx).Where("created_at >= ?", today).Order("created_at DESC").Limit(10).Find(&resultsToday).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
