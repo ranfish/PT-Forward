@@ -1,0 +1,97 @@
+第18篇 代码质量审计 — channel 关闭责任与 goroutine 同步配对语义
+证据采集：2026-11-27（本地离线·纯白盒·未碰靶机/生产/真实数据）
+基线：5f6d9cfa0c23e40591383de269a486d436e0cfcd（17 全案三刀收官）
+工具版本：go version go1.25.0 linux/amd64
+
+============================================================
+A. 确凿点一（V-01·高危）：WS client.send 三处 close 与发送方无配对
+============================================================
+
+源码：internal/api/ws_handler.go（基线 5f6d9cfa 行号）
+
+  :36-43  Client 结构：send chan *WSMessage（容量 64，见 :256）
+  :104-110 Hub.Run unregister 分支：delete client 后 close(client.send)，但不关 conn
+  :89-97  Hub.Run stop 分支：close(client.send) + conn.Close()
+  :126-135 broadcast 命中 default 的 stale 驱逐：unregister 满时直接 close(c.send)，不关 conn
+  :271    ServeHTTP：go writePump/readPump 后裸发 client.send <- ...（无 default）
+  :311/321/331 readPump 的 ping/subscribe/unsubscribe 分支：
+             select { case c.send <- ...: default: }  ← default 只防阻塞，不防 send on closed
+  :276-282 readPump defer：投递 unregister + conn.Close()，无 recover
+  :338-354 writePump：从 send 读取，conn 关则退出；同样无 recover
+
+触发序列（stale 驱逐路径，不关 conn、读泵仍存活）：
+  1) 已鉴权客户端完成注册，writePump/readPump 运行中；
+  2) send 缓冲被填满（容量 64）→ Hub.Broadcast 命中 :119-123 的 default → 加入 stale；
+  3) :127-128 投入 h.unregister → Hub :104-109 执行 close(client.send)，但不关 conn；
+  4) 对端此时发一帧 {"type":"ping"} → readPump :311 向已关闭 send 发送；
+  5) panic: send on closed channel，readPump 无 recover → panic 冒泡杀进程。
+
+离线复现（internal/api 包内临时测试，复用生产 Hub.Run 的 stale 驱逐与 close 逻辑、
+readPump 的 ping 发送形态；取证后已删除，工作区干净）：
+  $ go test ./internal/api/ -run '^TestRepro18_WSSendOnClosedPanic$' -count=1 -v
+    zz_repro_18_test.go:37: 驱逐完成 clients=0（send 已由 Hub 关闭）
+    zz_repro_18_test.go:45: PANIC 捕获: send on closed channel
+    --- PASS: TestRepro18_WSSendOnClosedPanic (0.00s)
+    ok  github.com/ranfish/pt-forward/internal/api  0.048s
+  （测试用 recover 捕获 panic 以避免测试进程退出；生产 readPump 无此 recover。）
+
+附带形态：:271 ServeHTTP 的裸阻塞发送——若 stop/unregister 先关了 send 则同为 panic；
+  若 send 已满且 pump 已退出则永久阻塞（无 default、无 ctx）。
+
+============================================================
+B. 确凿点二（V-02·中危）：AuthManager.persistWg 零 Add → Stop 空等
+============================================================
+
+源码：internal/auth/auth.go（基线 5f6d9cfa 行号）
+  :152  persistWg sync.WaitGroup 声明
+  :234  go mgr.persistLoop()  ← 没有 persistWg.Add(1)
+  :255-261 Stop()：stopOnce close(stopCh) → loginLimiter.stop() → persistWg.Wait()
+  :263-279 persistLoop()：stopCh 分支执行最后一次 persistRefreshTokens() 后 return
+  全库 grep persistWg 仅命中 :152 与 :260 两行，Add 为零。
+
+停机链：cmd/pt-forward/main.go:228 defer authManager.Stop() + :844 链内 Stop()。
+旁证：internal/auth/auth_test.go:475 因缺少同步原语只能用 store.waitFor("refresh_tokens", 2s)
+      轮询等待持久化完成（异步组件测试靠轮询妥协）。
+
+离线复现（internal/auth 包内临时测试，阻塞 SettingStore.Set 模拟未完成的落库；
+取证后已删除，工作区干净）：
+  $ go test ./internal/auth/ -run '^TestRepro18_StopEmptyWait$' -count=1 -v -timeout 20s
+    zz_repro_18_test.go:58: persistLoop 已进入 Set（持久化尚未完成）
+    zz_repro_18_test.go:68: Stop() 在 Set 仍阻塞时已返回（persistWg.Wait() 空等实证）
+    --- PASS: TestRepro18_StopEmptyWait (0.50s)
+    ok  github.com/ranfish/pt-forward/internal/auth  0.517s
+  预期：Stop() 应阻塞等待最后一次 refresh token 落库（持久化是停机不变量）。
+  实际：WaitGroup 计数恒 0，Wait() 空操作，Stop() 立即返回——落库脱离生命周期。
+
+============================================================
+C. 正交性核对（与 01-17 不重复）
+============================================================
+- 02 篇「后台任务生命周期与优雅停机」docs/代码质量审计/02:27 仅标
+  「authManager 构造 / defer Stop + 链内 Stop / 合格」——只核对是否在停机链被调用，
+  未进入组件内部 WaitGroup 配对；本篇进入组件内部，正交成立。
+- 10 篇「共享状态与缓存并发治理」管 map 裸写 fatal，本篇管 channel close 责任 + wg 配对。
+- 12 篇「限流器状态机」domain_limiter.go:130/198-199 的 waitCh 替换竞态已覆盖，本篇不重复。
+- 09 篇管 HTTP 边界资源（transport/ReadAll），本篇管 WS 通信语义。
+- 03 篇管日志/错误透传，本篇管 panic 与生命周期同步（不主张日志问题）。
+
+============================================================
+D. 健康面（核验但不主张）
+============================================================
+- 全库 59 处 make(chan)、26 处 close、97 处 select、22 处 WaitGroup（无 errgroup）：
+  绝大多数正确。正例：
+  * internal/api/sse_log_handler.go:43-63 Unsubscribe 持写锁 delete+close，
+    Broadcast 持读锁发送——send/close 同锁互斥（项目已认知该模式）。
+  * internal/pusher/eventbus.go:63-108 closed 位 + RLock/Lock 幂等 Close
+    （§59.563 刀B 已修 send-on-closed 陷阱，审计 02 §3.1 有案）。
+  * internal/httpclient/smart_dial.go:103-144 resultCh 容量=生产者数，wg.Done 后才 close。
+  * internal/orphan/recovery.go:770-918 resultCh 从不 close，allDone 在 wg 后关闸。
+  * internal/notification/service.go:76-113 缓冲容量=goroutine 数，一对一发送。
+- internal/db/write_queue.go:58-96 Stop close q.ch 与 Execute 发送理论窗口存在，
+  但全库 Execute() 仅本文件测试使用，cmd/pt-forward 只做 Start/Stop——无生产调用方，
+  当前不构成功能缺陷，诚实标注不入主线。
+- cmd/pt-forward/main.go:430-459 freezeCh 用 for range 且从不 close（停机后 goroutine 不退出）——
+  进程退出即终止，归 02 停机语义，本篇不单列。
+- 盘点另三面经核验健康、不立项：错误链与类型断言（1093 文件·errors.Is/== 混用仅裸
+  GORM 错误·包装全 %w·AppError/哨兵链完整·recover 正确）；缓存 TTL 面单位/方向/边界
+  全健康（唯一候选 discountCache key 维度遗漏属独立方向，用户已选 A 不并入）；
+  临时文件生命周期（screenshot.go 全帧失败清理死代码，低危）。
