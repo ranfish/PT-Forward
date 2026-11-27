@@ -1,0 +1,93 @@
+=== 基线 = 8ec12cab1af3372f2f081802c095bccb9ccd8ece ===
+=== 17 篇证据：GORM Upsert 同指针赋值语义（本地离线复现·未碰靶机/真实数据）===
+
+--- A. 项目自证 §56.33（git show 13b17321a 提交说明节选）---
+根因：store 用 Assign(meta).FirstOrCreate(meta)，attrs 和 dest 是同一
+现象：FetchAndStore 对已存在 torrent_metadata 记录返回旧值（detail_source_json=空），
+诊断验证（v0.0.282）：Descendants 种子 detail_fetched=True 但
+修复：attrs 用 meta 的值副本（attrs := *meta），FirstOrCreate 的 dest
+回归：go vet + go test ./internal/metadata/... ./internal/api/... 全绿。
++	// 更新=无效。修复：attrs 用 meta 的值副本，FirstOrCreate 的 dest 用 meta 本体。
+
+--- B. GORM v1.31.1 机制（finisher_api.go:354-379 节选）---
+	result := queryTx.Find(dest, conds...)
+	if result.RowsAffected == 0 {
+		return tx.Create(dest)
+	} else if len(db.Statement.assigns) > 0 {
+		exprs := tx.Statement.BuildCondition(db.Statement.assigns[0], db.Statement.assigns[1:]...)
+
+--- C. 两处确凿点现态 ---
+[coverage/service.go:359-364]
+func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
+	return s.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", record.InfoHash, record.SiteName).
+		Assign(record).
+		FirstOrCreate(record).Error
+}
+[metadata/fetcher.go:738-747]
+		row := model.SiteCoverageCache{
+			InfoHash: infoHash, SiteName: h.SiteName,
+			Status: model.CoverageConfirmedHas, Source: model.CoverageSourceIYUU,
+			TorrentID: h.TorrentID, Confidence: 1.0,
+			QueriedAt: now, ExpiresAt: ttl,
+		}
+		f.db.WithContext(ctx).
+			Where("info_hash = ? AND site_name = ?", infoHash, h.SiteName).
+			Assign(&row).FirstOrCreate(&row)
+	}
+
+--- D. 本地真实 Go 离线复现（内存 SQLite + 真实 model.SiteCoverageCache）---
+    zz_repro17_test.go:36: A 同指针 : err=<nil> rows=1 | Status="confirmed_not" Source="tracker" TorrentID="" QueriedAt=1000
+    zz_repro17_test.go:38:   期望    : Status="confirmed_has" Source="iyuu" TorrentID="t-new" QueriedAt=2000
+    zz_repro17_test.go:54: B 值副本 : err=<nil> rows=1 | Status="confirmed_has" Source="iyuu" TorrentID="t-new" QueriedAt=2000
+    zz_repro17_test.go:58: 结论: 同指针刷新失效已复现——已存在行保持旧值；值副本正常刷新
+--- PASS: TestZZRepro17 (0.00s)
+PASS
+
+--- E. 业务路径：同 (InfoHash,SiteName) 先写后写 ---
+[publish_torrents_handler_torrents.go:386-415 节选]
+	// ① 辅种引擎查询 → 🟡（先写·带 TorrentID）
+			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   req.InfoHash,
+				SiteName:   hit.SiteName,
+				Status:     model.CoverageConfirmedHas,
+				Source:     source,
+				TorrentID:  hit.TorrentID,
+	// ② tracker 映射 → 🟢 做种中（后写，覆盖同名 🟡）
+			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   req.InfoHash,
+				SiteName:   sn,
+				Status:     model.CoverageConfirmedHas,
+				Source:     model.CoverageSourceTracker,
+
+--- F. 调用面 ---
+internal/metadata/fetcher.go:928:func (f *Fetcher) PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string) {
+internal/api/publish_torrents_handler_torrents.go:275:				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:330:				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:392:			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:413:			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:499:			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:538:					if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/publish_torrents_handler_torrents.go:557:				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/api/manual_forward_handler.go:57:	PersistCoverageHit(ctx context.Context, infoHash, siteName, torrentID string)                    
+internal/api/publish_torrents_handler_music.go:349:			h.metadataFetcher.PersistCoverageHit(ctx, hash, musicSite, meta.TorrentID)
+internal/api/seed_fetch.go:50:						if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+internal/orphan/recovery.go:123:	UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error
+internal/orphan/recovery.go:1384:	if err := r.coverageSrv.UpsertCoverage(ctx, rec); err != nil {
+internal/coverage/service.go:197:			if err := s.upsertCoverage(ctx, &r); err != nil {
+internal/coverage/service.go:356:	return s.upsertCoverage(ctx, &record)
+internal/coverage/service.go:359:func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
+internal/coverage/service.go:366:func (s *Service) UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
+internal/coverage/service.go:367:	return s.upsertCoverage(ctx, record)
+
+--- G. 正例对照 ---
+[fetcher.go:888-893 §56.33 修复后]
+	// 更新=无效。修复：attrs 用 meta 的值副本，FirstOrCreate 的 dest 用 meta 本体。
+	attrs := *meta
+	return f.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+		Assign(&attrs).
+		FirstOrCreate(meta).Error
+[traffic_aggregator.go:78-95]
+			Assign(record).
+			FirstOrCreate(&record).Error; err != nil {
