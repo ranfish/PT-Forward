@@ -21,7 +21,7 @@ import (
 // "", false）——排除。
 var ruleConditionFields = map[string]struct{}{
 	// Record 层
-	"free_level": {}, "freeLevel": {}, "status": {}, "discount": {},
+	"free_level": {}, "status": {}, "discount": {},
 	"source": {}, "last_action_by": {}, "unregistered": {},
 	"unregistered_msg": {}, "subscription_id": {}, "client_id": {},
 	"torrent_id": {}, "tracker_url": {}, "site_name": {},
@@ -62,7 +62,7 @@ func ValidateConditions(conditionsJSON string) error {
 	}
 	for i, cond := range conds {
 		if _, ok := ruleConditionFields[cond.Field]; !ok {
-			return fmt.Errorf("条件 %d 字段 %q 不在支持清单（42 键·拼写错误？）", i+1, cond.Field)
+			return fmt.Errorf("条件 %d 字段 %q 不在支持清单（拼写错误？）", i+1, cond.Field)
 		}
 		if _, ok := ruleConditionOperators[cond.Operator]; !ok {
 			return fmt.Errorf("条件 %d 操作符 %q 不支持（拼写错误？）", i+1, cond.Operator)

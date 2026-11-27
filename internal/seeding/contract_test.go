@@ -2,7 +2,10 @@ package seeding
 
 import (
 	"fmt"
+	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -168,25 +171,67 @@ func TestValidateConditions(t *testing.T) {
 	}
 }
 
-// 锚7: 白名单与 fieldValue 实现一致性——白名单键全部真实可用
-// （known=true·scoringCycleID 恒 not-known 已排除）。
+// 锚7: 白名单与 fieldValue 实现集合相等（双向）——静态提取实现
+// case 键集与白名单做差集断言（15 补刀·用户复审：原锚对 not-known
+// 键只 Logf 不 Errorf=虚锚——注入实现没有的键仍 PASS·防不住白名单
+// 漂移）。双向：
+//
+//	白名单⊄实现 → FAIL（校验放行实现不认识的键=运行期静默恒假）；
+//	实现⊄白名单 → FAIL（实现新增键漏登记=校验拒绝合法键）。
+//
+// 恒 not-known 键（case 存在但 return "", false）显式登记排除。
+//
+// 阴性对照：白名单注入 no_such_field_xyz → 本锚 FAIL（已实证可触发）。
 func TestWhitelistMatchesImplementation(t *testing.T) {
-	rec := &model.SeedingTorrentRecord{
-		SiteName: "s", Status: "seeding", Discount: "none", Source: "x",
+	// 恒 not-known 键登记（fieldValue case 存在但已知恒 not-known——
+	// 新增此类键时在此登记并保持白名单排除）
+	notKnownKeys := map[string]struct{}{"scoringCycleID": {}}
+
+	// 静态提取 rule_evaluator.go 的 fieldValue 函数体 case 键集
+	// （函数头到下一个顶层 func 之间——嵌套块不影响）
+	src, err := os.ReadFile("rule_evaluator.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
 	}
-	ti := &model.TorrentInfo{Name: "n", Category: "c", Tags: []string{"t"}, SavePath: "/p"}
-	rc := &RuleContext{Record: rec, Torrent: ti, Now: time.Now()}
+	srcStr := string(src)
+	start := strings.Index(srcStr, "func (rc *RuleContext) fieldValue")
+	if start < 0 {
+		t.Fatal("fieldValue 函数定位失败（签名变更？锚需同步）")
+	}
+	nextFn := start + len("func (rc *RuleContext) fieldValue")
+	if idx := strings.Index(srcStr[nextFn:], "\nfunc "); idx >= 0 {
+		nextFn += idx
+	} else {
+		nextFn = len(srcStr)
+	}
+	body := srcStr[start:nextFn]
+	implKeys := map[string]struct{}{}
+	for _, m := range regexp.MustCompile(`case "([a-zA-Z0-9_]+)"`).FindAllStringSubmatch(body, -1) {
+		implKeys[m[1]] = struct{}{}
+	}
+	for _, m := range regexp.MustCompile(`key == "([a-zA-Z0-9_]+)"`).FindAllStringSubmatch(body, -1) {
+		implKeys[m[1]] = struct{}{}
+	}
+	for k := range notKnownKeys {
+		delete(implKeys, k)
+	}
+
+	// 双向差集断言
+	var extraInWhitelist, extraInImpl []string
 	for k := range ruleConditionFields {
-		if _, ok := rc.fieldValue(k); !ok {
-			// 部分键需特定状态（is_paused 需状态匹配等）——仅对
-			// 恒 not-known 的键报警（scoringCycleID 已排除）。
-			if k == "scoringCycleID" {
-				continue
-			}
-			// 上下文相关键在最小 ctx 下可能 not-known——记录供
-			// 人工核（不算 FAIL：与实现同步的白名单以 case 存在
-			// 为准）。此锚防「白名单出现实现没有的键」。
-			t.Logf("键 %s 在最小 ctx 下 not-known（上下文相关·case 存在即合法）", k)
+		if _, ok := implKeys[k]; !ok {
+			extraInWhitelist = append(extraInWhitelist, k)
 		}
+	}
+	for k := range implKeys {
+		if _, ok := ruleConditionFields[k]; !ok {
+			extraInImpl = append(extraInImpl, k)
+		}
+	}
+	if len(extraInWhitelist) > 0 {
+		t.Errorf("白名单含实现没有的键（校验放行运行期恒假键）: %v", extraInWhitelist)
+	}
+	if len(extraInImpl) > 0 {
+		t.Errorf("实现含白名单没有的键（新增键漏登记=校验拒绝合法键）: %v", extraInImpl)
 	}
 }
