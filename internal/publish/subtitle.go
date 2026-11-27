@@ -270,6 +270,10 @@ func (d *SubtitleDetector) SelectBestSubtitle(candidates []SubtitleCandidate) (i
 	}
 	if bestTier == 0 {
 		// 无体系命中：按顺序第一候选（非 codec 优先）
+		// best≥0 已保证非空（range 索引）——显式守卫 appease gosec G602
+		if len(candidates) == 0 {
+			return 0, ""
+		}
 		return candidates[0].StreamIndex, candidates[0].Codec
 	}
 	return candidates[best].StreamIndex, candidates[best].Codec
