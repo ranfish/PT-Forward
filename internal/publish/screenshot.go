@@ -385,8 +385,10 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 			// 替代 --sid（bd:// 轨道编号由 libbluray playlist 决定，与 CLPI
 			// StreamOrder 可能不对齐；--slang 按语言匹配更稳健）。sid 编号
 			// 复用为 slang 强度信号：>0=有中文字幕轨（语言列表覆盖三级优先）
+			// §59.590: 尾补 eng——对齐八级体系序（无中文时选英文·粗粒度
+			// 降级——--slang 语义做不了双字/次序细粒度，libbluray 场景可接受）
 			args = append(args,
-				"--slang=zh-Hans,chs,zh,chi,zho,zh-Hant,cht",
+				"--slang=zh-Hans,chs,zh,chi,zho,zh-Hant,cht,eng",
 				"--sub-visibility=yes",
 				"--blend-subtitles=yes",
 			)

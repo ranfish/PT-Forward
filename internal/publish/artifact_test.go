@@ -82,9 +82,9 @@ func TestMediaInfoAnalyzerNotAvailable(t *testing.T) {
 	}
 }
 
-func TestSelectBestChinese_NoCandidates(t *testing.T) {
+func TestSelectBestSubtitle_NoCandidates(t *testing.T) {
 	d := NewSubtitleDetector(nil)
-	sid, codec := d.SelectBestChinese(nil)
+	sid, codec := d.SelectBestSubtitle(nil)
 	if sid != 0 {
 		t.Errorf("expected sid=0, got %d", sid)
 	}
@@ -93,13 +93,13 @@ func TestSelectBestChinese_NoCandidates(t *testing.T) {
 	}
 }
 
-func TestSelectBestChinese_PrioritizesASS(t *testing.T) {
+func TestSelectBestSubtitle_PrioritizesASS(t *testing.T) {
 	d := NewSubtitleDetector(nil)
 	candidates := []SubtitleCandidate{
-		{StreamIndex: 2, Codec: "subrip", Language: "chi", Score: 10, IsText: true},
-		{StreamIndex: 3, Codec: "ass", Language: "chi", Score: 10, IsText: true},
+		{StreamIndex: 2, Codec: "subrip", Language: "chi", IsText: true},
+		{StreamIndex: 3, Codec: "ass", Language: "chi", IsText: true},
 	}
-	sid, codec := d.SelectBestChinese(candidates)
+	sid, codec := d.SelectBestSubtitle(candidates)
 	if codec != "ass" {
 		t.Errorf("expected ass, got %s", codec)
 	}
@@ -108,13 +108,13 @@ func TestSelectBestChinese_PrioritizesASS(t *testing.T) {
 	}
 }
 
-func TestSelectBestChinese_PrioritizesSRT_OverPGS(t *testing.T) {
+func TestSelectBestSubtitle_PrioritizesSRT_OverPGS(t *testing.T) {
 	d := NewSubtitleDetector(nil)
 	candidates := []SubtitleCandidate{
-		{StreamIndex: 5, Codec: "hdmv_pgs", Language: "chi", Score: 10, IsText: false},
-		{StreamIndex: 4, Codec: "subrip", Language: "chi", Score: 10, IsText: true},
+		{StreamIndex: 5, Codec: "hdmv_pgs", Language: "chi", IsText: false},
+		{StreamIndex: 4, Codec: "subrip", Language: "chi", IsText: true},
 	}
-	sid, codec := d.SelectBestChinese(candidates)
+	sid, codec := d.SelectBestSubtitle(candidates)
 	if codec != "subrip" {
 		t.Errorf("expected subrip, got %s", codec)
 	}
@@ -125,12 +125,12 @@ func TestSelectBestChinese_PrioritizesSRT_OverPGS(t *testing.T) {
 
 // §59.319 附十语义更新：无中文（含无显式语言）→ 按顺序第一字幕轨
 // （宁英文不裸图——原零分不选=裸图语义废止，用户定案三级优先）
-func TestSelectBestChinese_IgnoresZeroScore(t *testing.T) {
+func TestSelectBestSubtitle_IgnoresZeroScore(t *testing.T) {
 	d := NewSubtitleDetector(nil)
 	candidates := []SubtitleCandidate{
-		{StreamIndex: 1, Codec: "ass", Language: "eng", Score: 0, IsText: true},
+		{StreamIndex: 1, Codec: "ass", Language: "eng", IsText: true},
 	}
-	sid, codec := d.SelectBestChinese(candidates)
+	sid, codec := d.SelectBestSubtitle(candidates)
 	if sid != 1 {
 		t.Errorf("无中文应选第一轨（宁英文不裸图）, got sid=%d", sid)
 	}
@@ -143,15 +143,15 @@ func TestSelectBestChinese_IgnoresZeroScore(t *testing.T) {
 		{StreamIndex: 11, Codec: "subrip", Language: "zh-hant", IsText: true},
 		{StreamIndex: 12, Codec: "subrip", Language: "chi", IsText: true},
 	}
-	if idx, _ := d.SelectBestChinese(tri); idx != 12 {
+	if idx, _ := d.SelectBestSubtitle(tri); idx != 12 {
 		t.Errorf("简中应最优先: got %d", idx)
 	}
 	tri[2] = SubtitleCandidate{StreamIndex: 12, Codec: "subrip", Language: "english", IsText: true} // 去简中
-	if idx, _ := d.SelectBestChinese(tri); idx != 11 {
+	if idx, _ := d.SelectBestSubtitle(tri); idx != 11 {
 		t.Errorf("无简中时繁中优先: got %d", idx)
 	}
 	tri[1] = SubtitleCandidate{StreamIndex: 11, Codec: "subrip", Language: "french", IsText: true} // 去繁中
-	if idx, _ := d.SelectBestChinese(tri); idx != 10 {
+	if idx, _ := d.SelectBestSubtitle(tri); idx != 10 {
 		t.Errorf("无中文应选第一轨: got %d", idx)
 	}
 	// 无显式语言（m2ts PGS 常态）同归第一轨
@@ -159,7 +159,7 @@ func TestSelectBestChinese_IgnoresZeroScore(t *testing.T) {
 		{StreamIndex: 20, Codec: "hdmv_pgs_subtitle"},
 		{StreamIndex: 21, Codec: "hdmv_pgs_subtitle"},
 	}
-	if idx, _ := d.SelectBestChinese(noLang); idx != 20 {
+	if idx, _ := d.SelectBestSubtitle(noLang); idx != 20 {
 		t.Errorf("无语言标记应选第一轨: got %d", idx)
 	}
 }
