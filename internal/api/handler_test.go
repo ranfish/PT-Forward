@@ -1035,7 +1035,7 @@ func TestSeeding_RulesCRUD(t *testing.T) {
 		"priority":   1,
 		"enabled":    true,
 		"type":       "normal",
-		"conditions": `{"field":"seeders","op":"gt","value":5}`,
+		"conditions": `[{"field":"addedTime","operator":">=","value":"18000"}]`,
 		"action":     "delete",
 	})
 	if w.Code != http.StatusOK {
@@ -3007,7 +3007,7 @@ func TestDeleteRule_TestRule(t *testing.T) {
 		"priority":   1,
 		"enabled":    true,
 		"type":       "normal",
-		"conditions": `{"field":"seeders","op":"gt","value":5}`,
+		"conditions": `[{"field":"addedTime","operator":">=","value":"18000"}]`,
 		"action":     "delete",
 	})
 	if w.Code != http.StatusOK {
@@ -3812,7 +3812,7 @@ func TestSeeding_RulesTestRule(t *testing.T) {
 		"priority":   1,
 		"enabled":    true,
 		"type":       "normal",
-		"conditions": `{"field":"seeders","op":"gt","value":5}`,
+		"conditions": `[{"field":"addedTime","operator":">=","value":"18000"}]`,
 		"action":     "delete",
 	})
 	if w.Code != http.StatusOK {
@@ -3840,7 +3840,7 @@ func TestSeeding_RulesUpdateRule(t *testing.T) {
 		"priority":   1,
 		"enabled":    true,
 		"type":       "normal",
-		"conditions": `{"field":"seed_time","op":"gt","value":100}`,
+		"conditions": `[{"field":"addedTime","operator":">=","value":"10800"}]`,
 		"action":     "delete",
 	})
 	if w.Code != http.StatusOK {
@@ -4178,7 +4178,7 @@ func TestSeeding_DeleteRule(t *testing.T) {
 
 	w := env.doRequest("POST", "/api/v1/seeding/rules", map[string]interface{}{
 		"alias": "del-seed-rule", "priority": 1, "enabled": true,
-		"type": "normal", "conditions": `{"field":"size","op":"gt","value":100}`,
+		"type": "normal", "conditions": `[{"field":"size","operator":">","value":"100"}]`,
 		"action": "delete",
 	})
 	if w.Code != http.StatusOK {

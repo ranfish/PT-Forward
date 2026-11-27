@@ -3,6 +3,7 @@ package rule
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -135,10 +136,14 @@ func (c *Context) fieldValue(key string) (string, bool) {
 	case "tracker_url":
 		return c.TrackerURL, true
 	case "downloadUploadRatio":
-		if c.TotalSize > 0 && c.UploadSpeed > 0 {
-			return fmt.Sprintf("%.4f", float64(c.DownloadSpeed)/float64(c.UploadSpeed)), true
-		}
-		return "0", true
+		// 15 刀1（v0.0.1661）: 零上传=+∞（契约 docs31:7757——黑车
+		// 「只下不传」是该键存在的核心需求·原返回 "0" 语义完全反转：
+		// downloadUploadRatio > 阈值 在黑车典型形态下恰不命中）。
+		// +Inf 经 fmt "%.4f" 产出 "+Inf"·compareNumeric 的 ParseFloat
+		// 天然解析（实测 +Inf>5=true）。去 TotalSize>0 门槛（文档
+		// 未声明·速度比与种子大小无关——零大小种子〔刚建任务〕有
+		// 上传速度原也被归零）。语义单点=DownloadUploadRatioOf。
+		return fmt.Sprintf("%.4f", DownloadUploadRatioOf(c.DownloadSpeed, c.UploadSpeed)), true
 	case "addedTime":
 		if !c.AddedAt.IsZero() {
 			return fmt.Sprintf("%.0f", c.Now.Sub(c.AddedAt).Seconds()), true
@@ -241,12 +246,13 @@ func MatchRule(c *Context, r *model.DeleteRule) bool {
 func evalCondition(c *Context, cond Condition) bool {
 	fv, known := c.fieldValue(cond.Field)
 	if !known {
-		switch cond.Operator {
-		case "bigger", ">", "smaller", "<", "bigger_eq", ">=", "smaller_eq", "<=":
-			return false
-		default:
-			return true
-		}
+		// 15 刀3 F-01（v0.0.1661）: 未知字段统一拒绝（原 default:
+		// return true 放行——拼错操作符落入 default 致条件恒真·
+		// 规则静默生效〔删种规则即误删风险〕）。29 实态取证：6 条
+		// 规则字段/操作符全已知——改拒绝零兼容风险。配置期拦截=
+		// seeding.ValidateConditions（字段+操作符白名单校验·拼错
+		// 当场 400 回显）；本分支为运行期兜底（DB 直改绕过防）。
+		return false
 	}
 
 	switch cond.Operator {
@@ -275,7 +281,10 @@ func evalCondition(c *Context, cond Condition) bool {
 	case "notRegExp":
 		return !matchRegExp(fv, cond.Value)
 	default:
-		return true
+		// 15 刀3 F-01（v0.0.1661）: 未知操作符拒绝（原 true 放行——
+		// 拼错操作符恒真·删种规则误删风险）。与 seeding 包统一口径；
+		// 配置期拦截=seeding.ValidateConditions 操作符白名单。
+		return false
 	}
 }
 
@@ -336,22 +345,27 @@ func matchRegExp(s, pattern string) bool {
 }
 
 type ExprEnv struct {
-	SiteName            string  `expr:"siteName"`
-	Status              string  `expr:"status"`
-	IsFree              bool    `expr:"isFree"`
-	HasHR               bool    `expr:"hasHR"`
-	HRSeedTimeH         int     `expr:"hrSeedTimeH"`
-	Discount            string  `expr:"discount"`
-	ClientUID           uint    `expr:"clientUID"`
-	Name                string  `expr:"name"`
-	Size                int64   `expr:"size"`
-	TotalSize           int64   `expr:"totalSize"`
-	Progress            float64 `expr:"progress"`
-	State               string  `expr:"state"`
-	Uploaded            int64   `expr:"uploaded"`
-	UploadSpeed         int64   `expr:"uploadSpeed"`
-	DownloadSpeed       int64   `expr:"downloadSpeed"`
-	Ratio               float64 `expr:"ratio"`
+	SiteName      string  `expr:"siteName"`
+	Status        string  `expr:"status"`
+	IsFree        bool    `expr:"isFree"`
+	HasHR         bool    `expr:"hasHR"`
+	HRSeedTimeH   int     `expr:"hrSeedTimeH"`
+	Discount      string  `expr:"discount"`
+	ClientUID     uint    `expr:"clientUID"`
+	Name          string  `expr:"name"`
+	Size          int64   `expr:"size"`
+	TotalSize     int64   `expr:"totalSize"`
+	Progress      float64 `expr:"progress"`
+	State         string  `expr:"state"`
+	Uploaded      int64   `expr:"uploaded"`
+	UploadSpeed   int64   `expr:"uploadSpeed"`
+	DownloadSpeed int64   `expr:"downloadSpeed"`
+	Ratio         float64 `expr:"ratio"`
+	// 15 刀2（v0.0.1661）: V-02 根修——文档 42 键清单声明该字段但
+	// expr 环境缺失（expr.Compile 实测 unknown name·按文档配置的
+	// 规则编译期即失败）。与声明式路径（fieldValue）同语义：零上传
+	// =+Inf（V-01 同批）。
+	DownloadUploadRatio float64 `expr:"downloadUploadRatio"`
 	SeedingTime         int64   `expr:"seedingTime"`
 	Category            string  `expr:"category"`
 	Tags                string  `expr:"tags"`
@@ -377,22 +391,25 @@ type ExprEnv struct {
 
 func buildExprEnv(c *Context) *ExprEnv {
 	env := &ExprEnv{
-		SiteName:            c.SiteName,
-		Status:              c.Status,
-		IsFree:              c.IsFree,
-		HasHR:               c.HasHR,
-		HRSeedTimeH:         c.HRSeedTimeH,
-		Discount:            c.Discount,
-		ClientUID:           c.ClientUID,
-		Name:                c.Name,
-		Size:                c.TotalSize,
-		TotalSize:           c.TotalSize,
-		Progress:            c.Progress,
-		State:               c.State,
-		Uploaded:            c.Uploaded,
-		UploadSpeed:         c.UploadSpeed,
-		DownloadSpeed:       c.DownloadSpeed,
-		Ratio:               c.Ratio,
+		SiteName:      c.SiteName,
+		Status:        c.Status,
+		IsFree:        c.IsFree,
+		HasHR:         c.HasHR,
+		HRSeedTimeH:   c.HRSeedTimeH,
+		Discount:      c.Discount,
+		ClientUID:     c.ClientUID,
+		Name:          c.Name,
+		Size:          c.TotalSize,
+		TotalSize:     c.TotalSize,
+		Progress:      c.Progress,
+		State:         c.State,
+		Uploaded:      c.Uploaded,
+		UploadSpeed:   c.UploadSpeed,
+		DownloadSpeed: c.DownloadSpeed,
+		Ratio:         c.Ratio,
+		// 15 刀2（v0.0.1661）: 与 fieldValue 同语义填充（零上传
+		// =+Inf·黑车检测）。
+		DownloadUploadRatio: downloadUploadRatioOf(c.DownloadSpeed, c.UploadSpeed),
 		SeedingTime:         c.SeedTime,
 		Category:            c.Category,
 		Tags:                strings.Join(c.Tags, ","),
@@ -472,6 +489,11 @@ func ValidateExpr(exprStr string) error {
 	return err
 }
 
+// ValidateExprForTest 15 刀2: 测试别名（语义同 ValidateExpr）。
+func ValidateExprForTest(exprStr string) error {
+	return ValidateExpr(exprStr)
+}
+
 func ContextFromTorrentInfo(ti *model.TorrentInfo, siteName string, clientUID uint, now time.Time) *Context {
 	return &Context{
 		InfoHash:      ti.Hash,
@@ -499,4 +521,20 @@ func ContextFromTorrentInfo(ti *model.TorrentInfo, siteName string, clientUID ui
 		ClientUID:     clientUID,
 		Now:           now,
 	}
+}
+
+// DownloadUploadRatioOf 15 刀2（v0.0.1661）: 下载/上传速度比——全库
+// 唯一语义单点（声明式 fieldValue 与双 expr 环境填充三处共用·
+// 双路径口径一致）。零上传=+Inf（契约 docs31:7757：黑车「只下不传」
+// 是该键存在的核心需求·V-01——原返回 0 语义反转：>阈值 恰不命中）。
+func DownloadUploadRatioOf(downloadSpeed, uploadSpeed int64) float64 {
+	if uploadSpeed > 0 {
+		return float64(downloadSpeed) / float64(uploadSpeed)
+	}
+	return math.Inf(1)
+}
+
+// downloadUploadRatioOf 包内别名（fieldValue 与 buildExprEnv 共用）。
+func downloadUploadRatioOf(downloadSpeed, uploadSpeed int64) float64 {
+	return DownloadUploadRatioOf(downloadSpeed, uploadSpeed)
 }

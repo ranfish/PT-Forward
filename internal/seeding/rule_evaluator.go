@@ -132,11 +132,11 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 			return ti.TrackerURL, true
 		}
 
-		if ti.TotalSize > 0 && key == "downloadUploadRatio" {
-			if ti.UploadSpeed > 0 {
-				return fmt.Sprintf("%.4f", float64(ti.DownloadSpeed)/float64(ti.UploadSpeed)), true
-			}
-			return "0", true
+		// 15 刀1（v0.0.1661）: 零上传=+∞（契约 docs31:7757·与 rule 包
+		// 同批同语义〔语义单点 rule.DownloadUploadRatioOf〕——黑车检测
+		// 核心需求·原 "0" 反转）。去 TotalSize 门槛（文档未声明）。
+		if key == "downloadUploadRatio" {
+			return fmt.Sprintf("%.4f", rule.DownloadUploadRatioOf(ti.DownloadSpeed, ti.UploadSpeed)), true
 		}
 
 		if !ti.AddedAt.IsZero() && key == "addedTime" {
@@ -514,18 +514,12 @@ func MatchContextWithLogic(rc *RuleContext, conditions []ruleCondition, logic st
 func evalCondition(rc *RuleContext, cond ruleCondition) bool {
 	fv, known := rc.fieldValue(cond.Field)
 	if !known {
-		switch cond.Operator {
-		case "equals", "==", "not_equals", "!=",
-			"contains", "not_contains",
-			"includeIn", "notIncludeIn",
-			"regExp", "notRegExp":
-			return true
-		case "bigger", ">", "smaller", "<",
-			"bigger_eq", ">=", "smaller_eq", "<=":
-			return false
-		default:
-			return true
-		}
+		// 15 刀3 F-01（v0.0.1661）: 未知字段统一拒绝（原字符串类
+		// true+default true 放行——拼错操作符〔如 biggerThen〕落入
+		// default 致条件恒真·规则静默生效）。与 rule 包统一口径；
+		// 29 实态取证零未知形态——改拒绝零兼容风险。配置期拦截=
+		// ValidateConditions（与 ValidateExpr 对称）。
+		return false
 	}
 
 	result := false
@@ -555,7 +549,10 @@ func evalCondition(rc *RuleContext, cond ruleCondition) bool {
 	case "notRegExp":
 		result = !matchRegExp(fv, cond.Value)
 	default:
-		result = true
+		// 15 刀3 F-01（v0.0.1661）: 未知操作符拒绝（原 true 放行——
+		// 拼错操作符〔如 biggerThen〕恒真·删种规则误删风险）。配置期
+		// 拦截=ValidateConditions 操作符白名单。
+		result = false
 	}
 
 	if rc.logger != nil {

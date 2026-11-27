@@ -144,6 +144,15 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
+	// 15 刀3（v0.0.1661）: 声明式条件配置期校验（与 ValidateExpr
+	// 对称——拼错字段/操作符当场 400 回显·原零校验直落 DB 运行期
+	// 静默失效）。
+	if req.Conditions != "" {
+		if err := seeding.ValidateConditions(req.Conditions); err != nil {
+			Error(w, http.StatusBadRequest, 14004, "条件校验失败: "+err.Error())
+			return
+		}
+	}
 
 	rule := model.DeleteRule{
 		Alias:                req.Alias,
@@ -214,6 +223,11 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 		updates["logic"] = v
 	}
 	if v, ok := req["conditions"].(string); ok {
+		// 15 刀3（v0.0.1661）: 更新路径同校验（与 create 对称）。
+		if err := seeding.ValidateConditions(v); err != nil {
+			Error(w, http.StatusBadRequest, 14004, "条件校验失败: "+err.Error())
+			return
+		}
 		updates["conditions"] = v
 	}
 	if v, ok := req["action"].(string); ok {

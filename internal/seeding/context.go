@@ -7,6 +7,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
+	"github.com/ranfish/pt-forward/internal/rule"
 )
 
 type exprEnv struct {
@@ -30,20 +31,32 @@ type exprEnv struct {
 	UploadSpeed   int64   `expr:"uploadSpeed"`
 	DownloadSpeed int64   `expr:"downloadSpeed"`
 	Ratio         float64 `expr:"ratio"`
-	SeedingTime   int64   `expr:"seedingTime"`
-	Category      string  `expr:"category"`
-	Tags          string  `expr:"tags"`
-	SavePath      string  `expr:"savePath"`
-	Seeder        int     `expr:"seeder"`
-	Leecher       int     `expr:"leecher"`
-	IsFinished    bool    `expr:"isFinished"`
-	AddedTime     float64 `expr:"addedTime"`
-	FreeRemainSec float64 `expr:"freeRemainSec"`
-	HRRemainSec   int64   `expr:"hrRemainSec"`
-	FreeSpace     int64   `expr:"freeSpace"`
-	TotalSpace    int64   `expr:"totalSpace"`
-	DiskUsedPct   float64 `expr:"diskUsedPct"`
-	Hour          int     `expr:"hour"`
+	// 15 刀2（v0.0.1661）: V-02 根修——文档 42 键清单声明但 expr 环境
+	// 缺失（Compile 实测 unknown name）。语义单点=rule.DownloadUploadRatioOf
+	// （零上传=+Inf·V-01 同批·双路径一致）。
+	DownloadUploadRatio float64 `expr:"downloadUploadRatio"`
+	SeedingTime         int64   `expr:"seedingTime"`
+	Category            string  `expr:"category"`
+	Tags                string  `expr:"tags"`
+	SavePath            string  `expr:"savePath"`
+	Seeder              int     `expr:"seeder"`
+	Leecher             int     `expr:"leecher"`
+	IsFinished          bool    `expr:"isFinished"`
+	AddedTime           float64 `expr:"addedTime"`
+	FreeRemainSec       float64 `expr:"freeRemainSec"`
+	HRRemainSec         int64   `expr:"hrRemainSec"`
+	FreeSpace           int64   `expr:"freeSpace"`
+	TotalSpace          int64   `expr:"totalSpace"`
+	DiskUsedPct         float64 `expr:"diskUsedPct"`
+	// 15 刀2 补（v0.0.1661）: 双路径一致性缺口（fieldValue 有·expr
+	// 缺·实施中覆盖探针抓出）——4 键。unregistered 29 生产规则在用
+	// （声明式）；diskUsedPercent 为 fieldValue 键名（expr 旧键
+	// diskUsedPct 保留兼容）。
+	Unregistered    bool    `expr:"unregistered"`
+	Downloaded      int64   `expr:"downloaded"`
+	Error           string  `expr:"error"`
+	DiskUsedPercent float64 `expr:"diskUsedPercent"`
+	Hour            int     `expr:"hour"`
 
 	ActiveUploads       int     `expr:"activeUploads"`
 	ActiveDownloads     int     `expr:"activeDownloads"`
@@ -68,9 +81,19 @@ func buildExprEnv(rc *RuleContext) *exprEnv {
 		FreeLevel:    rc.Record.FreeLevel,
 		Source:       rc.Record.Source,
 		LastActionBy: rc.Record.LastActionBy,
+		// 15 刀2 补（v0.0.1661）: 双路径一致性——unregistered 生产在用。
+		Unregistered: rc.Record.Unregistered,
 		FreeSpace:    rc.FreeSpace,
 		TotalSpace:   rc.TotalSpace,
 		DiskUsedPct: func() float64 {
+			if rc.TotalSpace > 0 {
+				return float64(rc.TotalSpace-rc.FreeSpace) / float64(rc.TotalSpace) * 100.0
+			}
+			return 0
+		}(),
+		// 15 刀2 补（v0.0.1661）: 双键名并存（diskUsedPercent=
+		// fieldValue 键名·diskUsedPct=expr 旧键兼容）·同源同值。
+		DiskUsedPercent: func() float64 {
 			if rc.TotalSpace > 0 {
 				return float64(rc.TotalSpace-rc.FreeSpace) / float64(rc.TotalSpace) * 100.0
 			}
@@ -115,6 +138,11 @@ func buildExprEnv(rc *RuleContext) *exprEnv {
 		env.UploadSpeed = ti.UploadSpeed
 		env.DownloadSpeed = ti.DownloadSpeed
 		env.Ratio = ti.Ratio
+		// 15 刀2（v0.0.1661）: 语义单点填充（零上传=+Inf·V-01 同批）
+		// + 双路径一致性补全（downloaded/error——fieldValue 有 expr 缺）。
+		env.DownloadUploadRatio = rule.DownloadUploadRatioOf(ti.DownloadSpeed, ti.UploadSpeed)
+		env.Downloaded = ti.Downloaded
+		env.Error = ti.Error
 		env.SeedingTime = ti.SeedTime
 		env.Category = ti.Category
 		env.Tags = strings.Join(ti.Tags, ",")

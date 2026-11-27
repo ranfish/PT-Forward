@@ -210,8 +210,10 @@ func TestEvalCondition_AllOperators(t *testing.T) {
 		{"not_contains no match", ruleCondition{Field: "site_name", Operator: "not_contains", Value: "ite"}, false},
 		{"bool equals", ruleCondition{Field: "is_free", Operator: "equals", Value: "true"}, true},
 		{"discount equals", ruleCondition{Field: "discount", Operator: "equals", Value: "FREE"}, true},
-		{"unknown field", ruleCondition{Field: "unknown", Operator: "equals", Value: "x"}, true},
-		{"unknown operator", ruleCondition{Field: "site_name", Operator: "regex", Value: "site1"}, true},
+		// 15 刀3（v0.0.1661）: 未知字段/操作符统一拒绝（原 true 放行——
+		// 拼错恒真误删风险·F-01 整改·语义变更测试对齐）。
+		{"unknown field", ruleCondition{Field: "unknown", Operator: "equals", Value: "x"}, false},
+		{"unknown operator", ruleCondition{Field: "site_name", Operator: "regex", Value: "site1"}, false},
 	}
 
 	for _, tt := range tests {
@@ -385,9 +387,11 @@ func TestEvalCondition_NoTorrent(t *testing.T) {
 		t.Error("should match site_name without torrent")
 	}
 
+	// 15 刀3（v0.0.1661）: 无 torrent 时 name 属未知字段——统一拒绝
+	// （原「should pass」恒真放行已废）。
 	got = evalCondition(rc, ruleCondition{Field: "name", Operator: "equals", Value: "test"})
-	if !got {
-		t.Error("unknown text field without torrent should pass")
+	if got {
+		t.Error("unknown field without torrent should be rejected")
 	}
 
 	got = evalCondition(rc, ruleCondition{Field: "seed_time", Operator: ">=", Value: "172800"})
