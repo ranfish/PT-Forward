@@ -1,0 +1,21 @@
+=== 基线 = 6aad0a388f8afe3e4a8d6630d245a3b5870aaeb3 ===
+=== 15 篇证据：规则引擎条件字段语义契约（本地离线复现·未碰靶机/真实数据）===
+
+--- A. 声明式字段求值：零上传语义反转（真实 fieldValue）---
+    probe15_test.go:6: 零上传（黑车典型）: value="0" ok=true  ← 文档契约要求 +∞
+    probe15_test.go:9: 有上传对照: value="5.0000"
+    probe15_test.go:11: expr 编译 downloadUploadRatio: err=unknown name downloadUploadRatio (1:1)
+    probe15_test.go:13: expr 编译已有字段 ratio 对照: err=<nil>
+
+--- B. seeding 包 expr 环境同型缺失（真实 expr.Compile）---
+    probe15_test.go:5: seeding expr 编译 downloadUploadRatio: err=unknown name downloadUploadRatio (1:1)
+
+--- C. 契约来源摘录 ---
+[docs/31-模块设计决策记录.md:7757]
+| 20 | `downloadUploadRatio` | float64 | 下载/上传速度比（downloadSpeed/uploadSpeed，上传=0 时为 +∞） |
+[docs/31-模块设计决策记录.md:7674]
+| 黑车检测（下载速度远大于上传）是核心需求 | 条件键新增 `downloadUploadRatio`，预置 8 档分级表模板 |
+
+--- 探针残留确认 ---
+?? evidence/rule-field-contract-repro.txt
+(空=干净)
