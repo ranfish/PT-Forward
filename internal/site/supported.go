@@ -3,6 +3,7 @@ package site
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -45,6 +46,36 @@ type SupportedSite struct {
 	// *bool 用指针+omitempty 区分「false 与未设置」——本位是开发者
 	// 权威数据源（seed 必填）无「未设置」态·值类型+无 omitempty 即对。
 	PublishSupported bool `json:"publish_supported"`
+	// §59.580: 站点级禁转小组黑名单（站方明文谢绝的小组——瓷器
+	// rules.php §6.2 实测）。硬编码随版本（前端不可增删改——站方
+	// 规则是外部权威非用户业务偏好）。通用字段：任意站可配·当前
+	// 只填瓷器；exact=精确匹配（EqualFold）·prefixes=前缀族
+	// （CHD*/Hyperay*——「任何官方组」宁严不宽）。
+	BannedGroups *BannedGroupsConfig `json:"banned_groups,omitempty"`
+}
+
+// BannedGroupsConfig §59.580: 站点禁转小组黑名单配置。
+type BannedGroupsConfig struct {
+	Exact    []string `json:"exact"`
+	Prefixes []string `json:"prefixes"`
+}
+
+// Match §59.580: 组名是否命中黑名单（exact 大小写不敏感+前缀族）。
+func (b *BannedGroupsConfig) Match(group string) bool {
+	if b == nil || group == "" {
+		return false
+	}
+	for _, e := range b.Exact {
+		if strings.EqualFold(group, e) {
+			return true
+		}
+	}
+	for _, p := range b.Prefixes {
+		if len(group) >= len(p) && strings.EqualFold(group[:len(p)], p) {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -84,6 +115,32 @@ func GetSupportedSite(domain string) (*SupportedSite, bool) {
 	}
 	s, ok := supportedSitesMap[domain]
 	return s, ok
+}
+
+// BannedGroupsForSite §59.580: 按站名或域名查禁转小组黑名单
+// （双键——发布/辅种消费点持站名〔sites.name=name_cn〕·辅种
+// SiteInfo 无 Domain 字段·domain 直查+name_cn 回查双保险）。
+// 硬编码数据源=supported_sites.json（前端不可增删改）。
+func BannedGroupsForSite(nameOrDomain string) *BannedGroupsConfig {
+	loadSupportedSites()
+	if supportedSitesErr != nil {
+		return nil
+	}
+	if s, ok := supportedSitesMap[nameOrDomain]; ok {
+		return s.BannedGroups
+	}
+	for _, s := range supportedSitesMap {
+		if s.NameCN == nameOrDomain {
+			return s.BannedGroups
+		}
+	}
+	return nil
+}
+
+// GroupBannedOnSite §59.580: 组名在站点黑名单（便捷组合——
+// 发布一种多站循环/辅种 matchAtSite 消费）。
+func GroupBannedOnSite(group, nameOrDomain string) bool {
+	return BannedGroupsForSite(nameOrDomain).Match(group)
 }
 
 // IsPublishSupported §59.318→§59.571 双源: 站点是否已适配发布。

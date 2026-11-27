@@ -9,6 +9,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
@@ -201,6 +202,18 @@ type matchConfig struct {
 
 func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model.SiteInfo) *model.Candidate {
 	if siteInfo.Name == src.SiteName {
+		return nil
+	}
+	// §59.580: 站点级禁转小组黑名单（辅种侧=保守防御——避免跟将被
+	// 站方清理的资源发生关联·用户定案①。源种子组名在目标站黑名单
+	// →该站不出候选〔同 ContentType 过滤同构〕。硬编码数据源
+	// supported_sites.json〔瓷器 rules.php §6.2 谢绝 12 组〕）。
+	if bg := util.ExtractGroupName(src.Name); bg != "" && site.GroupBannedOnSite(bg, siteInfo.Name) {
+		e.logger.Debug("reseed site banned group filtered",
+			zap.String("sourceSite", src.SiteName),
+			zap.String("targetSite", siteInfo.Name),
+			zap.String("group", bg),
+			zap.String("info_hash", src.InfoHash))
 		return nil
 	}
 	if mc.nameSites != nil {

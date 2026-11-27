@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/site"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -136,6 +137,35 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 		return
 	}
 	batchID := fmt.Sprintf("%d", time.Now().UnixNano())
+	// §59.580: 站点级禁转小组黑名单预取（种子级过滤——组名在目标站
+	// 黑名单→剔除该站·与 preflightSite 同隔离语义：跳过+提示·不阻塞
+	// 其它站。硬编码数据源 supported_sites.json〔瓷器 rules.php §6.2
+	// 站方明文谢绝 12 组〕——前端不可增删改）。
+	bannedGroup := ""
+	var srcName string
+	if err := h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", req.InfoHash).
+		Select("name").
+		Limit(1).
+		Scan(&srcName).Error; err == nil && srcName != "" {
+		bannedGroup = util.ExtractGroupName(srcName)
+	}
+	// §59.580: 黑名单命中的目标站集合（循环外预计算——包名 site
+	// 与循环变量名冲突规避+零重复判断）。
+	bannedSites := make(map[string]bool, 0)
+	if bannedGroup != "" {
+		for _, ts := range req.TargetSites {
+			if site.GroupBannedOnSite(bannedGroup, ts) {
+				bannedSites[ts] = true
+			}
+		}
+		if len(bannedSites) > 0 {
+			h.logger.Info("publish batch banned group sites filtered",
+				zap.String("group", bannedGroup),
+				zap.Int("banned_sites", len(bannedSites)),
+				zap.String("info_hash", req.InfoHash))
+		}
+	}
 	type siteResult struct {
 		Site      string                  `json:"site"`
 		Status    string                  `json:"status"`
@@ -158,6 +188,11 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 					results[idx] = siteResult{Site: siteName, Status: "failed", Message: fmt.Sprintf("panic: %v", rec)}
 				}
 			}()
+			// §59.580: 黑名单小组过滤（一种多站——该站被剔除·其它站照发）
+			if bannedSites[siteName] {
+				results[idx] = siteResult{Site: siteName, Status: "banned_group", Message: fmt.Sprintf("站方谢绝发布 %s 小组资源（rules.php §6.2 硬编码黑名单）", bannedGroup)}
+				return
+			}
 			// §59.176: 站点发布前置检查——不可发布仅跳过该站（隔离语义：
 			// 不阻塞可发布站），提示+日志
 			if pf := h.preflightSite(ctx, siteName); pf != nil && !pf.Allowed {
@@ -213,6 +248,12 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 
 	// §59.535 刀6: 覆盖判据 matcher——在 var site 局部变量遮蔽包名前构建
 	covTM := site.NewTrackerMatcher(h.db)
+
+	// §59.580: 站点级禁转小组黑名单（一站多种——目标站黑名单存在时
+	// 逐种过滤：种子组在黑名单→跳过该种。与覆盖过滤同 skipped 终态。
+	// 硬编码数据源 supported_sites.json〔瓷器 rules.php §6.2〕——
+	// 非黑名单站零开销〔BannedGroupsForSite=nil 直接跳过〕）。
+	bannedCfg := site.BannedGroupsForSite(req.TargetSite)
 
 	// 目标站校验：存在 + 发布配置启用
 	var site model.Site
@@ -324,6 +365,28 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 				task.Done++
 				h.siteBatch.mu.Unlock()
 				continue
+			}
+
+			// §59.580: 黑名单小组过滤（逐种——组名在目标站黑名单→跳过）
+			if bannedCfg != nil {
+				var sName string
+				_ = h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+					Where("hash = ?", hash).
+					Select("name").
+					Limit(1).
+					Scan(&sName).Error
+				if bg := util.ExtractGroupName(sName); bg != "" && bannedCfg.Match(bg) {
+					h.logger.Info("site-batch: 站方谢绝小组·跳过（§59.580 黑名单）",
+						zap.String("hash", hash), zap.String("site", req.TargetSite), zap.String("group", bg))
+					h.siteBatch.mu.Lock()
+					task.Results = append(task.Results, siteBatchResult{
+						InfoHash: hash, Title: curTitle,
+						Status: "skipped", Message: fmt.Sprintf("站方谢绝 %s 小组资源·跳过（黑名单）", bg),
+					})
+					task.Done++
+					h.siteBatch.mu.Unlock()
+					continue
+				}
 			}
 
 			// §59.166 回归审核补：per-seed recover——executor panic 若穿透会把任务

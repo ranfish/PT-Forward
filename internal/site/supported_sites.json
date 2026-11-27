@@ -285,7 +285,26 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "hdwing.org",
     "verification_status": "verified",
-    "publish_supported": true
+    "publish_supported": true,
+    "banned_groups": {
+      "exact": [
+        "SeeHD",
+        "RARBG",
+        "FGT",
+        "HDArea",
+        "EPiC",
+        "HQC",
+        "WEBHD",
+        "Mp4Ba",
+        "NSBC",
+        "Xiaomi",
+        "BitsTV"
+      ],
+      "prefixes": [
+        "CHD",
+        "Hyperay"
+      ]
+    }
   },
   "hdtime.org": {
     "domain": "hdtime.org",
