@@ -231,6 +231,11 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 	}
 
 	go mgr.loginLimiter.cleanupLoop()
+	// 18 刀2（v0.0.1671）: V-02 根修——原零 Add（persistWg 仅声明
+	// :152+Wait :260·计数恒 0）→Stop() 空等立即返回·最后一批
+	// refresh token 落库脱离停机生命周期（main.go:228/:844 的
+	// Stop 语义承诺失效）。配对补全：Add 在 go 前·Done 在 loop 入口。
+	mgr.persistWg.Add(1)
 	go mgr.persistLoop()
 
 	if settingRepo != nil {
@@ -261,6 +266,10 @@ func (m *AuthManager) Stop() {
 }
 
 func (m *AuthManager) persistLoop() {
+	// 18 刀2（v0.0.1671）: 与构造期 Add(1) 配对——Stop() 的 Wait()
+	// 从空等变真等待（最后一次 persistRefreshTokens 落库完成后
+	// Stop 才返回·停机不变量成立）。
+	defer m.persistWg.Done()
 	for {
 		select {
 		case <-m.stopCh:

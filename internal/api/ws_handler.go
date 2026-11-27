@@ -40,6 +40,35 @@ type Client struct {
 	userID   string
 	channels map[string]bool
 	mu       sync.RWMutex
+	// 18 刀1（v0.0.1671）: 生命周期信号——channel 关闭责任单一化（V-01
+	// 根修）。原三处 Hub close(client.send) 与四处发送方无协调——
+	// stale 驱逐只关 send 不关 conn·readPump ping 一帧即
+	// panic: send on closed channel（无 recover 杀进程·已鉴权客户端
+	// 可稳定触发=远程 DoS·离线复现实锤）。新纪律：
+	//   done 由 Hub 唯一关闭（shutdown 幂等）·send 永不被 close·
+	//   所有发送方带 <-c.done 分支退出。
+	done     chan struct{}
+	doneOnce sync.Once
+}
+
+// shutdown 18 刀1: 幂等关闭 done——所有发送方（readPump 三处/
+// ServeHTTP）与 writePump 经 done 分支退出。Hub 是唯一 owner。
+func (c *Client) shutdown() {
+	c.doneOnce.Do(func() { close(c.done) })
+}
+
+// trySend 18 刀1: 发送方统一形态——send 满→丢弃（default）·
+// done 关→false（调用方退出）。永不向已关 channel 发送（send 不再
+// 被 close）。
+func (c *Client) trySend(msg *WSMessage) bool {
+	select {
+	case c.send <- msg:
+		return true
+	case <-c.done:
+		return false
+	default:
+		return true // 缓冲满丢弃（既有语义）
+	}
 }
 
 func (c *Client) ShouldReceive(eventType string) bool {
@@ -89,8 +118,13 @@ func (h *Hub) Run(stop <-chan struct{}) {
 		case <-stop:
 			h.mu.Lock()
 			for client := range h.clients {
-				close(client.send)
-				_ = client.conn.Close()
+				// 18 刀1（v0.0.1671）: close(client.send) → shutdown()
+				// ——send 永不被关（V-01 根修·done 单一 owner）
+				client.shutdown()
+				if client.conn != nil {
+					// 18 刀1 附: nil 守卫（stale/stop 路径测试构造可无 conn）
+					_ = client.conn.Close()
+				}
 			}
 			h.clients = make(map[*Client]bool)
 			h.mu.Unlock()
@@ -105,7 +139,8 @@ func (h *Hub) Run(stop <-chan struct{}) {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				// 18 刀1: shutdown()（原 close(send) 不关 conn——配对缺失）
+				client.shutdown()
 			}
 			h.mu.Unlock()
 
@@ -129,8 +164,15 @@ func (h *Hub) Run(stop <-chan struct{}) {
 				default:
 					h.mu.Lock()
 					delete(h.clients, c)
-					close(c.send)
+					// 18 刀1（v0.0.1671）: close(c.send) → shutdown()
+					// +conn.Close()（原只关 send 不关 conn——readPump 存活
+					// 发 ping 即 panic 的原案路径。conn.Close 让 readPump
+					// 立即退出·done 让所有发送方退出）
+					c.shutdown()
 					h.mu.Unlock()
+					if c.conn != nil {
+						_ = c.conn.Close()
+					}
 					slog.Warn("ws: unregister channel full, directly evicted stale client")
 				}
 			}
@@ -250,10 +292,13 @@ func (s *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	_ = conn.SetReadDeadline(time.Time{})
 
+	// 18 刀1（v0.0.1671）: done 初始化——Client 构造必经（V-01 根修
+	// 生命周期信号）。
 	client := &Client{
 		hub:      s.hub,
 		conn:     conn,
 		send:     make(chan *WSMessage, 64),
+		done:     make(chan struct{}),
 		userID:   claims.Sub,
 		channels: make(map[string]bool),
 	}
@@ -268,9 +313,11 @@ func (s *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 	go client.readPump()
 
-	client.send <- NewWSMessage("server.connected", map[string]string{
+	// 18 刀1: 原裸阻塞发送——Hub stop/unregister 先关 send 则 panic·
+	// send 满且 pump 退出则永久阻塞。改 trySend（done 退出+满丢弃）。
+	client.trySend(NewWSMessage("server.connected", map[string]string{
 		"serverTime": time.Now().UTC().Format(time.RFC3339),
-	})
+	}))
 }
 
 func (c *Client) readPump() {
@@ -307,9 +354,9 @@ func (c *Client) readPump() {
 
 		switch msg.Type {
 		case "ping":
-			select {
-			case c.send <- NewWSMessage("pong", nil):
-			default:
+			// 18 刀1（v0.0.1671）: trySend——send 永不被关·done 退出
+			if !c.trySend(NewWSMessage("pong", nil)) {
+				return
 			}
 		case "subscribe":
 			c.mu.Lock()
@@ -317,9 +364,8 @@ func (c *Client) readPump() {
 				c.channels[ch] = true
 			}
 			c.mu.Unlock()
-			select {
-			case c.send <- NewWSMessage("subscribed", map[string]interface{}{"channels": msg.Channels}):
-			default:
+			if !c.trySend(NewWSMessage("subscribed", map[string]interface{}{"channels": msg.Channels})) {
+				return
 			}
 		case "unsubscribe":
 			c.mu.Lock()
@@ -327,9 +373,8 @@ func (c *Client) readPump() {
 				delete(c.channels, ch)
 			}
 			c.mu.Unlock()
-			select {
-			case c.send <- NewWSMessage("unsubscribed", map[string]interface{}{"channels": msg.Channels}):
-			default:
+			if !c.trySend(NewWSMessage("unsubscribed", map[string]interface{}{"channels": msg.Channels})) {
+				return
 			}
 		}
 	}
@@ -347,12 +392,18 @@ func (c *Client) writePump() {
 		case message, ok := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
+				// 18 刀1（v0.0.1671）: send 永不被关（Hub 收口为 done）——
+				// 此分支不再可达·保留防御（未来若有人误关 send 优雅退出）。
 				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 			if err := c.conn.WriteJSON(message); err != nil {
 				return
 			}
+
+		case <-c.done:
+			// 18 刀1: Hub 关闭 done——退出（conn 由 Hub/readPump defer 关）
+			return
 
 		case <-ticker.C:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))

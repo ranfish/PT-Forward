@@ -1,6 +1,6 @@
 # 18 channel 关闭责任与 goroutine 同步配对语义
 
-- **状态**：已精读（三刀待实施）
+- **状态**：已完成（三刀 v0.0.1671 落地·回归审核遗物处置）
 - **日期**：2026-11-27
 - **基线**：`5f6d9cfa`（17 全案三刀收官·审计系列 01-17十七篇全毕）
 - **审计范围**：生产代码中 channel 的「谁关闭、谁发送」责任边界（`close(send)` 与并发/后续发送是否配对），以及 goroutine 生命周期同步原语（`WaitGroup.Add/Wait` 是否成对）——两处确凿缺陷：WebSocket `client.send` 的 send-on-closed 进程级 panic（高危）与 `AuthManager.persistWg` 零 `Add` 导致 `Stop()` 空等（中危）。

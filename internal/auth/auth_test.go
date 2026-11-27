@@ -472,8 +472,17 @@ func TestAuthManager_PersistentRefreshTokens(t *testing.T) {
 		t.Fatalf("IssueTokenPair: %v", err)
 	}
 
-	if !store.waitFor("refresh_tokens", 2*time.Second) {
-		t.Fatal("timed out waiting for refresh_tokens persist")
+	// 18 刀2（v0.0.1671）: 轮询妥协同步化——persistWg Add/Done 配对
+	// 后 Stop() 真等待最后一次落库（persistRefreshTokens 在 persistLoop
+	// 退出路径执行·Done 在其之后）——Stop 返回即落库完成·
+	// waitFor 轮询（异步组件测试的原语缺失妥协）可删。
+	mgr.Stop()
+
+	store.mu.RLock()
+	_, persisted := store.data["refresh_tokens"]
+	store.mu.RUnlock()
+	if !persisted {
+		t.Fatal("refresh_tokens not persisted after Stop (persistWg pairing broken)")
 	}
 
 	store.mu.RLock()
