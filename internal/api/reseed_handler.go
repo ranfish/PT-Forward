@@ -9,6 +9,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -449,10 +450,13 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	if site != "" {
 		// §59.506 附: 站点筛选模糊化（与旁边 torrentId LIKE 同款·对齐发布日志
 		// 目标站搜索语义——输入不完整站名精确匹配 miss）
-		query = query.Where("target_site LIKE ? OR source_site LIKE ?", "%"+site+"%", "%"+site+"%")
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01）。
+		like := util.LikeContains(site)
+		query = query.Where("target_site LIKE ?"+util.LikeEscapeSuffix+" OR source_site LIKE ?"+util.LikeEscapeSuffix, like, like)
 	}
 	if torrentID != "" {
-		query = query.Where("source_torrent_id LIKE ? OR target_torrent_id LIKE ?", "%"+torrentID+"%", "%"+torrentID+"%")
+		like := util.LikeContains(torrentID)
+		query = query.Where("source_torrent_id LIKE ?"+util.LikeEscapeSuffix+" OR target_torrent_id LIKE ?"+util.LikeEscapeSuffix, like, like)
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)

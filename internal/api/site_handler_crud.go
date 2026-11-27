@@ -13,6 +13,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/site"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -27,9 +28,11 @@ func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 	query := h.db.WithContext(r.Context()).Model(&model.Site{})
 	if search != "" {
-		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(search)
-		like := "%" + escaped + "%"
-		query = query.Where("name LIKE ? OR domain LIKE ? ESCAPE '\\'", like, like)
+		// 13 刀2（v0.0.1656）: V-02 同型——原仅第二条（domain）带 ESCAPE·
+		// 第一条（name）缺子句·转义值 \% 在 name 列反漏匹配。两条统一
+		// 收编 util.LikeEscape 公共单点（转义+ESCAPE 成对）。
+		like := util.LikeContains(search)
+		query = query.Where("name LIKE ?"+util.LikeEscapeSuffix+" OR domain LIKE ?"+util.LikeEscapeSuffix, like, like)
 	}
 	if framework != "" {
 		query = query.Where("framework = ?", framework)

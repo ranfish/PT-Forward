@@ -7,6 +7,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/ptgen"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -80,8 +81,12 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 
 	q := h.db.WithContext(r.Context()).Model(&model.PTGenCache{})
 	if keyword := r.URL.Query().Get("keyword"); keyword != "" {
-		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(keyword)
-		q = q.Where("query_key LIKE ? OR chinese_title LIKE ?", "%"+escaped+"%", "%"+escaped+"%")
+		// 13 刀2（v0.0.1656）: V-02 根修——原 NewReplacer 转义后两条 LIKE
+		// 均无 ESCAPE 子句·SQLite 下 \% 是字面两字符·查字面 % 反漏匹配
+		// （实测查 100%done 返回空）。收编 util.LikeEscape 公共单点
+		// （转义+ESCAPE 成对铁律·13 篇刀1）。
+		like := util.LikeContains(keyword)
+		q = q.Where("query_key LIKE ?"+util.LikeEscapeSuffix+" OR chinese_title LIKE ?"+util.LikeEscapeSuffix, like, like)
 	}
 
 	var total int64

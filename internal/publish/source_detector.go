@@ -175,10 +175,13 @@ func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) 
 	// 按 domain 模糊匹配站点表（含 alternative_domains，自动去除 www.）
 	if mapping.Domain != "" {
 		bareDomain := strings.TrimPrefix(strings.ToLower(mapping.Domain), "www.")
+		// 13 刀3（v0.0.1656）: DB 配置数据进 LIKE 的防御纵深收编
+		// （静态锚白名单外从严路径）——正常域名不含 %/_·转义幂等·
+		// 配置含通配符时语义不劫持。
+		pattern := "%" + util.LikeEscape(bareDomain) + "%"
 		var site model.Site
-		pattern := "%" + bareDomain + "%"
 		if err := d.db.WithContext(ctx).
-			Where("LOWER(REPLACE(domain, 'www.', '')) LIKE ? OR LOWER(REPLACE(base_url, 'www.', '')) LIKE ? OR LOWER(alternative_domains) LIKE ?", pattern, pattern, pattern).
+			Where("LOWER(REPLACE(domain, 'www.', '')) LIKE ?"+util.LikeEscapeSuffix+" OR LOWER(REPLACE(base_url, 'www.', '')) LIKE ?"+util.LikeEscapeSuffix+" OR LOWER(alternative_domains) LIKE ?"+util.LikeEscapeSuffix, pattern, pattern, pattern).
 			First(&site).Error; err == nil {
 			resolved := site.Name
 			d.mu.Lock()
@@ -260,7 +263,7 @@ func (d *SourceSiteDetector) HasGroupMappings(ctx context.Context, site *model.S
 	}
 	var count int64
 	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-		Where("site_name = ? OR domain LIKE ?", site.Name, "%"+strings.ToLower(site.Domain)+"%").
+		Where("site_name = ? OR domain LIKE ?"+util.LikeEscapeSuffix, site.Name, "%"+util.LikeEscape(strings.ToLower(site.Domain))+"%").
 		Count(&count)
 	return count > 0
 }

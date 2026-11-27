@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -51,7 +52,8 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 		q = q.Where("client_uid || '|' || name IN (SELECT client_uid || '|' || name FROM torrent_snapshots WHERE save_path = ?)", savePath)
 	}
 	if search != "" {
-		q = q.Where("name LIKE ?", "%"+search+"%")
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01）。
+		q = q.Where("name LIKE ?"+util.LikeEscapeSuffix, util.LikeContains(search))
 	}
 	var rows []obsRow
 	if err := q.Order("last_seen DESC").Find(&rows).Error; err != nil {

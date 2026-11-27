@@ -242,6 +242,13 @@ func (c *Checker) checkSite(ctx context.Context, title, siteName string) *Result
 		sourceCat := c.lookupSourceCategory(ctx, title, siteName)
 		if sourceCat != "" {
 			for _, blockedCat := range cats {
+				// 13 刀3 F-01（v0.0.1656）: 空串守卫——Contains(x, "")
+				// 恒真·配置含空串条目即该站全部种子被拒。与同函数
+				// catExcludes 循环（:305 if cat == "" { continue }）纪律
+				// 对齐（原一处有一处无的明确不一致）。
+				if blockedCat == "" {
+					continue
+				}
 				if strings.Contains(sourceCat, blockedCat) {
 					return &Result{Passed: false, Reason: siteName + ":" + blockedCat, Category: "site_blacklist"}
 				}

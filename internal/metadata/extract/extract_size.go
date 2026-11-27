@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -129,14 +130,30 @@ func parseSizeToBytes(s string) int64 {
 	if err != nil {
 		return 0
 	}
+	// 13 刀3 F-02（v0.0.1656）: float→int64 前置上界守卫——超大外部
+	// 输入（ParseFloat 成功）乘单位后转 int64 溢出为负（行为未定义·
+	// 13 篇标注未实测但形态确凿）。超界拒绝返 0（与解析失败同语义
+	// ——调用方以 0 判无效）。
 	switch strings.ToUpper(m[2]) {
 	case "TB", "TIB":
+		if val > math.MaxInt64/1024/1024/1024/1024 {
+			return 0
+		}
 		return int64(val * 1024 * 1024 * 1024 * 1024)
 	case "GB", "GIB":
+		if val > math.MaxInt64/1024/1024/1024 {
+			return 0
+		}
 		return int64(val * 1024 * 1024 * 1024)
 	case "MB", "MIB":
+		if val > math.MaxInt64/1024/1024 {
+			return 0
+		}
 		return int64(val * 1024 * 1024)
 	case "KB", "KIB":
+		if val > math.MaxInt64/1024 {
+			return 0
+		}
 		return int64(val * 1024)
 	default:
 		return int64(val)

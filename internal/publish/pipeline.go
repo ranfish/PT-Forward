@@ -474,8 +474,9 @@ func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int, st
 		q = q.Where("publish_status = ?", status)
 	}
 	if search != "" {
-		like := "%" + search + "%"
-		q = q.Where("torrent_name LIKE ? OR source_site LIKE ? OR target_sites LIKE ?", like, like, like)
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01）。
+		like := util.LikeContains(search)
+		q = q.Where("torrent_name LIKE ?"+util.LikeEscapeSuffix+" OR source_site LIKE ?"+util.LikeEscapeSuffix+" OR target_sites LIKE ?"+util.LikeEscapeSuffix, like, like, like)
 	}
 	if err := q.Count(&total).Error; err != nil {
 		p.logger.Warn("query failed", zap.Error(err))
@@ -569,7 +570,9 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 		// §59.506: 目标站模糊搜索（用户定案）——精确匹配改包含匹配
 		// （LIKE %X%：优/堡/优堡均命中"优堡"·好/好多/油均命中"好多油"）；
 		// 本函数唯一消费方=发布日志页端点（publish_handler:305），语义安全。
-		q = q.Where("target_site LIKE ?", "%"+targetSite+"%")
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01——13 篇清单外漏网
+		// 第 10 处·精读盘 477 漏 572·交叉复核抓出）。
+		q = q.Where("target_site LIKE ?"+util.LikeEscapeSuffix, util.LikeContains(targetSite))
 	}
 	if trigger != "" {
 		q = q.Where("trigger = ?", trigger)

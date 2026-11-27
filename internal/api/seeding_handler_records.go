@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -97,7 +98,7 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		q = q.Where("status = ?", status)
 	}
 	if search != "" {
-		q = q.Where("info_hash LIKE ? OR torrent_id LIKE ? OR site_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		q = q.Where("info_hash LIKE ?"+util.LikeEscapeSuffix+" OR torrent_id LIKE ?"+util.LikeEscapeSuffix+" OR site_name LIKE ?"+util.LikeEscapeSuffix, util.LikeContains(search), util.LikeContains(search), util.LikeContains(search))
 	}
 
 	var total int64
@@ -344,10 +345,11 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		q = q.Where("site_name = ?", siteName)
 	}
 	if search := r.URL.Query().Get("search"); search != "" {
-		q = q.Where("info_hash LIKE ? OR torrent_id LIKE ? OR site_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		q = q.Where("info_hash LIKE ?"+util.LikeEscapeSuffix+" OR torrent_id LIKE ?"+util.LikeEscapeSuffix+" OR site_name LIKE ?"+util.LikeEscapeSuffix, util.LikeContains(search), util.LikeContains(search), util.LikeContains(search))
 	}
 	if actionBy := r.URL.Query().Get("action_by"); actionBy != "" {
-		q = q.Where("last_action_by LIKE ?", "%"+actionBy+"%")
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01）。
+		q = q.Where("last_action_by LIKE ?"+util.LikeEscapeSuffix, util.LikeContains(actionBy))
 	}
 
 	var total int64

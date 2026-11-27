@@ -118,12 +118,16 @@ func (h *PublishTorrentsHandler) loadSeedSnapshots(ctx context.Context, q listSe
 	var searchConds []string
 	var searchArgs []interface{}
 	if q.search != "" {
+		// 13 刀1（v0.0.1656）: 用户输入 LIKE 转义收编（V-01——原裸拼
+		// "%"+search+"%"·输入 %/_ 命中全表劫持过滤）。每个 LIKE ? 配
+		// ESCAPE 子句（含子查询内两处）。
 		if searchHasCJK {
-			searchConds = []string{"name LIKE ?", "OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)"}
-			searchArgs = []interface{}{"%" + q.search + "%", "%" + q.search + "%", "%" + q.search + "%"}
+			searchConds = []string{"name LIKE ?" + util.LikeEscapeSuffix, "OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ?" + util.LikeEscapeSuffix + " OR m.subtitle LIKE ?" + util.LikeEscapeSuffix + ")"}
+			esc := util.LikeContains(q.search)
+			searchArgs = []interface{}{esc, esc, esc}
 		} else {
-			searchConds = []string{"name LIKE ?"}
-			searchArgs = []interface{}{"%" + q.search + "%"}
+			searchConds = []string{"name LIKE ?" + util.LikeEscapeSuffix}
+			searchArgs = []interface{}{util.LikeContains(q.search)}
 		}
 		sub = sub.Where(strings.Join(searchConds, " "), searchArgs...)
 	}
@@ -232,11 +236,13 @@ func (h *PublishTorrentsHandler) buildSeedClusterIndex(ctx context.Context, q li
 		var searchConds []string
 		var searchArgs []interface{}
 		if searchHasCJK {
-			searchConds = []string{"name LIKE ?", "OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)"}
-			searchArgs = []interface{}{"%" + q.search + "%", "%" + q.search + "%", "%" + q.search + "%"}
+			// 13 刀1（v0.0.1656）: 同上组——转义+ESCAPE 成对收编。
+			searchConds = []string{"name LIKE ?" + util.LikeEscapeSuffix, "OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ?" + util.LikeEscapeSuffix + " OR m.subtitle LIKE ?" + util.LikeEscapeSuffix + ")"}
+			esc := util.LikeContains(q.search)
+			searchArgs = []interface{}{esc, esc, esc}
 		} else {
-			searchConds = []string{"name LIKE ?"}
-			searchArgs = []interface{}{"%" + q.search + "%"}
+			searchConds = []string{"name LIKE ?" + util.LikeEscapeSuffix}
+			searchArgs = []interface{}{util.LikeContains(q.search)}
 		}
 		hashQ = hashQ.Where(strings.Join(searchConds, " "), searchArgs...)
 	}

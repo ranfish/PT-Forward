@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/ranfish/pt-forward/internal/util"
 	"sync"
 	"time"
 
@@ -34,13 +36,8 @@ type declBackfillState struct {
 	error         string
 }
 
-// likeEscape LIKE 通配符转义（用户自定义词可能含 %/_——miss 即漏清洗）。
-func likeEscape(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
+// 13 刀1（v0.0.1656）: 私有 likeEscape 收敛至 util.LikeEscape 公共单点
+// （转义顺序/ESCAPE 成对语义见 util/like.go——全库唯一真源）。
 
 // handleDeclBackfillTask POST /publish/seeds/declaration-backfill-task
 // 预筛：生效词任一 LIKE 命中 description/statement 的行（超集——Filter
@@ -123,8 +120,8 @@ func (h *PublishTorrentsHandler) declBackfillSelectRows(ctx context.Context, pat
 	conds := make([]string, 0, len(patterns)+1)
 	args := make([]interface{}, 0, len(patterns)*2)
 	for _, p := range patterns {
-		esc := "%" + likeEscape(p) + "%"
-		conds = append(conds, "(description LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')")
+		esc := util.LikeContains(p)
+		conds = append(conds, "(description LIKE ?"+util.LikeEscapeSuffix+" OR statement LIKE ?"+util.LikeEscapeSuffix+")")
 		args = append(args, esc, esc)
 	}
 	// 注意：Go 反引号原始字符串里 " 不需要转义——写 \" 会成为字面反斜杠

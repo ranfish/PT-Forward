@@ -10,6 +10,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -520,7 +521,9 @@ func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *ht
 	}
 
 	if search != "" {
-		query = query.Where("title LIKE ? OR subtitle LIKE ? OR info_hash LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		// 13 刀1（v0.0.1656）: LIKE 转义收编（V-01）。
+		like := util.LikeContains(search)
+		query = query.Where("title LIKE ?"+util.LikeEscapeSuffix+" OR subtitle LIKE ?"+util.LikeEscapeSuffix+" OR info_hash LIKE ?"+util.LikeEscapeSuffix, like, like, like)
 	}
 	if sourceSite != "" {
 		query = query.Where("site_name = ?", sourceSite)
