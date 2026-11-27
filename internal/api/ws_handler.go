@@ -60,7 +60,17 @@ func (c *Client) shutdown() {
 // trySend 18 刀1: 发送方统一形态——send 满→丢弃（default）·
 // done 关→false（调用方退出）。永不向已关 channel 发送（send 不再
 // 被 close）。
+// 18 刀1 附（v0.0.1671 flake 根修）: 原单层三路 select 在「done 已关
+// 且 send 有空位」时两 case 同就绪——Go select 随机选中，退出信号
+// 50% 不确定（锚×10 实测 flake）。两阶段形态：前置 done 检查（关→
+// 恒 false 确定退出）→未关走三路 select（间隙关闭的良性竞态由 send
+// 永不被关兜底——消息入死 channel 无害 GC）。
 func (c *Client) trySend(msg *WSMessage) bool {
+	select {
+	case <-c.done:
+		return false
+	default:
+	}
 	select {
 	case c.send <- msg:
 		return true
