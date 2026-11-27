@@ -39,6 +39,24 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_site 必填")
 		return
 	}
+	// §59.580 回归审核补：单发入口黑名单过滤（原实施漏点——批量
+	// 两个入口已过滤而单发零过滤·黑名单组种子单发瓷器=站方删种
+	// 风险。语义与批量一致：拒绝+组名提示〔单发是单站请求——拒绝
+	// 整单而非剔除某站〕）。
+	if banned := site.BannedGroupsForSite(req.TargetSite); banned != nil {
+		var sName string
+		_ = h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
+			Where("hash = ?", req.InfoHash).
+			Select("name").
+			Limit(1).
+			Scan(&sName).Error
+		if bg := util.ExtractGroupName(sName); bg != "" && banned.Match(bg) {
+			h.logger.Info("publish single-site banned group blocked",
+				zap.String("site", req.TargetSite), zap.String("group", bg), zap.String("info_hash", req.InfoHash))
+			Error(w, http.StatusBadRequest, 40006, fmt.Sprintf("站方谢绝发布 %s 小组资源（rules.php §6.2 硬编码黑名单）", bg))
+			return
+		}
+	}
 	if h.executor == nil {
 		Error(w, http.StatusServiceUnavailable, 50301, "执行器未初始化")
 		return

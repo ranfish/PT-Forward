@@ -96,3 +96,53 @@ func stringContains(s, sub string) bool {
 	}
 	return false
 }
+
+// §59.580 回归审核补：单发入口黑名单锚（原实施漏点——批量两入口
+// 已过滤而单发零过滤）。
+func TestExecutePublish_SingleSite_BannedGroupBlocked(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{Logger: logger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := model.AutoMigrate(db); err != nil {
+		t.Fatal(err)
+	}
+	db.Create(&model.TorrentSnapshot{
+		Hash:      "bannedhash00000000000000000000000000000000",
+		ClientUID: 1,
+		Name:      "Movie.2026.1080p.BluRay.x264-CHDBits",
+		SavePath:  "/x",
+	})
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	body, _ := json.Marshal(map[string]interface{}{
+		"info_hash":   "bannedhash00000000000000000000000000000000",
+		"target_site": "瓷器",
+	})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/publish/execute", bytes.NewReader(body))
+	h.handleExecutePublish(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("黑名单组单发瓷器应 400 拒绝·实得 %d: %s", w.Code, w.Body.String())
+	}
+	if !stringContains(w.Body.String(), "CHDBits") {
+		t.Errorf("拒绝文案应含组名: %s", w.Body.String())
+	}
+	// 合法组对照（不拦——走 executor 流程·此处 executor nil 503 证明
+	// 黑名单门放行）
+	db.Create(&model.TorrentSnapshot{
+		Hash:      "legalhash0000000000000000000000000000000000",
+		ClientUID: 1,
+		Name:      "Movie.2026.1080p.BluRay.x264-WiLDCAT",
+		SavePath:  "/x",
+	})
+	body2, _ := json.Marshal(map[string]interface{}{
+		"info_hash":   "legalhash0000000000000000000000000000000000",
+		"target_site": "瓷器",
+	})
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/publish/execute", bytes.NewReader(body2))
+	h.handleExecutePublish(w2, req2)
+	if w2.Code == http.StatusBadRequest && stringContains(w2.Body.String(), "黑名单") {
+		t.Error("合法组不应被黑名单拒绝")
+	}
+}

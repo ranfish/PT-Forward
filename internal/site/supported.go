@@ -83,6 +83,9 @@ var (
 	supportedSitesMap  map[string]*SupportedSite
 	supportedSitesList []*SupportedSite
 	supportedSitesErr  error
+	// §59.580 回归审核：name_cn 索引（双键 O(1)——原 O(105) 遍历在
+	// 辅种批量下 820 源×105 站×每次回查=900 万次比较的性能隐患）。
+	supportedSitesByNameCN map[string]*SupportedSite
 )
 
 // loadSupportedSites 单次解析 embedded JSON 到内存索引。
@@ -96,10 +99,14 @@ func loadSupportedSites() {
 		}
 		supportedSitesMap = make(map[string]*SupportedSite, len(m))
 		supportedSitesList = make([]*SupportedSite, 0, len(m))
+		supportedSitesByNameCN = make(map[string]*SupportedSite, len(m))
 		for k := range m {
 			s := m[k]
 			supportedSitesMap[k] = &s
 			supportedSitesList = append(supportedSitesList, &s)
+			if s.NameCN != "" {
+				supportedSitesByNameCN[s.NameCN] = &s
+			}
 		}
 		sort.Slice(supportedSitesList, func(i, j int) bool {
 			return supportedSitesList[i].Domain < supportedSitesList[j].Domain
@@ -121,6 +128,8 @@ func GetSupportedSite(domain string) (*SupportedSite, bool) {
 // （双键——发布/辅种消费点持站名〔sites.name=name_cn〕·辅种
 // SiteInfo 无 Domain 字段·domain 直查+name_cn 回查双保险）。
 // 硬编码数据源=supported_sites.json（前端不可增删改）。
+// 回归审核：name_cn 索引 O(1)（原 O(105) 遍历——辅种批量
+// 820×105 调用面的性能修复）。
 func BannedGroupsForSite(nameOrDomain string) *BannedGroupsConfig {
 	loadSupportedSites()
 	if supportedSitesErr != nil {
@@ -129,10 +138,8 @@ func BannedGroupsForSite(nameOrDomain string) *BannedGroupsConfig {
 	if s, ok := supportedSitesMap[nameOrDomain]; ok {
 		return s.BannedGroups
 	}
-	for _, s := range supportedSitesMap {
-		if s.NameCN == nameOrDomain {
-			return s.BannedGroups
-		}
+	if s, ok := supportedSitesByNameCN[nameOrDomain]; ok {
+		return s.BannedGroups
 	}
 	return nil
 }
