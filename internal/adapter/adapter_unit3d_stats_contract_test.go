@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -207,8 +206,5 @@ func TestParseSizeStringConverged(t *testing.T) {
 	// 上界守卫（13 篇同型纪律——收敛版继承）
 	if got := parseSizeString("99999999999999999999 PiB"); got != 0 {
 		t.Errorf("超界输入应拒绝返 0·实得 %d", got)
-	}
-	if !strings.Contains("unit3d", "unit3d") {
-		t.Error("unreachable")
 	}
 }
