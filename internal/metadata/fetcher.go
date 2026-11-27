@@ -741,9 +741,20 @@ func (f *Fetcher) persistCoverageHits(ctx context.Context, infoHash string, hits
 			TorrentID: h.TorrentID, Confidence: 1.0,
 			QueriedAt: now, ExpiresAt: ttl,
 		}
-		f.db.WithContext(ctx).
+		// 17 刀2（v0.0.1668）: V-02 根修——①同指针别名（同 V-01·§56.33
+		// 值副本修复形态）；②原 `.Error` 完全丢弃（数据库报错无日志无
+		// 返回——与同文件 store 的错误处理对齐：皇后 tid 缓存写失败应可见
+		// 而非静默丢失〔簇兄弟标题桥缓存化目的落空〕）。
+		attrs := row
+		if err := f.db.WithContext(ctx).
 			Where("info_hash = ? AND site_name = ?", infoHash, h.SiteName).
-			Assign(&row).FirstOrCreate(&row)
+			Assign(&attrs).
+			FirstOrCreate(&row).Error; err != nil {
+			f.logger.Warn("persistCoverageHits upsert failed",
+				zap.String("info_hash", infoHash),
+				zap.String("site", h.SiteName),
+				zap.Error(err))
+		}
 	}
 }
 

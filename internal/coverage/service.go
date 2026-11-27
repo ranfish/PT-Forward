@@ -357,9 +357,16 @@ func (s *Service) UpdateFromPublishResult(ctx context.Context, infoHash, siteNam
 }
 
 func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
+	// 17 刀1（v0.0.1668）: V-01 根修——Assign/FirstOrCreate 同指针别名
+	// 致已存在行刷新静默失效（GORM finisher_api.go:354 先 Find(dest) 写回
+	// DB 旧值·attrs 同指针被旧值污染→Updates 等价用旧值更新）。修复形态
+	// 复用 §56.33 正例（13b17321a·fetcher.store）：attrs 用值副本·dest
+	// 用本体。二次写入路径（handler_torrents ① IYUU 先写→② tracker 后写
+	// 覆盖）从「后写失效」修正为「后写生效」。
+	attrs := *record
 	return s.db.WithContext(ctx).
 		Where("info_hash = ? AND site_name = ?", record.InfoHash, record.SiteName).
-		Assign(record).
+		Assign(&attrs).
 		FirstOrCreate(record).Error
 }
 
