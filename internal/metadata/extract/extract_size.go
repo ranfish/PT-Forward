@@ -156,6 +156,12 @@ func parseSizeToBytes(s string) int64 {
 		}
 		return int64(val * 1024)
 	default:
+		// 13 补刀（v0.0.1657·用户复审）：B 单位（及未匹配单位）走
+		// default——原裸 int64(val) 无守卫·约 9 EB 极端外部文本触发
+		// 溢出（概率极低·顺手补齐与四 case 同纪律）。
+		if val >= math.MaxInt64 {
+			return 0
+		}
 		return int64(val)
 	}
 }

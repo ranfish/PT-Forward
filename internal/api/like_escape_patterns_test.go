@@ -34,9 +34,13 @@ var likeLiteralWhitelist = []likeWhitelistEntry{
 	{"migration.go", "flags LIKE ?", "字面量模式：禁转词重刷迁移固定模式（6 词）"},
 	{"seed_list.go", "detail_source_json LIKE ?", "字面量模式：release_group JSON 探针"},
 	{"declaration_backfill_task.go", "release_group", "字面量模式：JSON 探针（转义分支已带 ESCAPE）"},
-	{"lifecycle.go", "key LIKE ?", "字面量模式：lifecycle.% 前缀探针"},
+	{"lifecycle.go", "key LIKE ?", "字面量模式：lifecycle.% 前缀探针（定义处即消费处·单调用方自洽）"},
 	{"engine_store.go", "client_ids LIKE ?", "内部 ID 拼接：clientID 源自 uint 转字符串·无通配符劫持面"},
-	{"repository.go", "key LIKE ?", "内部前缀：调用方传常量 key 前缀（setting 键命名域）"},
+	// 白名单登记纪律（13 补刀 v0.0.1657 教训）：登记前必须 grep 该
+	// 函数全部调用方并核验输入源——repository.ListByPrefix 原登记
+	// 「调用方传常量 key 前缀」仅凭定义行猜测·漏查 settings_handler:95
+	// 用户输入直达调用方·给通配符劫持开绿灯（用户复审探针实证
+	// prefix=% 命中 3 行）。新登记条目理由必须附调用方清单。
 }
 
 func isLikeWhitelisted(file, line string) bool {

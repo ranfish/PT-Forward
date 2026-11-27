@@ -3,6 +3,7 @@ package setting
 import (
 	"context"
 
+	"github.com/ranfish/pt-forward/internal/util"
 	"gorm.io/gorm"
 )
 
@@ -42,7 +43,15 @@ func (r *Repository) ListByPrefix(ctx context.Context, prefix string) (map[strin
 	var settings []Setting
 	q := r.db.WithContext(ctx)
 	if prefix != "" {
-		q = q.Where("key LIKE ?", prefix+"%")
+		// 13 补刀（v0.0.1657·用户复审）：prefix 取自 URL 查询参数
+		// （settings_handler:95 r.URL.Query().Get("prefix")）——用户
+		// 输入裸拼 prefix+"%" 无转义无 ESCAPE·输入 % 时命中全表
+		// （探针实证 3 行 vs 前缀语义应 0 行）。改走 util.LikeEscape
+		// 前缀锚定形态（LikeEscape(prefix)+"%"——保留「前缀匹配」
+		// 原语义·非 LikeContains 的包含语义）+ESCAPE 成对。
+		// 原白名单条目「调用方传常量 key 前缀」登记理由失实撤除
+		// ——教训：白名单登记必须 grep 全部调用方核验输入源。
+		q = q.Where("key LIKE ?"+util.LikeEscapeSuffix, util.LikeEscape(prefix)+"%")
 	}
 	if err := q.Find(&settings).Error; err != nil {
 		return nil, err
