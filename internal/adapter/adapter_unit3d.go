@@ -801,6 +801,19 @@ func (a *Unit3DAdapter) FetchUserStats(ctx context.Context, config *model.SiteCo
 	var err error
 	if config.APIKey != "" || config.BearerToken != "" {
 		stats, err = a.fetchUserStatsAPI(ctx, config)
+		// 14 刀1（v0.0.1659）: API 失败降级 HTML（V-01 配套）——
+		// /api/user 是 UNIT3D v9.0.0 新增端点：老版站（≤v8.3·如
+		// monika 实测 404 route not found）恒失败；新版站形态漂移
+		// 亦触发。原实现直接 return err——配 APIKey 站点统计整体
+		// 不可用（无降级）。降级 HTML 路径（:875）已具备带单位
+		// 解析能力（reUnit3DUploaded+parseSizeString）。
+		if err != nil {
+			a.logger.Warn("UNIT3D user stats API failed, falling back to HTML",
+				zap.String("domain", config.Domain),
+				zap.String("fallback", "html"),
+				zap.Error(err))
+			stats, err = a.fetchUserStatsHTML(ctx, config)
+		}
 	} else {
 		stats, err = a.fetchUserStatsHTML(ctx, config)
 	}
@@ -845,14 +858,26 @@ func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Sit
 		return nil, err
 	}
 
+	// 14 刀1（v0.0.1659）: /api/user 响应结构体按 UNIT3D master
+	// UserResource 权威形态重写（V-01 根修——原 flexInt/float64 声明
+	// 与真实 string 形态不匹配：整体 unmarshal 报错〔ratio 路径〕或
+	// uploaded 静默归零〔flexInt 吞错路径〕——两条失效路径均实证）。
+	// 形态依据：docs/34 摸站记录+master 源码双重闭环（前置验证）：
+	//   uploaded/downloaded/buffer: string 带单位（"50.00 GiB"）
+	//   ratio/seedbonus: string 数值（"50.00"）——flexFloat 双兼容
+	//   防上游版本形态漂移为裸数字
+	//   seeding/leeching: int
+	// 端点分层（前置探针实证）：/api/user 是 UNIT3D v9.0.0 新增——
+	// 老版站（≤v8.3·如 monika）恒 404——API 失败由 FetchUserStats
+	// 降级 HTML 兜底（本函数不再吞错静默）。
 	var raw struct {
-		ID         flexInt `json:"id"`
-		Username   string  `json:"username"`
-		Uploaded   flexInt `json:"uploaded"`
-		Downloaded flexInt `json:"downloaded"`
-		Ratio      float64 `json:"ratio"`
-		Seedbonus  float64 `json:"seedbonus"`
-		Seeding    int     `json:"seeding"`
+		ID         flexInt   `json:"id"`
+		Username   string    `json:"username"`
+		Uploaded   string    `json:"uploaded"`
+		Downloaded string    `json:"downloaded"`
+		Ratio      flexFloat `json:"ratio"`
+		Seedbonus  flexFloat `json:"seedbonus"`
+		Seeding    int       `json:"seeding"`
 		Group      struct {
 			Name string `json:"name"`
 		} `json:"group"`
@@ -864,10 +889,10 @@ func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Sit
 	return &model.UserStatsResult{
 		Username:      raw.Username,
 		UserClass:     raw.Group.Name,
-		UploadBytes:   int64(raw.Uploaded),
-		DownloadBytes: int64(raw.Downloaded),
-		Ratio:         raw.Ratio,
-		BonusPoints:   raw.Seedbonus,
+		UploadBytes:   parseSizeString(raw.Uploaded),
+		DownloadBytes: parseSizeString(raw.Downloaded),
+		Ratio:         float64(raw.Ratio),
+		BonusPoints:   float64(raw.Seedbonus),
 		SeedingCount:  raw.Seeding,
 	}, nil
 }

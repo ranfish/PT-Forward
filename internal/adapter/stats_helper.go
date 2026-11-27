@@ -1,13 +1,57 @@
 package adapter
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"html"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 )
 
-var reSizeValue = regexp.MustCompile(`([\d.]+)\s*(PB|TB|GB|MB|KB|PiB|TiB|GiB|MiB|KiB|B)`)
+// 14 刀3（v0.0.1659）: reSizeValue/sizeToBytes 手搓第二套已删除——
+// 收敛至 extract.ParseSizeToBytes 全库唯一字节换算单点。
+
+// flexFloat 14 刀1（v0.0.1659）: API 结构化响应专用浮点——string/number
+// 双兼容（UNIT3D master UserResource 权威形态：ratio/seedbonus 均为
+// string 数值 "50.00"·防御上游版本形态漂移时兼容裸数字）。
+// 与 flexInt 的纪律分界（F-01 定性）：flexInt=页面文本抓取容错（解析
+// 失败静默归零——「真 0」与「失败」不可区分但页面场景可接受）；
+// flexFloat=API 契约场景显性化（解析失败返回 err→整体 unmarshal 失败
+// →触发 FetchUserStats HTML 降级——失败不被伪装成合法零值）。
+type flexFloat float64
+
+func (f *flexFloat) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return fmt.Errorf("flexFloat: empty input")
+	}
+	if data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return fmt.Errorf("flexFloat: empty string")
+		}
+		n, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return fmt.Errorf("flexFloat: %w", err)
+		}
+		*f = flexFloat(n)
+		return nil
+	}
+	var n float64
+	if err := json.Unmarshal(data, &n); err != nil {
+		return fmt.Errorf("flexFloat: %w", err)
+	}
+	*f = flexFloat(n)
+	return nil
+}
 
 func parseSizeString(s string) int64 {
 	s = strings.TrimSpace(s)
@@ -22,47 +66,11 @@ func parseSizeString(s string) int64 {
 	if f, err := strconv.ParseFloat(s, 64); err == nil {
 		return int64(f)
 	}
-	m := reSizeValue.FindStringSubmatch(s)
-	if len(m) < 3 {
-		return 0
-	}
-	return sizeToBytes(m[1], m[2])
-}
-
-func sizeToBytes(val string, unit string) int64 {
-	var multiplier float64
-	switch strings.ToUpper(unit) {
-	case "PB", "PIB":
-		multiplier = 1 << 50
-	case "TB", "TIB":
-		multiplier = 1 << 40
-	case "GB", "GIB":
-		multiplier = 1 << 30
-	case "MB", "MIB":
-		multiplier = 1 << 20
-	case "KB", "KIB":
-		multiplier = 1 << 10
-	case "B":
-		multiplier = 1
-	default:
-		return 0
-	}
-	var f float64
-	for _, c := range val {
-		if c >= '0' && c <= '9' {
-			f = f*10 + float64(c-'0')
-		} else if c == '.' {
-			fraction := 0.1
-			for _, fc := range val[strings.Index(val, ".")+1:] {
-				if fc >= '0' && fc <= '9' {
-					f += float64(fc-'0') * fraction
-					fraction *= 0.1
-				}
-			}
-			break
-		}
-	}
-	return int64(f * multiplier)
+	// 14 刀3 F-02（v0.0.1659）: 手搓 sizeToBytes 第二套删除——
+	// 收敛至 extract.ParseSizeToBytes 全库唯一单点（其多小数点
+	// 吸收〔"1.2.3"→1.23〕与裸 int64 上界漏网两缺陷根除·千分位
+	// 逗号剥离能力保留·PB/PiB 能力对齐）。
+	return extract.ParseSizeToBytes(s)
 }
 
 var reStripTags = regexp.MustCompile(`<[^>]+>`)

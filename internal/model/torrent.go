@@ -21,15 +21,18 @@ type MusicMeta struct {
 	LogText       string   `json:"log_text,omitempty"`       // log 文本（独立通道）
 	// §59.466 附: 海豚 Gazelle 路扩展——API 直读信号（皇后源后续解析 log
 	// 文本得分行同填——两源归一消费：发布预检 R2/Dupe 仲裁）。
-	LogScore    int    `json:"log_score,omitempty"`    // Log 得分（0-100；CD 抓轨质量核心）
-	HasLog      bool   `json:"has_log,omitempty"`      // log 在场
-	HasCue      bool   `json:"has_cue,omitempty"`      // cue 在场
+	// 14 刀2（v0.0.1659）: 零值有意义字段去 omitempty（LogScore=0 是
+	// 真实得分·HasLog=false 是真实缺席——V-02 契约纪律·当前无 JSON
+	// 输出面〔纯内部消费〕防御性对齐）。
+	LogScore    int    `json:"log_score"`              // Log 得分（0-100；CD 抓轨质量核心）
+	HasLog      bool   `json:"has_log"`                // log 在场
+	HasCue      bool   `json:"has_cue"`                // cue 在场
 	ReleaseType string `json:"release_type,omitempty"` // 发行类型（Album/EP/Single/Compilation…Gazelle 枚举）
 	// §59.485: 海豚原创族标记（action=torrentgroup 补采——detail API 盲区）。
 	// R7 判定锚：VH∨scene → 拦（原创作品/Scene 发布）；双 false → 转载可转
 	// （海豚规则：禁转标记仅原创资源可用——转载种无权禁转）。
-	IsVanityHouse bool `json:"is_vanity_house,omitempty"` // 原创作品（自己/授权代表发布）
-	IsScene       bool `json:"is_scene,omitempty"`        // Scene 发布
+	IsVanityHouse bool `json:"is_vanity_house"` // 原创作品（自己/授权代表发布）
+	IsScene       bool `json:"is_scene"`        // Scene 发布
 }
 
 type TorrentDetail struct {

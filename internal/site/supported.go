@@ -39,7 +39,12 @@ type SupportedSite struct {
 	SpecialNotes       string            `json:"special_notes,omitempty"`
 	// §59.318: 发布适配支持（开发者权威位——逐站适配完成随版本置 true；
 	// 用户侧 is_target(发布开关) 的门槛。当前：修道院/幸运）。
-	PublishSupported bool `json:"publish_supported,omitempty"`
+	// 14 刀2（v0.0.1659）: 去 omitempty——false 是有意义值（未适配站
+	// 是常态·键恒存在〔V-02 契约对齐：原 false 时键消失·前端
+	// types.ts 声明 boolean 非 optional 契约撒谎〕）。同结构体 8 个
+	// *bool 用指针+omitempty 区分「false 与未设置」——本位是开发者
+	// 权威数据源（seed 必填）无「未设置」态·值类型+无 omitempty 即对。
+	PublishSupported bool `json:"publish_supported"`
 }
 
 var (

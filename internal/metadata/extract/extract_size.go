@@ -9,7 +9,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-var sizeValueRe = regexp.MustCompile(`(?i)([\d.,]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)`)
+// 14 刀3（v0.0.1659）: regex 补 PiB|PB（对齐 ParseSizeToBytes switch
+// 能力——收敛自 adapter 手搓版时保留其 PB 面）。
+var sizeValueRe = regexp.MustCompile(`(?i)([\d.,]+)\s*(PiB|TiB|GiB|MiB|KiB|PB|TB|GB|MB|KB|B)`)
 
 // extractSize 从详情页解析种子大小（字节）。
 // 主路径：goquery 找含"大小"的 dt/dd 或 th/td 行。
@@ -117,9 +119,13 @@ func findSizeInRows(doc *goquery.Document) string {
 	return found
 }
 
-// parseSizeToBytes 解析 "1.5 GB" / "800 MB" 等为字节数。
-// 支持 B/KB/MB/GB/TB 和 KiB/MiB/GiB/TiB（合并 PT-Forward 旧 parseSizeStr + parseSizeString）。
-func parseSizeToBytes(s string) int64 {
+// ParseSizeToBytes 14 刀3（v0.0.1659）: 全库唯一字节换算公共单点
+// ——收敛 adapter/stats_helper.go 第二套手搓实现（其多小数点吸收
+// 〔"1.2.3"→1.23〕与裸 int64 上界漏网随之消失）。PB/PiB 能力
+// 补齐（对齐被收敛版的能力面·UNIT3D/M-Team 统计形态）。
+// 解析 "1.5 GB" / "800 MB" / "3 PiB" 等；千分位逗号剥离；
+// 支持 B/KB/MB/GB/TB/PB 和 KiB/MiB/GiB/TiB/PiB。
+func ParseSizeToBytes(s string) int64 {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "")
 	m := sizeValueRe.FindStringSubmatch(s)
@@ -135,6 +141,11 @@ func parseSizeToBytes(s string) int64 {
 	// 13 篇标注未实测但形态确凿）。超界拒绝返 0（与解析失败同语义
 	// ——调用方以 0 判无效）。
 	switch strings.ToUpper(m[2]) {
+	case "PB", "PIB":
+		if val > math.MaxInt64/1024/1024/1024/1024/1024 {
+			return 0
+		}
+		return int64(val * 1024 * 1024 * 1024 * 1024 * 1024)
 	case "TB", "TIB":
 		if val > math.MaxInt64/1024/1024/1024/1024 {
 			return 0
@@ -164,4 +175,9 @@ func parseSizeToBytes(s string) int64 {
 		}
 		return int64(val)
 	}
+}
+
+// parseSizeToBytes 包内既有调用点别名（14 刀3：统一经公共单点）。
+func parseSizeToBytes(s string) int64 {
+	return ParseSizeToBytes(s)
 }
