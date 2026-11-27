@@ -1,0 +1,36 @@
+=== 基线 = 17230e8a5be72ae2bca90b6a3c84655511839a11 ===
+=== 16 篇证据：本地日界与 Truncate 对齐语义（本地离线复现·未碰靶机/真实数据）===
+
+--- A. 部署时区形态证据（仓库内·非缺口）---
+[docker-compose.yml:23]
+      - TZ=Asia/Shanghai    # 时区
+[Dockerfile:39]
+        tzdata \
+[internal/notification/service.go:26-27]
+	// §59.292 附: 时钟注入（测试时区 flake 修复——CI UTC 03:2x 命中
+	// 03:00-04:00 窗口而本地 CST 不中的双环境飘移；nil=time.Now）
+[本机 date]
+Fri Nov 27 13:15:21 CST 2026
+
+--- B. Truncate(24h) 边界与本地午夜对照（真实 Go 1.25）---
+对齐点: 本地 11-27 08:00 epoch=1795737600 可被86400整除=true
+本地 11-27 00:30 → Truncate(24h)=11-26 08:00 | 本地午夜口径=11-27 00:00
+本地 11-27 07:30 → Truncate(24h)=11-26 08:00 | 本地午夜口径=11-27 00:00
+本地 11-27 08:30 → Truncate(24h)=11-27 08:00 | 本地午夜口径=11-27 00:00
+本地 11-27 09:30 → Truncate(24h)=11-27 08:00 | 本地午夜口径=11-27 00:00
+趋势图: 本地 11-27 07:30 的 date 标签=2026-11-26, 窗口=[11-26 08:00, 11-27 08:00)
+
+--- C. 正确口径正例（同库·dashboard_handler.go:282）---
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(days - 1))
+
+--- D. 使用点清单 ---
+internal/api/seeding_handler_stats.go:52:	today := time.Now().Truncate(24 * time.Hour)
+internal/api/seeding_handler_stats.go:111:	today := time.Now().Truncate(24 * time.Hour)
+internal/api/seeding_handler_stats.go:217:		dayStart := day.Truncate(24 * time.Hour)
+internal/api/seeding_handler_stats.go:313:			GROUP BY info_hash`, hashes, time.Now().Truncate(24*time.Hour)).Scan(&rows)
+internal/api/dashboard_handler.go:100:	today := time.Now().Truncate(24 * time.Hour)
+internal/api/dashboard_handler.go:431:	today := time.Now().Truncate(24 * time.Hour)
+internal/api/dashboard_handler.go:565:	today := time.Now().Truncate(24 * time.Hour)
+internal/api/dashboard_handler.go:611:	today := time.Now().Truncate(24 * time.Hour)
+internal/seeding/engine_stats.go:636:	today := now.Truncate(24 * time.Hour)
+internal/seeding/engine_test.go:909:	today := now.Truncate(24 * time.Hour)
