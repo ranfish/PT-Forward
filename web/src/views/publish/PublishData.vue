@@ -603,6 +603,15 @@ watch(() => batchTask.value?.finished, (fin) => {
 watch(selectedTarget, (v) => {
   if (v) readyFilter.value = 'publishable'
   else if (readyFilter.value !== 'all') readyFilter.value = 'all'
+  // §59.591: 选站/换站/清站→数据联动——查询参数变（target_site/publish_
+  // state 依赖 selectedTarget/readyFilter）·程序化切 tab 不触发 radio
+  // @change（Ant Design Vue change=用户交互事件）——须显式重拉。页码归
+  // 1+勾选清空（onInjectFilterChange 同款定案：目标站变化→已存在语义变
+  // →旧勾选挂错站）。用户实证：选瓷器后列表内容停留旧数据·须手动刷新
+  // 或切 tab 二次触发（§59.276 三步舞同族·batchTask 场景修过漏本场景）。
+  injectPage.value = 1
+  selectedInjectHashes.value = []
+  fetchInjectList()
   if (!batchTask.value || batchTask.value.finished) resumeActiveBatch()
 })
 
