@@ -356,7 +356,7 @@ func detectDiscForSubtitle(videoPath string) string {
 // sid 对应——CLPI StreamOrder 过滤字幕流后的序=容器字幕轨序，Under
 // Current 实证 1:1）。目录盘取 videoPath 同名 CLPI（精确该文件流表）；
 // ISO 取主 playlist（FileSize 最大）流序（mpv 直读 ISO 不可行的既有
-// 边界下为将来留位）。语言为 ISO3 码（zho/eng），chineseTier 词表覆盖。
+// 边界下为将来留位）。语言为 ISO3 码（zho/eng），langTier 词表覆盖。
 func probeDiscSubtitleCandidates(ctx context.Context, discRoot, videoPath string) []SubtitleCandidate {
 	rom, err := bdrom.New(discRoot, bdsettings.Default(""))
 	if err != nil {
