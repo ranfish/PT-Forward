@@ -20,7 +20,10 @@ func TestDiscountCacheKey_Form(t *testing.T) {
 	if discountCacheKey("siteA", "12345") == discountCacheKey("siteB", "12345") {
 		t.Fatal("跨站同号键必须不同（V-01 根修核心语义）")
 	}
-	if discountCacheKey("siteA", "12345") != discountCacheKey("siteA", "12345") {
+	// 同输入确定性（中间变量消 SA4000 同表达式形态）
+	k1 := discountCacheKey("siteA", "12345")
+	k2 := discountCacheKey("siteA", "12345")
+	if k1 != k2 {
 		t.Fatal("同站同号键必须相同")
 	}
 	if got := discountCacheKey("siteA", "12345"); got != "siteA:12345" {
