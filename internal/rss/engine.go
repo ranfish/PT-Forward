@@ -82,7 +82,6 @@ type Engine struct {
 	eventBus       *pusher.EventBus
 	wsBroadcaster  event.WSBroadcaster
 	sideLoadMgr    *SideLoadManager
-	configBus      *ConfigEventBus
 	pushLimiter    *PushLimiter
 
 	detectCache sync.Map
@@ -226,10 +225,6 @@ func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
 
 func (e *Engine) SetSideLoadManager(mgr *SideLoadManager) {
 	e.sideLoadMgr = mgr
-}
-
-func (e *Engine) SetConfigEventBus(bus *ConfigEventBus) {
-	e.configBus = bus
 }
 
 func (e *Engine) SetPushLimiter(limiter *PushLimiter) {

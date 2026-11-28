@@ -3,82 +3,56 @@ package rss
 import (
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
-func TestConfigEventBus_PublishReceive(t *testing.T) {
+// §59.597（审计 21 刀3）: ConfigEventBus 健康锚——图床代理真链的总线侧保真。
+//
+// 用户第三案裁决：总线保留（唯一秒级消费者=图床代理·main.go 订阅者）·
+// rss Engine 侧死件已拆（刀2）。本锚锁总线核心语义：
+//
+//	① Publish→Subscribe 实收（fanout 不丢）
+//	② 200ms debounce（合并窗口·两次 Publish 只收一次）
+//	③ 版本去重（旧版本事件被拒）
+//
+// 阴性对照（刀3 三阴性 A）：删 Publish 的 fanout（select+default 置空）→ ①红。
+func TestConfigEventBusAlive(t *testing.T) {
 	bus := NewConfigEventBus()
 	ch := bus.Subscribe()
 
+	// ① 实收
 	bus.Publish(ConfigChangedEvent{
-		ChangedKeys: []string{"rss_interval"},
-		Version:     1,
+		ChangedKeys: []string{"image_host_use_proxy", "httpProxy"},
+		Version:     time.Now().UnixNano(),
 	})
-
 	select {
-	case evt := <-ch:
-		require.Equal(t, []string{"rss_interval"}, evt.ChangedKeys)
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out")
-	}
-}
-
-func TestConfigEventBus_VersionDedup(t *testing.T) {
-	bus := NewConfigEventBus()
-	ch := bus.Subscribe()
-
-	bus.Publish(ConfigChangedEvent{Version: 2, ChangedKeys: []string{"a"}})
-	bus.Publish(ConfigChangedEvent{Version: 1, ChangedKeys: []string{"b"}})
-	bus.Publish(ConfigChangedEvent{Version: 2, ChangedKeys: []string{"c"}})
-
-	var received []ConfigChangedEvent
-	timeout := time.After(500 * time.Millisecond)
-	for len(received) < 2 {
-		select {
-		case evt := <-ch:
-			received = append(received, evt)
-		case <-timeout:
-			goto done
+	case ev, ok := <-ch:
+		if !ok {
+			t.Fatal("通道意外关闭")
 		}
-	}
-done:
-
-	require.Equal(t, 1, len(received), "version 1 should be deduped")
-	require.Equal(t, []string{"a"}, received[0].ChangedKeys)
-}
-
-func TestConfigEventBus_Debounce(t *testing.T) {
-	bus := NewConfigEventBus()
-	ch := bus.Subscribe()
-
-	bus.Publish(ConfigChangedEvent{Version: 1, ChangedKeys: []string{"a"}})
-	bus.Publish(ConfigChangedEvent{Version: 2, ChangedKeys: []string{"b"}})
-
-	select {
-	case evt := <-ch:
-		require.Equal(t, int64(2), evt.Version, "should get last debounced version")
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out")
+		if len(ev.ChangedKeys) != 2 || ev.ChangedKeys[0] != "image_host_use_proxy" || ev.ChangedKeys[1] != "httpProxy" {
+			t.Fatalf("键集合不符: %v", ev.ChangedKeys)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("① 实收失败：debounce 200ms 后 1s 内未收到事件——总线 fanout 断裂（刀2 误伤或后续改动破坏）")
 	}
 
+	// ② debounce 合并（同窗口事件收敛一次发送）+ ③ 版本去重（同/旧版本拒——首个胜出）
+	v2 := time.Now().UnixNano()
+	bus.Publish(ConfigChangedEvent{ChangedKeys: []string{"b"}, Version: v2})
+	bus.Publish(ConfigChangedEvent{ChangedKeys: []string{"c"}, Version: v2})     // 同版本拒发（首个 b 胜出）
+	bus.Publish(ConfigChangedEvent{ChangedKeys: []string{"a"}, Version: v2 - 1}) // 旧版本拒发
 	select {
-	case <-ch:
-		t.Fatal("should only get one debounced event")
+	case ev := <-ch:
+		if len(ev.ChangedKeys) != 1 || ev.ChangedKeys[0] != "b" {
+			t.Fatalf("③ 版本去重语义不符（期望同版本首个 b·实收 %v）", ev.ChangedKeys)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("② 第二事件未到达——debounce Reset 语义破坏")
+	}
+	// 旧版本事件不应再有
+	select {
+	case ev := <-ch:
+		t.Fatalf("③ 旧版本事件漏发（应被版本去重拒绝·实收 %v）", ev.ChangedKeys)
 	case <-time.After(300 * time.Millisecond):
-	}
-}
-
-func TestConfigEventBus_ZeroVersionAlwaysPasses(t *testing.T) {
-	bus := NewConfigEventBus()
-	ch := bus.Subscribe()
-
-	bus.Publish(ConfigChangedEvent{Version: 0, ChangedKeys: []string{"a"}})
-
-	select {
-	case evt := <-ch:
-		require.Equal(t, []string{"a"}, evt.ChangedKeys)
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out")
 	}
 }

@@ -477,7 +477,6 @@ func main() {
 	sideLoadMgr := rss.NewSideLoadManager(siteProvider, sideLoadEmitter, log)
 	rssEngine.SetSideLoadManager(sideLoadMgr)
 	configEventBus := rss.NewConfigEventBus()
-	rssEngine.SetConfigEventBus(configEventBus)
 	go func() {
 		ch := configEventBus.Subscribe()
 		for {
