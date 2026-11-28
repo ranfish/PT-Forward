@@ -1,0 +1,84 @@
+=== 代码质量审计 20 — 限时免费等待阈值重启丢失：离线复现原始证据 ===
+采集时间: Sat Nov 28 11:43:24 CST 2026
+复现基线: f8a87182412a322060e48b8dd92f2336888ff02d（v0.0.1676 附·SA4000 根修）
+落盘基线: cba999b3d2f5f6fbfcddaccb2e0443762bd68a64（仅文档卫生改动·代码与 f8a87182 一致）
+工具: go version go1.25.0 linux/amd64（/home/incast/.local/go/bin/go）
+环境: export LANG=C LC_ALL=C CGO_ENABLED=1
+方法: 包内临时测试 internal/seeding/zz_repro20_test.go，直接调生产 Add/RecoverOnStartup/CheckOnce
+      内存 SQLite（setupFreeWaitDB + uniqueSQLiteDSN），取证后即删，工作区干净（git status 空）
+
+=== 一、设计权威（docs/31-模块设计决策记录.md:65897-65901）===
+**P2 FreeWaitMinRemain 可行性检查（v0.0.526）**：
+- `DiscountChecker` 接口签名变更：`CheckDiscount` 返回 `(DiscountLevel, *time.Time, error)`（增加 `FreeEndAt`）
+- `CheckOnce` 在种子变免费后检查剩余时间：`freeEndAt != nil && MinRemainMin > 0 && time.Until(*freeEndAt) < MinRemainMin * time.Minute` → 跳过并移出队列
+- 永久免费（`FreeEndAt == nil`）或 `MinRemainMin == 0` → 跳过检查，直接推
+（:65877 落地表原文：FreeWaitMinRemain 可行性检查 ✅ 落地「公式简单，防止限时免费推了下载不完」）
+
+P1（:65889-65896，同段正例）：freeWaitEntry 新增 RecheckInterval+LastCheckAt；DB FreeWaitEntry
+新增 RecheckSec+LastCheckAt；Add() 接收 recheckSec；CheckOnce 按间隔跳过。
+—— P1 做了「运行时字段↔DB 字段」配对，P2 加 MinRemainMin 时漏了这一步。
+
+=== 二、代码摘录（基线快照·f8a87182）===
+[internal/model/free_wait.go:5-21] DB 模型字段止于 RecheckSec/CheckCount/LastCheckAt，无 MinRemainMin
+  type FreeWaitEntry struct {
+      ...
+      CheckBefore    *time.Time
+      CheckCount     int        `gorm:"default:0"`
+      RecheckSec     int        `gorm:"default:600"`
+      LastCheckAt    *time.Time `gorm:"index"`
+  }
+
+[internal/seeding/free_wait.go:118] Add 内存侧写入阈值
+      MinRemainMin:    minRemainMin,
+  (m.pending[key] = entry)
+
+[internal/seeding/free_wait.go:121-137] 构造 DB 记录时无处可写（model 无此字段）
+  dbEntry := &model.FreeWaitEntry{ ... CheckBefore: checkBefore, RecheckSec: recheckSec, LastCheckAt: &now }
+  m.db.Create(dbEntry)
+
+[internal/seeding/free_wait.go:58-73] RecoverOnStartup 从 DB 重建内存 entry（无 MinRemainMin → 零值）
+      m.pending[key] = &freeWaitEntry{
+          ... RecheckInterval: time.Duration(dbEntry.RecheckSec) * time.Second,
+          // 无 MinRemainMin 赋值 → 0
+      }
+
+[internal/seeding/free_wait.go:210-224] CheckOnce 保护闸门：阈值归零即整段跳过
+      if freeEndAt != nil && e.MinRemainMin > 0 {
+          if remaining < time.Duration(e.MinRemainMin)*time.Minute {
+              m.Remove(e.SiteName, e.TorrentID); continue
+          }
+      }
+      if addFunc != nil { ... addFunc(ctx, e) ... }
+
+[触达链] model/rss.go:135 FreeWaitMinRemain gorm:"default:30"
+        engine_stats.go:262 Add(..., sub.FreeWaitRecheckSec, sub.FreeWaitMinRemain)
+        engine.go:258 RecoverOnStartup(ctx)（启动恢复）
+        seeding/free_wait.go:283 GetEntryInfo.MinRemainMin（API 展示·重启后显示 0）
+
+=== 三、离线复现真实输出 ===
+命令: go test ./internal/seeding -run '^TestRepro20_' -count=1 -v
+
+  # github.com/mattn/go-sqlite3
+  sqlite3-binding.c: In function 'sqlite3ShadowTableName':
+  sqlite3-binding.c:123133:9: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  123133 |   zTail = strrchr(zName, '_');
+         |         ^
+  === RUN   TestRepro20_MinRemainMinLostOnRestart
+      zz_repro20_test.go:47: A(no restart): MinRemainMin=30 processed=0 pushed=0
+      zz_repro20_test.go:62: B(after restart): MinRemainMin 30 -> 0
+      zz_repro20_test.go:66: B(after restart): processed=1 pushed=1
+      zz_repro20_test.go:70: CONFIRMED: MinRemainMin 重启丢失 → 剩余 5 分钟的限时免费种子被错误推送
+  --- PASS: TestRepro20_MinRemainMinLostOnRestart (0.01s)
+  PASS
+  ok  	github.com/ranfish/pt-forward/internal/seeding	0.037s
+
+场景构造（两态唯一变量=是否经过 DB 恢复）:
+  A 未重启: Add 阈值 30 → pending 内存 entry 持 30 → CheckOnce（checker 返回 Free + freeEndAt=now+5min）→ 剩余 5min < 30min → Remove + skip → pushed=0
+  B 模拟重启: 同一 DB，新建 FreeWaitMonitor → RecoverOnStartup 从 DB 重建 → 阈值归零 → CheckOnce 同一 checker → e.MinRemainMin>0 为假 → addFunc 执行 → pushed=1
+  checker 与 addFunc 两态同形态，未 mock 生产逻辑；freeEndAt 固定 now+5min（远小于阈值 30）。
+
+=== 四、证据边界 ===
+- 已核实：代码形态（模型无字段/Add 漏写/Recover 漏读/闸门归零恒假）、设计权威 P2 原文（含 0=直接推语义）、离线复现两态真实输出。
+- 未验证/推断：①真实生产重启后是否恰好命中「剩余短于阈值」的免费种子（无日志证据，F-01）；②残留磁盘/用户实际影响量级（未取证）；③默认值 30 是否合适（设计未规定取值，本篇不评价）。
+- 非安全结论：本篇为功能缺陷（业务规则失真），CVSS 仅阅读辅助（4.3 低），不宣称安全边界漏洞、不宣称生产事故。
+- 复现全程未请求真实站点、未碰靶机 10.0.0.49:8765、未碰生产、未接触用户数据；临时测试已删除。
