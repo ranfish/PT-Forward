@@ -546,13 +546,15 @@ const configForm = reactive({
 
 // §59.596 刀2: 订阅页 4 时长字段智能回显（「数值+单位」UI 原子·底层单位不动·
 // 加载 smartDurationField 换算显示·保存 durationStoreValue 换算回写底层）。
+// 初始值=configForm 默认值的智能换算（回归审核 P1 修正：防 fetchSubscription
+// 失败 catch 时 display 与底层失联→保存把默认 7200/600/30 清零覆盖）。
 const lcdsHoursDisplay = ref(0)
 const lcdsHoursUnit = ref<DurationUnit>('minutes')
-const fwMaxDisplay = ref(0)
-const fwMaxUnit = ref<DurationUnit>('minutes')
-const fwRecheckDisplay = ref(0)
+const fwMaxDisplay = ref(2)
+const fwMaxUnit = ref<DurationUnit>('hours')
+const fwRecheckDisplay = ref(10)
 const fwRecheckUnit = ref<DurationUnit>('minutes')
-const fwMinRemainDisplay = ref(0)
+const fwMinRemainDisplay = ref(30)
 const fwMinRemainUnit = ref<DurationUnit>('minutes')
 const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0, sizeUnit: 'GB' }])
 const rulesSaving = ref(false)
