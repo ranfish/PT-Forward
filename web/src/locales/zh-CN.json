@@ -78,7 +78,10 @@
     "action": "操作",
     "confirm": "确认",
     "items": "条",
-    "add": "添加"
+    "add": "添加",
+    "unitMinutes": "分钟",
+    "unitHours": "小时",
+    "unitDays": "天"
   },
   "auth": {
     "login": "登录",

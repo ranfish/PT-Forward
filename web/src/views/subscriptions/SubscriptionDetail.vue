@@ -148,8 +148,7 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item :label="t('subscription.lifecycleDeleteSeedHours')">
-                  <a-input-number v-model:value="configForm.lifecycleDeleteSeedHours" :min="0" style="width: 100%" />
-                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('subscription.unitHours') }}</div>
+                  <DurationInput v-model:display="lcdsHoursDisplay" v-model:unit="lcdsHoursUnit" :min="0" />
                 </a-form-item>
               </a-col>
             </a-row>
@@ -202,17 +201,17 @@
                 <a-row v-if="configForm.freeWaitEnabled" :gutter="16">
                   <a-col :span="8">
                     <a-form-item :label="t('subscription.freeWaitMaxSec')">
-                      <a-input-number v-model:value="configForm.freeWaitMaxWaitSec" :min="0" style="width: 100%" />
+                      <DurationInput v-model:display="fwMaxDisplay" v-model:unit="fwMaxUnit" :min="0" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
                     <a-form-item :label="t('subscription.freeWaitRecheckSec')">
-                      <a-input-number v-model:value="configForm.freeWaitRecheckSec" :min="0" style="width: 100%" />
+                      <DurationInput v-model:display="fwRecheckDisplay" v-model:unit="fwRecheckUnit" :min="0" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
                     <a-form-item :label="t('subscription.freeWaitMinRemain')">
-                      <a-input-number v-model:value="configForm.freeWaitMinRemain" :min="0" style="width: 100%" />
+                      <DurationInput v-model:display="fwMinRemainDisplay" v-model:unit="fwMinRemainUnit" :min="0" />
                     </a-form-item>
                   </a-col>
                 </a-row>
@@ -410,6 +409,9 @@ import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { subscriptionsApi } from '@/api/subscriptions'
+import DurationInput from '@/components/DurationInput.vue'
+import { durationStoreValue, durationDisplayValue, smartDurationUnit } from '@/utils/duration'
+import type { DurationUnit } from '@/utils/duration'
 import { formatBytes, formatTime } from '@/utils/format'
 import { downloadersApi } from '@/api/downloaders'
 import { notificationsApi } from '@/api/notifications'
@@ -541,6 +543,17 @@ const configForm = reactive({
   diskGuardEnabled: true,
   diskGuardThreshold: 1,
 })
+
+// §59.596 刀2: 订阅页 4 时长字段智能回显（「数值+单位」UI 原子·底层单位不动·
+// 加载 smartDurationField 换算显示·保存 durationStoreValue 换算回写底层）。
+const lcdsHoursDisplay = ref(0)
+const lcdsHoursUnit = ref<DurationUnit>('minutes')
+const fwMaxDisplay = ref(0)
+const fwMaxUnit = ref<DurationUnit>('minutes')
+const fwRecheckDisplay = ref(0)
+const fwRecheckUnit = ref<DurationUnit>('minutes')
+const fwMinRemainDisplay = ref(0)
+const fwMinRemainUnit = ref<DurationUnit>('minutes')
 const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0, sizeUnit: 'GB' }])
 const rulesSaving = ref(false)
 
@@ -644,6 +657,21 @@ async function fetchSubscription() {
       diskGuardEnabled: subscription.value.diskGuardEnabled ?? true,
       diskGuardThreshold: subscription.value.diskGuardThreshold != null ? Number(subscription.value.diskGuardThreshold) / 1073741824 : 1,
     })
+    // §59.596 刀2: 智能回显同步（底层→显示）
+    {
+      const h = subscription.value.lifecycleDeleteSeedHours || 0
+      lcdsHoursUnit.value = smartDurationUnit(h * 3600)
+      lcdsHoursDisplay.value = durationDisplayValue(h, lcdsHoursUnit.value, 3600)
+      const mx = subscription.value.freeWaitMaxWaitSec || 7200
+      fwMaxUnit.value = smartDurationUnit(mx)
+      fwMaxDisplay.value = durationDisplayValue(mx, fwMaxUnit.value, 1)
+      const rc = subscription.value.freeWaitRecheckSec || 600
+      fwRecheckUnit.value = smartDurationUnit(rc)
+      fwRecheckDisplay.value = durationDisplayValue(rc, fwRecheckUnit.value, 1)
+      const mr = subscription.value.freeWaitMinRemain || 30
+      fwMinRemainUnit.value = smartDurationUnit(mr * 60)
+      fwMinRemainDisplay.value = durationDisplayValue(mr, fwMinRemainUnit.value, 60)
+    }
     const conds = subscription.value.conditions || []
     if (Array.isArray(conds) && conds.length) {
       ruleConditions.value = conds.map((c: RuleCondition) => ({
@@ -686,7 +714,7 @@ async function saveConfig() {
       transferClientIds: configForm.transferClientIds,
       lifecyclePauseSeeders: configForm.lifecyclePauseSeeders,
       lifecycleDeleteSeeders: configForm.lifecycleDeleteSeeders,
-      lifecycleDeleteSeedHours: configForm.lifecycleDeleteSeedHours,
+      lifecycleDeleteSeedHours: durationStoreValue(lcdsHoursDisplay.value, lcdsHoursUnit.value, 3600), // §59.596 刀2: 显示值换算落底层小时
       skipSameSize: configForm.skipSameSize,
       skipSameSizeWindowMin: configForm.skipSameSizeWindowMin,
       skipSameSizeStrict: configForm.skipSameSizeStrict,
@@ -695,9 +723,9 @@ async function saveConfig() {
       regexStr: configForm.regexStr,
       replaceStr: configForm.replaceStr,
       freeWaitEnabled: configForm.freeWaitEnabled,
-      freeWaitMaxWaitSec: configForm.freeWaitMaxWaitSec,
-      freeWaitRecheckSec: configForm.freeWaitRecheckSec,
-      freeWaitMinRemain: configForm.freeWaitMinRemain,
+      freeWaitMaxWaitSec: durationStoreValue(fwMaxDisplay.value, fwMaxUnit.value, 1), // §59.596 刀2: 显示值换算落底层秒
+      freeWaitRecheckSec: durationStoreValue(fwRecheckDisplay.value, fwRecheckUnit.value, 1), // §59.596 刀2: 显示值换算落底层秒
+      freeWaitMinRemain: durationStoreValue(fwMinRemainDisplay.value, fwMinRemainUnit.value, 60), // §59.596 刀2: 显示值换算落底层分钟
       feasibilityEnabled: configForm.feasibilityEnabled,
       feasibilitySpeedLimit: configForm.feasibilitySpeedLimit,
       feasibilitySizeLimit: configForm.feasibilitySizeLimit,

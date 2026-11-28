@@ -49,8 +49,8 @@
         <a-form-item label="最大数量">
           <a-input-number v-model:value="editingLimit.max_count" :min="1" :max="999" />
         </a-form-item>
-        <a-form-item label="周期（小时）">
-          <a-input-number v-model:value="editingLimit.window_hours" :min="1" :max="168" />
+        <a-form-item label="周期">
+          <DurationInput v-model:display="windowDisplay" v-model:unit="windowUnit" :min="1" :max="168" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -62,6 +62,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { publishLimitApi, type PublishLimit } from '@/api/image-host'
 import { sitesApi } from '@/api/sites'
+import DurationInput from '@/components/DurationInput.vue'
+import { durationStoreValue, durationDisplayValue, smartDurationUnit } from '@/utils/duration'
+import type { DurationUnit } from '@/utils/duration'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -69,6 +72,9 @@ const dialogVisible = ref(false)
 const limits = ref<PublishLimit[]>([])
 const siteOptions = ref<string[]>([])
 
+// §59.596 刀2: window_hours 智能回显（底层小时不动）
+const windowDisplay = ref(24)
+const windowUnit = ref<DurationUnit>('hours')
 const editingLimit = reactive<PublishLimit>({
   site_name: '',
   enabled: true,
@@ -100,11 +106,17 @@ async function loadSites() {
 
 function handleAdd() {
   Object.assign(editingLimit, { id: undefined, site_name: '', enabled: true, max_count: 20, window_hours: 24 })
+  windowUnit.value = 'hours' // §59.596 刀2: 新建默认（window 语义小时惯例）
+  windowDisplay.value = 24
   dialogVisible.value = true
 }
 
 function handleEdit(row: PublishLimit) {
   Object.assign(editingLimit, row)
+  // §59.596 刀2: 智能回显同步（底层小时→显示）
+  const h = row.window_hours ?? 24
+  windowUnit.value = smartDurationUnit(h * 3600)
+  windowDisplay.value = durationDisplayValue(h, windowUnit.value, 3600)
   dialogVisible.value = true
 }
 
@@ -115,7 +127,8 @@ async function handleSave() {
   }
   saving.value = true
   try {
-    await publishLimitApi.upsert({ ...editingLimit })
+    // §59.596 刀2: 显示值换算落底层小时
+    await publishLimitApi.upsert({ ...editingLimit, window_hours: durationStoreValue(windowDisplay.value, windowUnit.value, 3600) })
     message.success('保存成功')
     dialogVisible.value = false
     await loadLimits()

@@ -243,7 +243,7 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="种龄保护(小时)">
-                  <a-input-number v-model:value="configForm.cleanupMinAgeHours" :min="0" :max="720" :step="1" style="width: 100%" placeholder="默认 48" />
+                  <DurationInput v-model:display="cleanupAgeDisplay" v-model:unit="cleanupAgeUnit" :min="0" :max="720" :step="1" />
                 </a-form-item>
               </a-col>
               <a-col :span="8">
@@ -275,6 +275,9 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { settingsApi } from '@/api/settings'
+import DurationInput from '@/components/DurationInput.vue'
+import { durationStoreValue, durationDisplayValue, smartDurationUnit } from '@/utils/duration'
+import type { DurationUnit } from '@/utils/duration'
 import { message as antMessage } from 'ant-design-vue'
 import { downloadersApi } from '@/api/downloaders'
 import { formatDurationSec } from '@/utils/format'
@@ -329,6 +332,9 @@ const configModalVisible = ref(false)
 const configSubmitting = ref(false)
 const scoreCleanupEnabled = computed(() => configForm.role !== 'download')
 const editingConfig = ref<SeedingClientConfig | null>(null)
+// §59.596 刀2: cleanupMinAgeHours 智能回显（底层小时不动）
+const cleanupAgeDisplay = ref(48)
+const cleanupAgeUnit = ref<DurationUnit>('hours')
 const configForm = reactive({
   clientId: undefined as number | undefined,
   role: 'seeding' as string,
@@ -442,6 +448,12 @@ function openConfigModal(record?: SeedingClientConfig) {
       cleanupScoreWeights: record.cleanup_score_weights || '',
       archiveGranularity: record.archive_granularity || 'daily',
     })
+    // §59.596 刀2: cleanupMinAgeHours 智能回显同步（底层小时→显示）
+    {
+      const h = record.cleanup_min_age_hours ?? 0
+      cleanupAgeUnit.value = smartDurationUnit(h * 3600)
+      cleanupAgeDisplay.value = durationDisplayValue(h, cleanupAgeUnit.value, 3600)
+    }
   } else {
     Object.assign(configForm, {
       clientId: undefined as number | undefined,
@@ -471,6 +483,8 @@ function openConfigModal(record?: SeedingClientConfig) {
       cleanupMinAgeHours: 0,
       archiveGranularity: 'daily',
     })
+    cleanupAgeUnit.value = 'hours' // §59.596 刀2: 新建默认（0 值 minutes→但配置语义小时惯例）
+    cleanupAgeDisplay.value = 0
   }
   configModalVisible.value = true
 }
@@ -482,8 +496,10 @@ async function handleConfigSubmit() {
   }
   configSubmitting.value = true
   try {
+    const cleanupAgeStore = durationStoreValue(cleanupAgeDisplay.value, cleanupAgeUnit.value, 3600) // §59.596 刀2: 显示值换算落底层小时
     const payload = {
       ...configForm,
+      cleanupMinAgeHours: cleanupAgeStore,
       deleteRuleIds: configForm.deleteRuleIds.length > 0 ? configForm.deleteRuleIds.join(',') : '',
     }
     if (editingConfig.value) {

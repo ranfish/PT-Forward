@@ -75,7 +75,10 @@
     "requestFailed": "Request failed",
     "networkError": "Network error",
     "saveSuccess": "Saved successfully",
-    "add": "Add"
+    "add": "Add",
+    "unitMinutes": "min",
+    "unitHours": "hours",
+    "unitDays": "days"
   },
   "auth": {
     "login": "Login",

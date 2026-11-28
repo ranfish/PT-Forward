@@ -24,9 +24,7 @@
                   <a-switch v-model:checked="scoringConfig.enabled" @change="saveScoringConfig" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.halfLifeHours')">
-                  <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%">
-                    <template #addonAfter>小时</template>
-                  </a-input-number>
+                  <DurationInput v-model:display="halfLifeDisplay" v-model:unit="halfLifeUnit" :min="0.1" :step="0.5" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.minScore')">
                   <a-input-number v-model:value="scoringConfig.minScore" :min="0" :step="0.1" style="width: 100%" />
@@ -146,6 +144,9 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { subscriptionsApi } from '@/api/subscriptions'
+import DurationInput from '@/components/DurationInput.vue'
+import { durationStoreValue, durationDisplayValue, smartDurationUnit } from '@/utils/duration'
+import type { DurationUnit } from '@/utils/duration'
 import { useTorrentColumns } from '@/composables/useTorrentColumns'
 import { formatTime } from '@/utils/format'
 import type { ScoringLog } from '@/api/types'
@@ -168,6 +169,9 @@ const logsLoading = ref(false)
 const dryrunResult = ref<DryrunResult | null>(null)
 const subscriptions = ref<{ id: number; name: string; site_name?: string }[]>([])
 const selectedSubId = ref<number | undefined>(undefined)
+// §59.596 刀2: halfLifeHours 智能回显（底层小时不动）
+const halfLifeDisplay = ref(2)
+const halfLifeUnit = ref<DurationUnit>('hours')
 const scoringConfig = reactive({
   enabled: false,
   halfLifeHours: 2,
@@ -236,6 +240,9 @@ async function fetchScoringConfig() {
       batchLimit: data.batch_limit ?? 5,
       pushIntervalMs: data.push_interval_ms ?? 0,
     })
+    // §59.596 刀2: halfLifeHours 智能回显同步（底层小时→显示）
+    halfLifeUnit.value = smartDurationUnit(scoringConfig.halfLifeHours * 3600)
+    halfLifeDisplay.value = durationDisplayValue(scoringConfig.halfLifeHours, halfLifeUnit.value, 3600)
     parseSiteWeightsJSON(data.site_weights_json || '{}')
     dryrunForm.halfLifeHours = scoringConfig.halfLifeHours
   } catch (e: unknown) {
@@ -248,8 +255,9 @@ async function fetchScoringConfig() {
 async function saveScoringConfig() {
   saving.value = true
   try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await seedingApi.updateScoringConfig({ ...scoringConfig, site_weights_json: siteWeightsToJSON() } as any, selectedSubId.value)
+    const halfLifeStore = durationStoreValue(halfLifeDisplay.value, halfLifeUnit.value, 3600) // §59.596 刀2: 显示值换算落底层小时
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await seedingApi.updateScoringConfig({ ...scoringConfig, halfLifeHours: halfLifeStore, site_weights_json: siteWeightsToJSON() } as any, selectedSubId.value)
     message.success(t('common.configSaved'))
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))

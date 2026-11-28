@@ -167,12 +167,7 @@
             <a-row :gutter="16">
               <a-col :span="12">
                 <a-form-item :label="t('seeding.fitTime')">
-                  <div style="display: flex; gap: 8px">
-                    <a-input-number v-model:value="fitTimeDisplay" :min="0" style="flex: 1" />
-                    <a-select :value="fitTimeUnit" style="width: 90px" @change="(u: DurationUnit) => onFitTimeUnitChange(u)">
-                      <a-select-option v-for="u in durationUnits" :key="u.value" :value="u.value">{{ u.label }}</a-select-option>
-                    </a-select>
-                  </div>
+                  <DurationInput v-model:display="fitTimeDisplay" v-model:unit="fitTimeUnit" :min="0" />
                   <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.fitTimeHint') }}</div>
                 </a-form-item>
               </a-col>
@@ -250,6 +245,7 @@ import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { deleteRulesApi, seedingApi } from '@/api/seeding'
 import type { DeleteRule } from '@/api/types'
+import DurationInput from '@/components/DurationInput.vue'
 import { durationStoreValue, durationDisplayValue, convertDuration, smartDurationUnit, isDurationUnit } from '@/utils/duration'
 import type { DurationUnit } from '@/utils/duration'
 
@@ -614,13 +610,6 @@ function formatCondValue(field: string, storeVal: string): string {
 const fitTimeDisplay = ref(0)
 const fitTimeUnit = ref<DurationUnit>('minutes')
 
-function onFitTimeUnitChange(u: DurationUnit) {
-  const n = fitTimeDisplay.value
-  if (Number.isFinite(n)) {
-    fitTimeDisplay.value = convertDuration(n, fitTimeUnit.value, u)
-  }
-  fitTimeUnit.value = u
-}
 
 function parseConditionsForDisplay(json: string): ConditionItem[] {
   if (!json) return []
