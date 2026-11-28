@@ -153,6 +153,22 @@ func TestValidateConditions(t *testing.T) {
 	if err := ValidateConditions(`[{"field":"downloadUploadRatio","operator":">","value":"5"}]`); err != nil {
 		t.Errorf("downloadUploadRatio 应在白名单: %v", err)
 	}
+	// §59.596: unit 白名单锚——合法三值+空缺省
+	for _, u := range []string{"minutes", "hours", "days"} {
+		if err := ValidateConditions(`[{"field":"seed_time","operator":">=","value":"259200","unit":"` + u + `"}]`); err != nil {
+			t.Errorf("合法时长单位 %q 被拒: %v", u, err)
+		}
+	}
+	if err := ValidateConditions(`[{"field":"seed_time","operator":">=","value":"259200"}]`); err != nil {
+		t.Errorf("无 unit（存量形态）应放行: %v", err)
+	}
+	// 拒绝：非法单位（含 seconds——用户定案三选不加秒）
+	if err := ValidateConditions(`[{"field":"seed_time","operator":">=","value":"1","unit":"seconds"}]`); err == nil {
+		t.Error("seconds 单位应被拒（三选不含秒）")
+	}
+	if err := ValidateConditions(`[{"field":"seed_time","operator":">=","value":"1","unit":"hour"}]`); err == nil {
+		t.Error("拼错单位应被拒（配置期显性化）")
+	}
 	// 拒绝：拼错字段
 	if err := ValidateConditions(`[{"field":"addedTim","operator":">=","value":"1"}]`); err == nil {
 		t.Error("拼错字段应被拒（配置期显性化）")
@@ -206,8 +222,12 @@ func TestWhitelistMatchesImplementation(t *testing.T) {
 	}
 	body := srcStr[start:nextFn]
 	implKeys := map[string]struct{}{}
-	for _, m := range regexp.MustCompile(`case "([a-zA-Z0-9_]+)"`).FindAllStringSubmatch(body, -1) {
-		implKeys[m[1]] = struct{}{}
+	// §59.596: 多键 case（`case "a", "b":`——seedingTime/seed_time 双收族）
+	// 须提取全部键（原单键模式只捕首个——白名单补齐被误判漂移）。
+	for _, m := range regexp.MustCompile(`case ((?:"[^"]+",?\s*)+):`).FindAllStringSubmatch(body, -1) {
+		for _, k := range regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(m[1], -1) {
+			implKeys[k[1]] = struct{}{}
+		}
 	}
 	for _, m := range regexp.MustCompile(`key == "([a-zA-Z0-9_]+)"`).FindAllStringSubmatch(body, -1) {
 		implKeys[m[1]] = struct{}{}

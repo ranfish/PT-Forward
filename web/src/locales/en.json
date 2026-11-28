@@ -800,6 +800,8 @@
     "stoppedStatus": "Stopped",
     "noDiscount": "No Discount",
     "unitHours": "Unit: hours",
+    "unitDays": "days",
+    "unitMinutes": "min",
     "unitSeconds": "Unit: seconds",
     "unitBytes": "Unit: bytes",
     "hideRawJson": "Hide JSON",

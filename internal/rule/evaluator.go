@@ -202,6 +202,10 @@ type Condition struct {
 	Field    string `json:"field"`
 	Operator string `json:"operator"`
 	Value    string `json:"value"`
+	// §59.596: 前端时长单位键（minutes/hours/days）——求值零消费（value 恒
+	// 字段底层单位）·仅供回显还原「数值+单位」UI 原子。老版本 json.Unmarshal
+	// 忽略未知键·双向版本兼容。
+	Unit string `json:"unit,omitempty"`
 }
 
 func ParseConditions(conditionsJSON string) []Condition {

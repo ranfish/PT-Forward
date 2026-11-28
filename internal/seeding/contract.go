@@ -28,8 +28,8 @@ var ruleConditionFields = map[string]struct{}{
 	// Torrent 层
 	"name": {}, "size": {}, "totalSize": {}, "progress": {}, "state": {},
 	"uploaded": {}, "downloaded": {}, "uploadSpeed": {}, "downloadSpeed": {},
-	"ratio": {}, "seedingTime": {}, "category": {}, "tags": {},
-	"savePath": {}, "seeder": {}, "leecher": {}, "error": {},
+	"ratio": {}, "seedingTime": {}, "seed_time": {}, "category": {}, "tags": {},
+	"savePath": {}, "seeder": {}, "num_complete": {}, "leecher": {}, "num_incomplete": {}, "error": {},
 	// 状态/标记层（蛇形兼容键）
 	"is_free": {}, "is_finished": {}, "is_paused": {}, "has_hr": {},
 	"hr_seed_time_h": {},
@@ -66,6 +66,10 @@ func ValidateConditions(conditionsJSON string) error {
 		}
 		if _, ok := ruleConditionOperators[cond.Operator]; !ok {
 			return fmt.Errorf("条件 %d 操作符 %q 不支持（拼写错误？）", i+1, cond.Operator)
+		}
+		// §59.596: unit 白名单（前端回显键·拼错配置期拦截——15 篇纪律）。
+		if cond.Unit != "" && cond.Unit != "minutes" && cond.Unit != "hours" && cond.Unit != "days" {
+			return fmt.Errorf("条件 %d 单位 %q 不支持（minutes/hours/days）", i+1, cond.Unit)
 		}
 	}
 	return nil

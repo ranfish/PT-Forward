@@ -474,6 +474,9 @@ type ruleCondition struct {
 	Field    string `json:"field"`
 	Operator string `json:"operator"`
 	Value    string `json:"value"`
+	// §59.596: 前端时长单位键（minutes/hours/days）——求值零消费（value 恒
+	// 字段底层单位）·ValidateConditions 白名单校验+回显还原用。
+	Unit string `json:"unit,omitempty"`
 }
 
 func ParseConditions(conditionsJSON string) []ruleCondition {

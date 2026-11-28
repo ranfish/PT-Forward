@@ -82,7 +82,7 @@
             <a-button size="small" type="dashed" @click="showRawJson = !showRawJson">{{ showRawJson ? t('seeding.hideRawJson') : t('seeding.showRawJson') }}</a-button>
           </div>
           <div v-for="(cond, idx) in conditions" :key="idx" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-            <a-select v-model:value="cond.field" show-search option-filter-prop="label" style="width: 180px" :placeholder="t('seeding.selectField')" @change="(v: string) => { cond.value = ''; const u = fieldUnit(v); condUnits[idx] = u === 'size' ? 1 : u === 'speed' ? 0 : 0 }">
+            <a-select v-model:value="cond.field" show-search option-filter-prop="label" style="width: 180px" :placeholder="t('seeding.selectField')" @change="(v: string) => { cond.value = ''; cond.unit = undefined; const u = fieldUnit(v); condUnits[idx] = u === 'size' ? 1 : u === 'speed' ? 0 : 0 }">
               <a-select-option v-for="f in availableFields" :key="f.value" :value="f.value" :label="f.label">
                 {{ f.label }} <span style="color: #999; font-size: 11px">({{ f.value }})</span>
               </a-select-option>
@@ -115,6 +115,12 @@
                 <a-select-option v-for="(u, ui) in speedUnits" :key="ui" :value="ui">{{ u.value }}</a-select-option>
               </a-select>
             </template>
+            <template v-else-if="fieldDuration(cond.field)">
+              <a-input-number v-model:value="cond.value" style="flex: 1; min-width: 100px" :placeholder="t('seeding.conditionValue')" :min="0" />
+              <a-select :value="(isDurationUnit(cond.unit) ? cond.unit : DURATION_FALLBACK_UNIT)" style="width: 80px" @change="(u: DurationUnit) => onDurationUnitChange(cond, u)">
+                <a-select-option v-for="u in durationUnits" :key="u.value" :value="u.value">{{ u.label }}</a-select-option>
+              </a-select>
+            </template>
             <template v-else-if="fieldUnit(cond.field) === 'progress'">
               <a-input-number v-model:value="cond.value" style="flex: 1; min-width: 100px" :placeholder="'1~100'" :min="0" :max="100" />
               <span style="line-height: 32px; margin-left: 4px; color: #999">%</span>
@@ -124,7 +130,7 @@
             </template>
             <a-button type="link" danger size="small" @click="removeCondition(idx)">{{ t('common.delete') }}</a-button>
           </div>
-          <a-textarea v-if="showRawJson || conditions.length === 0" v-model:value="form.conditions" :rows="2" :placeholder="'[{&quot;field&quot;:&quot;seed_time&quot;,&quot;operator&quot;:&quot;>&quot;,&quot;value&quot;:&quot;720&quot;}]'" style="margin-top: 4px" />
+          <a-textarea v-if="showRawJson || conditions.length === 0" v-model:value="form.conditions" :rows="2" :placeholder="'[{&quot;field&quot;:&quot;seed_time&quot;,&quot;operator&quot;:&quot;>=&quot;,&quot;value&quot;:&quot;259200&quot;,&quot;unit&quot;:&quot;hours&quot;}]  ← value=底层秒·unit=minutes/hours/days（缺省=hours）'" style="margin-top: 4px" />
         </a-form-item>
         <a-form-item v-if="form.type === 'expr'" :label="t('seeding.expression')" name="expr">
           <a-textarea v-model:value="form.expr" :rows="3" :placeholder="t('seeding.celExpressionOptional')" />
@@ -161,7 +167,12 @@
             <a-row :gutter="16">
               <a-col :span="12">
                 <a-form-item :label="t('seeding.fitTime')">
-                  <a-input-number v-model:value="form.fit_time" :min="0" style="width: 100%" />
+                  <div style="display: flex; gap: 8px">
+                    <a-input-number v-model:value="fitTimeDisplay" :min="0" style="flex: 1" />
+                    <a-select :value="fitTimeUnit" style="width: 90px" @change="(u: DurationUnit) => onFitTimeUnitChange(u)">
+                      <a-select-option v-for="u in durationUnits" :key="u.value" :value="u.value">{{ u.label }}</a-select-option>
+                    </a-select>
+                  </div>
                   <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.fitTimeHint') }}</div>
                 </a-form-item>
               </a-col>
@@ -239,6 +250,8 @@ import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { deleteRulesApi, seedingApi } from '@/api/seeding'
 import type { DeleteRule } from '@/api/types'
+import { durationStoreValue, durationDisplayValue, convertDuration, smartDurationUnit, isDurationUnit } from '@/utils/duration'
+import type { DurationUnit } from '@/utils/duration'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -332,7 +345,7 @@ const form = reactive({
 
 const actionMode = ref<'delete' | 'pause' | 'limit_speed'>('delete')
 
-interface ConditionItem { field: string; operator: string; value: string }
+interface ConditionItem { field: string; operator: string; value: string; unit?: string }
 const conditions = ref<ConditionItem[]>([])
 const condUnits = ref<number[]>([])
 
@@ -353,12 +366,16 @@ const discountOptions = [
   { value: 'none', label: t('seeding.noDiscount') },
 ]
 
-const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> = {
+// §59.596 时长字段标记：duration=字段底层单位（'seconds'|'hours'）·
+// 条件值落库恒底层单位（求值零改动）·前端按 unit 键（minutes/hours/days）
+// 换算显示。存量无 unit=小时缺省（与旧 ÷3600 回显逐字一致零惊扰）。
+type FieldDuration = 'seconds' | 'hours'
+const fieldMeta: Record<string, { type: string; hint: string; unit?: string; duration?: FieldDuration }> = {
   site_name: { type: 'text', hint: '' },
   status: { type: 'enum:status', hint: '' },
   is_free: { type: 'bool', hint: '' },
   has_hr: { type: 'bool', hint: '' },
-  hr_seed_time_h: { type: 'number', hint: t('seeding.unitHours') },
+  hr_seed_time_h: { type: 'number', hint: '', duration: 'hours' },
   discount: { type: 'enum:discount', hint: '' },
   free_level: { type: 'text', hint: '' },
   client_id: { type: 'text', hint: '' },
@@ -369,7 +386,7 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   unregistered_msg: { type: 'text', hint: '' },
   subscription_id: { type: 'text', hint: '' },
   name: { type: 'text', hint: '' },
-  seed_time: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
+  seed_time: { type: 'number', hint: '', duration: 'seconds' },
   size: { type: 'number', hint: '', unit: 'size' },
   totalSize: { type: 'number', hint: '', unit: 'size' },
   progress: { type: 'number', hint: '1~100', unit: 'progress' },
@@ -389,9 +406,9 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   downloaded: { type: 'number', hint: '', unit: 'size' },
   error: { type: 'text', hint: '' },
   tracker_url: { type: 'text', hint: '' },
-  addedTime: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
-  freeRemainSec: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
-  hrRemainSec: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
+  addedTime: { type: 'number', hint: '', duration: 'seconds' },
+  freeRemainSec: { type: 'number', hint: '', duration: 'seconds' },
+  hrRemainSec: { type: 'number', hint: '', duration: 'seconds' },
   freeSpace: { type: 'number', hint: '', unit: 'size' },
   totalSpace: { type: 'number', hint: '', unit: 'size' },
   diskUsedPercent: { type: 'number', hint: '%', unit: 'percent' },
@@ -415,12 +432,40 @@ function fieldHint(field: string): string {
   if (u === 'speed') return ''
   if (u === 'percent') return '%'
   if (u === 'progress') return '%'
-  if (u === 'hours') return t('seeding.unitHours')
   return fieldMeta[field]?.hint || t('seeding.conditionValue')
 }
 
 function fieldUnit(field: string): string {
   return fieldMeta[field]?.unit || ''
+}
+
+// §59.596: 时长字段底层单位（'seconds'|'hours'|undefined——非时长字段）。
+function fieldDuration(field: string): FieldDuration | undefined {
+  return fieldMeta[field]?.duration
+}
+
+// §59.596: 时长单位下拉（分/时/天三选——用户定案不加秒）。
+const durationUnits: { value: DurationUnit; label: string }[] = [
+  { value: 'minutes', label: t('seeding.unitMinutes') },
+  { value: 'hours', label: t('seeding.unitHours') },
+  { value: 'days', label: t('seeding.unitDays') },
+]
+
+// 条件缺省回显单位：无 unit 的存量=小时（与旧 ÷3600 行为逐字一致）。
+const DURATION_FALLBACK_UNIT: DurationUnit = 'hours'
+
+function durationBaseSeconds(base: FieldDuration): number {
+  return base === 'hours' ? 3600 : 1
+}
+
+// §59.596 决策②: 切换单位自动换算显示值（30 分 → 切小时 = 0.5·4 位小数）。
+function onDurationUnitChange(cond: ConditionItem, newUnit: DurationUnit) {
+  const oldUnit: DurationUnit = isDurationUnit(cond.unit) ? cond.unit : DURATION_FALLBACK_UNIT
+  const n = Number(cond.value)
+  if (cond.value !== '' && Number.isFinite(n)) {
+    cond.value = String(convertDuration(n, oldUnit, newUnit))
+  }
+  cond.unit = newUnit
 }
 
 const sizeUnits = [
@@ -564,6 +609,19 @@ function formatCondValue(field: string, storeVal: string): string {
   return storeVal
 }
 
+// §59.596 fit_time（规则级字段·无 JSON 通道不持久 unit）：输入可选单位换算
+// 落秒·回显 smartDurationUnit 智能选单位（用户确认案 a）。
+const fitTimeDisplay = ref(0)
+const fitTimeUnit = ref<DurationUnit>('minutes')
+
+function onFitTimeUnitChange(u: DurationUnit) {
+  const n = fitTimeDisplay.value
+  if (Number.isFinite(n)) {
+    fitTimeDisplay.value = convertDuration(n, fitTimeUnit.value, u)
+  }
+  fitTimeUnit.value = u
+}
+
 function parseConditionsForDisplay(json: string): ConditionItem[] {
   if (!json) return []
   try {
@@ -626,7 +684,8 @@ const availableFields = [
 ]
 
 function addCondition() {
-  conditions.value.push({ field: '', operator: '==', value: '' })
+  // §59.596 决策②: 新条件时长单位默认=分（存量字段选定后由模板按 duration 呈现）
+  conditions.value.push({ field: '', operator: '==', value: '', unit: 'minutes' })
   condUnits.value.push(0)
 }
 
@@ -638,8 +697,13 @@ function removeCondition(idx: number) {
 function conditionsToJSON(): string {
   if (conditions.value.length === 0) return ''
   return JSON.stringify(conditions.value.map((c, i) => {
-    if (fieldMeta[c.field]?.unit === 'hours' && c.value) {
-      return { ...c, value: String(Math.round(Number(c.value) * 3600)) }
+    const dur = fieldDuration(c.field)
+    if (dur && c.value) {
+      // §59.596: UI 原子「数值+单位」→ 落库恒字段底层单位（求值零改动）。
+      // unit 键随条件持久（回显还原「0.5 天」形态）·缺省=小时（存量语义）。
+      const unit: DurationUnit = isDurationUnit(c.unit) ? c.unit : DURATION_FALLBACK_UNIT
+      const storeVal = durationStoreValue(Number(c.value), unit, durationBaseSeconds(dur))
+      return { ...c, value: String(storeVal), unit }
     }
     if ((fieldMeta[c.field]?.unit === 'size' || fieldMeta[c.field]?.unit === 'speed') && c.value) {
       const storeVal = storeValueFromDisplay(c.field, c.value, condUnits.value[i] ?? 0)
@@ -649,7 +713,10 @@ function conditionsToJSON(): string {
       const storeVal = storeValueFromDisplay(c.field, c.value, 0)
       return { ...c, value: storeVal }
     }
-    return c
+    // 非时长字段剔除残留 unit（字段切换残留·JSON 形态与旧行为一致）
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { unit: _omit, ...rest } = c
+    return rest
   }))
 }
 
@@ -659,9 +726,13 @@ function parseConditions(json: string): ConditionItem[] {
     const parsed = JSON.parse(json)
     const units: number[] = []
     const items = parsed.map((c: ConditionItem) => {
-      if (fieldMeta[c.field]?.unit === 'hours' && c.value) {
-        const hours = Number(c.value) / 3600
-        return { ...c, value: String(Math.round(hours * 100) / 100) }
+      const dur = fieldDuration(c.field)
+      if (dur && c.value) {
+        // §59.596: 按持久 unit 还原「数值+单位」形态（存 0.5 天回显 0.5 天）。
+        // 存量无 unit=小时缺省（864000→240——与旧 ÷3600 行为逐字一致零惊扰）。
+        const unit: DurationUnit = isDurationUnit(c.unit) ? c.unit : DURATION_FALLBACK_UNIT
+        const display = durationDisplayValue(Number(c.value), unit, durationBaseSeconds(dur))
+        return { ...c, value: String(display), unit }
       }
       if ((fieldMeta[c.field]?.unit === 'size' || fieldMeta[c.field]?.unit === 'speed') && c.value) {
         units.push(inferUnitIndex(c.field, c.value))
@@ -739,10 +810,15 @@ function openModal(record?: DeleteRule) {
       delete_companions: record.delete_companions !== undefined ? record.delete_companions : true,
     })
     conditions.value = parseConditions(record.conditions || '')
+    // §59.596: fit_time 智能回显（秒 → 按量级选单位显示）
+    fitTimeUnit.value = smartDurationUnit(record.fit_time ?? 0)
+    fitTimeDisplay.value = durationDisplayValue(record.fit_time ?? 0, fitTimeUnit.value, 1)
   } else {
     actionMode.value = 'delete'
     Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, fit_time: 0, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, delete_companions: true })
     conditions.value = []
+    fitTimeUnit.value = 'minutes'
+    fitTimeDisplay.value = 0
   }
   modalVisible.value = true
 }
@@ -753,6 +829,8 @@ async function handleSubmit() {
     if (form.type !== 'expr' && conditions.value.length > 0) {
       form.conditions = conditionsToJSON()
     }
+    // §59.596: fit_time 显示值按单位换算落秒（0=立即语义 0×any=0 天然兼容）
+    form.fit_time = durationStoreValue(fitTimeDisplay.value, fitTimeUnit.value, 1)
     const payload = { ...form, limit_speed_bytes: Math.round((form.limit_speed_mb || 0) * 1048576) }
     delete (payload as Record<string, unknown>).limit_speed_mb
     switch (actionMode.value) {

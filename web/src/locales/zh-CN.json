@@ -803,6 +803,8 @@
     "stoppedStatus": "已停止",
     "noDiscount": "无优惠",
     "unitHours": "单位：小时",
+    "unitDays": "天",
+    "unitMinutes": "分钟",
     "unitSeconds": "单位：秒",
     "unitBytes": "单位：字节",
     "hideRawJson": "隐藏 JSON",
