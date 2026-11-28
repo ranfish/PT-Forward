@@ -79,6 +79,8 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 	}
 	// §59.94: 审核簇同步（公共方法）
 	h.syncClusterReviewedByIDs(context.Background(), []uint{uint(id)}, true)
+	// §59.598 钩②: 保存编辑（含 reviewed=true）→重算物化状态
+	h.reclassifyByMetaIDs(r.Context(), []uint{uint(id)})
 
 	Success(w, map[string]interface{}{"success": true, "id": id})
 }
@@ -139,7 +141,83 @@ func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *htt
 	}
 	// §59.94: 审核簇同步（公共方法——批量 ID 去重簇键后逐簇传播）
 	h.syncClusterReviewedByIDs(context.Background(), ids, req.Reviewed)
+	// §59.598 钩②: 审核 meta 变更→重算物化状态（reviewed↔pending）
+	h.reclassifyByMetaIDs(r.Context(), ids)
 	Success(w, map[string]interface{}{"updated": result.RowsAffected})
+}
+
+// BackfillClassifyStatus §59.598（migration 首算·用户裁决④）: classify
+// 六态物化 backfill——启动检测式后台跑。幂等（零标记·count 驱动）。
+// detector 缓存预热（O4：先 Pluck distinct 组名→逐个 LookupGroup→行循环·
+// 避开 N×LOWER 全表扫）。
+func (h *PublishTorrentsHandler) BackfillClassifyStatus(ctx context.Context, detector *publish.SourceSiteDetector, logger *zap.Logger) {
+	if h.db == nil {
+		return
+	}
+	var pending int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("status = ''").Count(&pending)
+	if pending == 0 {
+		return
+	}
+	logger.Info("classify backfill start", zap.Int64("pending", pending))
+	// 预热：物化前快照行 status 全空——先按 name/title 提取组名预热 detector
+	var names []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("status = ''").Limit(100000).Pluck("name", &names)
+	groupSet := make(map[string]struct{})
+	for _, n := range names {
+		if g := publish.ExtractGroupName(n); g != "" {
+			groupSet[g] = struct{}{}
+		}
+	}
+	var titles []string
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Pluck("title", &titles)
+	for _, t := range titles {
+		if g := publish.ExtractGroupName(t); g != "" {
+			groupSet[g] = struct{}{}
+		}
+	}
+	if detector != nil {
+		for g := range groupSet {
+			detector.LookupGroup(ctx, g)
+		}
+	}
+	// 行循环分批（2000/批·防大环境长事务）
+	const batch = 2000
+	var offset int
+	for {
+		var rows []model.TorrentSnapshot
+		if err := h.db.WithContext(ctx).Where("status = ''").
+			Order("id").Limit(batch).Offset(offset).Find(&rows).Error; err != nil || len(rows) == 0 {
+			break
+		}
+		if err := h.reclassifyRows(ctx, rows); err != nil {
+			logger.Warn("classify backfill batch failed", zap.Int("offset", offset), zap.Error(err))
+		}
+		offset += len(rows)
+		if len(rows) < batch {
+			break
+		}
+	}
+	logger.Info("classify backfill done", zap.Int64("pending_was", pending))
+}
+
+// reclassifyByMetaIDs §59.598 钩②辅助: meta 批量 ID→hash→重算对应快照行。
+func (h *PublishTorrentsHandler) reclassifyByMetaIDs(ctx context.Context, ids []uint) {
+	if h.db == nil || len(ids) == 0 {
+		return
+	}
+	var hashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("id IN ?", ids).Pluck("info_hash", &hashes)
+	if len(hashes) == 0 {
+		return
+	}
+	if err := h.reclassifySnapshots(ctx, "hash IN ?", hashes); err != nil && h.logger != nil {
+		h.logger.Warn("reclassify by meta ids failed", zap.Error(err))
+	}
 }
 
 // handleBatchDelete §56.40: 批量删除元数据（硬删除，仅删快照不删种子）。
@@ -163,6 +241,8 @@ func (h *PublishTorrentsHandler) handleBatchDelete(w http.ResponseWriter, r *htt
 		return
 	}
 	h.logger.Info("batch delete metadata", zap.Int("count", int(result.RowsAffected)))
+	// §59.598 钩③: meta 删除→重算（回 unfetched）
+	h.reclassifyByMetaIDs(r.Context(), req.IDs)
 	Success(w, map[string]interface{}{"deleted": result.RowsAffected})
 }
 

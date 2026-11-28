@@ -261,6 +261,13 @@ func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr 
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSourceDetector(sourceDetector)
 	rt.siteHandler.SetSourceDetector(sourceDetector)
+	// §59.598 钩②: metadataHandler 审核→重算物化状态回调（闭包注入——
+	// §59.577 SetGroupKindChecker 先例·handler 间无直接依赖）
+	rt.metadataHandler.SetOnMetaChanged(func(ctx context.Context, infoHashes []string) {
+		if err := rt.publishTorrentsHandler.reclassifySnapshots(ctx, "hash IN ?", infoHashes); err != nil {
+			rt.publishTorrentsHandler.logger.Warn("reclassify after metadata review failed", zap.Error(err))
+		}
+	})
 }
 
 // SetBDInfoQueue §59.319 P1: 注入原盘扫描队列+识别器（main 装配，

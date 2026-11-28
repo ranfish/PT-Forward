@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -14,10 +15,18 @@ import (
 type MetadataHandler struct {
 	db     *gorm.DB
 	logger *zap.Logger
+	// §59.598 钩②: meta 审核写点→重算物化状态回调（闭包注入——
+	// §59.577 SetGroupKindChecker 先例·PublishTorrentsHandler 装配期注入）
+	onMetaChanged func(ctx context.Context, infoHashes []string)
 }
 
 func NewMetadataHandler(db *gorm.DB, logger *zap.Logger) *MetadataHandler {
 	return &MetadataHandler{db: db, logger: logger}
+}
+
+// SetOnMetaChanged §59.598: 审核写点重算回调注入（nil 容忍——单测）。
+func (h *MetadataHandler) SetOnMetaChanged(f func(ctx context.Context, infoHashes []string)) {
+	h.onMetaChanged = f
 }
 
 func (h *MetadataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -281,6 +290,10 @@ func (h *MetadataHandler) handleReview(w http.ResponseWriter, r *http.Request) {
 	if result.Error != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新失败")
 		return
+	}
+	// §59.598 钩②: 审核 meta 变更→重算物化状态
+	if h.onMetaChanged != nil {
+		h.onMetaChanged(r.Context(), []string{req.InfoHash})
 	}
 
 	Success(w, map[string]interface{}{"success": true, "affected": result.RowsAffected})

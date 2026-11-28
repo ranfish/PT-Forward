@@ -33,6 +33,7 @@ var likeLiteralWhitelist = []likeWhitelistEntry{
 	{"migration.go", "save_path LIKE ?", "字面量模式：尾斜杠归一迁移固定模式（%/）"},
 	{"migration.go", "flags LIKE ?", "字面量模式：禁转词重刷迁移固定模式（6 词）"},
 	{"seed_list.go", "detail_source_json LIKE ?", "字面量模式：release_group JSON 探针"},
+	{"seed_reclassify.go", "detail_source_json LIKE ?", "字面量模式：同 seed_list 音乐键探针（`%\"music\":{%` 内部常量·§59.598 isMusic 判定与列表口径同源）"},
 	{"declaration_backfill_task.go", "release_group", "字面量模式：JSON 探针（转义分支已带 ESCAPE）"},
 	{"lifecycle.go", "key LIKE ?", "字面量模式：lifecycle.% 前缀探针（定义处即消费处·单调用方自洽）"},
 	{"engine_store.go", "client_ids LIKE ?", "内部 ID 拼接：clientID 源自 uint 转字符串·无通配符劫持面"},

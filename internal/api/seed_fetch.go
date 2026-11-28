@@ -287,6 +287,15 @@ func (h *PublishTorrentsHandler) preFetchLocalArtifacts(ctx context.Context, cli
 // runFetchPostArtifacts §59.49/§59.490/§59.21/§59.236: 后处理三件——
 // 截图策略（音乐种跳过）+ localMI 落库簇传播 + 主链 PTGen。
 func (h *PublishTorrentsHandler) runFetchPostArtifacts(ctx context.Context, meta *model.TorrentMetadata, clientUID uint, savePath, name string, isLocal, force bool, localMI string) {
+	// §59.598 钩①: 获取成功（meta 已写）→重算物化状态（unfetched→
+	// reviewed/pending/incomplete）——簇级（fetchSingle 链收尾·所有 meta
+	// 写路径经此）。O1 覆盖：runFetchPostArtifacts 是 fetchSingle 成功
+	// 终态统一收尾点（本地 MI 落库/簇传播/flags 更新都在其后或内部）。
+	if rerr := h.reclassifySnapshots(ctx, "client_uid = ? AND save_path = ? AND name = ?",
+		clientUID, savePath, name); rerr != nil && h.logger != nil {
+		h.logger.Warn("reclassify after fetch success failed",
+			zap.String("name", name), zap.Error(rerr))
+	}
 	// §59.49+§59.57+§59.490: 截图探活与策略
 	if meta != nil && !metadata.HasMusic(meta.DetailSourceJSON) {
 		if h.shotStrategy != nil && savePath != "" {
@@ -474,6 +483,10 @@ func (h *PublishTorrentsHandler) clearFetchBrandByHash(ctx context.Context, hash
 		}).Error; uerr != nil && h.logger != nil {
 		h.logger.Warn("fetch brand clear failed", zap.String("hash", hash), zap.Error(uerr))
 	}
+	// §59.598 钩④: 烙印清除后重算（unsupported② 状态可能变化）
+	if rerr := h.reclassifySnapshots(ctx, "hash = ?", hash); rerr != nil && h.logger != nil {
+		h.logger.Warn("reclassify after brand clear failed", zap.String("hash", hash), zap.Error(rerr))
+	}
 }
 
 // markFetchFailed §59.578 刀2: 获取失败烙印（口径 A·用户定案）——
@@ -497,6 +510,10 @@ func (h *PublishTorrentsHandler) markFetchFailed(ctx context.Context, clientUID 
 		}).Error; uerr != nil && h.logger != nil {
 		h.logger.Warn("fetch brand update failed", zap.String("hash", hash), zap.Error(uerr))
 	}
+	// §59.598 钩④: 烙印写入后重算（→unsupported②）
+	if rerr := h.reclassifySnapshots(ctx, "hash = ? AND client_uid = ?", hash, clientUID); rerr != nil && h.logger != nil {
+		h.logger.Warn("reclassify after brand update failed", zap.String("hash", hash), zap.Error(rerr))
+	}
 }
 
 // clearFetchBrand §59.578 刀2: 清烙印（簇级·紧键域 client+path+name）
@@ -513,5 +530,10 @@ func (h *PublishTorrentsHandler) clearFetchBrand(ctx context.Context, clientUID 
 			"fetch_error":     "",
 		}).Error; uerr != nil && h.logger != nil {
 		h.logger.Warn("fetch brand clear failed", zap.String("name", name), zap.Error(uerr))
+	}
+	// §59.598 钩④: 烙印清除后重算（簇级——获取成功/handleDeleteSeed 共用口）
+	if rerr := h.reclassifySnapshots(ctx, "client_uid = ? AND save_path = ? AND name = ?",
+		clientUID, savePath, name); rerr != nil && h.logger != nil {
+		h.logger.Warn("reclassify after brand clear failed", zap.String("name", name), zap.Error(rerr))
 	}
 }

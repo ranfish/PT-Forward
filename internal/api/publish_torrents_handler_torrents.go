@@ -930,6 +930,8 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 		h.sourceDetector.RefreshCache(r.Context())
 		h.syncGroupLexicon(r.Context())
 	}
+	// §59.598 钩⑥: 组映射 CRUD→按组名反查重算（O5 物化 group_name 索引）
+	h.reclassifyByGroup(r.Context(), req.GroupName)
 	Success(w, mapping)
 }
 
@@ -966,6 +968,8 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 		h.sourceDetector.RefreshCache(r.Context())
 		h.syncGroupLexicon(r.Context())
 	}
+	// §59.598 钩⑥: 组映射 CRUD→按组名反查重算（O5 物化 group_name 索引）
+	h.reclassifyByGroup(r.Context(), req.GroupName)
 	Success(w, map[string]interface{}{"message": "已更新"})
 }
 
@@ -998,6 +1002,8 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 		h.sourceDetector.RefreshCache(r.Context())
 		h.syncGroupLexicon(r.Context())
 	}
+	// §59.598 钩⑥: 组映射 CRUD→按组名反查重算（O5 物化 group_name 索引）
+	h.reclassifyByGroup(r.Context(), mapping.GroupName) // §59.598 钩⑥: delete 用实体组名
 
 	// 删除后如果该站已无任何映射，自动关闭 is_source
 	if mapping.SiteName != "" {

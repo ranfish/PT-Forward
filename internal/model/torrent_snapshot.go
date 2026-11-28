@@ -27,9 +27,21 @@ type TorrentSnapshot struct {
 	// （②生效在刀2）；快照是未获取颗唯一宿主（无 metadata 行）。
 	FetchFailedAt *time.Time `json:"fetch_failed_at" gorm:"index"`
 	FetchError    string     `json:"fetch_error" gorm:"size:500;default:''"`
-	LastSeen      time.Time  `json:"last_seen"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	// §59.598（classify 六态物化）: 列表状态物化列——classifySeedStatusLite
+	// 唯一判定源的缓存结果（reviewed/pending/incomplete/forbidden/unfetched/
+	// unsupported）。直筛走复合索引 idx_snapshots_status (client_uid, save_path,
+	// status)。空值=待算（新建行/漏网钩子）→ 自愈通道直筛时现场补算落库。
+	// 失效触发八钩子全经 api 包 ReclassifySnapshots 公共单点（B1）。
+	Status string `json:"status" gorm:"size:20;default:'';index:idx_snapshots_status,composite:client_uid;index:idx_snapshots_status,composite:save_path;index:idx_snapshots_status,composite:status"`
+	// §59.598 O5: classify 提取的组名物化——外部表（release_group_mappings/
+	// external_release_groups）CRUD 时按组名反查快照行走索引（免全表 LIKE 扫）。
+	GroupName string `json:"group_name" gorm:"size:100;default:'';index"`
+	// §59.598 裁决③: 限时禁转到期时间戳副本（物化时的 meta.NoTransferUntil 快照）——
+	// forbidden 态行查询时轻校验（当页时间比较）·发现过期→顺手重算写回（B2 自愈）。
+	NoTransferUntil *time.Time `json:"no_transfer_until"`
+	LastSeen        time.Time  `json:"last_seen"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 func (TorrentSnapshot) TableName() string { return "torrent_snapshots" }

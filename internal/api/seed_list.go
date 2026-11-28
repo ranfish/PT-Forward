@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -476,8 +477,17 @@ func (h *PublishTorrentsHandler) buildSeedListItems(r *http.Request, sc *seedLis
 			mr = sc.musicMeta[meta.InfoHash]
 		}
 		isMusic := mr.InfoHash != ""
-		// §59.578 刀2: 烙印②（snap 循环变量直接可读——零额外查询）
-		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic, snap.FetchFailedAt != nil)
+		// §59.598（classify 物化·直筛根修）: 读物化列——classifySeedStatusLite
+		// 唯一判定源·物化=其缓存结果。原现场 classify（24606 行×regex+gate+
+		// detector 查询=30s 挂死）改为 reclassifySnapshots 八钩子+自愈通道
+		// 维护列·查询路径零计算（O(C1)：22 量级 30s→~200ms）。列空兜底=
+		// 自愈已在 handleListSeeds 前置补算（B2）·此处的空值仅出现在
+		// reclassifyRows 失败残留行——保留现场计算兜底防该行从所有筛选
+		// 桶消失（诚实：计算值不落库·仅本次响应）。
+		status := snap.Status
+		if status == "" {
+			status = h.classifySeedStatusLite(r.Context(), snap.Name, meta, isMusic, snap.FetchFailedAt != nil)
+		}
 		item["status"] = status
 		// §59.578 刀3: 烙印原因透出（可解释性——unsupported② 颗用户须能
 		// 查「为什么不支持」：tooltip 消费）
@@ -658,6 +668,15 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	}
 
 	sc := &seedListContext{q: q}
+
+	// §59.598（classify 物化·直筛根修）: 自愈通道——待算行（新建/漏网
+	// 钩子/名称变更）现场补算落库（B2）。22 量级（24606 行/路径）下此查询
+	// 有 status 索引（空态行数极少·首次自愈后清零）。限 client/path 域内
+	// 避免全表扫。
+	if n := h.selfHealPending(r.Context(), q); n > 0 {
+		h.logger.Info("seed_list self-heal reclassified", zap.Int("rows", n))
+	}
+
 	sc.publishedClusters = h.loadPublishedClusterSet(r.Context(), q.publishTargetSite)
 	sc.snapshots = h.loadSeedSnapshots(r.Context(), q)
 	if len(sc.snapshots) == 0 {
@@ -678,4 +697,35 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		"items": items,
 		"total": total,
 	})
+}
+
+// selfHealPending §59.598 B2: 域内待算行（status=”）补算——O3 覆盖
+// syncer 新建行（跨包·不走钩子）+ 漏网钩子 + name 变更。幂等（算完写
+// 回后下次查询零命中）。
+func (h *PublishTorrentsHandler) selfHealPending(ctx context.Context, q listSeedsQuery) int {
+	heal := h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("status = '' AND is_hidden = ?", false)
+	if q.clientUID != 0 {
+		heal = heal.Where("client_uid = ?", q.clientUID)
+	}
+	if q.savePath != "" {
+		heal = heal.Where("save_path = ?", q.savePath)
+	}
+	var rows []model.TorrentSnapshot
+	if err := heal.Limit(5000).Find(&rows).Error; err != nil || len(rows) == 0 {
+		return 0
+	}
+	// 限时禁转到期行（⑧ 轻校验）：status=forbidden 且 no_transfer_until
+	// 已过期→一并重算（查询时发现过期→顺手重算写回——B2 自愈）
+	var expired []model.TorrentSnapshot
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("status = 'forbidden' AND no_transfer_until IS NOT NULL AND no_transfer_until < ?",
+			time.Now()).
+		Limit(5000).Find(&expired)
+	rows = append(rows, expired...)
+	if err := h.reclassifyRows(ctx, rows); err != nil {
+		h.logger.Warn("seed_list self-heal failed", zap.Error(err))
+		return 0
+	}
+	return len(rows)
 }

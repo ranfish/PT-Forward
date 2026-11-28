@@ -637,6 +637,14 @@ func main() {
 	router.SetBDInfoQueue(bdinfoQueue, bdinfoScanner)
 	router.SetupCompliance(complianceChecker)
 
+	// §59.598（migration 首算·用户裁决④）: classify 六态物化 backfill——
+	// 启动检测式（count(status='')>0 → 后台 goroutine 预热跑·不阻塞启动）。
+	// detector 缓存预热：先 Pluck distinct 组名→逐个 LookupGroup→行循环
+	// （避开 N×LOWER 全表扫·§59.598 O4）。幂等（零标记：算完写回后
+	// count=0 自然跳过）。大环境（22 66444 行）首次冷轮数十秒~分钟级·
+	// 日志进度可见。
+	go router.PublishTorrents().BackfillClassifyStatus(ctx, sourceDetector, log)
+
 	orphanScanner := orphan.NewScanner(clientManager, db, log)
 	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)
 	orphanRecovery.SetCoverageService(coverageSvc) // §59.196: 恢复链 tid 回写
