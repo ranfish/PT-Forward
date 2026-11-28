@@ -71,6 +71,7 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 			CheckBefore:     dbEntry.CheckBefore,
 			CheckCount:      dbEntry.CheckCount,
 			RecheckInterval: time.Duration(dbEntry.RecheckSec) * time.Second,
+			MinRemainMin:    dbEntry.MinRemainMin, // §59.594 刀1: 恢复回填（原漏→归零根因）
 		}
 		if dbEntry.LastCheckAt != nil {
 			m.pending[key].LastCheckAt = *dbEntry.LastCheckAt
@@ -133,6 +134,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		CheckBefore:    checkBefore,
 		RecheckSec:     recheckSec,
 		LastCheckAt:    &now,
+		MinRemainMin:   minRemainMin, // §59.594 刀1: DB 侧补写（配对纪律三处同批）
 	}
 	if err := m.db.Create(dbEntry).Error; err != nil {
 		m.logger.Warn("free wait: persist to DB failed", zap.String("key", key), zap.Error(err))
