@@ -8,3 +8,10 @@ Sat Nov 28 11:23:48 2026
 基线: cba999b3（19 篇四条非阻断观察即修·文档卫生——20 篇精读落盘+离线复现基线；代码与 f8a87182 一致）
 Sat Nov 28 11:43:24 CST 2026（20 篇 MinRemainMin 重启丢失复现采集）
 基线: afbbc50a（20 三刀落地·v0.0.1679——精读基线 cba999b3 后实施；本轮为用户复审三观察补刀：A 态假绿根修+静态三构造块+evidence 补记）
+Sat Nov 28 15:43:48 CST 2026（21 篇 ConfigEventBus 消费链缺失复现采集）
+基线: f180ec76（20 补刀锚诚实化·v0.0.1680——21 精读基线·代码零改动·五探针离线复现）
+
+--- 21 篇工具/命令实录 ---
+go version go1.25.0 linux/amd64
+命令: $GO test ./internal/rss -run TestRepro21_BusHealthyButNoConsumer -count=1 -v（包内临时测试·取证后即删）
+原始输出: evidence/config-event-bus-consumer-repro.txt
