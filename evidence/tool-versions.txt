@@ -1,3 +1,5 @@
 go version go1.25.0 linux/amd64
 基线: 8ec12cab1af3372f2f081802c095bccb9ccd8ece
 Fri Nov 27 17:25:15 CST 2026
+基线: 5eb45207cc218ee852f4f35448b98d6d9007d86f
+Sat Nov 28 10:28:26 CST 2026

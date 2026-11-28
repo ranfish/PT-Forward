@@ -1,0 +1,94 @@
+代码质量审计 19 · 折扣缓存跨站键隔离语义 — 定题实证与离线复现
+================================================================
+
+采集时间：Sat Nov 28 10:28:26 CST 2026
+基线提交：5eb45207cc218ee852f4f35448b98d6d9007d86f
+工具版本：go version go1.25.0 linux/amd64（/home/incast/.local/go/bin/go）
+方式：纯白盒源码精读 + 包内临时测试直调生产缓存方法（取证后即删，工作区干净）
+边界：未请求真实站点 API、未碰靶机/生产、未接触用户数据、未改任何生产代码
+
+一、设计权威（docs/31-模块设计决策记录.md:10065-10067，Sprint 101 决策 #401 第(4)条）
+------------------------------------------------------------------------
+> **(4) 免费重检缓存冲突修复**：明确免费检测 LRU 缓存键为 `(siteName, torrentID)`，
+> 最大容量 10000 条。重检时必须先清除该种子的免费检测 LRU 缓存，再调 API 获取最新结果。
+
+同仓正例：internal/rss/engine.go:1190
+    cacheKey := siteName + ":" + event.TorrentID
+    if cached, ok := e.detectCache.Load(cacheKey); ok { ... }
+（RSS 侧同类 HR/折扣检测缓存正确带站点维度；seeding 侧漏接。）
+
+二、代码实态（基线 5eb45207）
+----------------------------
+internal/seeding/engine.go:59-66,97
+    discountCache   map[string]*discountCacheEntry
+    discountCacheMu sync.Mutex
+    type discountCacheEntry struct {
+        Result    *model.DiscountResult
+        CheckedAt time.Time
+    }
+    // NewEngine: discountCache: make(map[string]*discountCacheEntry)
+
+internal/seeding/flush.go:187-208（读写均为裸 torrentID）
+    func (e *Engine) getDiscountFromCache(torrentID string, ttlSec int) (*model.DiscountResult, bool) {
+        ...
+        if entry, ok := e.discountCache[torrentID]; ok { ... }
+    }
+    func (e *Engine) setDiscountCache(torrentID string, result *model.DiscountResult) {
+        ...
+        e.discountCache[torrentID] = &discountCacheEntry{Result: result, CheckedAt: time.Now()}
+    }
+
+internal/seeding/flush.go:648-678（同一 pushOne 消费点：真查带 site、缓存不带）
+    if rec.IsFree && rec.FreeEndAt == nil && rec.Discount != model.DiscountAssumeFree
+            && e.siteProvider != nil && rec.SiteName != "" {
+        cacheTTL := 0
+        if fc.clientCfg != nil { cacheTTL = fc.clientCfg.EnhancementCacheTTL }
+        if cached, ok := e.getDiscountFromCache(rec.TorrentID, cacheTTL); ok {   // 裸 key
+            if cached == nil || !cached.Level.IsFree() { return candidate, false }
+        } else if adapter, adpErr := e.siteProvider.GetAdapter(ctx, rec.SiteName); adpErr == nil {
+            if siteCfg, cfgErr := e.siteProvider.GetSiteConfig(ctx, rec.SiteName); cfgErr == nil && siteCfg != nil {
+                recheckCtx, recheckCancel := context.WithTimeout(ctx, 10*time.Second)
+                discResult, discErr := adapter.DetectDiscount(recheckCtx, siteCfg, rec.TorrentID)  // 带 site
+                ...
+                e.setDiscountCache(rec.TorrentID, discResult)                    // 裸 key
+            }
+        }
+    }
+
+internal/model/seeding.go:11-14：SeedingTorrentRecord 的 ClientUID / SiteName / TorrentID 为并列独立字段；
+  DetectDiscount(ctx, siteCfg, torrentID) 把 torrentID 拼进该站点详情页/API —— torrentID 命名空间是「每站独立」。
+
+internal/seeding/engine_stats.go:825-837：archiveLoop（6h ticker）按 30min 清理过期条目；TTL 单位/方向/边界健康，问题不在 TTL。
+
+三、离线复现（包内临时测试 internal/seeding/zz_repro19_test.go，直接调生产方法）
+-------------------------------------------------------------------------------
+测试要点（全文摘要）：
+    e := &Engine{discountCache: make(map[string]*discountCacheEntry)}
+    e.setDiscountCache("12345", &model.DiscountResult{Level: model.DiscountFree})  // 站 A 写入
+    got, ok := e.getDiscountFromCache("12345", 600)                                // 站 B 同号读取
+    ...
+    e2.setDiscountCache("12345", &model.DiscountResult{Level: model.DiscountNone}) // 反向：站 A 写 NONE
+    got2, ok2 := e2.getDiscountFromCache("12345", 600)                             // 站 B 读取
+    ...
+    composite := make(map[string]*discountCacheEntry)
+    composite["siteA:12345"] = ...                                                 // 对照：复合键形态
+    _, exists := composite["siteB:12345"]                                          // 应 miss
+
+真实输出：
+    $ go test ./internal/seeding -run '^TestRepro19_' -count=1 -v
+    === RUN   TestRepro19_DiscountCacheCrossSiteCollision
+        zz_repro19_test.go:22: 正向实锤：站 B 同号种子命中站 A 缓存 Level=FREE IsFree=true（绕过本站 DetectDiscount）
+        zz_repro19_test.go:31: 反向实锤：站 B 命中站 A 的 NONE → IsFree=false（本该推的免费种子被漏掉）
+        zz_repro19_test.go:39: 对照：复合键形态下站 B miss（设计约定形态）
+    --- PASS: TestRepro19_DiscountCacheCrossSiteCollision (0.00s)
+    PASS
+    ok  	github.com/ranfish/pt-forward/internal/seeding	0.034s
+
+（编译期仅 sqlite3-binding.c 既有 C 警告：assignment discards 'const' qualifier，与本篇无关。）
+
+四、证据边界
+------------
+- 已核实：key 形态、读写调用方、消费点逻辑、Engine 单例共享、设计权威原文、rss 正例、离线复现两个方向的输出。
+- 推断（未取证）：不同站点是否实际存在同号 torrentID 的真实实例；生产是否发生过误判下载（无日志证据）。
+- 不构成独立缺陷：ClientUID 维度缺失——DiscountResult 是「站点+种子」属性，与下载器无关。
+- 临时测试取证后已删除；git status --short 为空，工作区干净。
