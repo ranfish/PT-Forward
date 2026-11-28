@@ -184,27 +184,37 @@ func (fc *flushContext) flushCtx() context.Context {
 	return context.Background()
 }
 
+// discountCacheKey §59.592（审计 19 刀1·V-01 根修）：免费重检缓存复合键——
+// 设计权威 docs/31:10067 决策 #401(4)「键为 (siteName, torrentID)」+ rss 正例
+// engine.go:1190 同形态。原裸 torrentID 键在 Engine 单例（全站共享 map）下
+// 跨站同号种子 TTL 内互命中——双方向串数据（FREE 误放行/NONE 漏推·离线
+// 复现实锤）。单一 helper 禁止调用方手拼。
+func discountCacheKey(siteName, torrentID string) string {
+	return siteName + ":" + torrentID
+}
+
 // getDiscountFromCache §14.21 EnhancementCacheTTL: 从缓存获取折扣查询结果。
-func (e *Engine) getDiscountFromCache(torrentID string, ttlSec int) (*model.DiscountResult, bool) {
+func (e *Engine) getDiscountFromCache(siteName, torrentID string, ttlSec int) (*model.DiscountResult, bool) {
 	if ttlSec <= 0 {
 		return nil, false
 	}
 	e.discountCacheMu.Lock()
 	defer e.discountCacheMu.Unlock()
-	if entry, ok := e.discountCache[torrentID]; ok {
+	key := discountCacheKey(siteName, torrentID)
+	if entry, ok := e.discountCache[key]; ok {
 		if time.Since(entry.CheckedAt) < time.Duration(ttlSec)*time.Second {
 			return entry.Result, true
 		}
-		delete(e.discountCache, torrentID)
+		delete(e.discountCache, key)
 	}
 	return nil, false
 }
 
 // setDiscountCache §14.21: 写入折扣查询缓存。
-func (e *Engine) setDiscountCache(torrentID string, result *model.DiscountResult) {
+func (e *Engine) setDiscountCache(siteName, torrentID string, result *model.DiscountResult) {
 	e.discountCacheMu.Lock()
 	defer e.discountCacheMu.Unlock()
-	e.discountCache[torrentID] = &discountCacheEntry{Result: result, CheckedAt: time.Now()}
+	e.discountCache[discountCacheKey(siteName, torrentID)] = &discountCacheEntry{Result: result, CheckedAt: time.Now()}
 }
 
 func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
@@ -650,7 +660,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 		if fc.clientCfg != nil {
 			cacheTTL = fc.clientCfg.EnhancementCacheTTL
 		}
-		if cached, ok := e.getDiscountFromCache(rec.TorrentID, cacheTTL); ok {
+		if cached, ok := e.getDiscountFromCache(rec.SiteName, rec.TorrentID, cacheTTL); ok {
 			if cached == nil || !cached.Level.IsFree() {
 				return candidate, false
 			}
@@ -666,7 +676,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 						zap.Error(discErr))
 					return candidate, false
 				}
-				e.setDiscountCache(rec.TorrentID, discResult)
+				e.setDiscountCache(rec.SiteName, rec.TorrentID, discResult)
 				if discResult == nil || !discResult.Level.IsFree() {
 					e.logger.Info("flush: free status expired before push, skipping",
 						zap.String("torrent_id", rec.TorrentID),
