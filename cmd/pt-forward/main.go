@@ -604,6 +604,8 @@ func main() {
 	bdinfoQueue.Start()
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
+	// §59.593: 发布门禁转 gate 组映射注入（pipeline 聚合读消费）
+	publishPipeline.SetSourceDetector(sourceDetector)
 	// §59.577 刀2: 组身份三辨闭包注入（description 包零 DB 依赖——
 	// §59.571 SetFormConfigChecker 先例；mappings 命中=官组·
 	// external_release_groups 命中=外站组·双 miss=未知不合成声明）

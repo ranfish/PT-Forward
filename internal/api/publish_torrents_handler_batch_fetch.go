@@ -611,20 +611,27 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 	if meta != nil && meta.Flags != "" {
 		var flags []string
 		if err := json.Unmarshal([]byte(meta.Flags), &flags); err == nil {
-			forbiddenSet := map[string]bool{
-				"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
-				"谢绝搬运": true, "独占": true, "限转": true,
-			}
+			// §59.162: 限时禁转两态——now<until 才拦（keepfrds 24h 窗到期自动放行）
 			for _, f := range flags {
-				if forbiddenSet[f] {
-					return "forbidden"
-				}
-				// §59.162: 限时禁转两态——now<until 才拦（keepfrds 24h 窗到期自动放行）
 				if f == "限时禁转" {
 					if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
 						return "forbidden"
 					}
 				}
+				// §59.539: 限转站规族（标记在=拦·站方解除后自动放行）——
+				// 不进 gate（站规体系非权利体系·与发布门同口径）
+				if f == "限转" {
+					return "forbidden"
+				}
+			}
+			// §59.593（语义重定义刀 3）: 权利族 gate（公共单点
+			// NoTransferGateBlock——与发布门 checkFlagsFromMetadata 同口径
+			// 防口径分裂）：组映射身份判定/描述域保守拦/退化二分支。
+			// 列表判定=选出行（selectSourceMeta 组映射优先）+该行 gate——
+			// 发布门聚合更严（多行全扫）——两层防御口径单向包含（发布门⊇
+			// 列表·§59.548 复检实态化同款哲学）。
+			if blocked, _ := publish.NoTransferGateBlock(h.sourceDetector, meta); blocked {
+				return "forbidden"
 			}
 		}
 	}

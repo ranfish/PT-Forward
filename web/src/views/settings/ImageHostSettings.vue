@@ -12,10 +12,10 @@
         </a-form-item>
         <a-form-item label="截图策略">
           <a-select v-model:value="config.strategy" style="width: 320px">
-            <a-select-option value="auto">自动（源站优先+本地兜底）</a-select-option>
+            <a-select-option value="auto">自动（来源站优先+本地兜底）</a-select-option>
             <a-select-option value="local_upload">始终本地截图</a-select-option>
-            <a-select-option value="source_rehost">源站截图转存</a-select-option>
-            <a-select-option value="source_direct">源站截图直用</a-select-option>
+            <a-select-option value="source_rehost">来源站截图转存</a-select-option>
+            <a-select-option value="source_direct">来源站截图直用</a-select-option>
           </a-select>
         </a-form-item>
         <!-- v0.0.256 图床代理开关 -->

@@ -53,7 +53,13 @@ type Pipeline struct {
 	pusher        *pusher.Pusher // §56.30: 发布后自动加种
 	wsBroadcaster event.WSBroadcaster
 	// §59.146: TagApplier 灰度站点查询（nil=关闭；返回 settings 逗号分隔串）
+	// §59.593: 源站映射 gate 依赖（NoTransferGateBlock 组映射身份判定）
+	// ——main 装配注入；nil 保守拦（测试/降级语义）
+	sourceSiteDetector *SourceSiteDetector
 }
+
+// SetSourceDetector §59.593: 源站映射注入（main 装配——gate 消费）。
+func (p *Pipeline) SetSourceDetector(d *SourceSiteDetector) { p.sourceSiteDetector = d }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 	logger = logger.With(zap.String("component", "publish"))
@@ -704,61 +710,69 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	if infoHash == "" {
 		return false, ""
 	}
-	var meta model.TorrentMetadata
+	// §59.593（语义重定义刀 2·发现 1 根修）: 单行最新读→多行聚合读。
+	// torrent_metadata 唯一键 (info_hash, site_name)——同 hash 多站行并存；
+	// 原单行口径（updated_at DESC First）在重获跨站后晾掉旧站行的禁转签
+	// （列表与发布门口径分裂实锤）。聚合逐行判定：时间态/站规（保持现有
+	// 行级语义·行 SiteName 判定）+权利族 gate（NoTransferGateBlock 公共
+	// 单点）+adult（合规族）。任一行命中→拦。
+	var metas []model.TorrentMetadata
 	if err := p.db.WithContext(ctx).
 		Where("info_hash = ?", infoHash).
 		Order("updated_at DESC").
-		First(&meta).Error; err != nil {
+		Find(&metas).Error; err != nil || len(metas) == 0 {
 		return false, ""
 	}
-	if meta.Flags == "" {
-		return false, ""
-	}
-	var flags []string
-	if err := json.Unmarshal([]byte(meta.Flags), &flags); err != nil {
-		return false, ""
-	}
-	// §59.162: 限时禁转两态——now<until 才拦（24h 窗到期自动放行）
-	if slices.Contains(flags, "限时禁转") {
-		if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
-			return true, "源站 flags 标记限时禁转（窗口内），跳过发布"
+	for i := range metas {
+		meta := &metas[i]
+		if meta.Flags == "" {
+			continue
 		}
-	}
-	// §59.369 附二: 站规定向禁转两态（深度站 rules.php 首例）——
-	// "限转"标签语义：① 发布 72h 内禁一切 ② 72h 后永久禁定向名单站。
-	// 窗判定用 torrent_metadata 首见时间近似（官种 RSS 即时抓首见≈发布，
-	// 误差小；老种首采低估窗=放行偏宽可接受——方案 A 用户确认）。
-	if slices.Contains(flags, "限转") {
-		// 72h 全站窗+定向名单语义仅深度站（rules.php 定义）——
-		// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
-		if siteName == "深度" {
-			for _, t := range siteDirectedNoTransferTargets[siteName] {
-				if t == targetSite {
-					return true, fmt.Sprintf("源站 %s 限转规则永久禁转至 %s（站规定向名单），跳过发布", siteName, targetSite)
+		var flags []string
+		if err := json.Unmarshal([]byte(meta.Flags), &flags); err != nil {
+			continue
+		}
+		// §59.162: 限时禁转两态——now<until 才拦（24h 窗到期自动放行）
+		if slices.Contains(flags, "限时禁转") {
+			if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
+				return true, "源站 flags 标记限时禁转（窗口内），跳过发布"
+			}
+		}
+		// §59.369 附二: 站规定向禁转两态（深度站 rules.php 首例）——
+		// "限转"标签语义：① 发布 72h 内禁一切 ② 72h 后永久禁定向名单站。
+		// 窗判定用 torrent_metadata 首见时间近似（官种 RSS 即时抓首见≈发布，
+		// 误差小；老种首采低估窗=放行偏宽可接受——方案 A 用户确认）。
+		if slices.Contains(flags, "限转") {
+			// 72h 全站窗+定向名单语义仅深度站（rules.php 定义）——
+			// keepfrds 等"限转"无此窗语义（其窗走"限时禁转"24h 独立通道）。
+			if meta.SiteName == "深度" {
+				for _, t := range siteDirectedNoTransferTargets[meta.SiteName] {
+					if t == targetSite {
+						return true, fmt.Sprintf("源站 %s 限转规则永久禁转至 %s（站规定向名单），跳过发布", meta.SiteName, targetSite)
+					}
 				}
+				// NoTransferUntil 精确窗（fetcher 站分支落 PublishedAt+72h；
+				// 缺失（提取失败/老数据）不拦：名单已拦三站，缺失时无限保守拦
+				// = 老种永久误拦，放行语义更正确。
+				if meta.NoTransferUntil != nil && meta.NoTransferUntil.After(time.Now()) {
+					return true, fmt.Sprintf("源站 %s 限转标签 72h 发布窗口内（至 %s），跳过发布", meta.SiteName, meta.NoTransferUntil.Format("01-02 15:04"))
+				}
+			} else {
+				// §59.539: 非深度站「限转」通用拦截——标记在=拦（对齐列表
+				// forbiddenSet 语义·消除两端口径不一致）；复检发现站方摘除
+				// 标记后自动放行（标记跟随·用户定案）。优堡同名历史遗留条目
+				// 一并收敛到通用语义。
+				return true, fmt.Sprintf("源站 %s 限转标记在效（站方解除后复检自动放行），跳过发布", meta.SiteName)
 			}
-			// NoTransferUntil 精确窗（fetcher 站分支落 PublishedAt+72h；
-			// 缺失（提取失败/老数据）不拦：名单已拦三站，缺失时无限保守拦
-			// = 老种永久误拦，放行语义更正确。
-			if meta.NoTransferUntil != nil && meta.NoTransferUntil.After(time.Now()) {
-				return true, fmt.Sprintf("源站 %s 限转标签 72h 发布窗口内（至 %s），跳过发布", siteName, meta.NoTransferUntil.Format("01-02 15:04"))
-			}
-		} else {
-			// §59.539: 非深度站「限转」通用拦截——标记在=拦（对齐列表
-			// forbiddenSet 语义·消除两端口径不一致）；复检发现站方摘除
-			// 标记后自动放行（标记跟随·用户定案）。优堡同名历史遗留条目
-			// 一并收敛到通用语义。
-			return true, fmt.Sprintf("源站 %s 限转标记在效（站方解除后复检自动放行），跳过发布", siteName)
 		}
-	}
-	forbiddenFlags := map[string]bool{
-		"禁转": true, "禁止转载": true, "谢绝转载": true,
-		"严禁转载": true, "谢绝搬运": true, "独占": true,
-		"adult": true,
-	}
-	for _, f := range flags {
-		if forbiddenFlags[f] {
-			return true, "源站 flags 标记禁转/独占（torrent_metadata），跳过发布"
+		// adult 合规族（不进 gate——内容合规体系非权利体系）
+		if slices.Contains(flags, "adult") {
+			return true, "源站 flags 标记 adult（内容合规），跳过发布"
+		}
+		// §59.593: 权利族 gate（公共单点·列表链同口径）——组映射身份判定
+		// /描述域保守拦/退化二分支/外站组保守
+		if blocked, reason := NoTransferGateBlock(p.sourceSiteDetector, meta); blocked {
+			return true, reason + "，跳过发布"
 		}
 	}
 	return false, ""

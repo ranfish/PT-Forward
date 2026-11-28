@@ -128,6 +128,23 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 	return result
 }
 
+// IsOfficialSite §59.593: 站点是否官组站（release_group_mappings 有该站
+// 的映射行=有官组=可能是种子的初始发布站）。gate 组名空退化判定用
+// （cache 值集合派生——RefreshCache 后自动跟随）。
+func (d *SourceSiteDetector) IsOfficialSite(siteName string) bool {
+	if siteName == "" {
+		return false
+	}
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	for _, mapped := range d.cache {
+		if mapped == siteName {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) string {
 	if groupName == "" {
 		return ""

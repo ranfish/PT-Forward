@@ -291,7 +291,7 @@ const negPage = ref(1)
 const negPageSize = ref(20)
 const negColumns = [
   { title: '源InfoHash', dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
-  { title: '源站点', dataIndex: 'source_site', key: 'source_site', width: 100 },
+  { title: '来源站点', dataIndex: 'source_site', key: 'source_site', width: 100 },
   { title: '排除目标', dataIndex: 'excluded_targets', key: 'excluded_targets', ellipsis: true },
   { title: '方法', dataIndex: 'last_method', key: 'last_method', width: 100 },
   { title: '过期时间', dataIndex: 'expires_at', key: 'expires_at', width: 160 },

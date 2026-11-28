@@ -180,7 +180,7 @@
             <!-- Tab 3: 视频截图 -->
             <a-tab-pane key="screenshots" tab="视频截图">
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
-                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图' : '从源站重新获取截图' }}</a-button>
+                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图' : '从来源站重新获取截图' }}</a-button>
                 <!-- §59.298 C: 字幕轨人工纠偏（MI Text 轨数>0 时显示——无标记 PGS 蓝光盘自动选轨可能非中文） -->
                 <!-- §59.319 附九: label=语言（可解析时）或 字幕轨 N（§59.298 默认形态） -->
                 <a-select v-if="seedIsLocal && subtitleTracks.length > 0" v-model:value="selectedSubtitleSid" size="small" style="width: 160px; margin-left: 8px" @change="doRefresh('screenshots')">
@@ -220,7 +220,7 @@
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
                 <!-- §59.36: MI 重获是数据源修复动作（与 Tab3 截图同性质），维护模式放开 -->
                 <!-- §59.319 附四: 文案随 is_disc 分流 -->
-                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? (isDisc ? '重新获取 BDInfo' : '重新获取 MediaInfo') : (isDisc ? '从源站重新获取 BDInfo' : '从源站重新获取 MediaInfo') }}</a-button>
+                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? (isDisc ? '重新获取 BDInfo' : '重新获取 MediaInfo') : (isDisc ? '从来源站重新获取 BDInfo' : '从来源站重新获取 MediaInfo') }}</a-button>
               </div>
               <!-- §59.319 附四: 单框化——原盘只显 BDInfo（MI 框与 bdinfo 恒同源冗余） -->
               <a-textarea v-if="!isDisc" v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" disabled />

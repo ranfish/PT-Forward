@@ -166,8 +166,12 @@ func (h *PublishTorrentsHandler) loadSeedMetas(ctx context.Context, snapshots []
 		Select("client_uid, save_path, name").
 		Where("id IN ?", snapIDs)
 	var metas []model.TorrentMetadata
+	// §59.593（刀 3）: 排序确定性——原 Find 无 Order（DB 返回序未定义）
+	// selectSourceMeta 的 best=&metas[0] 依赖未定义行为。updated_at DESC
+	// 对齐发布门口径（重获新行优先——与 §59.548 复检实态化哲学一致）。
 	if err := h.db.WithContext(ctx).
 		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE (client_uid, save_path, name) IN (?) AND is_hidden = 0)", keySub).
+		Order("updated_at DESC").
 		Find(&metas).Error; err != nil {
 		if h.logger != nil {
 			h.logger.Error("listSeeds metas join failed", zap.Error(err))

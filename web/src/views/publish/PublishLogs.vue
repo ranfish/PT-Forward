@@ -273,7 +273,7 @@ const statusFilterValues = [
 // 把时间列推出视口要拉滚动条）。列宽总和 1134+勾选列 32≈1170。
 const columns = [
   { title: '触发', key: 'trigger', width: 60 },
-  { title: '源站', key: 'source_site', width: 80 },
+  { title: '来源站', key: 'source_site', width: 80 },
   { title: '目标站', key: 'target_site', width: 80 },
   { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 70 },
   { title: '标题', key: 'title', ellipsis: true, width: 300 },
@@ -537,7 +537,7 @@ onUnmounted(() => {
 })
 
 function exportCSV() {
-  const headers = ['时间', '源站', '目标站', '标题', '状态', '耗时', '链接', '错误']
+  const headers = ['时间', '来源站', '目标站', '标题', '状态', '耗时', '链接', '错误']
   const rows = tableData.value.map((r: PublishResultRecord) => [
     formatTime(r.created_at),
     r.source_site || '',
